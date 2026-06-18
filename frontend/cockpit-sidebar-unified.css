@@ -1,0 +1,163 @@
+/**
+ * Sidebar unificada — rail compacto 56px (igual CRM desk v2) em todas as telas.
+ */
+
+:root {
+    --velo-sidebar-compact: 56px;
+    --velo-sidebar-bg: #000058;
+    --velo-sidebar-accent: #1634FF;
+    --velo-sidebar-icon-muted: rgba(255, 255, 255, 0.55);
+    --velo-sidebar-icon-active-bg: rgba(22, 52, 255, 0.35);
+    --velo-sidebar-avatar-bg: #1694FF;
+}
+
+#mainSidebar.sidebar.velo-nav-rail {
+    width: var(--velo-sidebar-compact);
+    background: var(--velo-sidebar-bg);
+    border-right: 0.5px solid rgba(255, 255, 255, 0.06);
+    padding: 10px 0;
+    gap: 4px;
+}
+
+#mainSidebar.velo-nav-rail .sidebar-brand {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--velo-sidebar-accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 12px;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+#mainSidebar.velo-nav-rail .nav-list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    overflow: visible;
+}
+
+#mainSidebar.velo-nav-rail .nav-item {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 8px;
+    justify-content: center;
+    color: var(--velo-sidebar-icon-muted);
+    transform: none;
+    box-shadow: none;
+}
+
+#mainSidebar.velo-nav-rail .nav-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    transform: none;
+    box-shadow: none;
+}
+
+#mainSidebar.velo-nav-rail .nav-item.active {
+    background: var(--velo-sidebar-icon-active-bg);
+    color: #fff;
+    border-right: none;
+    box-shadow: inset 3px 0 0 var(--velo-sidebar-accent);
+}
+
+#mainSidebar.velo-nav-rail .nav-item i {
+    margin: 0;
+    width: auto;
+    font-size: 20px;
+}
+
+#mainSidebar.velo-nav-rail .nav-item > span:not(.nav-item__badge) {
+    display: none;
+}
+
+#mainSidebar.velo-nav-rail .nav-item__badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 8px;
+    height: 8px;
+    background: #FCC200;
+    border: 1.5px solid var(--velo-sidebar-bg);
+    border-radius: 50%;
+    display: block;
+    padding: 0;
+}
+
+#mainSidebar.velo-nav-rail .profile-section {
+    padding: 10px;
+    margin-top: auto;
+    border-top: none;
+}
+
+#mainSidebar.velo-nav-rail .profile-btn {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    padding: 0;
+    margin: 0 auto;
+    border-radius: 50%;
+    background: var(--velo-sidebar-avatar-bg);
+    border: none;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    font-size: 0;
+    font-weight: 700;
+    overflow: hidden;
+    gap: 0;
+}
+
+#mainSidebar.velo-nav-rail .profile-btn .sidebar-profile-initials {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+}
+
+#mainSidebar.velo-nav-rail .profile-btn .sidebar-profile-label,
+#mainSidebar.velo-nav-rail .profile-btn i {
+    display: none;
+}
+
+#mainSidebar.velo-nav-rail .profile-menu {
+    left: var(--velo-sidebar-compact);
+}
+
+.main-content.sidebar-collapsed,
+#velodeskDeskV2Root {
+    margin-left: 0;
+}
+
+.main-content.sidebar-collapsed {
+    margin-left: var(--velo-sidebar-compact);
+}
+
+body.desk-v2-mode #mainSidebar.velo-nav-rail {
+    z-index: 8100;
+    top: 0;
+    height: 100vh;
+}
+
+body.desk-v2-mode #velodeskDeskV2Root {
+    left: var(--velo-sidebar-compact);
+}
+
+body.velo-nav-rail-mode .sidebar-toggle-btn {
+    display: none !important;
+}

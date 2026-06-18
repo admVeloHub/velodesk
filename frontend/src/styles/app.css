@@ -1,0 +1,96 @@
+/**
+ * Estilos React adicionais (toast, ajustes)
+ * VERSION: v1.0.0 | DATE: 2026-06-18
+ */
+.cockpit-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  background: #1e293b;
+  color: #f8fafc;
+  font-size: 14px;
+  z-index: 10000;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.3s, transform 0.3s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.cockpit-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.cockpit-toast--success { border-left: 4px solid #15A237; }
+.cockpit-toast--info { border-left: 4px solid #1634FF; }
+.cockpit-toast--error { border-left: 4px solid #dc2626; }
+
+.eco-dropdown-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+}
+
+#velodeskDeskV2Root {
+  grid-column: 1 / -1;
+  min-height: calc(100vh - 64px);
+}
+
+.eco-kpi-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.supervisor-team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.pf-agent-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.pf-load-bar {
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
+  margin: 8px 0;
+  overflow: hidden;
+}
+
+.pf-load-bar div {
+  height: 100%;
+}
+
+.chat-thread {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  border: none;
+  background: transparent;
+  border-bottom: 1px solid #e2e8f0;
+  cursor: pointer;
+}
+
+.chat-thread.active {
+  background: rgba(22, 52, 255, 0.08);
+}
+
+.chat-thread span {
+  display: block;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.nav-list .nav-item {
+  cursor: pointer;
+}

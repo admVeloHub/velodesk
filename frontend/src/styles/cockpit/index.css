@@ -1,0 +1,13 @@
+/**
+ * Velodesk Cockpit — estilos do design system
+ * VERSION: v2.0.0 | DATE: 2026-06-18
+ */
+@import '../../../styles.css';
+@import '../../../cockpit-crm-ui.css';
+@import '../../../velodesk-ecosystem.css';
+@import '../../../cockpit.css';
+@import '../../../cockpit-sidebar-unified.css';
+@import '../../../velotax-theme.css';
+@import '../../../cockpit-ux-enhancements.css';
+@import '../../../velodesk-crm.css';
+@import '../../../cockpit-profiles.css';

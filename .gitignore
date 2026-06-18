@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+frontend-legacy/node_modules/
+backend/node_modules/
+
+# Build
+frontend/dist/
+backend/dist/
+
+# WhatsApp auth cache
+backend/.wwebjs_auth/
+backend/.wwebjs_cache/
+
+# Environment (dev local usa FONTE DA VERDADE/.env-velodesk via bootstrap)
+.env
+.env.local
+backend/.env
+backend/.env.local
+frontend/.env
+frontend/.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel/
+_vercel-deploy/
+
+# Temp
+tmp/
+temp/
