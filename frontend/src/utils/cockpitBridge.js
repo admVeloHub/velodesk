@@ -6,14 +6,14 @@ const PAGE_ROUTES = {
   workspace: '/workspace',
   dashboard: '/dashboard',
   tickets: '/tickets?desk=v2',
-  chat: '/chat',
   reports: '/reports',
+  chat: '/chat',
   config: '/config',
   'analytics-ia': '/analytics-ia',
   'client-portal': '/client-portal'
 };
 
-export function installCockpitBridge(navigate, showNotification, ticketActions) {
+export function installCockpitBridge(navigate, showNotification, ticketActions = {}) {
   window.navigateToPage = function navigateToPage(page) {
     document.querySelectorAll('.page').forEach((p) => {
       p.classList.remove('active', 'ticket-tab-open');
@@ -42,19 +42,32 @@ export function installCockpitBridge(navigate, showNotification, ticketActions) 
   };
 
   window.openQuickRegisterModal = function openQuickRegisterModal() {
-    window.dispatchEvent(new CustomEvent('velodesk:quick-register'));
+    navigate('/tickets?desk=v2');
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('velodesk:quick-register'));
+    }, 0);
   };
 
   window.closeQuickRegisterModal = function closeQuickRegisterModal() {
     window.dispatchEvent(new CustomEvent('velodesk:quick-register-close'));
   };
 
-  if (ticketActions?.openTicket) {
+  if (ticketActions.openTicket) {
     window.openTicket = function openTicket(ticketId) {
       ticketActions.openTicket(ticketId);
       navigate('/tickets?desk=v2');
     };
   }
+
+  if (ticketActions.refreshTickets) {
+    window.refreshTickets = function refreshTickets() {
+      return ticketActions.refreshTickets();
+    };
+  }
+
+  window.dispatchRefreshTickets = function dispatchRefreshTickets() {
+    window.dispatchEvent(new CustomEvent('velodesk:refresh-tickets'));
+  };
 
   window.showNotification = function cockpitShowNotification(message, type) {
     showNotification(message, type || 'info');

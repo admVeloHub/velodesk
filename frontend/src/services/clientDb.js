@@ -66,7 +66,7 @@ export function resetClientDB() {
 
 export function getAgentName() {
   try {
-    const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    const user = JSON.parse(localStorage.getItem('velodesk_user') || '{}');
     return user.name || 'Ana Silva';
   } catch {
     return 'Ana Silva';

@@ -1,0 +1,820 @@
+/**
+ * Velodesk — modo escuro unificado (LAYOUT_GUIDELINES)
+ * VERSION: v1.0.0 | DATE: 2026-06-19
+ * Importar por último em src/styles/cockpit/index.css
+ */
+
+/* ═══ 1. Tokens globais ═══ */
+body.velodesk-dark {
+    --velo-dark-bg: #272A30;
+    --velo-dark-surface: #323a42;
+    --velo-dark-surface-hover: #3a4450;
+    --velo-dark-surface-inset: #2a3038;
+    --velo-dark-border: rgba(255, 255, 255, 0.1);
+    --velo-dark-border-strong: rgba(255, 255, 255, 0.16);
+    --velo-dark-text: #F3F7FC;
+    --velo-dark-text-muted: #B0BEC5;
+    --velo-dark-accent: #1694FF;
+
+    --eco-surface: var(--velo-dark-bg);
+    --eco-card: var(--velo-dark-surface);
+    --eco-border: var(--velo-dark-border);
+
+    --light-gray: var(--velo-dark-bg);
+    --white: var(--velo-dark-surface);
+
+    background-color: var(--velo-dark-bg);
+    color: var(--velo-dark-text-muted);
+}
+
+/* ═══ 2. Superfícies eco / páginas ═══ */
+body.velodesk-dark .main-content:has(#workspace.active),
+body.velodesk-dark .main-content:has(#analytics-ia.active),
+body.velodesk-dark .main-content:has(#client-portal.active),
+body.velodesk-dark .main-content:has(#config.active),
+body.velodesk-dark .main-content:has(#dashboard.active),
+body.velodesk-dark .main-content:has(#reports.active) {
+    background: var(--velo-dark-bg) !important;
+}
+
+body.velodesk-dark .main-app.velo-chromeless .main-content {
+    background: var(--velo-dark-bg) !important;
+}
+
+body.velodesk-dark .eco-page-inner,
+body.velodesk-dark #workspace360Content,
+body.velodesk-dark .ws360-shell,
+body.velodesk-dark #workspace.active.workspace-page {
+    background: var(--velo-dark-bg);
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #analyticsIAContent .ws-stats-grid--6 .ws-stat-card,
+body.velodesk-dark #config.config-page,
+body.velodesk-dark #config .config-layout,
+body.velodesk-dark #config .config-sidebar,
+body.velodesk-dark #config .config-content,
+body.velodesk-dark #config .config-panel,
+body.velodesk-dark #config .config-welcome-card {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #config .config-sidebar-brand h3,
+body.velodesk-dark #config .config-content-header h2,
+body.velodesk-dark #config .config-menu-label {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #config .config-menu-item {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #config .config-menu-item:hover,
+body.velodesk-dark #config .config-menu-item.active {
+    background: var(--velo-dark-surface-hover);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .dashboard-filter-bar,
+body.velodesk-dark .kpi-card,
+body.velodesk-dark .chart-container {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .dashboard-filter-bar__label {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .dashboard-filter-bar__label i {
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .dashboard-filter-bar__select {
+    background-color: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .kpi-section h3,
+body.velodesk-dark .kpi-info h4 {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .kpi-value {
+    color: var(--velo-dark-accent);
+}
+
+/* Legacy shell (styles.css) */
+body.velodesk-dark .header {
+    background: #1a1f26;
+    border-bottom-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .sidebar {
+    background: #111827;
+}
+
+body.velodesk-dark .ticket-tab-footer-fixed,
+body.velodesk-dark .ticket-tab-content,
+body.velodesk-dark .velo-lateral-form-sidebar,
+body.velodesk-dark .ws-panel {
+    background: var(--velo-dark-surface);
+    color: var(--velo-dark-text-muted);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .form-input,
+body.velodesk-dark .form-textarea {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .form-input:focus,
+body.velodesk-dark .form-textarea:focus {
+    border-color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .ticket-macro-btn {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+/* ═══ 3. Painel 360° ═══ */
+body.velodesk-dark .ws360-header__greeting,
+body.velodesk-dark .ws360-kpis__title,
+body.velodesk-dark .ws360-section__title,
+body.velodesk-dark .ws360-ticket-row__name,
+body.velodesk-dark .ws360-kpi__value,
+body.velodesk-dark .ws360-production__title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ws360-header__datetime,
+body.velodesk-dark .ws360-kpi__label,
+body.velodesk-dark .ws360-production__label,
+body.velodesk-dark .ws360-production__value,
+body.velodesk-dark .ws360-production__subtitle,
+body.velodesk-dark .ws360-ticket-row__meta {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ws360-link {
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .ws360-section__count {
+    background: rgba(22, 148, 255, 0.18);
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .ws360-header .ws360-notification-bell,
+body.velodesk-dark .ws360-header .ws360-theme-toggle {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ws360-header .ws360-notification-bell.is-open,
+body.velodesk-dark .ws360-header .ws360-notification-bell:hover,
+body.velodesk-dark .ws360-header .ws360-theme-toggle:hover {
+    background: var(--velo-dark-surface-hover);
+    border-color: rgba(22, 148, 255, 0.35);
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .ws360-kpi,
+body.velodesk-dark .ws360-section,
+body.velodesk-dark .ws360-super-kpi,
+body.velodesk-dark .ws360-super-kpi--secondary .ws-stat-card,
+body.velodesk-dark .ws-stat-card {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+body.velodesk-dark .ws360-super-kpi__value,
+body.velodesk-dark .ws360-super-kpi--primary .ws360-super-kpi__value,
+body.velodesk-dark .ws360-super-kpi--secondary .ws360-super-kpi__value,
+body.velodesk-dark .ws-stat-card .ws-stat-value {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ws360-super-kpi__label,
+body.velodesk-dark .ws360-super-kpi--primary .ws360-super-kpi__label,
+body.velodesk-dark .ws360-super-kpi--secondary .ws360-super-kpi__label,
+body.velodesk-dark .ws-stat-card .ws-stat-label {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ws360-kpi__top i {
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .ws360-kpi__hint--neutral {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ws360-kpi__hint--success {
+    background: rgba(21, 162, 55, 0.2);
+    color: #86efac;
+}
+
+body.velodesk-dark .ws360-kpi__hint--warn {
+    background: rgba(234, 88, 12, 0.2);
+    color: #fdba74;
+}
+
+body.velodesk-dark .ws360-kpi--success .ws360-kpi__value {
+    color: #4ade80;
+}
+
+body.velodesk-dark .ws360-kpi--warn .ws360-kpi__value {
+    color: #fb923c;
+}
+
+body.velodesk-dark .ws360-ticket-row {
+    border-top-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .ws360-ticket-row:hover {
+    background: var(--velo-dark-surface-hover);
+}
+
+body.velodesk-dark .ws360-ticket-row__subject {
+    color: #cbd5e1;
+}
+
+body.velodesk-dark .ws360-ticket-row__avatar {
+    background: rgba(22, 148, 255, 0.15);
+    color: #93c5fd;
+}
+
+body.velodesk-dark .ws360-ticket-row--critical .ws360-ticket-row__avatar {
+    background: rgba(220, 38, 38, 0.2);
+    color: #fca5a5;
+}
+
+body.velodesk-dark .ws360-ticket-row--new .ws360-ticket-row__avatar {
+    background: rgba(22, 148, 255, 0.18);
+    color: #93c5fd;
+}
+
+body.velodesk-dark .ws360-ticket-row--replied .ws360-ticket-row__avatar {
+    background: rgba(21, 162, 55, 0.18);
+    color: #86efac;
+}
+
+body.velodesk-dark .ws360-ticket-row--workflow .ws360-ticket-row__avatar {
+    background: rgba(234, 88, 12, 0.18);
+    color: #fdba74;
+}
+
+body.velodesk-dark .ws360-badge--critical {
+    background: rgba(220, 38, 38, 0.22);
+    color: #fca5a5;
+}
+
+body.velodesk-dark .ws360-badge--new {
+    background: rgba(22, 148, 255, 0.2);
+    color: #93c5fd;
+}
+
+body.velodesk-dark .ws360-badge--replied {
+    background: rgba(21, 162, 55, 0.2);
+    color: #86efac;
+}
+
+body.velodesk-dark .ws360-badge--workflow {
+    background: rgba(234, 88, 12, 0.2);
+    color: #fdba74;
+}
+
+body.velodesk-dark .ws360-sla--critical {
+    background: rgba(220, 38, 38, 0.22);
+    color: #fca5a5;
+}
+
+body.velodesk-dark .ws360-sla--ok {
+    background: rgba(21, 162, 55, 0.2);
+    color: #86efac;
+}
+
+body.velodesk-dark .ws360-sla--warn {
+    background: rgba(234, 88, 12, 0.2);
+    color: #fdba74;
+}
+
+body.velodesk-dark .ws360-tag {
+    background: var(--velo-dark-surface-hover);
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ws360-production__bar-track {
+    background: var(--velo-dark-surface-hover);
+}
+
+body.velodesk-dark .ws360-production__bar-fill {
+    background: rgba(22, 148, 255, 0.35);
+}
+
+body.velodesk-dark .ws360-production__row--today .ws360-production__label,
+body.velodesk-dark .ws360-production__row--today .ws360-production__value {
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .ws360-production__row--today .ws360-production__bar-fill {
+    background: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .ws360-alert {
+    background: rgba(127, 29, 29, 0.35);
+    border-color: rgba(220, 38, 38, 0.4);
+    color: #fecaca;
+}
+
+body.velodesk-dark .ws360-alert__content i,
+body.velodesk-dark .ws360-alert__link {
+    color: #fca5a5;
+}
+
+/* Painel legado ws-agent */
+body.velodesk-dark .ws-action-panel,
+body.velodesk-dark .velo-lf-db-panel {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .ws-action-panel__greeting,
+body.velodesk-dark .ws-action-focus strong,
+body.velodesk-dark .ws-queue-card__title,
+body.velodesk-dark .velo-lf-meta-value {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ws-action-focus,
+body.velodesk-dark .velo-lf-history-item {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ws-queue-card,
+body.velodesk-dark .ws-feed-item {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
+}
+
+/* Noticiário */
+body.velodesk-dark .ws360-news-popover,
+body.velodesk-dark .ws360-news-modal {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border-strong);
+}
+
+body.velodesk-dark .ws360-news-popover__header,
+body.velodesk-dark .ws360-news-modal__header {
+    background: linear-gradient(180deg, var(--velo-dark-surface) 0%, var(--velo-dark-surface-inset) 100%);
+}
+
+body.velodesk-dark .ws360-news-popover__title,
+body.velodesk-dark .ws360-news-modal__title,
+body.velodesk-dark .ws360-news-popover__item-title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ws360-news-popover__subtitle,
+body.velodesk-dark .ws360-news-popover__excerpt,
+body.velodesk-dark .ws360-news-popover__hint,
+body.velodesk-dark .ws360-news-modal__body p {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ws360-news-popover__item,
+body.velodesk-dark .ws360-news-popover__footer,
+body.velodesk-dark .ws360-news-modal__footer {
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .ws360-news-popover__item.is-unread {
+    background: rgba(22, 148, 255, 0.08);
+}
+
+body.velodesk-dark .ws360-news-popover__footer,
+body.velodesk-dark .ws360-news-modal__footer {
+    background: var(--velo-dark-surface-inset);
+}
+
+/* ═══ 4. Desk CRM ═══ */
+body.velodesk-dark #velodeskDeskV2Root {
+    --gray-bg: var(--velo-dark-bg);
+    --white: var(--velo-dark-surface);
+    --gray-border: var(--velo-dark-border-strong);
+    --text-primary: var(--velo-dark-text);
+    --gray-muted: var(--velo-dark-text-muted);
+    --gray-placeholder: #8896a3;
+    --blue-ia-bg: rgba(22, 52, 255, 0.12);
+    --blue-ia-border: rgba(22, 148, 255, 0.25);
+    background: var(--velo-dark-bg);
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root ::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .ticket-list-panel,
+body.velodesk-dark #velodeskDeskV2Root .crm-main-content,
+body.velodesk-dark #velodeskDeskV2Root .crm-client-profile-bar,
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-compose-footer,
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-compose .crm-ticket-response,
+body.velodesk-dark #velodeskDeskV2Root .crm-notes-footer,
+body.velodesk-dark #velodeskDeskV2Root .crm-right-panel,
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-tabs-bar {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-create-panel {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border-strong);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-create-panel__header,
+body.velodesk-dark #velodeskDeskV2Root .crm-create-panel__footer {
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-create-panel__title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-create-panel__hint,
+body.velodesk-dark #velodeskDeskV2Root .crm-create-panel__label {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-create-panel__input,
+body.velodesk-dark #velodeskDeskV2Root .crm-create-panel__select {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-create-panel__back {
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-create-panel__back:hover {
+    background: var(--velo-dark-surface-hover);
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-create-panel__client-match {
+    background: rgba(22, 148, 255, 0.15);
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .tabs-top {
+    background: var(--velo-dark-surface);
+    border-bottom-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .tab-btn {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .tab-btn.is-active {
+    color: var(--velo-dark-accent);
+    border-bottom-color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card:hover {
+    background: var(--velo-dark-surface-hover);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card.is-active {
+    background: rgba(22, 148, 255, 0.12);
+    border-color: rgba(22, 148, 255, 0.35);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card__name,
+body.velodesk-dark #velodeskDeskV2Root .ticket-client-profile__name,
+body.velodesk-dark #velodeskDeskV2Root .ticket-list-header__title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card__preview,
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card__meta,
+body.velodesk-dark #velodeskDeskV2Root .ticket-client-profile__contact,
+body.velodesk-dark #velodeskDeskV2Root .crm-empty-state {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .tab-panel--notes .crm-internal-notes {
+    background: var(--velo-dark-surface-inset);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-note-card {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-note-card__body {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-tab {
+    background: var(--velo-dark-surface-hover);
+    border-color: var(--velo-dark-border);
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-tab.is-active {
+    background: var(--velo-dark-surface);
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-tabs-bar {
+    background: var(--velo-dark-bg);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .conversation .message-bubble--agent,
+body.velodesk-dark #velodeskDeskV2Root .octa-panel-box {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .response-textarea,
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-response .response-textarea {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .rp-panel,
+body.velodesk-dark #velodeskDeskV2Root .crm-rp-section {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .rp-panel .form-input,
+body.velodesk-dark #velodeskDeskV2Root .rp-panel select.form-input {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+/* ═══ 5. Sidebar, menus, toasts ═══ */
+body.velodesk-dark .profile-menu,
+body.velodesk-dark .profile-menu--rail,
+body.velodesk-dark .eco-profile-dropdown {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border-strong);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+body.velodesk-dark .profile-menu a,
+body.velodesk-dark .eco-profile-dropdown-header {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .profile-menu a:hover,
+body.velodesk-dark .eco-profile-btn:hover {
+    background: var(--velo-dark-surface-hover);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .eco-profile-btn.active {
+    background: rgba(22, 148, 255, 0.15);
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .profile-menu-divider {
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .cockpit-toast {
+    background: var(--velo-dark-surface);
+    color: var(--velo-dark-text);
+    border: 1px solid var(--velo-dark-border-strong);
+}
+
+/* Relatórios operacionais — supervisor */
+body.velodesk-dark .ws360-reports__title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ws360-reports__title-icon {
+    background: rgba(22, 148, 255, 0.12);
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .ws360-reports__select {
+    background-color: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ws360-reports-card {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+    box-shadow: none;
+}
+
+body.velodesk-dark .ws360-reports-card:hover {
+    border-color: rgba(22, 148, 255, 0.35);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+body.velodesk-dark .ws360-reports-card__title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ws360-reports-card__desc {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ws360-leaderboard__title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ws360-leaderboard__select {
+    background-color: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ws360-leaderboard__name {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ws360-leaderboard__item--first {
+    background: rgba(234, 179, 8, 0.08);
+}
+
+body.velodesk-dark .ws360-report-modal {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border-strong);
+}
+
+body.velodesk-dark .ws360-report-modal__header,
+body.velodesk-dark .ws360-report-modal__footer {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .ws360-report-modal__title,
+body.velodesk-dark .ws360-report-modal__summary-value {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ws360-report-modal__meta,
+body.velodesk-dark .ws360-report-modal__generated,
+body.velodesk-dark .ws360-report-modal__summary-label {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ws360-report-modal__summary-item {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .ws360-report-modal__table-wrap {
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .ws360-report-modal__table th {
+    background: var(--velo-dark-surface);
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ws360-report-modal__table td {
+    color: var(--velo-dark-text);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .ws360-report-modal__close {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ws360-report-modal__close:hover {
+    background: var(--velo-dark-surface-hover);
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .account-modal {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border-strong);
+}
+
+body.velodesk-dark .account-modal__header,
+body.velodesk-dark .account-modal__footer {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .account-modal__title,
+body.velodesk-dark .account-modal__toggle {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .account-modal__subtitle,
+body.velodesk-dark .account-modal__section-desc,
+body.velodesk-dark .account-modal__label {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .account-modal__section-title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .account-modal__section {
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .account-modal__input {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .account-modal__close {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .account-modal__close:hover {
+    background: var(--velo-dark-surface-hover);
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .account-modal .eco-profile-dropdown-header {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .account-modal .eco-profile-btn {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .account-modal .eco-profile-btn:hover {
+    background: var(--velo-dark-surface-hover);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .account-modal .eco-profile-btn.active {
+    background: rgba(22, 148, 255, 0.15);
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .queue-box-modal {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border-strong);
+}
+
+body.velodesk-dark .queue-box-modal__header,
+body.velodesk-dark .queue-box-modal__footer {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .queue-box-modal__title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .queue-box-modal__subtitle,
+body.velodesk-dark .queue-box-modal__hint,
+body.velodesk-dark .queue-box-modal__label {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .queue-box-modal__icon {
+    background: rgba(22, 148, 255, 0.12);
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .queue-box-modal__input,
+body.velodesk-dark .queue-box-modal__select {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .queue-box-modal__close {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .queue-box-modal__close:hover {
+    background: var(--velo-dark-surface-hover);
+    color: var(--velo-dark-accent);
+}

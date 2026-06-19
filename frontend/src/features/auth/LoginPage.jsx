@@ -3,7 +3,7 @@
  * VERSION: v1.0.0 | DATE: 2026-06-18 | AUTHOR: VeloHub Development Team
  */
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 export default function LoginPage() {
@@ -11,8 +11,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState('admin123');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  if (isAuthenticated) {
+    return <Navigate to="/tickets?desk=v2" replace />;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();

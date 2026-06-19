@@ -17,14 +17,25 @@ import WorkspacePage from '../pages/WorkspacePage';
 import DashboardPage from '../pages/DashboardPage';
 import TicketsPage from '../pages/TicketsPage';
 import ChatPage from '../pages/ChatPage';
-import ReportsPage from '../pages/ReportsPage';
 import ConfigPage from '../pages/ConfigPage';
 import AnalyticsIaPage from '../pages/AnalyticsIaPage';
+import ReportsPage from '../pages/ReportsPage';
 import ClientPortalPage from '../pages/ClientPortalPage';
 import { bootstrapCockpitData } from '../services/seedDemo';
 import { initCockpitGlobals } from '../config/cockpitConfig';
+import { isLocalDevBypass } from '../config/devAuth';
 import { migrateAllTicketsForDeskV2 } from '../services/desk/utils';
-import { loadKanbanFromApi } from '../services/ticketsCache';
+import { loadKanbanFromApi, setApiMode } from '../services/ticketsCache';
+
+let localDevBootstrapped = false;
+
+function ensureLocalDevData() {
+  if (localDevBootstrapped || !isLocalDevBypass()) return;
+  localDevBootstrapped = true;
+  setApiMode(false);
+  bootstrapCockpitData();
+  migrateAllTicketsForDeskV2();
+}
 
 function AppRoutes() {
   return useRoutes([
@@ -38,9 +49,9 @@ function AppRoutes() {
             { index: true, element: React.createElement(Navigate, { to: '/tickets?desk=v2', replace: true }) },
             { path: 'workspace', element: React.createElement(WorkspacePage) },
             { path: 'dashboard', element: React.createElement(DashboardPage) },
+            { path: 'reports', element: React.createElement(ReportsPage) },
             { path: 'tickets', element: React.createElement(TicketsPage) },
             { path: 'chat', element: React.createElement(ChatPage) },
-            { path: 'reports', element: React.createElement(ReportsPage) },
             { path: 'config', element: React.createElement(ConfigPage) },
             { path: 'analytics-ia', element: React.createElement(AnalyticsIaPage) },
             { path: 'client-portal', element: React.createElement(ClientPortalPage) },
@@ -73,8 +84,11 @@ function AppProviders({ children }) {
 }
 
 export default function App() {
+  ensureLocalDevData();
+
   useEffect(() => {
     initCockpitGlobals();
+    if (isLocalDevBypass()) return;
     loadKanbanFromApi()
       .then((cols) => {
         if (!cols.length && import.meta.env.DEV) {

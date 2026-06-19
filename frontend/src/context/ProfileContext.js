@@ -1,6 +1,6 @@
 /**
- * ProfileContext — perfis Agente / Supervisor / Gestão
- * VERSION: v1.0.0 | DATE: 2026-06-18
+ * ProfileContext — perfis Agente / Supervisor
+ * VERSION: v1.1.0 | DATE: 2026-06-19
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +14,9 @@ export function ProfileProvider({ children }) {
   const { showNotification } = useNotifications();
   const [profileId, setProfileIdState] = useState(() => {
     const saved = localStorage.getItem('velodeskProfile') || 'agent';
-    return PROFILES[saved] ? saved : 'agent';
+    const id = PROFILES[saved] ? saved : 'agent';
+    if (id !== saved) localStorage.setItem('velodeskProfile', id);
+    return id;
   });
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -25,7 +27,10 @@ export function ProfileProvider({ children }) {
   }, [profileId]);
 
   const setProfile = useCallback((id) => {
-    if (!PROFILES[id]) return;
+    if (!PROFILES[id] || id === profileId) {
+      setDropdownOpen(false);
+      return;
+    }
     localStorage.setItem('velodeskProfile', id);
     setProfileIdState(id);
     setDropdownOpen(false);
@@ -34,7 +39,7 @@ export function ProfileProvider({ children }) {
     if (defaultPage === 'tickets') navigate('/tickets?desk=v2');
     else if (defaultPage === 'analytics-ia') navigate('/analytics-ia');
     else navigate('/' + defaultPage);
-  }, [navigate, showNotification]);
+  }, [navigate, showNotification, profileId]);
 
   const toggleDropdown = useCallback(() => setDropdownOpen((v) => !v), []);
 

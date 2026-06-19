@@ -1,12 +1,27 @@
 /**
- * ticketsCache v1.0.0 — cache em memória sincronizado com API
- * VERSION: v1.0.0 | DATE: 2026-06-18 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.1.0 — cache em memória sincronizado com API + fallback local
+ * VERSION: v1.1.1 | DATE: 2026-06-19 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { adaptColumnsFromApi, apiTicketToCockpit, cockpitTicketToApi } from '../api/adapters/ticketAdapter';
 
 let columns = [];
 let useApi = true;
+
+const DEFAULT_BOXES = [
+  { id: 'novos', name: 'Novos', tickets: [] },
+  { id: 'em-andamento', name: 'Em Andamento', tickets: [] },
+  { id: 'em-espera', name: 'Pendente', tickets: [] },
+  { id: 'pendentes', name: 'Aguardando retorno', tickets: [] },
+  { id: 'resolvidos', name: 'Resolvidos', tickets: [] },
+];
+
+function ensureDefaultColumns() {
+  if (!columns.length) {
+    columns = DEFAULT_BOXES.map((box) => ({ ...box, tickets: [...(box.tickets || [])] }));
+  }
+  return columns;
+}
 
 export function isApiMode() {
   return useApi;
@@ -35,6 +50,16 @@ export async function loadKanbanFromApi() {
     console.warn('ticketsCache v1.0.0: falha ao carregar boxes', err.message);
   }
   return columns;
+}
+
+export function addCustomKanbanBox(box) {
+  const cols = ensureDefaultColumns();
+  if (cols.some((col) => col.id === box.id)) {
+    return cols.find((col) => col.id === box.id);
+  }
+  const nextBox = { id: box.id, name: box.name, action: box.action, tickets: [] };
+  columns = [...cols, nextBox];
+  return nextBox;
 }
 
 function findInColumns(ticketId) {
@@ -92,5 +117,33 @@ export async function createTicketViaApi(payload) {
     await loadKanbanFromApi();
     return apiTicketToCockpit(created);
   }
-  return null;
+
+  const cols = ensureDefaultColumns();
+  const boxId = payload.boxId || 'novos';
+  const box = cols.find((col) => col.id === boxId) || cols[0];
+  const now = new Date().toISOString();
+  const id = `local-${Date.now()}`;
+  const ticket = apiTicketToCockpit({
+    ...payload,
+    id,
+    _id: id,
+    status: payload.status || 'novo',
+    createdAt: now,
+    updatedAt: now,
+    messages: payload.text || payload.description
+      ? [{
+        id: `${id}-msg-1`,
+        fromClient: true,
+        type: 'client',
+        text: payload.text || payload.description,
+        timestamp: now,
+        author: payload.clientName || 'Cliente',
+      }]
+      : [],
+  });
+
+  if (!box.tickets) box.tickets = [];
+  box.tickets.unshift(ticket);
+  columns = cols;
+  return ticket;
 }

@@ -1,69 +1,117 @@
 /**
- * Configurações do cockpit
- * VERSION: v2.0.0 | DATE: 2026-06-18
+ * Central de Configurações — layout V2
+ * VERSION: v3.0.0 | DATE: 2026-06-19
  */
 import React, { useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useProfile } from '../../context/ProfileContext';
 import { resetVelodeskLabData } from '../../config/cockpitConfig';
-
-const SECTIONS = [
-  { id: 'ticket-form', label: 'Formulário do ticket', desc: 'CPF, canal, produto, motivo…' },
-  { id: 'forms', label: 'Formulários', desc: 'Campos e árvores de tabulação' },
-  { id: 'workflows', label: 'Workflows', desc: 'Regras e fluxos automáticos' },
-  { id: 'backup', label: 'Backup / Restore', desc: 'Exportar e restaurar dados' },
-  { id: 'api', label: 'API Externa', desc: 'Chaves e endpoints' },
-  { id: 'automations', label: 'Automações', desc: 'Gatilhos e ações' }
-];
+import { CONFIG_SECTIONS, getConfigSection } from './configSections';
 
 export default function ConfigView() {
+  const { isNavAllowed } = useProfile();
   const [section, setSection] = useState(null);
+  const active = section ? getConfigSection(section) : null;
+
+  if (!isNavAllowed('config')) {
+    return <Navigate to="/workspace" replace />;
+  }
 
   return (
     <div id="config" className="page config-page active">
-      <div className="page-header"><h2>Configurações</h2></div>
-      <div className="config-container" style={{ display: 'grid', gridTemplateColumns: '260px 1fr', minHeight: 480 }}>
-        <nav className="config-sidebar">
-          <h3>Configurações</h3>
-          <p>Personalize tickets, fluxos e integrações</p>
-          <ul className="config-nav">
-            {SECTIONS.map((s) => (
-              <li key={s.id}>
-                <button type="button" className={'config-nav-item' + (section === s.id ? ' active' : '')} onClick={() => setSection(s.id)}>
-                  <strong>{s.label}</strong>
-                  <span>{s.desc}</span>
-                </button>
-              </li>
+      <div className="config-layout">
+        <aside className="config-sidebar">
+          <div className="config-sidebar-brand">
+            <div className="config-sidebar-brand-icon" aria-hidden="true">
+              <i className="ti ti-adjustments-horizontal" />
+            </div>
+            <div>
+              <h3>Configurações</h3>
+              <p>Personalize tickets, fluxos e integrações</p>
+            </div>
+          </div>
+
+          <nav className="config-menu" aria-label="Áreas de configuração">
+            {CONFIG_SECTIONS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={'config-menu-item' + (section === item.id ? ' active' : '')}
+                onClick={() => setSection(item.id)}
+              >
+                <span className="config-menu-icon" aria-hidden="true">
+                  <i className={'ti ' + item.icon} />
+                </span>
+                <span className="config-menu-text">
+                  <span className="config-menu-label">{item.label}</span>
+                  <span className="config-menu-desc">{item.menuDesc}</span>
+                </span>
+              </button>
             ))}
-          </ul>
-        </nav>
-        <main className="config-main-content" style={{ padding: 24 }}>
-          {!section && (
+          </nav>
+        </aside>
+
+        <main className="config-content">
+          {!section ? (
             <>
-              <h3>Central de configurações</h3>
-              <p>Escolha uma área no menu para começar.</p>
-              <div className="config-shortcuts" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 24 }}>
-                {SECTIONS.slice(0, 3).map((s) => (
-                  <button key={s.id} type="button" className="eco-card" onClick={() => setSection(s.id)}>
-                    <h4>{s.label}</h4>
-                    <p>{s.desc}</p>
+              <header className="config-content-header">
+                <span className="config-content-eyebrow">Central de configurações</span>
+                <h3>Bem-vindo</h3>
+                <p>Escolha uma área no menu ou nos atalhos abaixo para começar.</p>
+              </header>
+
+              <div className="config-welcome-grid">
+                {CONFIG_SECTIONS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="config-welcome-card"
+                    onClick={() => setSection(item.id)}
+                  >
+                    <span className="config-welcome-card-icon" aria-hidden="true">
+                      <i className={'ti ' + item.icon} />
+                    </span>
+                    <strong>{item.cardTitle || item.label}</strong>
+                    <span>{item.cardDesc}</span>
                   </button>
                 ))}
               </div>
             </>
-          )}
-          {section === 'backup' && (
-            <section>
-              <h3>Backup e restauração</h3>
-              <p>Exporte snapshots completos ou incrementais.</p>
-              <button type="button" className="btn-secondary" onClick={resetVelodeskLabData} style={{ marginTop: 16 }}>
-                Resetar dados demo
-              </button>
-            </section>
-          )}
-          {section && section !== 'backup' && (
-            <section>
-              <h3>{SECTIONS.find((s) => s.id === section)?.label}</h3>
-              <p>Editor de {section} — protótipo operacional em localStorage.</p>
-            </section>
+          ) : (
+            <>
+              <header className="config-content-header">
+                <span className="config-content-eyebrow">Central de configurações</span>
+                <h3>{active?.label}</h3>
+                <p>{active?.menuDesc}</p>
+              </header>
+
+              <div className="config-tab-content active">
+                {section === 'backup' ? (
+                  <section className="config-panel">
+                    <div className="config-panel-hero">
+                      <h4>Backup e restauração</h4>
+                      <p>Exporte snapshots completos ou incrementais e restaure quando necessário.</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={resetVelodeskLabData}
+                    >
+                      Resetar dados demo
+                    </button>
+                  </section>
+                ) : (
+                  <section className="config-panel">
+                    <div className="config-panel-hero">
+                      <h4>{active?.label}</h4>
+                      <p>
+                        Editor de {active?.label?.toLowerCase()} — protótipo operacional em localStorage.
+                      </p>
+                    </div>
+                  </section>
+                )}
+              </div>
+            </>
           )}
         </main>
       </div>

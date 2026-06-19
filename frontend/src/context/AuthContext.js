@@ -1,20 +1,36 @@
 /**
- * AuthContext v1.0.0 — JWT Velodesk
- * VERSION: v1.0.0 | DATE: 2026-06-18 | AUTHOR: VeloHub Development Team
+ * AuthContext v1.1.0 — JWT Velodesk + bypass localhost dev
+ * VERSION: v1.1.0 | DATE: 2026-06-19 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import { authApi } from '../api/client';
+import { applyLocalDevSession, isLocalDevBypass } from '../config/devAuth';
 
 const AuthContext = createContext(null);
 
+function readInitialSession() {
+  if (isLocalDevBypass()) {
+    return applyLocalDevSession();
+  }
+  const raw = localStorage.getItem('velodesk_user');
+  return {
+    token: localStorage.getItem('velodesk_token'),
+    user: raw ? JSON.parse(raw) : null,
+  };
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const raw = localStorage.getItem('velodesk_user');
-    return raw ? JSON.parse(raw) : null;
-  });
-  const [token, setToken] = useState(() => localStorage.getItem('velodesk_token'));
+  const [session] = useState(readInitialSession);
+  const [user, setUser] = useState(session.user);
+  const [token, setToken] = useState(session.token);
 
   const login = useCallback(async (email, password) => {
+    if (isLocalDevBypass()) {
+      const session = applyLocalDevSession();
+      setToken(session.token);
+      setUser(session.user);
+      return;
+    }
     const data = await authApi.login(email, password);
     setToken(data.token);
     setUser(data.user);
@@ -23,6 +39,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
+    if (isLocalDevBypass()) return;
     setToken(null);
     setUser(null);
     localStorage.removeItem('velodesk_token');
@@ -30,9 +47,18 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('isLoggedIn');
   }, []);
 
+  const updateUser = useCallback((partial) => {
+    setUser((prev) => {
+      const base = prev || { id: 'local', name: 'Ana Silva', email: '' };
+      const next = { ...base, ...partial };
+      localStorage.setItem('velodesk_user', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
-    () => ({ user, token, login, logout, isAuthenticated: !!token }),
-    [user, token, login, logout]
+    () => ({ user, token, login, logout, updateUser, isAuthenticated: !!token }),
+    [user, token, login, logout, updateUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

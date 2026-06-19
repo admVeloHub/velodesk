@@ -1,42 +1,40 @@
 /**
  * AppShell — layout cockpit
- * VERSION: v2.0.0 | DATE: 2026-06-18
+ * VERSION: v2.3.0 | DATE: 2026-06-19
  */
 import React, { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import TicketTabsBar from '../components/TicketTabsBar';
 import AIChatbotModal from '../features/modals/AIChatbotModal';
-import QuickRegisterModal from '../features/modals/QuickRegisterModal';
 
 export default function AppShell() {
   const [aiOpen, setAiOpen] = useState(false);
-  const [quickOpen, setQuickOpen] = useState(false);
 
   useEffect(() => {
-    const openQuick = () => setQuickOpen(true);
-    const closeQuick = () => setQuickOpen(false);
-    window.addEventListener('velodesk:quick-register', openQuick);
-    window.addEventListener('velodesk:quick-register-close', closeQuick);
+    const openAi = () => setAiOpen(true);
+    const closeAi = () => setAiOpen(false);
+    const toggleAi = () => setAiOpen((v) => !v);
+    window.addEventListener('velodesk:open-ai', openAi);
+    window.addEventListener('velodesk:close-ai', closeAi);
+    window.addEventListener('velodesk:toggle-ai', toggleAi);
     return () => {
-      window.removeEventListener('velodesk:quick-register', openQuick);
-      window.removeEventListener('velodesk:quick-register-close', closeQuick);
+      window.removeEventListener('velodesk:open-ai', openAi);
+      window.removeEventListener('velodesk:close-ai', closeAi);
+      window.removeEventListener('velodesk:toggle-ai', toggleAi);
     };
   }, []);
 
   return (
     <>
-      <div id="mainApp" className="main-app sidebar-collapsed" style={{ display: 'grid' }}>
-        <Header onQuickRegister={() => setQuickOpen(true)} />
+      <div id="mainApp" className="main-app sidebar-collapsed velo-chromeless" style={{ display: 'grid' }}>
         <TicketTabsBar />
-        <Sidebar onOpenAI={() => setAiOpen(true)} />
+        <Sidebar onOpenAI={() => setAiOpen((v) => !v)} />
         <main className="main-content sidebar-collapsed">
           <Outlet />
         </main>
       </div>
       <AIChatbotModal open={aiOpen} onClose={() => setAiOpen(false)} />
-      <QuickRegisterModal open={quickOpen} onClose={() => setQuickOpen(false)} />
     </>
   );
 }

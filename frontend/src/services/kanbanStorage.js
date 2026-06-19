@@ -54,7 +54,12 @@ const QUEUE_MAP = {
   resolvidos: ['resolvidos', 'resolvido'],
 };
 
+import { loadCustomQueues } from './desk/customQueueBoxes';
+
 export function mapTicketQueueId(ticket, boxId) {
+  const custom = loadCustomQueues().find((item) => item.id === boxId || item.boxes?.includes(boxId));
+  if (custom) return custom.id;
+
   const status = ticket.status || boxId || '';
   const entries = Object.entries(QUEUE_MAP);
   for (let i = 0; i < entries.length; i++) {

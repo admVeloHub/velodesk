@@ -17,6 +17,7 @@
     border-right: 0.5px solid rgba(255, 255, 255, 0.06);
     padding: 10px 0;
     gap: 4px;
+    z-index: 8300;
 }
 
 #mainSidebar.velo-nav-rail .sidebar-brand {
@@ -120,6 +121,11 @@
     gap: 0;
 }
 
+#mainSidebar.velo-nav-rail .profile-btn::before {
+    content: none;
+    display: none;
+}
+
 #mainSidebar.velo-nav-rail .profile-btn .sidebar-profile-initials {
     display: flex;
     align-items: center;
@@ -135,8 +141,97 @@
     display: none;
 }
 
+#mainSidebar.velo-nav-rail .profile-section {
+    position: relative;
+}
+
 #mainSidebar.velo-nav-rail .profile-menu {
+    position: fixed;
     left: var(--velo-sidebar-compact);
+    bottom: 10px;
+    top: auto;
+    display: block;
+    opacity: 1;
+    transform: none;
+    margin-bottom: 0;
+    z-index: 10000;
+    padding: 0.5rem;
+    min-width: 240px;
+}
+
+#mainSidebar.velo-nav-rail .profile-menu .profile-role-menu {
+    padding: 0;
+}
+
+#mainSidebar.velo-nav-rail .profile-menu .eco-profile-dropdown-header {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+    padding: 0.35rem 0.65rem 0.5rem;
+    font-weight: 600;
+}
+
+#mainSidebar.velo-nav-rail .profile-menu .eco-profile-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: #334155;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: var(--eco-font, inherit);
+    text-align: left;
+    transition: background 0.15s ease;
+}
+
+#mainSidebar.velo-nav-rail .profile-menu .eco-profile-btn i {
+    width: 1.1rem;
+    color: var(--eco-accent, #1634FF);
+}
+
+#mainSidebar.velo-nav-rail .profile-menu .eco-profile-btn:hover {
+    background: #f1f5ff;
+}
+
+#mainSidebar.velo-nav-rail .profile-menu .eco-profile-btn.active {
+    background: linear-gradient(135deg, rgba(0, 0, 88, 0.06), rgba(79, 110, 247, 0.1));
+    color: var(--eco-navy, #000058);
+    font-weight: 600;
+}
+
+#mainSidebar.velo-nav-rail .profile-menu-divider {
+    height: 1px;
+    margin: 0.35rem 0.5rem;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+#mainSidebar.velo-nav-rail .profile-menu a {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.75rem 0.85rem;
+    color: var(--dark-gray, #334155);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 8px;
+    transition: background 0.15s ease;
+}
+
+#mainSidebar.velo-nav-rail .profile-menu a:hover {
+    background: rgba(102, 126, 234, 0.08);
+    color: var(--primary-blue, #1634FF);
+}
+
+#mainSidebar.velo-nav-rail .profile-menu a i {
+    width: 1rem;
+    text-align: center;
+    opacity: 0.85;
 }
 
 .main-content.sidebar-collapsed,
@@ -149,7 +244,7 @@
 }
 
 body.desk-v2-mode #mainSidebar.velo-nav-rail {
-    z-index: 8100;
+    z-index: 8300;
     top: 0;
     height: 100vh;
 }

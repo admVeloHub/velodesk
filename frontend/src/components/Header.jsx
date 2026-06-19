@@ -67,7 +67,7 @@ export default function Header({ onQuickRegister, onGlobalSearch }) {
               <i className="fas fa-chevron-down eco-badge-chevron" />
             </button>
             {dropdownOpen && (
-              <div className="eco-profile-dropdown" id="ecoProfileDropdown">
+              <div className={'eco-profile-dropdown open'} id="ecoProfileDropdown">
                 <div className="eco-profile-dropdown-header">Visão do portal</div>
                 {Object.keys(PROFILES).map((id) => (
                   <button

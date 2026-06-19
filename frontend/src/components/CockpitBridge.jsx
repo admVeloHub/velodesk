@@ -11,11 +11,11 @@ import { installCockpitBridge } from '../utils/cockpitBridge';
 export default function CockpitBridge() {
   const navigate = useNavigate();
   const { showNotification } = useNotifications();
-  const { openTicket } = useTickets();
+  const { openTicket, refreshTickets } = useTickets();
 
   useEffect(() => {
-    installCockpitBridge(navigate, showNotification, { openTicket });
-  }, [navigate, showNotification, openTicket]);
+    installCockpitBridge(navigate, showNotification, { openTicket, refreshTickets });
+  }, [navigate, showNotification, openTicket, refreshTickets]);
 
   return null;
 }

@@ -32,7 +32,7 @@ export default function AnalyticsView() {
       <div className="page-header"><h2>Analytics IA</h2></div>
       <div className="eco-page-inner eco-stagger" id="analyticsIAContent">
         <div className="ws-hero ws-hero--mgmt">
-          <div><span className="ws-eyebrow">Analytics & Gestão</span><h3>Dashboard executivo em tempo real</h3><p>TMA, SLA, NPS e previsões atualizados continuamente.</p></div>
+          <div><span className="ws-eyebrow">Analytics</span><h3>Dashboard executivo em tempo real</h3><p>TMA, SLA, NPS e previsões atualizados continuamente.</p></div>
           <div className="analytics-filters">
             <select id="analyticsPeriod"><option>Hoje</option><option>7 dias</option><option>30 dias</option></select>
             <select><option>Todos os produtos</option><option>Internet</option><option>Móvel</option></select>

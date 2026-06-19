@@ -1,5 +1,5 @@
 /**
  * Relatórios
- * VERSION: v2.0.0 | DATE: 2026-06-18
+ * VERSION: v1.0.0 | DATE: 2026-06-19
  */
 export { default } from '../features/reports/ReportsView';
