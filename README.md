@@ -45,3 +45,11 @@ Login dev: `admin@velodesk.local` / `admin123`
 ## Repositório
 
 https://github.com/admVeloHub/velodesk
+
+## Deploy (Vercel)
+
+- **Produção:** https://velodesk.vercel.app
+- **Desk v2:** https://velodesk.vercel.app/tickets?desk=v2
+- O `vercel.json` na raiz do repositório aponta o build para `frontend/`.
+- Cada push na branch `main` dispara deploy se o projeto Vercel estiver conectado ao GitHub `admVeloHub/velodesk`.
+- Deploy manual (pasta `frontend`): `npx vercel --prod --yes`

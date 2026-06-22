@@ -3671,6 +3671,336 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     justify-content: center;
 }
 
+/* Modal de redistribuição — supervisor */
+.ws360-redistribute-modal__body {
+    padding-top: 12px;
+}
+
+.ws360-redistribute-modal__agent-list,
+.ws360-redistribute-modal__target-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ws360-redistribute-modal__agent-item {
+    border: 0.5px solid rgba(0, 0, 88, 0.1);
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ws360-redistribute-modal__agent-item.is-selected {
+    border-color: rgba(22, 52, 255, 0.35);
+    box-shadow: 0 0 0 1px rgba(22, 52, 255, 0.08);
+}
+
+.ws360-redistribute-modal__agent-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+}
+
+.ws360-redistribute-modal__agent-select {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    min-width: 0;
+}
+
+.ws360-redistribute-modal__agent-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #1634FF;
+}
+
+.ws360-redistribute-modal__agent-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.ws360-redistribute-modal__agent-main strong {
+    font-size: 0.88rem;
+    color: #0f172a;
+}
+
+.ws360-redistribute-modal__count {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.ws360-redistribute-modal__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: transparent;
+    color: #1634FF;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+.ws360-redistribute-modal__toggle:hover {
+    text-decoration: underline;
+}
+
+.ws360-redistribute-modal__ticket-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 14px 12px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ws360-redistribute-modal__ticket-list li {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+    align-items: baseline;
+    font-size: 0.74rem;
+    color: #475569;
+}
+
+.ws360-redistribute-modal__ticket-id {
+    font-weight: 700;
+    color: #1634FF;
+    white-space: nowrap;
+}
+
+.ws360-redistribute-modal__ticket-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ws360-redistribute-modal__ticket-client {
+    font-size: 0.68rem;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+.ws360-redistribute-modal__summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: baseline;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-radius: 10px;
+    background: #f8fafc;
+    border: 0.5px solid rgba(0, 0, 88, 0.08);
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.ws360-redistribute-modal__summary strong {
+    color: #0f172a;
+}
+
+.ws360-redistribute-modal__hint {
+    margin: 0 0 12px;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.ws360-redistribute-modal__target-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 0.5px solid rgba(0, 0, 88, 0.1);
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ws360-redistribute-modal__target-item.is-selected {
+    border-color: rgba(22, 52, 255, 0.35);
+    background: #f8faff;
+}
+
+.ws360-redistribute-modal__target-item input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #1634FF;
+}
+
+.ws360-redistribute-modal__target-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.ws360-redistribute-modal__empty {
+    margin: 0;
+    padding: 24px 12px;
+    text-align: center;
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
+/* Modal de escalonamento — supervisor */
+.ws360-escalate-modal__body {
+    padding-top: 12px;
+}
+
+.ws360-escalate-modal__search {
+    margin-bottom: 16px;
+}
+
+.ws360-escalate-modal__search-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.ws360-escalate-modal__search-row {
+    display: flex;
+    gap: 8px;
+}
+
+.ws360-escalate-modal__search-input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 0.5px solid rgba(0, 0, 88, 0.15);
+    border-radius: 10px;
+    font-size: 0.84rem;
+    font-family: inherit;
+    color: #0f172a;
+    background: #fff;
+}
+
+.ws360-escalate-modal__search-input:focus {
+    outline: none;
+    border-color: #1634FF;
+    box-shadow: 0 0 0 3px rgba(22, 52, 255, 0.12);
+}
+
+.ws360-escalate-modal__search-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+}
+
+.ws360-escalate-modal__results-label {
+    margin: 0 0 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.ws360-escalate-modal__results {
+    list-style: none;
+    margin: 0 0 16px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ws360-escalate-modal__result {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 14px;
+    border: 0.5px solid rgba(0, 0, 88, 0.1);
+    border-radius: 10px;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ws360-escalate-modal__result:hover {
+    border-color: rgba(22, 52, 255, 0.25);
+}
+
+.ws360-escalate-modal__result.is-selected {
+    border-color: rgba(22, 52, 255, 0.35);
+    background: #f8faff;
+    box-shadow: 0 0 0 1px rgba(22, 52, 255, 0.08);
+}
+
+.ws360-escalate-modal__result-id {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #1634FF;
+    white-space: nowrap;
+}
+
+.ws360-escalate-modal__result-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.ws360-escalate-modal__result-main strong {
+    font-size: 0.84rem;
+    color: #0f172a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ws360-escalate-modal__result-main span {
+    font-size: 0.72rem;
+    color: #64748b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ws360-escalate-modal__result-badge {
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #eef1ff;
+    color: #1634FF;
+    font-size: 0.68rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.ws360-escalate-modal__options {
+    padding-top: 4px;
+    border-top: 0.5px solid rgba(0, 0, 88, 0.08);
+}
+
+.ws360-escalate-modal__options-title {
+    margin: 12px 0 10px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #475569;
+}
+
 @media (max-width: 640px) {
     .ws360-report-modal__summary {
         grid-template-columns: 1fr;
