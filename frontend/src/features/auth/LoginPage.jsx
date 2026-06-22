@@ -1,14 +1,14 @@
 /**
- * LoginPage v1.0.0 — autenticação JWT
- * VERSION: v1.0.0 | DATE: 2026-06-18 | AUTHOR: VeloHub Development Team
+ * LoginPage v1.1.0 — autenticação JWT
+ * VERSION: v1.1.0 | DATE: 2026-06-22
  */
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@velodesk.local');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState(import.meta.env.DEV ? 'admin@velodesk.local' : '');
+  const [password, setPassword] = useState(import.meta.env.DEV ? 'admin123' : '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login, isAuthenticated } = useAuth();
@@ -78,9 +78,6 @@ export default function LoginPage() {
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
-        <p style={{ marginTop: '1rem', color: '#64748b', fontSize: '.75rem' }}>
-          Dev: admin@velodesk.local / admin123
-        </p>
       </div>
     </div>
   );
