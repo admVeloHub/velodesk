@@ -926,6 +926,99 @@
     margin-top: 2px;
 }
 
+#velodeskDeskV2Root .ticket-op-progress {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1.5px solid #000058;
+    border-radius: 8px;
+    padding: 4px 10px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+#velodeskDeskV2Root .ticket-op-progress__label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #000058;
+    flex-shrink: 0;
+}
+
+#velodeskDeskV2Root .ticket-op-progress__track {
+    display: flex;
+    align-items: center;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: 0;
+}
+
+#velodeskDeskV2Root .ticket-op-progress__step {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+#velodeskDeskV2Root .ticket-op-progress__circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #e2e8f0;
+    color: #94a3b8;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+#velodeskDeskV2Root .ticket-op-progress__circle .ti {
+    font-size: 14px;
+    line-height: 1;
+}
+
+#velodeskDeskV2Root .ticket-op-progress__step--completed .ticket-op-progress__circle,
+#velodeskDeskV2Root .ticket-op-progress__step--active .ticket-op-progress__circle {
+    background: #15A237;
+    color: #fff;
+}
+
+#velodeskDeskV2Root .ticket-op-progress__step--active .ticket-op-progress__circle {
+    box-shadow: 0 0 0 3px rgba(21, 162, 55, 0.18);
+}
+
+#velodeskDeskV2Root .ticket-op-progress__sub {
+    position: absolute;
+    top: calc(100% + 1px);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: 700;
+    color: #15A237;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+#velodeskDeskV2Root .ticket-op-progress__connector {
+    width: 18px;
+    height: 3px;
+    margin: 0 2px;
+    margin-bottom: 0;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: radial-gradient(circle, #cbd5e1 1.5px, transparent 1.5px);
+    background-size: 6px 3px;
+    background-repeat: repeat-x;
+    background-position: center;
+}
+
+#velodeskDeskV2Root .ticket-op-progress__connector.is-completed {
+    background: #15A237;
+}
+
 #velodeskDeskV2Root .crm-client-profile-bar .ticket-client-profile__operation-status.container-secondary {
     border-color: #000058;
     padding: 3px 10px;

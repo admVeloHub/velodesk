@@ -127,15 +127,56 @@ export function getEscalonarLabel(id) {
   return map[id] || 'Selecionar escalonamento';
 }
 
-export function getTicketOperationAreaLabel(ticket) {
-  const escalonar = ticket?.lateralForm?.escalonar;
-  if (escalonar === 'n2') return 'N2';
-  if (escalonar === 'financeiro') return 'Financeiro';
+export const TICKET_OPERATION_STEPS = [
+  { id: 1, title: 'Caixa de entrada e atendimento N1', subtitle: 'N1', icon: 'ti-inbox' },
+  { id: 2, title: 'Workflow', subtitle: 'Workflow', icon: 'ti-arrows-exchange' },
+  { id: 3, title: 'Retorno ao atendimento N1', subtitle: 'Finalização', icon: 'ti-home' },
+];
 
+function resolveWorkflowArea(escalonar, group, lastWorkflow) {
+  if (escalonar === 'n2' || lastWorkflow === 'n2' || group.includes('n2')) return 'N2';
+  if (escalonar === 'financeiro' || lastWorkflow === 'financeiro' || group.includes('financeiro')) {
+    return 'Financeiro';
+  }
+  if (escalonar === 'suporte' || lastWorkflow === 'suporte' || group.includes('suporte')) {
+    return 'Suporte';
+  }
+  return null;
+}
+
+export function getTicketOperationProgress(ticket, queueId, liveEscalonar) {
+  const lf = ticket?.lateralForm || {};
+  const escalonar = liveEscalonar !== undefined ? liveEscalonar : lf.escalonar;
   const group = String(ticket?.group || '').toLowerCase();
-  if (group.includes('n2')) return 'N2';
-  if (group.includes('financeiro')) return 'Financeiro';
+  const resolved = queueId === 'resolvidos' || ticket?.status === 'resolvido';
+  const workflowArea = resolveWorkflowArea(escalonar, group, lf.lastWorkflow);
+  const inWorkflow = Boolean(escalonar);
+  const retornoN1 = lf.retornoN1 === true || (lf.wasEscalated && !escalonar && !resolved);
 
+  let activeStep = 1;
+  if (resolved) {
+    activeStep = 4;
+  } else if (inWorkflow) {
+    activeStep = 2;
+  } else if (retornoN1) {
+    activeStep = 3;
+  } else if (queueId === 'novos' || ticket?.status === 'novo') {
+    activeStep = 1;
+  }
+
+  return {
+    activeStep,
+    workflowArea,
+    resolved,
+    steps: TICKET_OPERATION_STEPS,
+  };
+}
+
+export function getTicketOperationAreaLabel(ticket) {
+  const { activeStep, workflowArea } = getTicketOperationProgress(ticket);
+  if (activeStep >= 4) return 'Finalizado';
+  if (activeStep === 2 && workflowArea) return workflowArea;
+  if (activeStep === 3) return 'N1 — Finalização';
   return 'N1';
 }
 

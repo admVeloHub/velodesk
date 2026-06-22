@@ -6,18 +6,23 @@ import {
   getClientContactFields,
   getClientProducts,
   getProductTagClass,
-  getTicketOperationAreaLabel,
 } from '../../../services/desk/utils';
 import ClientTicketHistoryModal from './ClientTicketHistoryModal';
+import TicketOperationProgress from './TicketOperationProgress';
 
-export default function DeskClientProfileBar({ ticket, client, onSaveContact, onSelectTicket }) {
+export default function DeskClientProfileBar({
+  ticket,
+  client,
+  queueId,
+  escalonar,
+  onSaveContact,
+  onSelectTicket,
+}) {
   const [editOpen, setEditOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [draft, setDraft] = useState({ name: '', email: '', phone: '' });
   const contact = getClientContactFields(ticket, client);
   const products = getClientProducts(ticket, client);
-  const operationArea = getTicketOperationAreaLabel(ticket);
-
   const openEdit = () => {
     setDraft({ name: contact.name, email: contact.email, phone: contact.phone });
     setEditOpen(true);
@@ -88,14 +93,11 @@ export default function DeskClientProfileBar({ ticket, client, onSaveContact, on
           >
             <i className="fas fa-history" /> Histórico de tickets
           </button>
-          <div
-            className="container-secondary ticket-client-profile__operation-status"
-            id="profileOperationStatus"
-            aria-label={'Área operacional: ' + operationArea}
-          >
-            <span className="ticket-client-profile__operation-status-label">Status</span>
-            <strong className="ticket-client-profile__operation-status-value">{operationArea}</strong>
-          </div>
+          <TicketOperationProgress
+            ticket={ticket}
+            queueId={queueId}
+            escalonar={escalonar}
+          />
         </div>
       </section>
       <ClientTicketHistoryModal

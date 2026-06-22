@@ -259,11 +259,20 @@ export default function DeskV2Root() {
     if (!ticket) return;
     try {
       await updateTicketInKanban(ticket.id, (t) => {
-        t.lateralForm = {
-          ...t.lateralForm,
+        const prevLf = t.lateralForm || {};
+        const nextLf = {
+          ...prevLf,
           ...rightFields,
           escalonar,
         };
+        if (escalonar) {
+          nextLf.wasEscalated = true;
+          nextLf.lastWorkflow = escalonar;
+          nextLf.retornoN1 = false;
+        } else if (prevLf.wasEscalated) {
+          nextLf.retornoN1 = true;
+        }
+        t.lateralForm = nextLf;
         t.responsibleAgent = rightFields.responsavel;
         t.channel = rightFields.canal;
         t.updatedAt = new Date().toISOString();
@@ -428,6 +437,8 @@ export default function DeskV2Root() {
             <DeskClientProfileBar
               ticket={ticket}
               client={client}
+              queueId={entry?.queueId}
+              escalonar={escalonar}
               onSaveContact={handleSaveContact}
               onSelectTicket={selectTicket}
             />
