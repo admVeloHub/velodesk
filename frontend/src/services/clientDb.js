@@ -1,6 +1,6 @@
 /**
  * Client DB localStorage
- * VERSION: v1.0.0 | DATE: 2026-06-18
+ * VERSION: v1.0.1 | DATE: 2026-06-24
  */
 export function getClientDB() {
   try {
@@ -33,33 +33,7 @@ export function searchClients(query) {
 }
 
 export function resetClientDB() {
-  const db = {
-    '12345678901': {
-      cpf: '123.456.789-01', name: 'Maria Oliveira', email: 'maria.oliveira@email.com',
-      telefone: '(11) 98765-4321', situacao: 'Adimplente', produtos: ['Internet Fibra', 'TV'],
-      risco: 'Baixo', termometro: 38, termometroLabel: 'Estável'
-    },
-    '98765432100': {
-      cpf: '987.654.321-00', name: 'João Pereira', email: 'joao.pereira@email.com',
-      telefone: '(11) 91234-5678', situacao: 'Inadimplente', produtos: ['Móvel', 'Combo'],
-      risco: 'Alto', termometro: 88, termometroLabel: 'Crítico'
-    },
-    '11122233344': {
-      cpf: '111.222.333-44', name: 'Empresa Tech Ltda', email: 'contato@empresatech.com.br',
-      telefone: '(11) 3456-7890', situacao: 'Adimplente', produtos: ['Internet Fibra'],
-      risco: 'Médio', termometro: 62, termometroLabel: 'Atenção'
-    },
-    '45678912345': {
-      cpf: '456.789.123-45', name: 'João Ferreira', email: 'joao.ferreira@email.com',
-      telefone: '(11) 99876-5432', situacao: 'Adimplente', produtos: ['Internet Fibra'],
-      risco: 'Baixo', termometro: 45, termometroLabel: 'Estável'
-    },
-    '55566677788': {
-      cpf: '555.666.777-88', name: 'Carlos Mendes', email: 'carlos.mendes@email.com',
-      telefone: '(11) 97654-3210', situacao: 'Adimplente', produtos: ['TV'],
-      risco: 'Médio', termometro: 52, termometroLabel: 'Atenção'
-    }
-  };
+  const db = {};
   saveClientDB(db);
   return db;
 }

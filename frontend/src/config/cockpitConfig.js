@@ -8,7 +8,7 @@ export function initCockpitGlobals() {
 }
 
 export function resetVelodeskLabData() {
-  const keep = ['velodeskDarkMode', 'velodesk_token', 'velodesk_user', 'velodeskProfile'];
+  const keep = ['velodeskDarkMode', 'velodesk_token', 'velodesk_user', 'velodeskProfile', 'velodesk_gate_authorized', 'velodesk_colaborador', 'velodesk_colaborador_meta'];
   const keys = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);

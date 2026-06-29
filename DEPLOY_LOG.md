@@ -1,10 +1,33 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.2.0 | DATE: 2026-06-18 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.3.0 | DATE: 2026-06-29 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk v2: inbound e-mail, Docker/GCP, tabulação e auth VeloHub
+
+- **Data/Hora**: 2026-06-29
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - root package.json v2.2.1
+  - frontend package.json v2.1.1
+  - backend package.json (inbound + tabulação)
+  - docker-compose.yml v1.0.0
+  - cloudbuild.yaml v1.0.0
+  - DEPLOY_LOG v1.3.0
+  - README (Docker/GCP/inbound)
+- **Arquivos modificados / incluídos**:
+  - `backend/` — inbound e-mail (webhook Mailgun/generic), modelo Cliente, tabulação de produtos, resolução MongoDB Atlas, middleware supervisor/inboundAuth, scripts de migração/purge demo
+  - `frontend/` — auth via sessão VeloHub (loading gate), tabulação na config, spell-check no compose, cadastro de cliente, integração velohubApi, remoção LoginPage/seedDemo
+  - `docker-compose.yml`, `cloudbuild.yaml`, Dockerfiles e `.dockerignore` (web + api)
+  - `docs/PLANO-ENTRADA-TICKETS.md`
+  - `package.json`, `run-dev.ps1`, `stop-dev.ps1`, `scripts/free-port.cjs`
+  - `README.md`, `DEPLOY_LOG.md`
+- **Descrição**: Push consolidando Desk v2 com entrada de tickets por e-mail, stack containerizada (local/GCP Cloud Run), tabulação configurável, cadastro de clientes unificado e gate de acesso VeloHub. Monorepo orquestrado na raiz; demo seed removido do frontend.
+- **Status**: Em andamento
 
 ### GitHub Push — Frontend Cockpit v2 + legado preservado
 

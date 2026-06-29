@@ -1,187 +1,134 @@
 /**
- * Painel compacto — criar ticket (Desk CRM)
- * VERSION: v1.0.0 | DATE: 2026-06-19
+ * Painel compacto — criar ticket draft por CPF
+ * VERSION: v2.0.1 | DATE: 2026-06-23
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { searchClients, getAgentName } from '../../../services/clientDb';
-import { createTicketViaApi } from '../../../services/ticketsCache';
-import { buildCreatePayload } from '../../../api/adapters/ticketAdapter';
+import React, { useEffect, useRef, useState } from 'react';
+import { clientsApi } from '../../../api/client';
+import { buildDraftTicketFromCliente } from '../../../api/adapters/clienteAdapter';
+import { createDraftTicketInCache } from '../../../services/ticketsCache';
+import { getAgentName } from '../../../services/clientDb';
+import { maskCpfInput, normalizeCpf, isValidCpfDigits } from '../../../services/desk/utils';
 import { useNotifications } from '../../../context/NotificationContext';
-
-const CHANNELS = ['WhatsApp', 'Telefone', 'E-mail'];
-const CHANNEL_STORAGE_KEY = 'velodeskCreateTicketChannel';
-
-function readDefaultChannel() {
-  const saved = sessionStorage.getItem(CHANNEL_STORAGE_KEY);
-  return CHANNELS.includes(saved) ? saved : 'WhatsApp';
-}
+import RegisterClientModal from './RegisterClientModal';
 
 export default function CreateTicketPanel({ onClose, onSaved }) {
-  const agent = getAgentName();
   const { showNotification } = useNotifications();
-  const assuntoRef = useRef(null);
-  const [clientQuery, setClientQuery] = useState('');
-  const [matchedClient, setMatchedClient] = useState(null);
-  const [assunto, setAssunto] = useState('');
-  const [assuntoError, setAssuntoError] = useState(false);
-  const [channel, setChannel] = useState(readDefaultChannel);
-  const [saving, setSaving] = useState(false);
-
-  const resolveClient = useCallback((query) => {
-    const trimmed = query.trim();
-    if (!trimmed) {
-      setMatchedClient(null);
-      return;
-    }
-    const results = searchClients(trimmed);
-    setMatchedClient(results[0] || null);
-  }, []);
+  const cpfRef = useRef(null);
+  const [cpfInput, setCpfInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [pendingCpf, setPendingCpf] = useState('');
 
   useEffect(() => {
-    assuntoRef.current?.focus();
+    cpfRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => resolveClient(clientQuery), 280);
-    return () => window.clearTimeout(timer);
-  }, [clientQuery, resolveClient]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !registerOpen) {
         event.preventDefault();
         onClose();
       }
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, [onClose, registerOpen]);
 
-  const handleSave = async () => {
-    if (!assunto.trim()) {
-      setAssuntoError(true);
-      showNotification('Informe o assunto do ticket.', 'error');
-      assuntoRef.current?.focus();
+  const openDraftForCliente = (clienteDoc) => {
+    const form = buildDraftTicketFromCliente(clienteDoc, getAgentName());
+    if (!form) {
+      showNotification('Dados do cliente inválidos.', 'error');
       return;
     }
-    setAssuntoError(false);
-    setSaving(true);
-    sessionStorage.setItem(CHANNEL_STORAGE_KEY, channel);
+    const draft = createDraftTicketInCache(form);
+    onSaved?.(draft.id || draft._id);
+    onClose();
+  };
 
-    const payload = buildCreatePayload({
-      assunto,
-      descricao: assunto,
-      channel,
-      tipo: 'Solicitação',
-      produto: 'Internet Fibra',
-      motivo: 'Outros',
-      atribuir: `${agent} (eu)`,
-      clientName: matchedClient?.name || clientQuery.trim() || 'Cliente',
-      clientCPF: matchedClient?.cpf || '',
-    });
-
+  const handleCreate = async () => {
+    const cpf = normalizeCpf(cpfInput);
+    if (!isValidCpfDigits(cpf)) {
+      showNotification('Informe um CPF completo (11 dígitos).', 'error');
+      cpfRef.current?.focus();
+      return;
+    }
+    setLoading(true);
     try {
-      const created = await createTicketViaApi(payload);
-      if (!created) {
-        showNotification('Não foi possível criar o ticket. Verifique sua conexão ou autenticação.', 'error');
+      const cliente = await clientsApi.getByCpf(cpf);
+      openDraftForCliente(cliente);
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        setPendingCpf(cpf);
+        setRegisterOpen(true);
         return;
       }
-      onSaved?.(created.id || created._id);
-      onClose();
-    } catch {
-      showNotification('Erro ao criar ticket.', 'error');
+      const msg = err?.response?.data?.message || 'Não foi possível consultar o CPF.';
+      showNotification(msg, 'error');
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
+  const handleRegisterSaved = (clienteDoc) => {
+    openDraftForCliente(clienteDoc);
+  };
+
   const handleKeyDown = (event) => {
-    if (event.key === 'Enter' && !event.shiftKey && (event.ctrlKey || event.target.id === 'crmCreateAssunto')) {
+    if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      handleSave();
+      handleCreate();
     }
   };
 
   return (
-    <div className="crm-create-panel" id="crmCreateTicketPanel">
-      <header className="crm-create-panel__header">
-        <button type="button" className="crm-create-panel__back" onClick={onClose} aria-label="Voltar">
-          <i className="ti ti-arrow-left" aria-hidden="true" />
-        </button>
-        <div>
-          <h2 className="crm-create-panel__title">Novo ticket</h2>
-          <p className="crm-create-panel__hint">Preencha os campos essenciais para abrir o atendimento.</p>
-        </div>
-      </header>
+    <>
+      <div className="crm-create-panel" id="crmCreateTicketPanel">
+        <header className="crm-create-panel__header">
+          <button type="button" className="crm-create-panel__back" onClick={onClose} aria-label="Voltar">
+            <i className="ti ti-arrow-left" aria-hidden="true" />
+          </button>
+          <div>
+            <h2 className="crm-create-panel__title">Novo ticket</h2>
+            <p className="crm-create-panel__hint">Informe o CPF do cliente para abrir o atendimento.</p>
+          </div>
+        </header>
 
-      <div className="crm-create-panel__body" onKeyDown={handleKeyDown}>
-        <div className="crm-create-panel__field">
-          <label className="crm-create-panel__label" htmlFor="crmCreateClient">
-            Cliente
-          </label>
-          <input
-            id="crmCreateClient"
-            type="text"
-            className="crm-create-panel__input"
-            value={clientQuery}
-            onChange={(event) => setClientQuery(event.target.value)}
-            placeholder="CPF, nome ou e-mail"
-            autoComplete="off"
-          />
-          {matchedClient ? (
-            <span className="crm-create-panel__client-match">
-              <i className="ti ti-user-check" aria-hidden="true" />
-              {matchedClient.name}
-              {matchedClient.cpf ? ` · ${matchedClient.cpf}` : ''}
-            </span>
-          ) : null}
+        <div className="crm-create-panel__body" onKeyDown={handleKeyDown}>
+          <div className="crm-create-panel__field">
+            <label className="crm-create-panel__label" htmlFor="crmCreateCpf">
+              CPF
+            </label>
+            <input
+              ref={cpfRef}
+              id="crmCreateCpf"
+              type="text"
+              className="crm-create-panel__input"
+              value={cpfInput}
+              onChange={(event) => setCpfInput(maskCpfInput(event.target.value))}
+              placeholder="000.000.000-00"
+              autoComplete="off"
+              inputMode="numeric"
+              maxLength={14}
+            />
+          </div>
         </div>
 
-        <div className="crm-create-panel__field">
-          <label className="crm-create-panel__label" htmlFor="crmCreateAssunto">
-            Assunto <span className="crm-create-panel__req">*</span>
-          </label>
-          <input
-            ref={assuntoRef}
-            id="crmCreateAssunto"
-            type="text"
-            className={'crm-create-panel__input' + (assuntoError ? ' crm-create-panel__input--error' : '')}
-            value={assunto}
-            onChange={(event) => {
-              setAssunto(event.target.value);
-              if (assuntoError) setAssuntoError(false);
-            }}
-            placeholder="Resumo do atendimento"
-          />
-        </div>
-
-        <div className="crm-create-panel__field">
-          <label className="crm-create-panel__label" htmlFor="crmCreateChannel">
-            Canal
-          </label>
-          <select
-            id="crmCreateChannel"
-            className="crm-create-panel__select"
-            value={channel}
-            onChange={(event) => setChannel(event.target.value)}
-          >
-            {CHANNELS.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </div>
+        <footer className="crm-create-panel__footer">
+          <button type="button" className="btn-secondary crm-create-panel__btn" onClick={onClose} disabled={loading}>
+            Cancelar
+          </button>
+          <button type="button" className="btn-primary crm-create-panel__btn" onClick={handleCreate} disabled={loading}>
+            {loading ? 'Consultando…' : 'Criar ticket'}
+          </button>
+        </footer>
       </div>
 
-      <footer className="crm-create-panel__footer">
-        <button type="button" className="btn-secondary crm-create-panel__btn" onClick={onClose} disabled={saving}>
-          Cancelar
-        </button>
-        <button type="button" className="btn-primary crm-create-panel__btn" onClick={handleSave} disabled={saving}>
-          {saving ? 'Criando…' : 'Criar ticket'}
-        </button>
-      </footer>
-    </div>
+      <RegisterClientModal
+        open={registerOpen}
+        cpf={pendingCpf}
+        onClose={() => setRegisterOpen(false)}
+        onSaved={handleRegisterSaved}
+      />
+    </>
   );
 }

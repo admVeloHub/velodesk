@@ -1,4 +1,4 @@
-/** tickets.routes v1.2.0 — POST com protocolo/status/mensagem inicial; 409 duplicado */
+/** tickets.routes v1.3.2 — cliente ref + join b2c_cadastros */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -32,7 +32,9 @@ router.get('/', authMiddleware, async (req, res: Response) => {
 
   const chamados = await ChamadoN1.find(filter).sort({ updatedAt: -1 });
   const tickets = await Promise.all(
-    chamados.map(async (chamado) => chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)))
+    chamados.map(async (chamado) =>
+      chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes))
+    )
   );
   res.json(tickets);
 });
@@ -45,14 +47,14 @@ router.get('/by-protocol/:protocolo', authMiddleware, async (req, res: Response)
   if (!chamado) return res.status(404).json({ message: 'Chamado não encontrado' });
 
   const boxes = await loadBoxes();
-  res.json(chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
 });
 
 router.get('/:id', authMiddleware, async (req, res: Response) => {
   const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
   const boxes = await loadBoxes();
-  res.json(chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
 });
 
 router.post('/', authMiddleware, async (req, res: Response) => {
@@ -76,8 +78,9 @@ router.post('/', authMiddleware, async (req, res: Response) => {
     }
   }
 
-  const chamado = await ChamadoN1.create(createChamadoFromBody(req.body, status));
-  res.status(201).json(chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  const chamado = await ChamadoN1.create(await createChamadoFromBody(req.body, status));
+  const ticket = await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes));
+  res.status(201).json(ticket);
 });
 
 router.put('/:id', authMiddleware, async (req, res: Response) => {
@@ -89,11 +92,11 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
     if (box) req.body.status = statusFromBoxName(box.name);
   }
 
-  applyBodyToChamado(chamado, req.body);
+  await applyBodyToChamado(chamado, req.body);
   await chamado.save();
 
   const boxes = await loadBoxes();
-  res.json(chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
 });
 
 router.delete('/:id', authMiddleware, async (req, res: Response) => {

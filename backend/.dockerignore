@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.*
+*.log
+.git
+.gitignore
+scripts/clear-demo-chamados.ts
+scripts/migrate-cliente-refs.ts

@@ -1,6 +1,6 @@
 /**
- * vite.config v1.0.0 — portas/proxy via FONTE DA VERDADE/.env-velodesk (8000/8001)
- * VERSION: v1.0.0 | DATE: 2026-06-18 | AUTHOR: VeloHub Development Team
+ * vite.config v1.1.0 — portas/proxy via FONTE DA VERDADE/.env-velodesk (8000/8001)
+ * VERSION: v1.1.0 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
  */
 import { createRequire } from 'node:module';
 import path from 'node:path';

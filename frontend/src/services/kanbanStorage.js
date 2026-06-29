@@ -1,6 +1,6 @@
 /**
- * Kanban / tickets — facade API + cache local (fallback demo)
- * VERSION: v1.1.0 | DATE: 2026-06-18 | AUTHOR: VeloHub Development Team
+ * Kanban / tickets — facade API + cache local
+ * VERSION: v1.2.0 | DATE: 2026-06-23 | AUTHOR: VeloHub Development Team
  */
 import {
   getCachedColumns,
@@ -9,6 +9,9 @@ import {
   updateTicketViaApi,
   addMessageViaApi,
   createTicketViaApi,
+  createDraftTicketInCache,
+  persistDraftTicket,
+  isDraftTicket,
   isApiMode,
 } from './ticketsCache';
 import { apiTicketToCockpit } from '../api/adapters/ticketAdapter';
@@ -100,3 +103,9 @@ export async function addTicketToBox(boxId, ticket) {
   setCachedColumns(cols);
   return normalized;
 }
+
+export {
+  createDraftTicketInCache,
+  persistDraftTicket,
+  isDraftTicket,
+};

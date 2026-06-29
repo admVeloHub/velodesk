@@ -49,13 +49,19 @@ body.velodesk-dark #workspace.active.workspace-page {
     color: var(--velo-dark-text-muted);
 }
 
+body.velodesk-dark #config.config-page {
+    --config-bg: var(--velo-dark-bg, #272A30);
+}
+
 body.velodesk-dark #analyticsIAContent .ws-stats-grid--6 .ws-stat-card,
 body.velodesk-dark #config.config-page,
 body.velodesk-dark #config .config-layout,
 body.velodesk-dark #config .config-sidebar,
 body.velodesk-dark #config .config-content,
 body.velodesk-dark #config .config-panel,
-body.velodesk-dark #config .config-welcome-card {
+body.velodesk-dark #config .config-welcome-card,
+body.velodesk-dark #config .config-tree-block,
+body.velodesk-dark #config .tree-config-container.config-tree-block {
     background: var(--velo-dark-surface);
     border-color: var(--velo-dark-border);
     color: var(--velo-dark-text-muted);
@@ -74,6 +80,19 @@ body.velodesk-dark #config .config-menu-item {
 body.velodesk-dark #config .config-menu-item:hover,
 body.velodesk-dark #config .config-menu-item.active {
     background: var(--velo-dark-surface-hover);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #config .config-field__input,
+body.velodesk-dark #config .config-form-grid input,
+body.velodesk-dark #config .config-tree-block input {
+    background: var(--velo-dark-bg);
+    border-color: var(--velo-dark-border);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #config .config-table thead th {
+    background: rgba(255, 255, 255, 0.04);
     color: var(--velo-dark-text);
 }
 
@@ -505,8 +524,27 @@ body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card:hover {
 }
 
 body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card.is-active {
-    background: rgba(22, 148, 255, 0.12);
-    border-color: rgba(22, 148, 255, 0.35);
+    z-index: 1;
+    background: rgba(22, 148, 255, 0.2);
+    border: 1.5px solid var(--velo-dark-accent);
+    border-left: 4px solid var(--velo-dark-accent);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(22, 148, 255, 0.25), 0 0 0 1px rgba(22, 148, 255, 0.2);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card.is-active:hover {
+    background: rgba(22, 148, 255, 0.28);
+    box-shadow: 0 6px 20px rgba(22, 148, 255, 0.32), 0 0 0 1px rgba(22, 148, 255, 0.28);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card.is-active .crm-ticket-card__name,
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card.is-active .crm-ticket-card__subject {
+    color: var(--velo-dark-text);
+    font-weight: 700;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card.is-active .crm-ticket-card__sla {
+    box-shadow: 0 0 0 2px rgba(22, 148, 255, 0.2);
 }
 
 body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card__name,
@@ -543,6 +581,14 @@ body.velodesk-dark #velodeskDeskV2Root .crm-ticket-tab {
 
 body.velodesk-dark #velodeskDeskV2Root .crm-ticket-tab.is-active {
     background: var(--velo-dark-surface);
+    color: var(--velo-dark-text);
+    font-weight: 700;
+    border-color: var(--velo-dark-accent);
+    border-top-color: var(--velo-dark-accent);
+    box-shadow: 0 2px 8px rgba(22, 148, 255, 0.2);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-tab.is-active .crm-ticket-tab__close {
     color: var(--velo-dark-accent);
 }
 
@@ -561,6 +607,44 @@ body.velodesk-dark #velodeskDeskV2Root .crm-ticket-response .response-textarea {
     background: var(--velo-dark-surface-inset);
     border-color: var(--velo-dark-border-strong);
     color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .spell-suggestion-bar {
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.12), rgba(34, 197, 94, 0.1));
+    border-color: var(--velo-dark-border-strong);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .spell-suggestion-bar__suggestion {
+    background: var(--velo-dark-surface);
+    color: #86efac;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .spell-errors-panel {
+    background: rgba(127, 29, 29, 0.25);
+    border-color: rgba(248, 113, 113, 0.35);
+    color: #fecaca;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .spell-errors-panel__fix {
+    color: #86efac;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .response-textarea.spell-textarea--error {
+    border-color: #f87171 !important;
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.2) !important;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .spell-textarea-wrap--has-errors .spell-textarea-input {
+    border-color: rgba(248, 113, 113, 0.55);
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.18);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .spell-textarea-mark {
+    text-decoration-color: #f87171;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .spell-textarea-mark--active {
+    background: rgba(127, 29, 29, 0.35);
 }
 
 body.velodesk-dark #velodeskDeskV2Root .rp-panel,

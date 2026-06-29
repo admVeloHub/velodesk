@@ -1,6 +1,6 @@
 /**
  * TicketsContext v1.2.0 — estado global tickets / abas + API
- * VERSION: v1.2.0 | DATE: 2026-06-19 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.2.1 | DATE: 2026-06-23 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { findTicketEntry, getKanbanColumns, refreshKanbanFromApi } from '../services/kanbanStorage';
@@ -88,6 +88,17 @@ export function TicketsProvider({ children }) {
     if (navigateFn) navigateFn('/tickets?desk=v2');
   }, [openTicket]);
 
+  const replaceOpenTabId = useCallback((oldId, newId, meta = {}) => {
+    setOpenTabs((prev) =>
+      prev.map((tab) =>
+        String(tab.id) === String(oldId)
+          ? { ...tab, id: newId, ...meta }
+          : tab
+      )
+    );
+    setActiveTabId((current) => (String(current) === String(oldId) ? newId : current));
+  }, []);
+
   return (
     <TicketsContext.Provider value={{
       openTabs,
@@ -96,6 +107,7 @@ export function TicketsProvider({ children }) {
       loading,
       openTicket,
       closeTicketTab,
+      replaceOpenTabId,
       setActiveTabId,
       refreshTickets,
       selectTicketFromModal,

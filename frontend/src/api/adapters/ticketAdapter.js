@@ -1,11 +1,13 @@
 /**
- * ticketAdapter v1.0.0 — normaliza ticket API ↔ cockpit
- * VERSION: v1.0.0 | DATE: 2026-06-18 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.2.1 — normaliza ticket API ↔ cockpit + draft
+ * VERSION: v1.2.1 | DATE: 2026-06-25 | AUTHOR: VeloHub Development Team
  */
 
 function normalizeMessage(msg) {
   if (!msg) return msg;
-  const isClient = msg.fromClient || msg.type === 'client' || msg.sender === 'them' || msg.type === 'public';
+  const isClient = msg.fromClient === true
+    || msg.type === 'client'
+    || (msg.type !== 'agent' && msg.type !== 'internal' && msg.sender === 'them');
   return {
     ...msg,
     text: msg.text || msg.message || '',
@@ -14,6 +16,13 @@ function normalizeMessage(msg) {
     type: isClient ? 'client' : (msg.type === 'system' ? 'system' : 'agent'),
     author: msg.author || msg.sender || '',
   };
+}
+
+export function isDraftTicket(ticket) {
+  if (!ticket) return false;
+  if (ticket.isDraft === true) return true;
+  const id = String(ticket._id || ticket.id || '');
+  return id.startsWith('draft-');
 }
 
 export function apiTicketToCockpit(ticket) {
@@ -42,42 +51,59 @@ export function adaptColumnsFromApi(columns) {
 }
 
 export function cockpitTicketToApi(ticket) {
-  const id = ticket._id || ticket.id;
+  const lf = ticket.lateralForm || {};
   return {
     chamadoProtocolo: ticket.chamadoProtocolo,
     chamadoTitulo: ticket.chamadoTitulo || ticket.title,
     title: ticket.title,
     description: ticket.description,
+    text: ticket.text || ticket.description,
     status: ticket.status,
     priority: ticket.priority,
     channel: ticket.channel,
     source: ticket.source,
     boxId: ticket.boxId,
-    clientName: ticket.clientName || ticket.solicitante,
-    clientCPF: ticket.clientCPF,
-    responsibleAgent: ticket.responsibleAgent || ticket.lateralForm?.responsavel,
-    lateralForm: ticket.lateralForm,
+    clienteId: ticket.clienteId || lf.clienteId,
+    clientName: ticket.clientName || ticket.solicitante || lf.clienteNome,
+    clientCPF: ticket.clientCPF || lf.clienteCpf || lf.cpf,
+    responsibleAgent: ticket.responsibleAgent || lf.responsavel,
+    lateralForm: lf,
     formData: ticket.formData,
   };
 }
 
 export function buildCreatePayload(form) {
+  const title = String(form.title ?? form.assunto ?? '').trim();
+  const description = String(form.descricao ?? form.description ?? '').trim();
+  const cpf = String(form.clientCPF || form.lateralForm?.clienteCpf || form.lateralForm?.cpf || '').replace(/\D/g, '');
+  const lf = form.lateralForm || {};
   return {
-    chamadoTitulo: form.assunto || form.title,
-    title: form.assunto || form.title,
-    description: form.descricao || form.description || form.assunto,
-    text: form.descricao || form.description || form.assunto,
-    status: 'novo',
-    channel: form.channel,
-    clientName: form.clientName,
-    clientCPF: form.clientCPF,
+    chamadoTitulo: title,
+    title,
+    description,
+    text: form.text ?? description,
+    status: form.status || 'novo',
+    channel: form.channel || lf.canal,
+    clienteId: form.clienteId,
+    clientName: form.clientName || lf.clienteNome,
+    clientCPF: cpf,
     lateralForm: {
-      cpf: (form.clientCPF || '').replace(/\D/g, ''),
-      canal: form.channel,
-      classificacaoTipo: form.tipo,
-      produto: form.produto,
-      motivo: form.motivo,
-      responsavel: (form.atribuir || '').replace(' (eu)', ''),
+      cpf,
+      clienteCpf: cpf,
+      clienteNome: form.clientName || lf.clienteNome || '',
+      clienteEmail: lf.clienteEmail ?? (form.clientEmail ? [form.clientEmail] : []),
+      clienteTelefone: lf.clienteTelefone ?? (form.clientPhone ? [form.clientPhone] : []),
+      clienteId: form.clienteId || lf.clienteId,
+      canal: form.channel || lf.canal,
+      classificacaoTipo: form.tipo || lf.classificacaoTipo,
+      produto: form.produto || lf.produto,
+      motivo: form.motivo || lf.motivo,
+      responsavel: (form.atribuir || lf.responsavel || '').replace(' (eu)', ''),
+      detalhe: lf.detalhe || form.detalhe || '',
+      escalonar: lf.escalonar,
+      wasEscalated: lf.wasEscalated,
+      lastWorkflow: lf.lastWorkflow,
+      retornoN1: lf.retornoN1,
     },
   };
 }

@@ -1,7 +1,8 @@
 /**
- * DeskClientProfileBar v1.0.0 — cabeçalho do cliente no ticket
+ * DeskClientProfileBar v1.1.0 — cabeçalho do cliente no ticket
+ * VERSION: v1.1.0 | DATE: 2026-06-24
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   getClientContactFields,
   getClientProducts,
@@ -19,6 +20,7 @@ export default function DeskClientProfileBar({
   onSelectTicket,
 }) {
   const [editOpen, setEditOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [draft, setDraft] = useState({ name: '', email: '', phone: '' });
   const contact = getClientContactFields(ticket, client);
@@ -32,6 +34,27 @@ export default function DeskClientProfileBar({
     if (onSaveContact) onSaveContact(draft);
     setEditOpen(false);
   };
+
+  useEffect(() => {
+    if (!infoOpen) return undefined;
+
+    const handlePointer = (e) => {
+      if (e.target.closest?.('#btnClientContactInfo')) return;
+      if (e.target.closest?.('#clientContactInfoPopover')) return;
+      setInfoOpen(false);
+    };
+
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setInfoOpen(false);
+    };
+
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [infoOpen]);
 
   return (
     <div className="crm-client-profile-bar">
@@ -70,11 +93,53 @@ export default function DeskClientProfileBar({
               </div>
             )}
           </span>
-          <span className="ticket-client-profile__contact"><i className="fas fa-envelope" /> <span id="profileEmail">{contact.email || '—'}</span></span>
-          <span className="ticket-client-profile__contact"><i className="fas fa-phone" /> <span id="profilePhone">{contact.phone || '—'}</span></span>
-          <span className="ticket-client-profile__ticket-id" id="profileTicketId">Ticket #{ticket.id}</span>
-        </div>
-        <div className="ticket-client-profile__row ticket-client-profile__row--bottom">
+          <span className="ticket-client-profile__info-wrap">
+            <button
+              type="button"
+              className={'crm-client-info-btn' + (infoOpen ? ' is-active' : '')}
+              id="btnClientContactInfo"
+              title="E-mail e telefone"
+              aria-label="Ver e-mail e telefone"
+              aria-expanded={infoOpen}
+              aria-controls="clientContactInfoPopover"
+              onClick={() => setInfoOpen((open) => !open)}
+            >
+              <i className="ti ti-info-circle" aria-hidden="true" />
+            </button>
+            {infoOpen && (
+              <div
+                className="crm-client-contact-popover"
+                id="clientContactInfoPopover"
+                role="dialog"
+                aria-label="Contato do cliente"
+              >
+                <button
+                  type="button"
+                  className="crm-client-contact-popover__close"
+                  id="btnCloseClientContactInfo"
+                  title="Fechar"
+                  aria-label="Fechar"
+                  onClick={() => setInfoOpen(false)}
+                >
+                  <i className="ti ti-x" />
+                </button>
+                <div className="crm-client-contact-popover__row">
+                  <i className="fas fa-envelope" aria-hidden="true" />
+                  <div className="crm-client-contact-popover__field">
+                    <span className="crm-client-contact-popover__label">E-mail</span>
+                    <span className="crm-client-contact-popover__value" id="profileEmail">{contact.email || '—'}</span>
+                  </div>
+                </div>
+                <div className="crm-client-contact-popover__row">
+                  <i className="fas fa-phone" aria-hidden="true" />
+                  <div className="crm-client-contact-popover__field">
+                    <span className="crm-client-contact-popover__label">Telefone</span>
+                    <span className="crm-client-contact-popover__value" id="profilePhone">{contact.phone || '—'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </span>
           <span className="ticket-client-profile__cpf">
             <span className="ticket-client-profile__label">CPF</span> <span id="profileCpf">{contact.cpf || '—'}</span>
           </span>
@@ -83,21 +148,22 @@ export default function DeskClientProfileBar({
               <span key={p} className={'velo-product-tag ' + getProductTagClass(p)}>{p}</span>
             )) : <span className="ticket-client-profile__empty">—</span>}
           </span>
-        </div>
-        <div className="ticket-client-profile__footer">
-          <button
-            type="button"
-            className="btn-secondary btn-sm ticket-client-history-btn"
-            id="btnClientHistory"
-            onClick={() => setHistoryOpen(true)}
-          >
-            <i className="fas fa-history" /> Histórico de tickets
-          </button>
-          <TicketOperationProgress
-            ticket={ticket}
-            queueId={queueId}
-            escalonar={escalonar}
-          />
+          <span className="ticket-client-profile__ticket-meta">
+            <button
+              type="button"
+              className="btn-secondary btn-sm ticket-client-history-btn"
+              id="btnClientHistory"
+              onClick={() => setHistoryOpen(true)}
+            >
+              <i className="fas fa-history" /> Histórico de tickets
+            </button>
+            <TicketOperationProgress
+              ticket={ticket}
+              queueId={queueId}
+              escalonar={escalonar}
+            />
+            <span className="ticket-client-profile__ticket-id" id="profileTicketId">Ticket #{ticket.id}</span>
+          </span>
         </div>
       </section>
       <ClientTicketHistoryModal

@@ -1,19 +1,14 @@
 /**
  * Chat / Mensagens WhatsApp
- * VERSION: v2.1.0 | DATE: 2026-06-18 | AUTHOR: VeloHub Development Team
+ * VERSION: v2.2.0 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
  */
 import React, { useEffect, useState } from 'react';
 import { whatsappApi } from '../../api/client';
 
-const DEFAULT_THREADS = [
-  { id: '1', name: 'Maria Oliveira', preview: 'Internet lenta após 22h', channel: 'WhatsApp', unread: 2 },
-  { id: '2', name: 'João Pereira', preview: 'Bloqueio por inadimplência', channel: 'Portal', unread: 0 },
-];
-
 export default function ChatView() {
   const [connected, setConnected] = useState(false);
-  const [threads, setThreads] = useState(DEFAULT_THREADS);
-  const [active, setActive] = useState(DEFAULT_THREADS[0]);
+  const [threads, setThreads] = useState([]);
+  const [active, setActive] = useState(null);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
@@ -68,8 +63,10 @@ export default function ChatView() {
       </div>
       <div id="whatsappConnected" className="chat-container" style={{ display: connected ? 'flex' : 'none', minHeight: 480 }}>
         <aside className="chat-threads" style={{ width: 280, borderRight: '1px solid var(--border-color, #e2e8f0)' }}>
-          {threads.map((t) => (
-            <button key={t.id} type="button" className={'chat-thread' + (active.id === t.id ? ' active' : '')} onClick={() => setActive(t)}>
+          {threads.length === 0 ? (
+            <p style={{ padding: 16, color: 'var(--text-muted, #64748b)' }}>Nenhuma conversa disponível.</p>
+          ) : threads.map((t) => (
+            <button key={t.id} type="button" className={'chat-thread' + (active?.id === t.id ? ' active' : '')} onClick={() => setActive(t)}>
               <strong>{t.name}</strong>
               <span>{t.preview}</span>
               {t.unread > 0 && <span className="chat-unread">{t.unread}</span>}
@@ -77,17 +74,17 @@ export default function ChatView() {
           ))}
         </aside>
         <section className="chat-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <header className="chat-panel__header"><h3>{active.name}</h3><span>{active.channel}</span></header>
+          <header className="chat-panel__header"><h3>{active?.name || 'Conversa'}</h3><span>{active?.channel || ''}</span></header>
           <div className="chat-messages" style={{ flex: 1, padding: 16 }}>
             {messages.length ? messages.map((m, i) => (
               <div key={i} className="chat-msg chat-msg--in">{m.text || m.body || m.message}</div>
             )) : (
-              <div className="chat-msg chat-msg--in">Olá, preciso de ajuda com meu plano.</div>
+              <p style={{ color: 'var(--text-muted, #64748b)' }}>Nenhuma mensagem nesta conversa.</p>
             )}
           </div>
           <footer className="chat-compose" style={{ display: 'flex', gap: 8, padding: 16 }}>
-            <input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Digite uma mensagem…" style={{ flex: 1 }} />
-            <button type="button" className="btn-primary" onClick={handleSend} disabled={sending}>Enviar</button>
+            <input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Digite uma mensagem…" style={{ flex: 1 }} disabled={!active?.id} />
+            <button type="button" className="btn-primary" onClick={handleSend} disabled={sending || !active?.id}>Enviar</button>
           </footer>
         </section>
       </div>

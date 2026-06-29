@@ -1,5 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+/** Box v1.0.2 — reservada p/ caixas personalizadas futuras (POST); sem seed automático */
+
 export interface IBox extends Document {
   name: string;
   order: number;

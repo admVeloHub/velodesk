@@ -1,11 +1,9 @@
-/** ChamadoN1 v1.0.1 — b2c_chamados.chamados_n1 (LISTA_SCHEMA_DESK.rb; processo[] adiado) */
-import mongoose, { Schema, Document } from 'mongoose';
+/** ChamadoN1 v1.1.0 — b2c_chamados.chamados_n1 (DESK_LISTA_SCHEMAS.rb) */
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
-export interface IClienteContato {
+export interface IClienteRef {
   clienteCpf: string;
-  clienteNome: string;
-  clienteEmail: { lista: string[] };
-  clienteTelefone: { lista: string[] };
+  clienteId: Types.ObjectId | null;
 }
 
 export interface ITabulacao {
@@ -30,19 +28,17 @@ export interface IRegistro {
 export interface IChamadoN1 extends Document {
   chamadoProtocolo: string;
   chamadoTitulo: string;
-  cliente: IClienteContato[];
+  cliente: IClienteRef[];
   tabulacao: ITabulacao[];
   registro: IRegistro[];
   createdAt: Date;
   updatedAt: Date;
 }
 
-const ClienteContatoSchema = new Schema<IClienteContato>(
+const ClienteRefSchema = new Schema<IClienteRef>(
   {
     clienteCpf: { type: String, default: '' },
-    clienteNome: { type: String, default: '' },
-    clienteEmail: { lista: { type: [String], default: [] } },
-    clienteTelefone: { lista: { type: [String], default: [] } },
+    clienteId: { type: Schema.Types.ObjectId, default: null },
   },
   { _id: false }
 );
@@ -76,7 +72,7 @@ const ChamadoN1Schema = new Schema<IChamadoN1>(
   {
     chamadoProtocolo: { type: String, required: true, unique: true },
     chamadoTitulo: { type: String, default: '' },
-    cliente: { type: [ClienteContatoSchema], default: [] },
+    cliente: { type: [ClienteRefSchema], default: [] },
     tabulacao: { type: [TabulacaoSchema], default: [] },
     registro: { type: [RegistroSchema], default: [] },
   },

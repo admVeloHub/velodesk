@@ -37,11 +37,11 @@
     margin-right: 0.35rem;
 }
 
-/* Sidebar cockpit */
-.sidebar { width: 200px !important; }
-.main-content { margin-left: 200px !important; }
-.sidebar.collapsed { width: 56px !important; }
-.main-content.sidebar-collapsed { margin-left: 56px !important; }
+/* Sidebar cockpit — não aplicar ao rail retrátil (.velo-nav-rail) */
+.sidebar:not(.velo-nav-rail) { width: 200px !important; }
+.sidebar.collapsed:not(.velo-nav-rail) { width: 56px !important; }
+.main-app:not(.velo-chromeless) .main-content:not(.sidebar-collapsed) { margin-left: 200px !important; }
+.main-app:not(.velo-chromeless) .main-content.sidebar-collapsed { margin-left: 56px !important; }
 
 .sidebar .nav-item {
     padding: 0.65rem 1rem;

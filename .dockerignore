@@ -1,0 +1,10 @@
+**/node_modules
+**/.git
+**/.vite
+**/dist
+_compare-remoto
+frontend-legacy
+*.log
+.env
+.env.*
+!.env.docker.example

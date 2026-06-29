@@ -1,53 +1,49 @@
 /**
- * loadFonteVelodeskEnv.cjs — localiza FONTE DA VERDADE e carrega .env-velodesk (dev local).
- * VERSION: v1.0.0 | DATE: 2026-06-15 | AUTHOR: VeloHub Development Team
- *
- * Sobe diretórios a partir de startDir até encontrar bootstrapFonteEnvVelodesk.cjs;
- * fallback: dotenv direto em .env-velodesk ou VELODESK_DOTENV_PATH.
+ * loadFonteVelodeskEnv.cjs — carrega exclusivamente backend/.env
+ * VERSION: v2.0.0 | DATE: 2026-06-25 | AUTHOR: VeloHub Development Team
  */
 'use strict';
 
 const path = require('path');
 const fs = require('fs');
 
+const DEFAULTS = {
+  VELODESK: '8000',
+  VELODESK_BACKEND: '8001',
+};
+
+function normalizeMongoEnv() {
+  if (!process.env.MONGODB_URI && process.env.MONGO_URI) {
+    process.env.MONGODB_URI = process.env.MONGO_URI;
+  }
+  if (process.env.MONGODB_URI) {
+    process.env.MONGODB_URI = process.env.MONGODB_URI.replace(/(@[^/?]+)\/\?/, '$1?');
+  }
+}
+
+function applyDefaults() {
+  if (!process.env.VELODESK) process.env.VELODESK = DEFAULTS.VELODESK;
+  if (!process.env.VELODESK_BACKEND) process.env.VELODESK_BACKEND = DEFAULTS.VELODESK_BACKEND;
+  normalizeMongoEnv();
+}
+
 function loadFrom(startDir) {
-  let d = path.resolve(startDir);
+  const envPath = path.join(path.resolve(startDir), '.env');
 
-  for (let i = 0; i < 16; i++) {
-    const loader = path.join(d, 'FONTE DA VERDADE', 'bootstrapFonteEnvVelodesk.cjs');
-    if (fs.existsSync(loader)) {
-      return require(loader).loadFrom(startDir);
-    }
-    const parent = path.dirname(d);
-    if (parent === d) break;
-    d = parent;
+  if (!fs.existsSync(envPath)) {
+    applyDefaults();
+    return { envPath: null, loaded: false, source: 'missing-dotenv' };
   }
 
-  d = path.resolve(startDir);
-  for (let i = 0; i < 16; i++) {
-    const envPath = path.join(d, 'FONTE DA VERDADE', '.env-velodesk');
-    if (fs.existsSync(envPath)) {
-      try {
-        require('dotenv').config({ path: envPath });
-        return { envPath, loaded: true };
-      } catch (err) {
-        console.warn('loadFonteVelodeskEnv v1.0.0: dotenv indisponível:', err.message);
-        return { envPath, loaded: false };
-      }
-    }
-    const parent = path.dirname(d);
-    if (parent === d) break;
-    d = parent;
+  try {
+    require('dotenv').config({ path: envPath });
+    applyDefaults();
+    return { envPath, loaded: true, source: 'dotenv' };
+  } catch (err) {
+    console.warn('loadFonteVelodeskEnv v2.0.0: falha ao carregar .env:', err.message);
+    applyDefaults();
+    return { envPath, loaded: false, source: 'dotenv-error' };
   }
-
-  const custom = process.env.VELODESK_DOTENV_PATH;
-  if (custom && fs.existsSync(custom)) {
-    require('dotenv').config({ path: custom });
-    return { envPath: custom, loaded: true };
-  }
-
-  console.warn('loadFonteVelodeskEnv v1.0.0: FONTE DA VERDADE/.env-velodesk não encontrado.');
-  return { envPath: null, loaded: false };
 }
 
 module.exports = { loadFrom };

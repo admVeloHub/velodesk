@@ -1,6 +1,6 @@
 /**
- * API client v1.0.0 — integração backend Velodesk
- * VERSION: v1.0.0 | DATE: 2026-06-18 | AUTHOR: VeloHub Development Team
+ * API client v1.2.0 — integração backend Velodesk + tabulação
+ * VERSION: v1.2.0 | DATE: 2026-06-25 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 
@@ -43,6 +43,11 @@ export const boxesApi = {
   list: (params) => api.get('/boxes', { params }).then((r) => r.data),
 };
 
+export const clientsApi = {
+  getByCpf: (cpf) => api.get('/clients', { params: { cpf } }).then((r) => r.data),
+  create: (payload) => api.post('/clients', payload).then((r) => r.data),
+};
+
 export const statsApi = {
   dashboard: () => api.get('/dashboard').then((r) => r.data),
 };
@@ -51,8 +56,15 @@ export const usersApi = {
   list: () => api.get('/users').then((r) => r.data),
 };
 
-export const formsApi = {
-  list: () => api.get('/forms').then((r) => r.data),
+export const tabulationApi = {
+  getActive: () => api.get('/tabulation').then((r) => r.data),
+  listProdutos: (includeInactive = false) =>
+    api.get('/tabulation/produtos', { params: { includeInactive: includeInactive ? 'true' : undefined } }).then((r) => r.data),
+  getProduto: (id) => api.get(`/tabulation/produtos/${id}`).then((r) => r.data),
+  createProduto: (data) => api.post('/tabulation/produtos', data).then((r) => r.data),
+  updateProduto: (id, data) => api.put(`/tabulation/produtos/${id}`, data).then((r) => r.data),
+  patchProduto: (id, data) => api.patch(`/tabulation/produtos/${id}`, data).then((r) => r.data),
+  deleteProduto: (id) => api.delete(`/tabulation/produtos/${id}`).then((r) => r.data),
 };
 
 export const whatsappApi = {

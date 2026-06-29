@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { updateTicketInKanban } from '../../services/kanbanStorage';
 import { useNotifications } from '../../context/NotificationContext';
-import { formsApi, usersApi } from '../../api/client';
+import { usersApi } from '../../api/client';
 
 export default function TicketLateralForm({ ticket, onClose }) {
   const { showNotification } = useNotifications();
@@ -20,7 +20,6 @@ export default function TicketLateralForm({ ticket, onClose }) {
   const [saving, setSaving] = useState(false);
 
   React.useEffect(() => {
-    formsApi.list().catch(() => {});
     usersApi.list().catch(() => {});
   }, []);
 

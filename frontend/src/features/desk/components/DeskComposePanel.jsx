@@ -1,8 +1,13 @@
-﻿/**
- * DeskComposePanel v1.1.0 — resposta pública / anotação interna + enviar
+/**
+ * DeskComposePanel v1.4.1 — resposta pública / anotação interna + corretor ortográfico
+ * VERSION: v1.4.1 | DATE: 2026-06-26
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { SEND_STATUS_OPTIONS } from '../../../services/desk/constants';
+import { useComposeSpellCheck } from '../../../hooks/useComposeSpellCheck';
+import { useTabulation } from '../../../context/TabulationContext';
+import SpellSuggestionBar, { SpellErrorsPanel } from './SpellSuggestionBar';
+import SpellComposeTextarea from './SpellComposeTextarea';
 
 const MACROS = [
   { value: 'F1', label: 'F1 — Saudação padrão', text: 'Olá! Obrigado por entrar em contato. Como posso ajudá-lo(a) hoje?' },
@@ -11,7 +16,7 @@ const MACROS = [
   { value: 'F4', label: 'F4 — Encerramento NPS', text: 'Agradecemos o contato. Por favor, avalie nosso atendimento.' },
 ];
 
-export function DeskComposeFooter({ sendStatus, onSendStatusChange, onSend }) {
+export function DeskStatusCommitButton({ sendStatus, onCommitStatus, variant = 'compose', disabled = false }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const currentStatus = SEND_STATUS_OPTIONS.find((o) => o.id === sendStatus) || SEND_STATUS_OPTIONS[0];
@@ -24,55 +29,119 @@ export function DeskComposeFooter({ sendStatus, onSendStatusChange, onSend }) {
     return () => document.removeEventListener('click', close);
   }, []);
 
+  useEffect(() => {
+    if (disabled) setMenuOpen(false);
+  }, [disabled]);
+
+  const isPanel = variant === 'panel';
+
   return (
-    <div className="crm-ticket-compose-footer">
-      <div className="compose-actions">
-        <div className="crm-send-status" id="crmSendStatus" ref={menuRef}>
-          <button
-            type="button"
-            className={'crm-send-status__trigger crm-send-status__trigger--' + currentStatus.cls}
-            id="crmStatusDropdown"
-            aria-haspopup="listbox"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((v) => !v)}
-          >
+    <div
+      className={'crm-send-status' + (isPanel ? ' crm-send-status--panel' : '') + (disabled ? ' crm-send-status--disabled' : '')}
+      id="crmSendStatus"
+      ref={menuRef}
+    >
+      <button
+        type="button"
+        className={
+          (isPanel
+            ? 'rp-footer-btn rp-footer-btn--primary crm-send-status__trigger-panel'
+            : 'crm-send-status__trigger crm-send-status__trigger--' + currentStatus.cls)
+          + (disabled ? ' is-disabled' : '')
+        }
+        id="crmStatusDropdown"
+        aria-haspopup="listbox"
+        aria-expanded={menuOpen}
+        aria-disabled={disabled}
+        disabled={disabled}
+        title={disabled ? 'Corrija os erros ortográficos antes de enviar' : undefined}
+        onClick={() => {
+          if (disabled) return;
+          setMenuOpen((v) => !v);
+        }}
+      >
+        {isPanel ? (
+          <>
+            <i className="ti ti-send" />
+            Enviar como
+            <i className="ti ti-chevron-down" />
+          </>
+        ) : (
+          <>
             {currentStatus.label} <i className="ti ti-chevron-down" />
+          </>
+        )}
+      </button>
+      <div className="crm-send-status__menu" id="crmStatusMenu" role="listbox" hidden={!menuOpen || disabled}>
+        {SEND_STATUS_OPTIONS.map((opt) => (
+          <button
+            key={opt.id}
+            type="button"
+            className={'crm-send-status__option crm-send-status__option--' + opt.cls}
+            role="option"
+            disabled={disabled}
+            onClick={() => {
+              if (disabled) return;
+              setMenuOpen(false);
+              onCommitStatus(opt.id);
+            }}
+          >
+            {opt.label}
           </button>
-          <div className="crm-send-status__menu" id="crmStatusMenu" role="listbox" hidden={!menuOpen}>
-            {SEND_STATUS_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                className={'crm-send-status__option crm-send-status__option--' + opt.cls}
-                role="option"
-                onClick={() => { onSendStatusChange(opt.id); setMenuOpen(false); onSend(opt.id); }}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );
 }
 
-function InternalNoteFields({ ticketId, internalText, onInternalTextChange }) {
+/** @deprecated use DeskStatusCommitButton */
+export const DeskComposeFooter = DeskStatusCommitButton;
+
+function InternalNoteFields({
+  ticketId,
+  internalText,
+  onInternalTextChange,
+  tabulationConfig,
+  spellIgnoredWords,
+  onIgnoreSpellWord,
+}) {
   const tid = String(ticketId);
+  const spell = useComposeSpellCheck({
+    text: internalText,
+    onTextChange: onInternalTextChange,
+    tabulationConfig,
+    ignoredWords: spellIgnoredWords,
+    onIgnoreWord: onIgnoreSpellWord,
+    trackFlaggedErrors: false,
+  });
+
   return (
-    <div className="response-form internal-form crm-notes-compose__form">
+    <div className="response-form internal-form crm-notes-compose__form spell-compose-wrap">
       <div className="crm-notes-compose__header">
         <i className="fas fa-lock" aria-hidden="true" />
         <span>Anotação interna — não será enviada ao cliente</span>
       </div>
-      <textarea
-        className="response-textarea crm-notes-compose__textarea"
+      <SpellSuggestionBar
+        suggestion={spell.activeSuggestion}
+        loading={spell.spellLoading}
+        loadError={spell.spellLoadError}
+        onApply={spell.applySuggestion}
+        onDismiss={spell.dismissSuggestion}
+        onIgnore={spell.ignoreSuggestion}
+      />
+      <SpellComposeTextarea
         id={'internalResponse-' + tid}
-        data-ai-skip="true"
+        className="response-textarea crm-notes-compose__textarea"
         placeholder="Digite uma anotação interna..."
         rows={5}
         value={internalText}
-        onChange={(e) => onInternalTextChange(e.target.value)}
+        flaggedErrors={spell.flaggedErrors}
+        activeErrorStartIndex={spell.activeErrorStartIndex}
+        onChange={spell.handleChange}
+        onKeyDown={spell.handleKeyDown}
+        onBlur={spell.handleBlur}
+        onSelect={spell.handleSelect}
+        onClick={spell.handleClick}
       />
     </div>
   );
@@ -87,8 +156,22 @@ export default function DeskComposePanel({
   onComposeTextChange,
   onInternalTextChange,
   onOpenAi,
+  spellIgnoredWords,
+  onIgnoreSpellWord,
+  onFlaggedErrorsChange,
 }) {
   const tid = String(ticketId);
+  const { config: tabulationConfig } = useTabulation();
+
+  const spell = useComposeSpellCheck({
+    text: composeText,
+    onTextChange: onComposeTextChange,
+    tabulationConfig,
+    ignoredWords: spellIgnoredWords,
+    onIgnoreWord: onIgnoreSpellWord,
+    onFlaggedErrorsChange,
+    trackFlaggedErrors: true,
+  });
 
   const applyMacro = (value) => {
     const macro = MACROS.find((m) => m.value === value);
@@ -121,15 +204,32 @@ export default function DeskComposePanel({
             </div>
             <div className="response-content octa-response-panel-body">
               <div className={'response-tab-content' + (composeMode === 'public' ? ' active' : '')} id={'public-' + tid}>
-                <div className="response-form">
-                  <textarea
-                    className="response-textarea"
+                <div className="response-form spell-compose-wrap">
+                  <SpellErrorsPanel
+                    errors={spell.flaggedErrors}
+                    onApplyFix={spell.applyErrorFix}
+                  />
+                  <SpellSuggestionBar
+                    suggestion={spell.activeSuggestion}
+                    loading={spell.spellLoading}
+                    loadError={spell.spellLoadError}
+                    onApply={spell.applySuggestion}
+                    onDismiss={spell.dismissSuggestion}
+                    onIgnore={spell.ignoreSuggestion}
+                  />
+                  <SpellComposeTextarea
                     id={'publicResponse-' + tid}
-                    data-ai-skip="true"
+                    className="response-textarea"
                     placeholder="Digite sua resposta ao cliente..."
                     rows={5}
                     value={composeText}
-                    onChange={(e) => onComposeTextChange(e.target.value)}
+                    flaggedErrors={spell.flaggedErrors}
+                    activeErrorStartIndex={spell.activeErrorStartIndex}
+                    onChange={spell.handleChange}
+                    onKeyDown={spell.handleKeyDown}
+                    onBlur={spell.handleBlur}
+                    onSelect={spell.handleSelect}
+                    onClick={spell.handleClick}
                   />
                   <div className="response-actions ticket-response-actions">
                     <div className="ticket-macro-hub">
@@ -156,6 +256,9 @@ export default function DeskComposePanel({
                   ticketId={ticketId}
                   internalText={internalText}
                   onInternalTextChange={onInternalTextChange}
+                  tabulationConfig={tabulationConfig}
+                  spellIgnoredWords={spellIgnoredWords}
+                  onIgnoreSpellWord={onIgnoreSpellWord}
                 />
               </div>
             </div>

@@ -1,14 +1,12 @@
 /**
- * Sidebar rail unificada
- * VERSION: v1.3.0 | DATE: 2026-06-19
+ * Sidebar rail unificada — 3 estados: 5px | hover 52px | chevron fixa 220px
+ * VERSION: v1.7.0 | DATE: 2026-06-24
+ * Perfil: VeloHub (sem botão local na barra)
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { NAV_ITEMS } from '../config/profiles';
 import { useProfile } from '../context/ProfileContext';
-import { useAuth } from '../context/AuthContext';
-import { getInitials } from '../services/desk/utils';
-import AccountSettingsModal from '../features/account/AccountSettingsModal';
 
 function navKeyActivate(e, action) {
   if (e.key === 'Enter' || e.key === ' ') {
@@ -19,15 +17,47 @@ function navKeyActivate(e, action) {
 
 export default function Sidebar({ onOpenAI }) {
   const { isNavAllowed, profile } = useProfile();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [accountOpen, setAccountOpen] = useState(false);
+  const [hoverExpanded, setHoverExpanded] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const leaveTimerRef = useRef(null);
 
-  const profileInitials = useMemo(
-    () => getInitials(user?.name || 'Ana Silva'),
-    [user?.name],
-  );
+  const isOpen = hoverExpanded || pinned;
+
+  const handleSidebarEnter = useCallback(() => {
+    if (leaveTimerRef.current) {
+      clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
+    setHoverExpanded(true);
+  }, []);
+
+  const handleSidebarLeave = useCallback(() => {
+    if (pinned) return;
+    if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
+    leaveTimerRef.current = setTimeout(() => {
+      setHoverExpanded(false);
+      leaveTimerRef.current = null;
+    }, 60);
+  }, [pinned]);
+
+  const handleWrapLeave = useCallback((e) => {
+    if (pinned) return;
+    const nav = e.currentTarget.querySelector('#mainSidebar');
+    if (nav && e.relatedTarget && nav.contains(e.relatedTarget)) return;
+    handleSidebarLeave();
+  }, [pinned, handleSidebarLeave]);
+
+  const togglePinned = useCallback((e) => {
+    e.stopPropagation();
+    setPinned((prev) => {
+      const next = !prev;
+      if (next) setHoverExpanded(true);
+      else setHoverExpanded(false);
+      return next;
+    });
+  }, []);
 
   const visibleNav = NAV_ITEMS
     .filter((item) => isNavAllowed(item.id))
@@ -50,10 +80,44 @@ export default function Sidebar({ onOpenAI }) {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
+  const wrapClass = [
+    'velo-nav-rail-wrap',
+    isOpen ? 'is-open' : '',
+    pinned ? 'is-pinned' : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <>
-      <nav className="sidebar collapsed velo-nav-rail" id="mainSidebar" aria-label="Navegação">
-        <div className="sidebar-brand" title="Velodesk">V</div>
+    <div
+      className={wrapClass}
+      onMouseEnter={handleSidebarEnter}
+      onMouseLeave={handleWrapLeave}
+    >
+      <nav
+        className="sidebar collapsed velo-nav-rail"
+        id="mainSidebar"
+        aria-label="Navegação"
+        onMouseEnter={handleSidebarEnter}
+        onMouseLeave={handleSidebarLeave}
+        onFocus={handleSidebarEnter}
+        onBlur={(e) => {
+          if (!pinned && !e.currentTarget.closest('.velo-nav-rail-wrap')?.contains(e.relatedTarget)) {
+            handleSidebarLeave();
+          }
+        }}
+      >
+        <div className="velo-nav-rail__head">
+          <button
+            type="button"
+            className="velo-nav-rail-chevron"
+            id="btnSidebarPin"
+            onClick={togglePinned}
+            aria-expanded={pinned}
+            aria-label={pinned ? 'Recolher menu lateral' : 'Fixar menu lateral com textos'}
+            title={pinned ? 'Recolher menu' : 'Expandir menu com textos'}
+          >
+            <i className={'ti ti-chevron-' + (pinned ? 'left' : 'right')} aria-hidden="true" />
+          </button>
+        </div>
         <ul className="nav-list">
           {visibleNav.map((item) => (
             <li
@@ -86,27 +150,7 @@ export default function Sidebar({ onOpenAI }) {
             <span>Assistente IA</span>
           </li>
         </ul>
-        <div className="profile-section">
-          <button
-            className="profile-btn"
-            id="profileBtn"
-            title={(user?.name || 'Minha conta') + ' — configurações da conta'}
-            aria-expanded={accountOpen}
-            aria-haspopup="dialog"
-            onClick={() => setAccountOpen(true)}
-          >
-            <span className="sidebar-profile-initials" aria-hidden="true">
-              {profileInitials}
-            </span>
-            <span className="sidebar-profile-label">Meu Perfil</span>
-          </button>
-        </div>
       </nav>
-
-      <AccountSettingsModal
-        open={accountOpen}
-        onClose={() => setAccountOpen(false)}
-      />
-    </>
+    </div>
   );
 }

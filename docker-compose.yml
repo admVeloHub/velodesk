@@ -1,0 +1,48 @@
+# docker-compose.yml v1.0.0 — Velodesk local / GCP-like stack
+# VERSION: v1.0.0 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
+#
+# Portas expostas no host: frontend 8000, API 8001 (padrão ecossistema).
+# Containers escutam 8080 (compatível com Cloud Run).
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - velodesk_mongo_data:/data/db
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8001:8080"
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/velodesk}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-b2c_chamados}
+      MONGODB_CADASTROS_DB_NAME: ${MONGODB_CADASTROS_DB_NAME:-b2c_cadastros}
+      JWT_SECRET: ${JWT_SECRET:-velodesk-dev-secret}
+      ENABLE_WHATSAPP: ${ENABLE_WHATSAPP:-false}
+    depends_on:
+      - mongo
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8080"
+    environment:
+      PORT: 8080
+      BACKEND_URL: http://api:8080
+    depends_on:
+      - api
+
+volumes:
+  velodesk_mongo_data:

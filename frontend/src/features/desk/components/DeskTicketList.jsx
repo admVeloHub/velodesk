@@ -1,5 +1,6 @@
 /**
- * DeskTicketList v1.0.0 — lista de tickets da fila
+ * DeskTicketList v1.0.1 — lista de tickets da fila
+ * VERSION: v1.0.1 | DATE: 2026-06-24
  */
 import React from 'react';
 import { SLA_LABELS } from '../../../services/desk/constants';
@@ -80,11 +81,13 @@ export default function DeskTicketList({
             const meta = statusMeta(queueId);
             const sla = getSlaClass(t);
             const tags = buildTags(t);
+            const isActive = String(t.id) === String(activeTicketId);
             return (
               <li
                 key={t.id}
-                className={'crm-ticket-card' + (String(t.id) === String(activeTicketId) ? ' is-active' : '')}
+                className={'crm-ticket-card' + (isActive ? ' is-active' : '')}
                 data-ticket-id={t.id}
+                aria-selected={isActive}
                 onClick={() => onSelectTicket(t.id)}
                 role="button"
                 tabIndex={0}

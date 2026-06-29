@@ -1,4 +1,4 @@
-/** stats.routes v1.1.0 — agregação sobre chamados_n1 */
+/** stats.routes v1.1.1 — agregação sobre chamados_n1 */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';

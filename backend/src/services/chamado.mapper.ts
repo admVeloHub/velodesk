@@ -1,7 +1,9 @@
-/** chamado.mapper v1.0.8 — create com protocolo informado, mensagem inicial e status */
+﻿/** chamado.mapper v1.2.2 — appendMessage com alteracoes extras (inbound e-mail) */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
-import type { IChamadoN1, IRegistro, ITabulacao } from '../models/ChamadoN1';
+import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
+import { loadDadosForRef, resolveClienteRefFromBody } from './cliente.service';
+import type { IClienteDados } from '../models/Cliente';
 
 export interface TicketMessageDto {
   id?: string;
@@ -55,7 +57,6 @@ export const MEUS_CHAMADOS_COLUMNS = [
   { id: 'meus-pendente', name: 'Pendente', status: 'pendente', order: 3 },
 ] as const;
 
-/** Limites de SLA por status (horas no status atual) — ajustável quando houver regra oficial */
 const SLA_LIMIT_HOURS: Record<string, number> = {
   'em-aberto': 4,
   'em-andamento': 8,
@@ -76,6 +77,23 @@ const STATUS_VARIANTS: Record<string, string[]> = {
 const STATUS_BY_BOX_NAME = Object.fromEntries(
   Object.entries(BOX_NAME_BY_STATUS).map(([status, name]) => [name, status])
 );
+
+/** Campos legados embutidos em cliente[] antes da migraÃ§Ã£o v1.1.0 */
+type LegacyClienteEmbed = IClienteRef & {
+  clienteNome?: string;
+  clienteEmail?: { lista?: string[] };
+  clienteTelefone?: { lista?: string[] };
+};
+
+function legacyDadosFromRef(ref?: LegacyClienteEmbed | null): IClienteDados | null {
+  if (!ref?.clienteNome && !ref?.clienteCpf) return null;
+  return {
+    clienteCpf: ref.clienteCpf ?? '',
+    clienteNome: ref.clienteNome ?? '',
+    clienteEmail: { lista: ref.clienteEmail?.lista ?? [] },
+    clienteTelefone: { lista: ref.clienteTelefone?.lista ?? [] },
+  };
+}
 
 export function statusFromBoxName(boxName: string): string {
   if (boxName === 'Novo') return 'novo';
@@ -118,15 +136,6 @@ function resolveChamadoTitulo(body: Record<string, unknown>, fallback = ''): str
   return String(body.chamadoTitulo ?? body.title ?? fallback).trim();
 }
 
-function normalizeStringList(value: unknown, fallback: string[] = []): string[] {
-  if (Array.isArray(value)) {
-    const items = value.map((item) => String(item ?? '').trim()).filter(Boolean);
-    return items.length > 0 ? items : fallback;
-  }
-  if (typeof value === 'string' && value.trim()) return [value.trim()];
-  return fallback;
-}
-
 function tabulacaoFromBody(body: Record<string, unknown>, fallbackTitle?: string): ITabulacao {
   const lateral = (body.lateralForm ?? {}) as Record<string, string>;
   return {
@@ -139,32 +148,10 @@ function tabulacaoFromBody(body: Record<string, unknown>, fallbackTitle?: string
   };
 }
 
-function clienteFromBody(body: Record<string, unknown>, existing?: IChamadoN1['cliente'][0]) {
-  const lateral = (body.lateralForm ?? {}) as Record<string, unknown>;
-  const cpf = String(body.clientCPF ?? lateral.clienteCpf ?? lateral.cpf ?? existing?.clienteCpf ?? '');
-  const nome = String(body.clientName ?? lateral.clienteNome ?? existing?.clienteNome ?? '');
-  const emailLista = normalizeStringList(
-    lateral.clienteEmail,
-    existing?.clienteEmail?.lista ?? []
-  );
-  const telLista = normalizeStringList(
-    lateral.clienteTelefone,
-    existing?.clienteTelefone?.lista ?? []
-  );
-
-  if (!cpf && !nome && emailLista.length === 0 && telLista.length === 0) return [];
-
-  return [
-    {
-      clienteCpf: cpf,
-      clienteNome: nome,
-      clienteEmail: { lista: emailLista },
-      clienteTelefone: { lista: telLista },
-    },
-  ];
-}
-
-export function createChamadoFromBody(body: Record<string, unknown>, status = 'novo'): Partial<IChamadoN1> {
+export async function createChamadoFromBody(
+  body: Record<string, unknown>,
+  status = 'novo'
+): Promise<Partial<IChamadoN1>> {
   const titulo = resolveChamadoTitulo(body);
   const tab = tabulacaoFromBody(body, titulo);
   const internal = Boolean(body.internal);
@@ -173,6 +160,7 @@ export function createChamadoFromBody(body: Record<string, unknown>, status = 'n
     ? body.attachments.map((item) => String(item ?? '').trim()).filter(Boolean)
     : [];
   const protocoloInformed = String(body.chamadoProtocolo ?? '').trim();
+  const cliente = await resolveClienteRefFromBody(body);
 
   const registro: IRegistro = {
     data: new Date(),
@@ -187,22 +175,20 @@ export function createChamadoFromBody(body: Record<string, unknown>, status = 'n
   return {
     chamadoProtocolo: protocoloInformed || generateProtocolo(),
     chamadoTitulo: titulo,
-    cliente: clienteFromBody(body),
+    cliente,
     tabulacao: [tab],
     registro: [registro],
   };
 }
 
-export function applyBodyToChamado(chamado: IChamadoN1, body: Record<string, unknown>): void {
-  if (body.clientName !== undefined || body.clientCPF !== undefined || body.lateralForm) {
-    const next = clienteFromBody(
-      {
-        ...body,
-        clientName: body.clientName ?? chamado.cliente[0]?.clienteNome,
-        clientCPF: body.clientCPF ?? chamado.cliente[0]?.clienteCpf,
-      },
-      chamado.cliente[0]
-    );
+export async function applyBodyToChamado(chamado: IChamadoN1, body: Record<string, unknown>): Promise<void> {
+  if (
+    body.clientName !== undefined ||
+    body.clientCPF !== undefined ||
+    body.clienteId !== undefined ||
+    body.lateralForm
+  ) {
+    const next = await resolveClienteRefFromBody(body, chamado.cliente[0]);
     if (next.length > 0) chamado.cliente = next;
   }
 
@@ -239,7 +225,8 @@ export function appendMessage(
   text: string,
   internal: boolean,
   sender = 'me',
-  attachments: string[] = []
+  attachments: string[] = [],
+  extraAlteracoes: Record<string, unknown> = {}
 ): TicketMessageDto {
   const status = currentStatus(chamado);
   const safeAttachments = attachments.map((url) => String(url).trim()).filter(Boolean);
@@ -249,7 +236,7 @@ export function appendMessage(
     anexosMensagemPublica: internal ? [] : safeAttachments,
     anotacaoInterna: internal ? text : '',
     anexosAnotacaoInterna: internal ? safeAttachments : [],
-    alteracoes: { sender },
+    alteracoes: { sender, ...extraAlteracoes },
     status,
   };
   chamado.registro.push(entry);
@@ -263,10 +250,13 @@ export function appendMessage(
   };
 }
 
-export function chamadoToTicket(chamado: IChamadoN1, boxId?: string): TicketDto {
+export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Promise<TicketDto> {
   const tab = chamado.tabulacao?.[0];
-  const cliente = chamado.cliente?.[0];
+  const ref = chamado.cliente?.[0] as LegacyClienteEmbed | undefined;
   const status = currentStatus(chamado);
+
+  let cadastro = await loadDadosForRef(ref);
+  if (!cadastro) cadastro = legacyDadosFromRef(ref);
 
   const messages: TicketMessageDto[] = [];
   const internalNotes: TicketMessageDto[] = [];
@@ -297,6 +287,9 @@ export function chamadoToTicket(chamado: IChamadoN1, boxId?: string): TicketDto 
     || tab?.motivo?.trim()
     || chamado.chamadoProtocolo;
 
+  const clientCpf = ref?.clienteCpf || cadastro?.clienteCpf;
+  const clientName = cadastro?.clienteNome;
+
   return {
     _id: chamado._id.toString(),
     chamadoProtocolo: chamado.chamadoProtocolo,
@@ -308,8 +301,8 @@ export function chamadoToTicket(chamado: IChamadoN1, boxId?: string): TicketDto 
     channel: 'digital',
     source: 'velodesk',
     boxId,
-    clientName: cliente?.clienteNome,
-    clientCPF: cliente?.clienteCpf,
+    clientName,
+    clientCPF: clientCpf,
     responsibleAgent: tab?.responsavel,
     lateralForm: {
       tipoChamado: tab?.tipoChamado,
@@ -319,11 +312,11 @@ export function chamadoToTicket(chamado: IChamadoN1, boxId?: string): TicketDto 
       detalhe: tab?.detalhe,
       responsavel: tab?.responsavel,
       atribuido: tab?.atribuido,
-      clienteCpf: cliente?.clienteCpf,
-      clienteNome: cliente?.clienteNome,
-      clienteEmail: cliente?.clienteEmail?.lista ?? [],
-      clienteTelefone: cliente?.clienteTelefone?.lista ?? [],
-      cpf: cliente?.clienteCpf,
+      clienteCpf: clientCpf,
+      clienteNome: clientName,
+      clienteEmail: cadastro?.clienteEmail?.lista ?? [],
+      clienteTelefone: cadastro?.clienteTelefone?.lista ?? [],
+      cpf: clientCpf,
     },
     messages,
     internalNotes,
@@ -412,3 +405,4 @@ export async function resolveBoxIdForChamado(
   const box = boxes.find((b) => b.name === name);
   return box?._id.toString();
 }
+

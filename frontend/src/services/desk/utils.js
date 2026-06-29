@@ -1,6 +1,6 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v2.1.0 | DATE: 2026-06-19
+ * VERSION: v2.3.1 | DATE: 2026-06-25
  */
 import { getKanbanColumns, saveKanbanColumns, getAllCockpitTickets } from '../kanbanStorage';
 import { lookupClient, getAgentName } from '../clientDb';
@@ -23,10 +23,30 @@ export function normalizeCpf(v) {
   return String(v || '').replace(/\D/g, '');
 }
 
+/** Máscara CPF enquanto digita (máx. 11 dígitos): 000.000.000-00 */
+export function maskCpfInput(value) {
+  const d = normalizeCpf(value).slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
 export function formatCpf(digits) {
   const d = normalizeCpf(digits);
-  if (d.length !== 11) return digits;
+  if (d.length !== 11) return maskCpfInput(d);
   return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
+export function isValidCpfDigits(value) {
+  return normalizeCpf(value).length === 11;
+}
+
+/** Exige formato mínimo local@dominio.ext (pelo menos um ponto após @) */
+export function isValidEmailFormat(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
 }
 
 export function formatMsgMeta(iso, author) {
@@ -80,11 +100,16 @@ export function buildTags(ticket) {
 }
 
 export function getClientContactFields(ticket, client) {
+  const lf = ticket?.lateralForm || {};
+  const emails = lf.clienteEmail;
+  const phones = lf.clienteTelefone;
+  const emailFromLf = Array.isArray(emails) ? emails[0] : emails?.lista?.[0];
+  const phoneFromLf = Array.isArray(phones) ? phones[0] : phones?.lista?.[0];
   return {
-    name: ticket.clientName || ticket.solicitante || client?.name || '',
-    cpf: formatCpf(ticket.lateralForm?.cpf || ticket.clientCPF || client?.cpf || ''),
-    email: client?.email || ticket.clientEmail || '',
-    phone: client?.telefone || ticket.clientPhone || '',
+    name: lf.clienteNome || ticket?.clientName || ticket?.solicitante || client?.name || '',
+    cpf: formatCpf(lf.clienteCpf || lf.cpf || ticket?.clientCPF || client?.cpf || ''),
+    email: emailFromLf || ticket?.clientEmail || client?.email || '',
+    phone: phoneFromLf || ticket?.clientPhone || client?.telefone || '',
   };
 }
 
@@ -115,11 +140,12 @@ export function buildIaReply(ticket) {
 
 export function buildIaTabulation(ticket, fields) {
   const lf = ticket?.lateralForm || {};
-  const tipo = fields?.tipo || lf.classificacaoTipo || 'Solicitação';
-  const produto = fields?.produto || lf.produto || 'Produto';
-  const motivo = fields?.motivo || lf.motivo || 'Motivo';
-  const detalhe = lf.detalhe || 'Em análise';
-  return `${tipo} → ${produto} → ${motivo} → ${detalhe}`;
+  const tipo = fields?.tipo || lf.classificacaoTipo || '';
+  const produto = fields?.produto || lf.produto || '';
+  const motivo = fields?.motivo || lf.motivo || '';
+  const detalhe = fields?.detalhe || lf.detalhe || '';
+  const parts = [tipo, produto, motivo, detalhe].filter(Boolean);
+  return parts.length ? parts.join(' → ') : 'Tabulação incompleta';
 }
 
 export function getEscalonarLabel(id) {
@@ -231,24 +257,14 @@ export function normalizeTicketForDeskV2(ticket) {
   ticket.clientName = ticket.clientName || ticket.solicitante || (client && client.name) || 'Cliente';
   ticket.solicitante = ticket.solicitante || ticket.clientName;
 
-  if (!ticket.lateralForm.canal) ticket.lateralForm.canal = ticket.channel || ticket.source || 'WhatsApp';
-  if (!ticket.lateralForm.classificacaoTipo) ticket.lateralForm.classificacaoTipo = 'Solicitação';
-  if (!ticket.lateralForm.produto) ticket.lateralForm.produto = (client && client.produtos && client.produtos[0]) || 'Internet Fibra';
-  if (!ticket.lateralForm.motivo) ticket.lateralForm.motivo = 'Em análise';
-  if (!ticket.lateralForm.responsavel) ticket.lateralForm.responsavel = ticket.responsibleAgent || getAgentName();
+  if (!ticket.lateralForm.canal && (ticket.channel || ticket.source)) {
+    ticket.lateralForm.canal = ticket.channel || ticket.source;
+  }
+  if (!ticket.lateralForm.responsavel) {
+    ticket.lateralForm.responsavel = ticket.responsibleAgent || getAgentName();
+  }
 
   ensureTicketSlaFields(ticket);
-
-  if (!ticket.messages || !ticket.messages.length) {
-    const created = ticket.createdAt || new Date().toISOString();
-    ticket.messages = [{
-      fromClient: true,
-      type: 'client',
-      text: ticket.description || ticket.title || 'Solicitação do cliente.',
-      timestamp: created,
-      author: ticket.clientName
-    }];
-  }
 
   if (!ticket.updatedAt) ticket.updatedAt = ticket.createdAt || new Date().toISOString();
   if (!ticket.createdAt) ticket.createdAt = ticket.updatedAt;
@@ -339,34 +355,37 @@ export function countByQueue(queueId) {
 }
 
 export function pickDefaultTicket(activeQueue) {
-  const all = getAllCockpitTickets();
-  const preferred = all.find((e) =>
-    e.queueId === 'em-andamento' && (e.ticket.clientName || '').indexOf('João Pereira') >= 0
-  ) || all.find((e) =>
-    e.queueId === 'em-andamento' && (e.ticket.clientName || '').indexOf('Maria') >= 0
-  );
-  if (preferred) return preferred.ticket.id;
   const list = filterTickets(activeQueue || 'em-andamento', '', 'data');
-  return list.length ? list[0].ticket.id : (all[0]?.ticket?.id ?? null);
+  if (list.length) return list[0].ticket.id;
+  const all = getAllCockpitTickets();
+  return all[0]?.ticket?.id ?? null;
+}
+
+export function isConversationMessage(message) {
+  if (!message) return false;
+  if (message.type === 'system' || message.type === 'internal') return false;
+  const text = String(message.text || message.message || '').trim();
+  if (!text) return false;
+  return true;
+}
+
+export function isClientConversationMessage(message) {
+  if (!isConversationMessage(message)) return false;
+  if (message.fromClient === true || message.type === 'client') return true;
+  if (message.type === 'agent') return false;
+  return message.sender === 'them';
 }
 
 export function buildConversationMessages(ticket) {
   const msgs = [];
-  const created = ticket.createdAt || new Date().toISOString();
-  msgs.push({
-    type: 'system',
-    text: 'Ticket #' + ticket.id + ' criado — ' + (ticket.title || 'Sem título'),
-    meta: formatMsgMeta(created, 'Sistema'),
-    timestamp: created,
-  });
   (ticket.messages || []).forEach((m) => {
-    if (m.type === 'system') return;
-    const isClient = m.fromClient || m.type === 'client';
-    const ts = m.timestamp || m.createdAt;
+    if (!isConversationMessage(m)) return;
+    const isClient = isClientConversationMessage(m);
+    const ts = m.timestamp || m.time || m.createdAt;
     msgs.push({
       type: isClient ? 'client' : 'agent',
-      initials: isClient ? getInitials(ticket.clientName || m.author) : getInitials(getAgentName()),
-      text: m.text || m.message || '',
+      initials: isClient ? getInitials(ticket.clientName || m.author) : getInitials(m.author || getAgentName()),
+      text: String(m.text || m.message || '').trim(),
       meta: formatMsgMeta(ts, m.author || (isClient ? ticket.clientName : getAgentName())),
       timestamp: ts,
     });
@@ -419,12 +438,6 @@ export function collectClientTickets(cpf, clientName) {
   return list;
 }
 
-function todayAt(hours, minutes) {
-  const d = new Date();
-  d.setHours(hours, minutes, 0, 0);
-  return d.toISOString();
-}
-
 function isSameDay(isoA, isoB) {
   const a = new Date(isoA);
   const b = new Date(isoB);
@@ -461,86 +474,6 @@ function mapStoredInternalNote(note, ticket) {
   };
 }
 
-function buildSyntheticInternalNotes(ticket) {
-  const notes = [];
-  const created = ticket.createdAt || new Date().toISOString();
-  const agent = ticket.responsibleAgent || ticket.lateralForm?.responsavel || getAgentName();
-  const lf = ticket.lateralForm || {};
-  const canal = lf.canal || ticket.channel || ticket.source || 'WhatsApp';
-  const tipo = lf.classificacaoTipo || 'Solicitação';
-  const produto = lf.produto || 'Internet Fibra';
-  const motivo = lf.motivo || 'Em análise';
-  const createdTime = new Date(created);
-
-  notes.push({
-    id: `sys-${ticket.id}`,
-    kind: 'system',
-    author: 'Sistema',
-    badge: 'Automático',
-    timestamp: created,
-    body: `Ticket criado via ${canal}. Tabulação aplicada automaticamente: ${tipo} → ${produto} → ${motivo}. Agente responsável: ${agent}.`,
-    ticketId: String(ticket.id),
-    ticketTitle: getTicketTitle(ticket),
-  });
-
-  const titleLower = String(ticket.title || '').toLowerCase();
-  const motivoLower = String(motivo).toLowerCase();
-  if (motivoLower.includes('lentid') || titleLower.includes('lentid')) {
-    notes.push({
-      id: `ai-${ticket.id}`,
-      kind: 'ai',
-      author: 'IA Revisor',
-      badge: 'Automática',
-      timestamp: new Date(createdTime.getTime() + 7 * 60000).toISOString(),
-      body: 'Análise automática: velocidade reportada (50MB) representa 10% do contrato (500MB). Padrão compatível com congestionamento de backhaul noturno. Recomendado: verificar utilização de porta na OLT entre 21h–23h dos últimos 7 dias.',
-      tags: ['Diagnóstico IA', 'Backhaul', 'Congestionamento'],
-      ticketId: String(ticket.id),
-      ticketTitle: getTicketTitle(ticket),
-    });
-  }
-
-  if ((ticket.clientName || '').indexOf('Maria Oliveira') >= 0) {
-    notes.push({
-      id: `agent-maria-${ticket.id}`,
-      kind: 'agent',
-      author: 'Ana Silva',
-      initials: 'AS',
-      badge: 'Interna',
-      timestamp: todayAt(9, 28),
-      body: 'Cliente reporta lentidão noturna recorrente. Verificar se há outros chamados abertos na mesma OLT — região do bairro Jardim América. Caso confirmado, abrir incidente coletivo e acionar N2 de redes.',
-      tags: ['OLT', 'Incidente coletivo', 'N2'],
-      editable: true,
-      ticketId: String(ticket.id),
-      ticketTitle: getTicketTitle(ticket),
-    });
-  }
-
-  ensureTicketSlaFields(ticket);
-  const slaClass = getSlaClass(ticket);
-  if (slaClass === 'warning' || slaClass === 'critical') {
-    const limitHours = String(ticket.priority || '').toLowerCase().includes('crit') ? 4 : 4;
-    const deadline = new Date(createdTime.getTime() + limitHours * 3600000);
-    const remainingMin = Math.max(0, ticket.slaRemaining || 0);
-    const h = Math.floor(remainingMin / 60);
-    const m = remainingMin % 60;
-    const deadlineLabel = deadline.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    const remainingLabel = `${h}h ${String(m).padStart(2, '0')}min`;
-    notes.push({
-      id: `sla-${ticket.id}`,
-      kind: 'sla',
-      author: 'Alerta SLA',
-      badge: 'Atenção',
-      timestamp: todayAt(11, 21),
-      body: `Este ticket completa 2h sem resolução em ${deadlineLabel}. O SLA contratado para reclamações de internet é de 4h. Restam ${remainingLabel} para vencimento.`,
-      boldSegments: [deadlineLabel, remainingLabel],
-      ticketId: String(ticket.id),
-      ticketTitle: getTicketTitle(ticket),
-    });
-  }
-
-  return notes;
-}
-
 export function buildClientInternalNotesFeed(ticket, client) {
   if (!ticket) return [];
 
@@ -558,11 +491,6 @@ export function buildClientInternalNotesFeed(ticket, client) {
       if (seen.has(mapped.id)) return;
       seen.add(mapped.id);
       merged.push(mapped);
-    });
-    buildSyntheticInternalNotes(t).forEach((note) => {
-      if (seen.has(note.id)) return;
-      seen.add(note.id);
-      merged.push(note);
     });
   });
 

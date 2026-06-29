@@ -1,6 +1,6 @@
 /**
- * ProfileContext — perfis Agente / Supervisor
- * VERSION: v1.1.0 | DATE: 2026-06-19
+ * ProfileContext v1.2.0 — perfis + segmentação pós-gate (fase 1: agent)
+ * VERSION: v1.2.0 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -19,12 +19,33 @@ export function ProfileProvider({ children }) {
     return id;
   });
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [segmentation, setSegmentation] = useState(() => {
+    try {
+      const raw = localStorage.getItem('velodesk_colaborador_meta');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
 
   const profile = getProfileMeta(profileId);
 
   useEffect(() => {
     document.body.dataset.velodeskProfile = profileId;
   }, [profileId]);
+
+  const applyGateProfile = useCallback((colaborador) => {
+    localStorage.setItem('velodeskProfile', 'agent');
+    setProfileIdState('agent');
+    const meta = colaborador ? {
+      atuacao: colaborador.atuacao || [],
+      departamento: colaborador.departamento || '',
+    } : null;
+    if (meta) {
+      localStorage.setItem('velodesk_colaborador_meta', JSON.stringify(meta));
+      setSegmentation(meta);
+    }
+  }, []);
 
   const setProfile = useCallback((id) => {
     if (!PROFILES[id] || id === profileId) {
@@ -49,11 +70,13 @@ export function ProfileProvider({ children }) {
     <ProfileContext.Provider value={{
       profileId,
       profile,
+      segmentation,
       dropdownOpen,
       setProfile,
+      applyGateProfile,
       toggleDropdown,
       setDropdownOpen,
-      isNavAllowed
+      isNavAllowed,
     }}>
       {children}
     </ProfileContext.Provider>

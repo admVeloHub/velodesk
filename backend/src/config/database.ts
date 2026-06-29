@@ -1,38 +1,100 @@
-/** database v1.1.0 — conexão MongoDB b2c_chamados (velodesk-dev) */
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
-import { env } from './env';
+/** database v1.6.0 — conexão Atlas + desk_config; resolve SRV via DNS público se necessário */
+import path from 'path';
+import mongoose, { Connection } from 'mongoose';
+import { env, envFile } from './env';
+import { MONGO_DRIVER_OPTIONS } from './mongoUri';
+import { maskMongoUri, resolveAtlasSrvUri } from './resolveAtlasUri';
 
-let memoryServer: MongoMemoryServer | null = null;
+let cadastrosConnection: Connection | null = null;
+let deskConfigConnection: Connection | null = null;
 
 export function isMongoConnected(): boolean {
   return mongoose.connection.readyState === 1;
 }
 
-export async function connectDatabase(): Promise<void> {
-  try {
-    await mongoose.connect(env.mongoUri, {
-      dbName: env.mongoDbName,
-      serverSelectionTimeoutMS: 4000,
-    });
-    console.log(`MongoDB conectado: ${env.mongoDbName} @ ${env.mongoUri}`);
-    return;
-  } catch (err) {
-    if (env.nodeEnv !== 'development') {
-      throw err;
-    }
+export function isCadastrosConnected(): boolean {
+  return cadastrosConnection?.readyState === 1;
+}
 
-    console.warn('MongoDB Atlas indisponível — instância em memória (dev):', (err as Error).message);
-    memoryServer = await MongoMemoryServer.create({ instance: { dbName: env.mongoDbName } });
-    await mongoose.connect(memoryServer.getUri(), { dbName: env.mongoDbName });
-    console.log(`MongoDB em memória conectado (dev) — db: ${env.mongoDbName}`);
+export function isDeskConfigConnected(): boolean {
+  return deskConfigConnection?.readyState === 1;
+}
+
+export function getCadastrosConnection(): Connection {
+  if (!cadastrosConnection || cadastrosConnection.readyState !== 1) {
+    throw new Error('Conexão b2c_cadastros indisponível');
   }
+  return cadastrosConnection;
+}
+
+export function getDeskConfigConnection(): Connection {
+  if (!deskConfigConnection || deskConfigConnection.readyState !== 1) {
+    throw new Error('Conexão desk_config indisponível');
+  }
+  return deskConfigConnection;
+}
+
+export function getMongoStorageLabel(): 'atlas' {
+  return 'atlas';
+}
+
+export function getAtlasConnectionInfo() {
+  const conn = mongoose.connection;
+  return {
+    storage: 'atlas' as const,
+    host: conn.host || null,
+    port: conn.port || null,
+    dbName: conn.name || env.mongoDbName,
+  };
+}
+
+function maskUri(uri: string): string {
+  return maskMongoUri(uri);
+}
+
+async function connectCadastros(uri: string): Promise<void> {
+  if (cadastrosConnection?.readyState === 1) return;
+
+  cadastrosConnection = mongoose.createConnection(uri, {
+    dbName: env.mongoCadastrosDbName,
+    ...MONGO_DRIVER_OPTIONS,
+  });
+  await cadastrosConnection.asPromise();
+  console.log(`Atlas cadastros conectado: ${env.mongoCadastrosDbName}`);
+}
+
+async function connectDeskConfig(uri: string): Promise<void> {
+  if (deskConfigConnection?.readyState === 1) return;
+
+  deskConfigConnection = mongoose.createConnection(uri, {
+    dbName: env.mongoDeskConfigDbName,
+    ...MONGO_DRIVER_OPTIONS,
+  });
+  await deskConfigConnection.asPromise();
+  console.log(`Atlas desk_config conectado: ${env.mongoDeskConfigDbName}`);
+}
+
+export async function connectDatabase(): Promise<void> {
+  const envPath = envFile.envPath || path.join(process.cwd(), '.env');
+  console.log(`[env] backend/.env: ${envPath}`);
+
+  const { uri: atlasUri, method } = await resolveAtlasSrvUri(env.mongoUri);
+  const options = { dbName: env.mongoDbName, ...MONGO_DRIVER_OPTIONS };
+  await mongoose.connect(atlasUri, options);
+  console.log(`Atlas conectado: ${env.mongoDbName} @ ${maskUri(atlasUri)} (${method})`);
+
+  await connectCadastros(atlasUri);
+  await connectDeskConfig(atlasUri);
 }
 
 export async function disconnectDatabase(): Promise<void> {
-  await mongoose.disconnect();
-  if (memoryServer) {
-    await memoryServer.stop();
-    memoryServer = null;
+  if (deskConfigConnection) {
+    await deskConfigConnection.close();
+    deskConfigConnection = null;
   }
+  if (cadastrosConnection) {
+    await cadastrosConnection.close();
+    cadastrosConnection = null;
+  }
+  await mongoose.disconnect();
 }

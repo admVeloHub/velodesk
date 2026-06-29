@@ -1,5 +1,6 @@
 /**
- * DeskWhatsAppChat v1.0.0 — conversa estilo WhatsApp no ticket
+ * DeskWhatsAppChat v1.0.2 — conversa estilo WhatsApp no ticket
+ * VERSION: v1.0.2 | DATE: 2026-06-26
  */
 import React, { useState, useRef } from 'react';
 import {
@@ -23,8 +24,8 @@ export default function DeskWhatsAppChat({
   const inputRef = useRef(null);
   const contact = getClientContactFields(ticket, client);
   const iaReply = buildIaReply(ticket);
-  const chatMessages = messages.filter((m) => m.type !== 'system');
-  const dateIso = ticket.createdAt || chatMessages[0]?.timestamp;
+  const chatMessages = messages || [];
+  const dateIso = chatMessages[0]?.timestamp || ticket.createdAt;
 
   const handleEditIa = () => {
     onUseIaReply(iaReply);
@@ -59,31 +60,37 @@ export default function DeskWhatsAppChat({
       </header>
 
       <div className="conversation wa-chat__body" id="conversation">
-        {dateIso && (
+        {dateIso && chatMessages.length > 0 && (
           <div className="wa-chat__date-sep">{formatWaDateSeparator(dateIso)}</div>
         )}
 
-        {chatMessages.map((msg, i) => (
-          <div
-            key={i}
-            className={'wa-msg' + (msg.type === 'agent' ? ' wa-msg--out' : ' wa-msg--in')}
-          >
-            <div
-              className={
-                'wa-msg__bubble' +
-                (msg.type === 'agent' ? ' wa-msg__bubble--out' : ' wa-msg__bubble--in')
-              }
-            >
-              <span className="wa-msg__text">{msg.text}</span>
-              <span className="wa-msg__time">
-                {formatWaTime(msg.timestamp)}
-                {msg.type === 'agent' && (
-                  <i className="ti ti-checks wa-msg__checks" aria-hidden="true" />
-                )}
-              </span>
-            </div>
+        {chatMessages.length === 0 ? (
+          <div className="crm-empty-state conversation-empty">
+            <p>Nenhuma mensagem pública neste atendimento.</p>
           </div>
-        ))}
+        ) : (
+          chatMessages.map((msg, i) => (
+            <div
+              key={i}
+              className={'wa-msg' + (msg.type === 'agent' ? ' wa-msg--out' : ' wa-msg--in')}
+            >
+              <div
+                className={
+                  'wa-msg__bubble' +
+                  (msg.type === 'agent' ? ' wa-msg__bubble--out' : ' wa-msg__bubble--in')
+                }
+              >
+                <span className="wa-msg__text">{msg.text}</span>
+                <span className="wa-msg__time">
+                  {formatWaTime(msg.timestamp)}
+                  {msg.type === 'agent' && (
+                    <i className="ti ti-checks wa-msg__checks" aria-hidden="true" />
+                  )}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
 
         {iaVisible && (
           <div className="wa-ia-card" id="iaSuggestionBar">
@@ -129,6 +136,10 @@ export default function DeskWhatsAppChat({
             type="text"
             className="wa-chat__input"
             placeholder="Escreva uma mensagem..."
+            spellCheck
+            lang="pt-BR"
+            autoCorrect="on"
+            autoCapitalize="sentences"
             value={composeText}
             onChange={(e) => onComposeTextChange(e.target.value)}
             onKeyDown={(e) => {

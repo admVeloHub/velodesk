@@ -1,14 +1,22 @@
 /**
  * loadFonteVelodeskEnv.cjs — localiza FONTE DA VERDADE e carrega .env-velodesk (dev local).
- * VERSION: v1.0.0 | DATE: 2026-06-15 | AUTHOR: VeloHub Development Team
- *
- * Sobe diretórios a partir de startDir até encontrar bootstrapFonteEnvVelodesk.cjs;
- * fallback: dotenv direto em .env-velodesk ou VELODESK_DOTENV_PATH.
+ * VERSION: v1.1.0 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
  */
 'use strict';
 
 const path = require('path');
 const fs = require('fs');
+
+const DEFAULTS = {
+  VELODESK: '8000',
+  VELODESK_BACKEND: '8001',
+};
+
+function applyDefaults() {
+  if (!process.env.VELODESK) process.env.VELODESK = DEFAULTS.VELODESK;
+  if (!process.env.VELODESK_BACKEND) process.env.VELODESK_BACKEND = DEFAULTS.VELODESK_BACKEND;
+  return { envPath: null, loaded: true, source: 'defaults' };
+}
 
 function loadFrom(startDir) {
   let d = path.resolve(startDir);
@@ -16,7 +24,9 @@ function loadFrom(startDir) {
   for (let i = 0; i < 16; i++) {
     const loader = path.join(d, 'FONTE DA VERDADE', 'bootstrapFonteEnvVelodesk.cjs');
     if (fs.existsSync(loader)) {
-      return require(loader).loadFrom(startDir);
+      const result = require(loader).loadFrom(startDir);
+      applyDefaults();
+      return result;
     }
     const parent = path.dirname(d);
     if (parent === d) break;
@@ -29,10 +39,11 @@ function loadFrom(startDir) {
     if (fs.existsSync(envPath)) {
       try {
         require('dotenv').config({ path: envPath });
-        return { envPath, loaded: true };
+        applyDefaults();
+        return { envPath, loaded: true, source: 'fonte-da-verdade' };
       } catch (err) {
-        console.warn('loadFonteVelodeskEnv v1.0.0: dotenv indisponível:', err.message);
-        return { envPath, loaded: false };
+        console.warn('loadFonteVelodeskEnv v1.1.0: dotenv indisponível:', err.message);
+        return applyDefaults();
       }
     }
     const parent = path.dirname(d);
@@ -43,11 +54,11 @@ function loadFrom(startDir) {
   const custom = process.env.VELODESK_DOTENV_PATH;
   if (custom && fs.existsSync(custom)) {
     require('dotenv').config({ path: custom });
-    return { envPath: custom, loaded: true };
+    applyDefaults();
+    return { envPath: custom, loaded: true, source: 'VELODESK_DOTENV_PATH' };
   }
 
-  console.warn('loadFonteVelodeskEnv v1.0.0: FONTE DA VERDADE/.env-velodesk não encontrado.');
-  return { envPath: null, loaded: false };
+  return applyDefaults();
 }
 
 module.exports = { loadFrom };

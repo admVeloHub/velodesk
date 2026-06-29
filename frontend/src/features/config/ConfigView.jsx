@@ -1,12 +1,13 @@
 /**
  * Central de Configurações — layout V2
- * VERSION: v3.0.0 | DATE: 2026-06-19
+ * VERSION: v3.2.0 | DATE: 2026-06-25
  */
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useProfile } from '../../context/ProfileContext';
 import { resetVelodeskLabData } from '../../config/cockpitConfig';
 import { CONFIG_SECTIONS, getConfigSection } from './configSections';
+import TabulationFormsSection from './components/TabulationFormsSection';
 
 export default function ConfigView() {
   const { isNavAllowed } = useProfile();
@@ -56,8 +57,10 @@ export default function ConfigView() {
             <>
               <header className="config-content-header">
                 <span className="config-content-eyebrow">Central de configurações</span>
-                <h3>Bem-vindo</h3>
-                <p>Escolha uma área no menu ou nos atalhos abaixo para começar.</p>
+                <div className="config-content-title-row">
+                  <h3>Bem-vindo</h3>
+                  <p>Escolha uma área no menu ou nos atalhos abaixo para começar.</p>
+                </div>
               </header>
 
               <div className="config-welcome-grid">
@@ -81,36 +84,27 @@ export default function ConfigView() {
             <>
               <header className="config-content-header">
                 <span className="config-content-eyebrow">Central de configurações</span>
-                <h3>{active?.label}</h3>
-                <p>{active?.menuDesc}</p>
+                <div className="config-content-title-row">
+                  <h3>{active?.label}</h3>
+                  <p>{active?.menuDesc}</p>
+                </div>
               </header>
 
-              <div className="config-tab-content active">
-                {section === 'backup' ? (
-                  <section className="config-panel">
-                    <div className="config-panel-hero">
-                      <h4>Backup e restauração</h4>
-                      <p>Exporte snapshots completos ou incrementais e restaure quando necessário.</p>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={resetVelodeskLabData}
-                    >
-                      Resetar dados demo
-                    </button>
-                  </section>
-                ) : (
-                  <section className="config-panel">
-                    <div className="config-panel-hero">
-                      <h4>{active?.label}</h4>
-                      <p>
-                        Editor de {active?.label?.toLowerCase()} — protótipo operacional em localStorage.
-                      </p>
-                    </div>
-                  </section>
-                )}
-              </div>
+              {section === 'backup' ? (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={resetVelodeskLabData}
+                >
+                  Resetar dados demo
+                </button>
+              ) : section === 'forms' ? (
+                <TabulationFormsSection />
+              ) : (
+                <p className="config-placeholder-msg">
+                  Editor de {active?.label?.toLowerCase()} — em desenvolvimento.
+                </p>
+              )}
             </>
           )}
         </main>
