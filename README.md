@@ -75,7 +75,7 @@ Scripts npm na raiz: `docker:build`, `docker:up`, `docker:up:detached`, `docker:
 
 | Variável | Descrição |
 |----------|-----------|
-| `MONGODB_URI` | URI Atlas (`mongodb+srv://...`) |
+| `MONGODB_URI` | Secret **`MONGO_ENV`** (cluster VelohubCentral — IP liberado). Não use `MONGO_URI` (`velodesk-dev`) sem liberar IP no Atlas |
 | `JWT_SECRET` | Segredo JWT |
 | `GOOGLE_CLIENT_ID` | OAuth Google (login Desk) |
 | `VITE_VELOHUB_API_URL` | API VeloHub (VeloNews) |

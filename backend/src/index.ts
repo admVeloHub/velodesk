@@ -1,4 +1,4 @@
-﻿/** index v1.3.1 — helmet sem COOP (Google OAuth) + retry Mongo */
+﻿/** index v1.3.2 — trust proxy Cloud Run + helmet Google OAuth */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -20,6 +20,8 @@ import { seedDevelopmentData, purgeLegacyDemoData } from './services/seed.servic
 const whatsapp = require('./whatsapp/whatsappModule.js');
 
 const app = express();
+
+app.set('trust proxy', 1);
 
 app.use(
   helmet({

@@ -1,10 +1,21 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.11.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.12.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GCP Cloud Run — MONGODB_URI apontado para secret MONGO_ENV (VelohubCentral)
+
+- **Data/Hora**: 2026-06-30
+- **Tipo**: GCP Cloud Run (gcloud)
+- **Projeto**: velohub-471220
+- **Serviço**: velodesk (us-east1)
+- **Revisão**: velodesk-00013-zrf
+- **Alteração**: `MONGODB_URI` ← secret `MONGO_ENV` (substitui `MONGO_URI` / cluster velodesk-dev bloqueado por IP no Atlas)
+- **Resultado**: `/health` → `status: ok`, `mongo: true`
+- **Status**: Concluído
 
 ### GitHub Push — Fix URI Atlas com /dbname + tabulação só após login
 
