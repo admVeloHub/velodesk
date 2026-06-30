@@ -1,4 +1,4 @@
-﻿/** index v1.2.0 — escuta PORT antes do Mongo (Cloud Run) + degradado se Atlas indisponível */
+﻿/** index v1.3.0 — retry Mongo em produção + helmet compatível Google OAuth */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -21,7 +21,11 @@ const whatsapp = require('./whatsapp/whatsappModule.js');
 
 const app = express();
 
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+  }),
+);
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -37,6 +41,8 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: isMongoConnected() ? 'ok' : 'degraded',
     mongo: isMongoConnected(),
+    mongoUriConfigured: Boolean(env.mongoUri?.trim()),
+    googleClientIdConfigured: Boolean(env.googleClientId),
     mongoStorage: getMongoStorageLabel(),
     atlas: getAtlasConnectionInfo(),
     mongoDbName: env.mongoDbName,
@@ -52,6 +58,8 @@ app.get('/health', (_req, res) => {
   res.json({
     status: isMongoConnected() ? 'ok' : 'degraded',
     mongo: isMongoConnected(),
+    mongoUriConfigured: Boolean(env.mongoUri?.trim()),
+    googleClientIdConfigured: Boolean(env.googleClientId),
     mongoStorage: getMongoStorageLabel(),
     atlas: getAtlasConnectionInfo(),
     mongoDbName: env.mongoDbName,
@@ -76,16 +84,21 @@ if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);
 }
 
-async function bootstrapDatabase() {
-  if (!env.mongoUri) {
-    console.error('[startup] MONGODB_URI ausente — configure no Cloud Run. /health retorna degraded.');
-    return;
-  }
+let mongoRetryTimer: ReturnType<typeof setInterval> | null = null;
+
+async function tryConnectDatabase(): Promise<boolean> {
+  if (isMongoConnected()) return true;
 
   try {
     await connectDatabase();
     await purgeLegacyDemoData();
     await seedDevelopmentData();
+    if (mongoRetryTimer) {
+      clearInterval(mongoRetryTimer);
+      mongoRetryTimer = null;
+    }
+    console.log('[startup] MongoDB conectado.');
+    return true;
   } catch (err) {
     const msg = (err as Error).message;
     console.error('Falha ao conectar ao Atlas:', msg);
@@ -94,10 +107,35 @@ async function bootstrapDatabase() {
     } else if (/querySrv|ECONNREFUSED.*mongodb/i.test(msg)) {
       console.error('Falha de DNS SRV. Verifique MONGODB_URI (mongodb+srv) no Cloud Run.');
     }
-    if (env.nodeEnv !== 'production') {
-      process.exit(1);
+    return false;
+  }
+}
+
+function scheduleMongoRetry() {
+  if (mongoRetryTimer) return;
+  console.error('[startup] Producao: retentando MongoDB a cada 30s...');
+  mongoRetryTimer = setInterval(() => {
+    if (isMongoConnected()) {
+      if (mongoRetryTimer) clearInterval(mongoRetryTimer);
+      mongoRetryTimer = null;
+      return;
     }
-    console.error('[startup] Producao: API continua em modo degradado até MongoDB responder.');
+    void tryConnectDatabase();
+  }, 30000);
+}
+
+async function bootstrapDatabase() {
+  if (!env.mongoUri) {
+    console.error('[startup] MONGODB_URI ausente — configure no Cloud Run (Variables & Secrets).');
+    return;
+  }
+
+  const connected = await tryConnectDatabase();
+  if (!connected && env.nodeEnv !== 'production') {
+    process.exit(1);
+  }
+  if (!connected && env.nodeEnv === 'production') {
+    scheduleMongoRetry();
   }
 }
 

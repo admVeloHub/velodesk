@@ -1,10 +1,24 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.8.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.9.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Retry MongoDB + diagnóstico health + helmet Google OAuth
+
+- **Data/Hora**: 2026-06-30
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.9.0
+  - index.ts v1.3.0, start-velodesk.sh v1.0.1
+- **Arquivos modificados / incluídos**:
+  - `backend/src/index.ts` — retry Mongo a cada 30s em produção; `/health` expõe `mongoUriConfigured`; helmet `same-origin-allow-popups` (Google OAuth)
+  - `docker/start-velodesk.sh` — log de aviso se `MONGODB_URI` / `GOOGLE_CLIENT_ID` ausentes no Cloud Run
+- **Descrição**: Melhorias operacionais; login Google 503 exige `MONGODB_URI` configurada no serviço Cloud Run `velodesk` + Atlas Network Access.
+- **Status**: Concluído
 
 ### GitHub Push — Container Cloud Run combinado (web + API)
 

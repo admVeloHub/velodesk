@@ -1,11 +1,21 @@
 #!/bin/sh
-# start-velodesk.sh v1.0.0 — nginx (SPA) + Node API no mesmo container Cloud Run
-# VERSION: v1.0.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+# start-velodesk.sh v1.0.1 — nginx (SPA) + Node API no mesmo container Cloud Run
+# VERSION: v1.0.1 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
 set -e
 
 API_PORT="${API_INTERNAL_PORT:-8081}"
 export PORT="${PORT:-8080}"
 export BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:${API_PORT}}"
+
+if [ -z "$MONGODB_URI" ] && [ -z "$MONGO_URI" ]; then
+  echo "[start-velodesk] ERRO: MONGODB_URI nao definida no servico Cloud Run velodesk"
+fi
+if [ -z "$GOOGLE_CLIENT_ID" ] && [ -z "$VITE_GOOGLE_CLIENT_ID" ]; then
+  echo "[start-velodesk] AVISO: GOOGLE_CLIENT_ID nao definida no servico Cloud Run"
+fi
+if [ -z "$JWT_SECRET" ]; then
+  echo "[start-velodesk] AVISO: JWT_SECRET nao definida — usando fallback inseguro"
+fi
 
 node -e "
 const fs = require('fs');
