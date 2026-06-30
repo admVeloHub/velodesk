@@ -1,6 +1,6 @@
 /**
  * Velodesk — modo escuro unificado (LAYOUT_GUIDELINES)
- * VERSION: v1.0.0 | DATE: 2026-06-19
+ * VERSION: v1.0.5 | DATE: 2026-06-30
  * Importar por último em src/styles/cockpit/index.css
  */
 
@@ -94,6 +94,18 @@ body.velodesk-dark #config .config-tree-block input {
 body.velodesk-dark #config .config-table thead th {
     background: rgba(255, 255, 255, 0.04);
     color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #config .config-ativo-toggle--on {
+    border-color: #1694FF;
+    color: #1694FF;
+    background: rgba(0, 106, 185, 0.15);
+}
+
+body.velodesk-dark #config .config-ativo-toggle--off {
+    border-color: #FCC200;
+    color: #ef4444;
+    background: rgba(39, 42, 48, 0.15);
 }
 
 body.velodesk-dark .dashboard-filter-bar,
@@ -205,6 +217,13 @@ body.velodesk-dark .ws360-header .ws360-theme-toggle:hover {
     background: var(--velo-dark-surface-hover);
     border-color: rgba(22, 148, 255, 0.35);
     color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark #mainSidebar.velo-nav-rail .velo-nav-rail__alerts-bell.is-open,
+body.velodesk-dark #mainSidebar.velo-nav-rail .velo-nav-rail__alerts-bell:hover {
+    background: #eff6ff;
+    border-color: rgba(22, 52, 255, 0.35);
+    color: #1634FF;
 }
 
 body.velodesk-dark .ws360-kpi,
@@ -426,6 +445,69 @@ body.velodesk-dark .ws360-news-popover__item.is-unread {
 body.velodesk-dark .ws360-news-popover__footer,
 body.velodesk-dark .ws360-news-modal__footer {
     background: var(--velo-dark-surface-inset);
+}
+
+/* VeloNews (sininho Desk) */
+body.velodesk-dark .velonews-popover,
+body.velodesk-dark .velonews-read-modal,
+body.velodesk-dark .velonews-history-modal,
+body.velodesk-dark .velonews-critical-modal {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .velonews-popover__header,
+body.velodesk-dark .velonews-history-modal__header,
+body.velodesk-dark .velonews-history-modal__filters {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .velonews-popover__title,
+body.velodesk-dark .velonews-popover__item-head strong,
+body.velodesk-dark .velonews-history-modal__item-head h3,
+body.velodesk-dark .velonews-read-modal h2 {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .velonews-popover__subtitle,
+body.velodesk-dark .velonews-popover__excerpt,
+body.velodesk-dark .velonews-history-modal__item-body {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .velonews-popover__item,
+body.velodesk-dark .velonews-popover__footer {
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .velonews-popover__item.is-unread {
+    background: rgba(22, 148, 255, 0.08);
+}
+
+body.velodesk-dark .velonews-popover__footer,
+body.velodesk-dark .velonews-comment-thread {
+    background: var(--velo-dark-surface-inset);
+}
+
+body.velodesk-dark .velonews-critical-bubble {
+    background: linear-gradient(135deg, var(--velo-dark-surface) 0%, rgba(127, 29, 29, 0.25) 100%);
+    border-color: rgba(239, 68, 68, 0.6);
+}
+
+body.velodesk-dark .velonews-critical-bubble__label {
+    color: #fca5a5;
+}
+
+body.velodesk-dark .critical-news-frame {
+    background: linear-gradient(135deg, rgba(127, 29, 29, 0.15) 0%, rgba(153, 27, 27, 0.12) 100%) !important;
+    border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
+body.velodesk-dark .solved-news-frame {
+    background-color: rgba(76, 175, 80, 0.12) !important;
+    border-color: rgba(76, 175, 80, 0.45) !important;
 }
 
 /* ═══ 4. Desk CRM ═══ */
@@ -901,4 +983,12 @@ body.velodesk-dark .queue-box-modal__close {
 body.velodesk-dark .queue-box-modal__close:hover {
     background: var(--velo-dark-surface-hover);
     color: var(--velo-dark-accent);
+}
+
+/* Config — raio dos botões (sobrescreve velotax-theme .btn-primary border-radius: 12px !important) */
+#config .config-table-head-actions .config-action-btn,
+#config .config-editor .forms-editor-back.config-action-btn,
+#config .forms-editor-actions .config-action-btn,
+#config .config-modal__footer .config-action-btn {
+    border-radius: 4px !important;
 }

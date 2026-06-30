@@ -1,10 +1,27 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.3.0 | DATE: 2026-06-29 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.4.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — VeloNews VeloHub na sidebar, proxy CORS e ajustes Desk v2
+
+- **Data/Hora**: 2026-06-30
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.4.0
+  - VeloNewsProvider v1.0.1, veloNewsApi v1.0.1, velohubApiConfig v1.1.0
+  - Sidebar v1.9.1, vite.config v1.2.0
+  - tickets.routes v1.3.3, chamado.mapper v1.2.3, tabulation.service v1.2.2
+- **Arquivos modificados / incluídos**:
+  - `frontend/` — sininho VeloNews no rodapé da sidebar; feed real via API VeloHub (`veloNewsApi`, `VeloNewsProvider`, modais/popover/histórico); proxy Vite `/velohub-api` (CORS dev :8000); remoção de noticiário demo do Painel 360; CSS `velonews.css`; fix `contains` na sidebar
+  - `backend/` — PUT ticket respeita status explícito (“Enviar como”); tabulação e mapper sem registro duplicado de status
+  - `frontend/.env.example` — documentação `VITE_VELOHUB_API_URL`
+- **Descrição**: Push integrando VeloNews do VeloHub (Cloud Run) no Desk, acessível em qualquer aba pela sidebar, com proxy local para evitar bloqueio CORS. Remove origem demo local. Corrige envio de status de ticket e componentes de tabulação/config.
+- **Status**: Concluído
 
 ### GitHub Push — Desk v2: inbound e-mail, Docker/GCP, tabulação e auth VeloHub
 

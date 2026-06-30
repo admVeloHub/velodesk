@@ -1,6 +1,6 @@
 /**
  * Sidebar rail — 3 estados: recolhida (5px) | hover (52px ícones) | fixada chevron (220px + labels)
- * VERSION: v1.9.1 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.9.3 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
 
 :root {
@@ -477,4 +477,70 @@ body.desk-v2-mode #velodeskDeskV2Root {
 
 body.velo-nav-rail-mode .sidebar-toggle-btn {
     display: none !important;
+}
+
+/* Alertas — sininho global na parte inferior da barra lateral retrátil */
+.velo-nav-rail__foot {
+    margin-top: auto;
+    padding: 10px 8px 12px;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+#mainSidebar.velo-nav-rail .velo-nav-rail__alerts-bell {
+    width: var(--ws360-bell-size, 40px);
+    height: var(--ws360-bell-size, 40px);
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 1rem;
+    color: var(--eco-navy, #04072E);
+    background: #fff;
+    border: 1px solid var(--eco-border, #E4E6EA);
+    box-shadow: 0 2px 8px rgba(0, 0, 88, 0.06);
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#mainSidebar.velo-nav-rail .velo-nav-rail__alerts-bell:hover {
+    background: #eff6ff;
+    border-color: rgba(22, 52, 255, 0.25);
+    transform: scale(1.04);
+}
+
+#mainSidebar.velo-nav-rail .velo-nav-rail__alerts-bell.is-open {
+    background: #eff6ff;
+    border-color: rgba(22, 52, 255, 0.35);
+    color: #1634FF;
+}
+
+#mainSidebar.velo-nav-rail .velo-nav-rail__alerts-bell .notification-badge {
+    top: -4px;
+    right: -4px;
+    width: var(--ws360-bell-badge, 18px);
+    height: var(--ws360-bell-badge, 18px);
+    font-size: var(--ws360-kpi-hint-size, 0.625rem);
+    border: 1.5px solid #fff;
+}
+
+.velo-nav-rail-wrap.is-open:not(.is-pinned) .velo-nav-rail__foot:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 8px);
+    bottom: 18px;
+    transform: none;
+    background: var(--velo-sidebar-accent);
+    color: #fff;
+    padding: 0.35rem 0.6rem;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 9000;
 }

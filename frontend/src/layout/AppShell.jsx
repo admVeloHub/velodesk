@@ -1,12 +1,17 @@
 /**
  * AppShell — layout cockpit
- * VERSION: v2.3.0 | DATE: 2026-06-19
+ * VERSION: v2.4.0 | DATE: 2026-06-30
  */
 import React, { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import TicketTabsBar from '../components/TicketTabsBar';
 import AIChatbotModal from '../features/modals/AIChatbotModal';
+import { VeloNewsProvider } from '../features/velonews/VeloNewsProvider';
+import VeloNewsCriticalBubble from '../features/velonews/VeloNewsCriticalBubble';
+import VeloNewsCriticalModal from '../features/velonews/VeloNewsCriticalModal';
+import VeloNewsReadModal from '../features/velonews/VeloNewsReadModal';
+import VeloNewsHistoryModal from '../features/velonews/VeloNewsHistoryModal';
 
 export default function AppShell() {
   const [aiOpen, setAiOpen] = useState(false);
@@ -26,7 +31,7 @@ export default function AppShell() {
   }, []);
 
   return (
-    <>
+    <VeloNewsProvider>
       <div id="mainApp" className="main-app sidebar-collapsed velo-chromeless" style={{ display: 'grid' }}>
         <TicketTabsBar />
         <Sidebar onOpenAI={() => setAiOpen((v) => !v)} />
@@ -35,6 +40,10 @@ export default function AppShell() {
         </main>
       </div>
       <AIChatbotModal open={aiOpen} onClose={() => setAiOpen(false)} />
-    </>
+      <VeloNewsCriticalBubble />
+      <VeloNewsCriticalModal />
+      <VeloNewsReadModal />
+      <VeloNewsHistoryModal />
+    </VeloNewsProvider>
   );
 }

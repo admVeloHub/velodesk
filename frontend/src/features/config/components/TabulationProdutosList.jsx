@@ -1,12 +1,13 @@
 /**
- * TabulationProdutosList v1.3.5 — lista, desativar e excluir com confirmação
- * VERSION: v1.3.5 | DATE: 2026-06-25
+ * TabulationProdutosList v1.4.3 — lista, ordem, desativar e excluir
+ * VERSION: v1.4.3 | DATE: 2026-06-30
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { tabulationApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
 import TabulationProdutoEditor from './TabulationProdutoEditor';
 import TabulationDeleteConfirmModal, { countDetalhes } from './TabulationDeleteConfirmModal';
+import ConfigAtivoToggle from './ConfigAtivoToggle';
 
 function computeStats(produtos) {
   const list = produtos || [];
@@ -18,6 +19,24 @@ function computeStats(produtos) {
   };
 }
 
+function sortProdutos(list) {
+  return [...(list || [])].sort((a, b) => {
+    const ordemDiff = (a.ordem ?? 0) - (b.ordem ?? 0);
+    if (ordemDiff !== 0) return ordemDiff;
+    return (a.produto || '').localeCompare(b.produto || '', 'pt-BR');
+  });
+}
+
+function moveItem(list, fromIndex, toIndex) {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= list.length || toIndex >= list.length) {
+    return list;
+  }
+  const next = [...list];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
+}
+
 export default function TabulationProdutosList({ id, onChanged }) {
   const { showNotification } = useNotifications();
   const [produtos, setProdutos] = useState([]);
@@ -26,14 +45,22 @@ export default function TabulationProdutosList({ id, onChanged }) {
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [togglingId, setTogglingId] = useState(null);
+  const [orderEditMode, setOrderEditMode] = useState(false);
+  const [orderDraft, setOrderDraft] = useState([]);
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [dragIndex, setDragIndex] = useState(null);
 
+  const sortedProdutos = useMemo(() => sortProdutos(produtos), [produtos]);
   const stats = useMemo(() => computeStats(produtos), [produtos]);
+  const displayProdutos = orderEditMode ? orderDraft : sortedProdutos;
+  const columnCount = orderEditMode ? 3 : 4;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await tabulationApi.listProdutos(true);
-      setProdutos(data || []);
+      setProdutos(sortProdutos(data || []));
     } catch {
       showNotification('Erro ao carregar produtos.', 'error');
     } finally {
@@ -43,14 +70,77 @@ export default function TabulationProdutosList({ id, onChanged }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const deactivate = async (itemId) => {
+  const toggleAtivo = async (itemId, nextAtivo) => {
+    setTogglingId(itemId);
     try {
-      await tabulationApi.patchProduto(itemId, { ativo: false });
-      showNotification('Produto desativado.', 'success');
+      await tabulationApi.patchProduto(itemId, { ativo: nextAtivo });
+      showNotification(nextAtivo ? 'Produto ativado.' : 'Produto desativado.', 'success');
       await load();
       onChanged?.();
     } catch {
-      showNotification('Erro ao desativar produto.', 'error');
+      showNotification('Erro ao atualizar status do produto.', 'error');
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const startOrderEdit = () => {
+    setOrderDraft(sortedProdutos);
+    setOrderEditMode(true);
+  };
+
+  const cancelOrderEdit = () => {
+    setOrderEditMode(false);
+    setOrderDraft([]);
+    setDragIndex(null);
+  };
+
+  const moveOrderItem = (index, direction) => {
+    setOrderDraft((prev) => moveItem(prev, index, index + direction));
+  };
+
+  const handleDragStart = (index) => (event) => {
+    setDragIndex(index);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (index) => (event) => {
+    event.preventDefault();
+    const fromIndex = dragIndex ?? Number(event.dataTransfer.getData('text/plain'));
+    if (Number.isNaN(fromIndex) || fromIndex === index) {
+      setDragIndex(null);
+      return;
+    }
+    setOrderDraft((prev) => moveItem(prev, fromIndex, index));
+    setDragIndex(null);
+  };
+
+  const saveOrder = async () => {
+    setSavingOrder(true);
+    try {
+      const updates = orderDraft
+        .map((item, index) => ({ id: item._id, ordem: index }))
+        .filter(({ id, ordem }) => {
+          const original = sortedProdutos.find((item) => item._id === id);
+          return (original?.ordem ?? 0) !== ordem;
+        });
+
+      await Promise.all(updates.map(({ id, ordem }) => tabulationApi.patchProduto(id, { ordem })));
+      showNotification('Ordem salva.', 'success');
+      setOrderEditMode(false);
+      setOrderDraft([]);
+      await load();
+      onChanged?.();
+    } catch {
+      showNotification('Erro ao salvar ordem.', 'error');
+    } finally {
+      setSavingOrder(false);
     }
   };
 
@@ -81,7 +171,10 @@ export default function TabulationProdutosList({ id, onChanged }) {
   }
 
   return (
-    <div id={id} className="config-section-body config-tabulation">
+    <div
+      id={id}
+      className={'config-section-body config-tabulation' + (orderEditMode ? ' config-tabulation--order-edit' : '')}
+    >
       <div className="forms-stats-row">
         <div className="stat-card">
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-box" /></span>
@@ -115,69 +208,143 @@ export default function TabulationProdutosList({ id, onChanged }) {
 
       <div className="config-table-wrap">
         <div className="config-table-head-actions">
-          <button
-            type="button"
-            className="btn-primary btn-forms-primary btn-forms-primary--compact"
-            onClick={() => setCreating(true)}
-          >
-            Adicionar Produto
-          </button>
+          {orderEditMode ? (
+            <>
+              <button
+                type="button"
+                className="config-action-btn config-action-btn--edit config-action-btn--compact"
+                onClick={cancelOrderEdit}
+                disabled={savingOrder}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="config-action-btn config-action-btn--create config-action-btn--compact"
+                onClick={saveOrder}
+                disabled={savingOrder}
+              >
+                {savingOrder ? 'Salvando…' : 'Salvar ordem'}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="config-action-btn config-action-btn--edit config-action-btn--compact"
+                onClick={startOrderEdit}
+                disabled={loading || sortedProdutos.length < 2}
+              >
+                Editar Ordem
+              </button>
+              <button
+                type="button"
+                className="config-action-btn config-action-btn--create config-action-btn--compact"
+                onClick={() => setCreating(true)}
+              >
+                Adicionar Produto
+              </button>
+            </>
+          )}
         </div>
 
-        <table className="config-table">
+        {orderEditMode && (
+          <p className="config-order-edit-hint">
+            Arraste pela alça ou use as setas para definir a sequência exibida no desk.
+          </p>
+        )}
+
+        <table className={'config-table' + (orderEditMode ? ' config-table--order-edit' : '')}>
           <thead>
             <tr>
+              {orderEditMode && <th className="config-table-th-order">Ordem</th>}
               <th>Produto</th>
-              <th>Ordem</th>
-              <th>Status</th>
               <th>Motivos</th>
-              <th>Ações</th>
+              {!orderEditMode && <th>Ações</th>}
+              {!orderEditMode && <th>Status</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5}>
+                <td colSpan={columnCount}>
                   <div className="config-loading" role="status">
                     <i className="ti ti-loader-2 config-loading__icon" aria-hidden="true" />
                     <span>Carregando produtos…</span>
                   </div>
                 </td>
               </tr>
-            ) : produtos.length === 0 ? (
+            ) : displayProdutos.length === 0 ? (
               <tr>
-                <td colSpan={5}>
+                <td colSpan={columnCount}>
                   <div className="forms-empty-state">
                     <p className="forms-empty-text">Nenhum produto configurado.</p>
                   </div>
                 </td>
               </tr>
             ) : (
-              produtos.map((item) => (
-                <tr key={item._id}>
+              displayProdutos.map((item, index) => (
+                <tr
+                  key={item._id}
+                  className={orderEditMode ? 'config-table-row--draggable' : undefined}
+                  draggable={orderEditMode}
+                  onDragStart={orderEditMode ? handleDragStart(index) : undefined}
+                  onDragOver={orderEditMode ? handleDragOver : undefined}
+                  onDrop={orderEditMode ? handleDrop(index) : undefined}
+                  onDragEnd={orderEditMode ? () => setDragIndex(null) : undefined}
+                >
+                  {orderEditMode && (
+                    <td className="config-table__order-controls">
+                      <span className="config-order-handle" aria-hidden="true">
+                        <i className="ti ti-grip-vertical" />
+                      </span>
+                      <div className="config-order-arrows">
+                        <button
+                          type="button"
+                          className="config-order-arrow"
+                          aria-label={'Subir ' + item.produto}
+                          disabled={index === 0}
+                          onClick={() => moveOrderItem(index, -1)}
+                        >
+                          <i className="ti ti-chevron-up" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="config-order-arrow"
+                          aria-label={'Descer ' + item.produto}
+                          disabled={index === displayProdutos.length - 1}
+                          onClick={() => moveOrderItem(index, 1)}
+                        >
+                          <i className="ti ti-chevron-down" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                   <td>
                     <strong className="config-table__name">{item.produto}</strong>
                   </td>
-                  <td>{item.ordem ?? 0}</td>
-                  <td>
-                    <span className={'config-status-badge' + (item.ativo !== false ? ' config-status-badge--active' : ' config-status-badge--inactive')}>
-                      {item.ativo !== false ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </td>
                   <td>{(item.motivos || []).length}</td>
-                  <td className="config-table__actions">
-                    <button type="button" className="config-action-btn config-action-btn--edit" onClick={() => setEditingId(item._id)}>Editar</button>
-                    {item.ativo !== false && (
-                      <button type="button" className="config-action-btn config-action-btn--deactivate" onClick={() => deactivate(item._id)}>Desativar</button>
-                    )}
-                    <button
-                      type="button"
-                      className="config-action-btn config-action-btn--delete"
-                      onClick={() => setDeleteTarget(item)}
-                    >
-                      Excluir
-                    </button>
-                  </td>
+                  {!orderEditMode && (
+                    <td className="config-table__actions">
+                      <button type="button" className="config-action-btn config-action-btn--edit" onClick={() => setEditingId(item._id)}>Editar</button>
+                      <button
+                        type="button"
+                        className="config-action-btn config-action-btn--delete"
+                        onClick={() => setDeleteTarget(item)}
+                      >
+                        Excluir
+                      </button>
+                    </td>
+                  )}
+                  {!orderEditMode && (
+                    <td>
+                      <ConfigAtivoToggle
+                        ativo={item.ativo}
+                        onChange={(nextAtivo) => toggleAtivo(item._id, nextAtivo)}
+                        disabled={togglingId === item._id}
+                      />
+                    </td>
+                  )}
                 </tr>
               ))
             )}

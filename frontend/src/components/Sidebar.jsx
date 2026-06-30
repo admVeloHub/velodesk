@@ -1,12 +1,14 @@
 /**
  * Sidebar rail unificada — 3 estados: 5px | hover 52px | chevron fixa 220px
- * VERSION: v1.7.0 | DATE: 2026-06-24
+ * VERSION: v1.9.1 | DATE: 2026-06-30
  * Perfil: VeloHub (sem botão local na barra)
  */
 import React, { useCallback, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { NAV_ITEMS } from '../config/profiles';
 import { useProfile } from '../context/ProfileContext';
+import { useVeloNews } from '../features/velonews/VeloNewsProvider';
+import VeloNewsPopover from '../features/velonews/VeloNewsPopover';
 
 function navKeyActivate(e, action) {
   if (e.key === 'Enter' || e.key === ' ') {
@@ -15,8 +17,17 @@ function navKeyActivate(e, action) {
   }
 }
 
+function isInsideNode(parent, target) {
+  return parent instanceof Node && target instanceof Node && parent.contains(target);
+}
+
+function isInsideVeloNewsPopover(target) {
+  return target instanceof Element && Boolean(target.closest?.('.velonews-popover'));
+}
+
 export default function Sidebar({ onOpenAI }) {
   const { isNavAllowed, profile } = useProfile();
+  const { unreadCount, popoverOpen, togglePopover, bellAnchorRef } = useVeloNews();
   const navigate = useNavigate();
   const location = useLocation();
   const [hoverExpanded, setHoverExpanded] = useState(false);
@@ -44,8 +55,9 @@ export default function Sidebar({ onOpenAI }) {
 
   const handleWrapLeave = useCallback((e) => {
     if (pinned) return;
-    const nav = e.currentTarget.querySelector('#mainSidebar');
-    if (nav && e.relatedTarget && nav.contains(e.relatedTarget)) return;
+    const wrap = e.currentTarget;
+    const related = e.relatedTarget;
+    if (isInsideNode(wrap, related) || isInsideVeloNewsPopover(related)) return;
     handleSidebarLeave();
   }, [pinned, handleSidebarLeave]);
 
@@ -100,9 +112,11 @@ export default function Sidebar({ onOpenAI }) {
         onMouseLeave={handleSidebarLeave}
         onFocus={handleSidebarEnter}
         onBlur={(e) => {
-          if (!pinned && !e.currentTarget.closest('.velo-nav-rail-wrap')?.contains(e.relatedTarget)) {
-            handleSidebarLeave();
-          }
+          if (pinned) return;
+          const wrap = e.currentTarget.closest('.velo-nav-rail-wrap');
+          const related = e.relatedTarget;
+          if (isInsideNode(wrap, related) || isInsideVeloNewsPopover(related)) return;
+          handleSidebarLeave();
         }}
       >
         <div className="velo-nav-rail__head">
@@ -150,7 +164,29 @@ export default function Sidebar({ onOpenAI }) {
             <span>Assistente IA</span>
           </li>
         </ul>
+        <div className="velo-nav-rail__foot" ref={bellAnchorRef} data-tooltip="VeloNews">
+          <div
+            className={'notification-bell ws360-notification-bell velo-nav-rail__alerts-bell' + (popoverOpen ? ' is-open' : '')}
+            id="btnAlertsNav"
+            data-tooltip="VeloNews"
+            title="VeloNews — alertas e notícias"
+            onClick={togglePopover}
+            onKeyDown={(e) => navKeyActivate(e, togglePopover)}
+            role="button"
+            tabIndex={0}
+            aria-label="VeloNews — alertas e notícias"
+            aria-expanded={popoverOpen}
+          >
+            <i className="fas fa-bell" />
+            {unreadCount > 0 ? (
+              <span className="notification-badge" aria-label={`${unreadCount} não lidos`}>
+                {unreadCount}
+              </span>
+            ) : null}
+          </div>
+        </div>
       </nav>
+      <VeloNewsPopover />
     </div>
   );
 }

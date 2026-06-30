@@ -2243,6 +2243,11 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     overflow: hidden;
 }
 
+.ws360-news-popover--from-rail {
+    position: fixed;
+    z-index: 9100;
+}
+
 .ws360-news-popover__header {
     display: flex;
     align-items: flex-start;
@@ -2361,6 +2366,40 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
 .ws360-news-popover__hint {
     font-size: 0.6875rem;
     color: #9ca3af;
+}
+
+.ws360-news-popover__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 32px 20px;
+    text-align: center;
+    color: #64748b;
+}
+
+.ws360-news-popover__empty-icon {
+    font-size: 1.75rem;
+    color: #94a3b8;
+}
+
+.ws360-news-popover__empty p {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.ws360-news-popover__empty small {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #6b7280;
+    max-width: 260px;
+}
+
+.ws360-news-popover__empty .ws360-btn {
+    margin-top: 8px;
 }
 
 .ws360-news-modal__backdrop {

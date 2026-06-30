@@ -1,6 +1,6 @@
 /**
- * API client v1.2.0 — integração backend Velodesk + tabulação
- * VERSION: v1.2.0 | DATE: 2026-06-25 | AUTHOR: VeloHub Development Team
+ * API client v1.2.1 — integração backend Velodesk + tabulação
+ * VERSION: v1.2.1 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 

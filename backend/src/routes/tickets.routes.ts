@@ -1,4 +1,4 @@
-/** tickets.routes v1.3.2 — cliente ref + join b2c_cadastros */
+/** tickets.routes v1.3.3 — PUT respeita status explícito (Enviar como) */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -87,7 +87,7 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
   const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
 
-  if (req.body.boxId) {
+  if (req.body.boxId && (req.body.status === undefined || String(req.body.status).trim() === '')) {
     const box = await Box.findById(req.body.boxId);
     if (box) req.body.status = statusFromBoxName(box.name);
   }

@@ -1,4 +1,4 @@
-﻿/** index v1.1.0 — inbound e-mail + falha se MongoDB Atlas indisponível */
+﻿/** index v1.1.1 — inbound e-mail + falha se MongoDB Atlas indisponível */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';

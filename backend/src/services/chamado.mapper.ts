@@ -1,4 +1,4 @@
-﻿/** chamado.mapper v1.2.2 — appendMessage com alteracoes extras (inbound e-mail) */
+﻿/** chamado.mapper v1.2.3 — status explícito no PUT; evita registro duplicado sem mudança */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -206,17 +206,21 @@ export async function applyBodyToChamado(chamado: IChamadoN1, body: Record<strin
   }
 
   if (body.status !== undefined) {
-    const registros = chamado.registro ?? [];
-    const last = registros[registros.length - 1];
-    chamado.registro.push({
-      data: new Date(),
-      mensagemPublica: '',
-      anexosMensagemPublica: [],
-      anotacaoInterna: '',
-      anexosAnotacaoInterna: [],
-      alteracoes: { status: { de: last?.status, para: body.status } },
-      status: String(body.status),
-    });
+    const nextStatus = String(body.status);
+    const current = currentStatus(chamado);
+    if (nextStatus !== current) {
+      const registros = chamado.registro ?? [];
+      const last = registros[registros.length - 1];
+      chamado.registro.push({
+        data: new Date(),
+        mensagemPublica: '',
+        anexosMensagemPublica: [],
+        anotacaoInterna: '',
+        anexosAnotacaoInterna: [],
+        alteracoes: { status: { de: last?.status ?? current, para: nextStatus } },
+        status: nextStatus,
+      });
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-/** tabulation.service v1.2.1 — agregação e cascata produto → motivo → detalhe */
+/** tabulation.service v1.2.2 — agregação e cascata produto → motivo → detalhe */
 import type { ITabulacaoDetalhe, ITabulacaoMotivo, ITabulacaoProduto } from '../models/TabulacaoProduto';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
 
@@ -82,9 +82,15 @@ export async function createProduto(
   const existing = await Model.findOne({ produto });
   if (existing) throw new Error('Produto já cadastrado');
 
+  let ordem = body.ordem;
+  if (ordem === undefined) {
+    const last = await Model.findOne().sort({ ordem: -1 }).select('ordem').lean();
+    ordem = ((last as { ordem?: number } | null)?.ordem ?? -1) + 1;
+  }
+
   const doc = await Model.create({
     produto,
-    ordem: body.ordem ?? 0,
+    ordem,
     ativo: body.ativo !== false,
     motivos: normalizeMotivos(body.motivos || []),
     updatedBy,

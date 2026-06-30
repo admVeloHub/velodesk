@@ -1,6 +1,6 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.4.0 | DATE: 2026-06-26
+ * VERSION: v3.4.1 | DATE: 2026-06-30
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -638,10 +638,8 @@ export default function DeskV2Root() {
           ticket={ticket}
           client={client}
           rightFields={rightFields}
-          escalonar={escalonar}
           sendStatus={sendStatus}
           onFieldChange={handleFieldChange}
-          onEscalonarChange={setEscalonar}
           onApplyTabulation={handleApplyTabulation}
           onCommitStatus={handleCommitWithStatus}
           onCloseTicket={handleCloseTicket}

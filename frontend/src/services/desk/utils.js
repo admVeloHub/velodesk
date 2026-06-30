@@ -1,6 +1,6 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v2.3.1 | DATE: 2026-06-25
+ * VERSION: v2.3.2 | DATE: 2026-06-30
  */
 import { getKanbanColumns, saveKanbanColumns, getAllCockpitTickets } from '../kanbanStorage';
 import { lookupClient, getAgentName } from '../clientDb';
@@ -506,6 +506,7 @@ export function applySendStatus(entry, queueId) {
   };
   const cfg = statusMap[queueId] || statusMap['em-andamento'];
   entry.ticket.status = cfg.status;
+  delete entry.ticket.boxId;
   moveTicketToBox(entry, cfg.box);
 }
 

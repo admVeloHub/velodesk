@@ -1,10 +1,9 @@
 /**
- * DeskRightPanel v1.2.3 — cascata dinâmica produto → motivo → detalhe (Mongo)
- * VERSION: v1.2.3 | DATE: 2026-06-26
+ * DeskRightPanel v1.2.4 — cascata dinâmica produto → motivo → detalhe (Mongo)
+ * VERSION: v1.2.4 | DATE: 2026-06-30
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { ESCALONAR_OPTIONS } from '../../../services/desk/constants';
-import { buildIaTabulation, getEscalonarLabel } from '../../../services/desk/utils';
+import React from 'react';
+import { buildIaTabulation } from '../../../services/desk/utils';
 import { useTabulation } from '../../../context/TabulationContext';
 import { DeskStatusCommitButton } from './DeskComposePanel';
 
@@ -33,10 +32,8 @@ export default function DeskRightPanel({
   ticket,
   client,
   rightFields,
-  escalonar,
   sendStatus,
   onFieldChange,
-  onEscalonarChange,
   onApplyTabulation,
   onCommitStatus,
   onCloseTicket,
@@ -46,8 +43,6 @@ export default function DeskRightPanel({
   sendDisabled = false,
 }) {
   const { loading, getMotivos, getDetalhes, getProdutoNames } = useTabulation();
-  const [escalonarOpen, setEscalonarOpen] = useState(false);
-  const escalonarRef = useRef(null);
 
   const thermo = client?.termometro ?? 38;
   const thermoLabel = client?.termometroLabel || (thermo >= 55 ? 'Crítico' : thermo >= 45 ? 'Atenção' : 'Estável');
@@ -58,14 +53,6 @@ export default function DeskRightPanel({
   const detalheOptions = rightFields.produto && rightFields.motivo
     ? getDetalhes(rightFields.produto, rightFields.motivo)
     : [];
-
-  useEffect(() => {
-    const close = (e) => {
-      if (escalonarRef.current && !escalonarRef.current.contains(e.target)) setEscalonarOpen(false);
-    };
-    document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
-  }, []);
 
   return (
     <aside className="crm-right-panel" id="crmRightPanel">
@@ -149,44 +136,6 @@ export default function DeskRightPanel({
               onFieldChange={onFieldChange}
             />
           )}
-        </section>
-
-        <section className="rp-section rp-section--cascade" id="escalonarSection" ref={escalonarRef}>
-          <div className="rp-section__label">Escalonar</div>
-          <div className="cascade-flow" id="escalonarFlow">
-            <div className="cascade-flow__step cascade-flow__step--category">
-              <button
-                type="button"
-                className={'cascade-flow__trigger' + (escalonar ? ' is-selected' : '')}
-                id="escalonarBtn"
-                aria-haspopup="listbox"
-                aria-expanded={escalonarOpen}
-                onClick={() => setEscalonarOpen((v) => !v)}
-              >
-                <span className="cascade-flow__trigger-prefix">Destino</span>
-                <span className="cascade-flow__trigger-label" id="escalonarLabel">{getEscalonarLabel(escalonar)}</span>
-                <i className="ti ti-chevron-down" />
-              </button>
-              <div className="cascade-flow__menu" id="escalonarMenu" role="listbox" hidden={!escalonarOpen}>
-                {ESCALONAR_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    className="cascade-flow__option"
-                    data-escalonar={opt.id}
-                    onClick={() => { onEscalonarChange(opt.id); setEscalonarOpen(false); }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {escalonar && (
-              <div className="cascade-flow__summary" id="escalonarSummary">
-                <i className="ti ti-arrow-up-right" /> Escalonado para <strong>{getEscalonarLabel(escalonar)}</strong>
-              </div>
-            )}
-          </div>
         </section>
 
         <section className="rp-section">

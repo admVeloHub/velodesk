@@ -1,10 +1,11 @@
 /**
- * TabulationProdutoEditor v1.2.1 — árvore motivo → detalhe por produto
- * VERSION: v1.2.1 | DATE: 2026-06-25
+ * TabulationProdutoEditor v1.3.1 — árvore motivo → detalhe por produto
+ * VERSION: v1.3.1 | DATE: 2026-06-30
  */
 import React, { useEffect, useState } from 'react';
 import { tabulationApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
+import ConfigAtivoToggle from './ConfigAtivoToggle';
 
 function emptyMotivo() {
   return { motivo: '', ordem: 0, ativo: true, detalhes: [{ detalhe: '', ordem: 0, ativo: true }] };
@@ -13,7 +14,6 @@ function emptyMotivo() {
 export default function TabulationProdutoEditor({ produtoId, onClose, onSaved }) {
   const { showNotification } = useNotifications();
   const [produto, setProduto] = useState('');
-  const [ordem, setOrdem] = useState(0);
   const [ativo, setAtivo] = useState(true);
   const [motivos, setMotivos] = useState([emptyMotivo()]);
   const [loading, setLoading] = useState(Boolean(produtoId));
@@ -25,7 +25,6 @@ export default function TabulationProdutoEditor({ produtoId, onClose, onSaved })
     tabulationApi.getProduto(produtoId)
       .then((data) => {
         setProduto(data.produto || '');
-        setOrdem(data.ordem || 0);
         setAtivo(data.ativo !== false);
         setMotivos((data.motivos && data.motivos.length) ? data.motivos : [emptyMotivo()]);
       })
@@ -59,7 +58,6 @@ export default function TabulationProdutoEditor({ produtoId, onClose, onSaved })
   const save = async () => {
     const payload = {
       produto: produto.trim(),
-      ordem: Number(ordem) || 0,
       ativo,
       motivos: motivos
         .filter((m) => m.motivo.trim())
@@ -106,13 +104,13 @@ export default function TabulationProdutoEditor({ produtoId, onClose, onSaved })
 
   return (
     <div className="config-section-body config-editor">
-      <button type="button" className="forms-editor-back btn-link" onClick={onClose}>
+      <button type="button" className="config-action-btn config-action-btn--edit forms-editor-back" onClick={onClose}>
         <i className="ti ti-arrow-left" aria-hidden="true" /> Voltar à lista
       </button>
 
       <div className="config-subsection config-subsection--product">
         <div className="config-form-grid config-form-grid--product">
-          <label className="config-field">
+          <label className="config-field config-field--produto">
             <span className="config-field__label">Produto</span>
             <input
               type="text"
@@ -122,20 +120,9 @@ export default function TabulationProdutoEditor({ produtoId, onClose, onSaved })
               placeholder="Ex.: Internet Fibra"
             />
           </label>
-          <label className="config-field config-field--ordem">
-            <span className="config-field__label">Ordem</span>
-            <input
-              type="number"
-              className="config-field__input config-field__input--narrow"
-              value={ordem}
-              onChange={(e) => setOrdem(e.target.value)}
-              min={0}
-            />
-          </label>
-          <label className="config-field config-field--checkbox config-field--checkbox-inline">
-            <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />
-            <span>Ativo no desk</span>
-          </label>
+          <div className="config-field config-field--ativo-toggle">
+            <ConfigAtivoToggle ativo={ativo} onChange={setAtivo} />
+          </div>
         </div>
       </div>
 
@@ -183,8 +170,8 @@ export default function TabulationProdutoEditor({ produtoId, onClose, onSaved })
       </div>
 
       <div className="config-panel-actions forms-editor-actions">
-        <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-        <button type="button" className="btn-primary btn-forms-primary" onClick={save} disabled={saving}>
+        <button type="button" className="config-action-btn config-action-btn--edit" onClick={onClose}>Cancelar</button>
+        <button type="button" className="config-action-btn config-action-btn--create" onClick={save} disabled={saving}>
           {saving ? 'Salvando…' : 'Salvar produto'}
         </button>
       </div>

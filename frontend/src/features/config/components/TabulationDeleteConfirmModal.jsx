@@ -1,6 +1,6 @@
 /**
- * TabulationDeleteConfirmModal v1.0.0 — confirmação de exclusão irreversível
- * VERSION: v1.0.0 | DATE: 2026-06-25
+ * TabulationDeleteConfirmModal v1.0.1 — confirmação de exclusão irreversível
+ * VERSION: v1.0.1 | DATE: 2026-06-30
  */
 import React, { useEffect } from 'react';
 
@@ -48,10 +48,10 @@ export default function TabulationDeleteConfirmModal({
           <p className="config-modal__warning">Esta operação não é reversível.</p>
         </div>
         <footer className="config-modal__footer">
-          <button type="button" className="btn-secondary" onClick={onCancel} disabled={deleting}>
+          <button type="button" className="config-action-btn config-action-btn--edit" onClick={onCancel} disabled={deleting}>
             Cancelar
           </button>
-          <button type="button" className="btn-danger" onClick={onConfirm} disabled={deleting}>
+          <button type="button" className="config-action-btn config-action-btn--delete" onClick={onConfirm} disabled={deleting}>
             {deleting ? 'Excluindo…' : 'Confirmar exclusão'}
           </button>
         </footer>

@@ -15091,7 +15091,7 @@ input:checked + .slider:before {
 
 /* ============================================
    CONFIGURAÇÕES — visual moderno (V2)
-   VERSION: v2.2.6 | DATE: 2026-06-25
+   VERSION: v2.4.6 | DATE: 2026-06-30
    ============================================ */
 #config.config-page {
     --config-bg: #f0f4f8;
@@ -15505,6 +15505,11 @@ input:checked + .slider:before {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
+    border-radius: 4px;
+}
+
+#config .config-tabulation .btn-primary.btn-forms-primary {
+    border-radius: 4px;
 }
 
 #config .config-tabulation .config-table-wrap {
@@ -15523,14 +15528,21 @@ input:checked + .slider:before {
     z-index: 2;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
+    gap: 0.45rem;
     height: calc(0.55rem * 2 + 0.74rem * 1.25);
     padding: 0;
     box-sizing: border-box;
     pointer-events: none;
 }
 
-#config .config-table-head-actions .btn-forms-primary--compact {
+#config .config-table-head-actions button {
+    border-radius: 4px;
+}
+
+#config .config-table-head-actions .btn-primary.btn-forms-primary.btn-forms-primary--compact,
+#config .config-table-head-actions .btn-secondary.btn-forms-secondary--compact,
+#config .config-table-head-actions .config-action-btn.config-action-btn--compact {
     pointer-events: auto;
     width: auto;
     flex-shrink: 0;
@@ -15540,11 +15552,24 @@ input:checked + .slider:before {
     line-height: 1.25;
     font-weight: 600;
     border-radius: 4px;
+}
+
+#config .config-table-head-actions .config-action-btn.config-action-btn--compact {
+    padding: 0.2rem 0.7rem;
+}
+
+#config .config-table-head-actions .btn-primary.btn-forms-primary.btn-forms-primary--compact {
     box-shadow: 0 2px 8px rgba(0, 0, 88, 0.22);
 }
 
-#config .config-table-head-actions .btn-forms-primary--compact:hover,
-#config .config-table-head-actions .btn-forms-primary--compact:active {
+#config .config-table-head-actions .btn-secondary.btn-forms-secondary--compact {
+    padding: 0.22rem 0.7rem;
+}
+
+#config .config-table-head-actions .btn-primary.btn-forms-primary--compact:hover,
+#config .config-table-head-actions .btn-primary.btn-forms-primary--compact:active,
+#config .config-table-head-actions .btn-secondary.btn-forms-secondary--compact:hover,
+#config .config-table-head-actions .btn-secondary.btn-forms-secondary--compact:active {
     transform: none;
 }
 
@@ -15561,7 +15586,82 @@ input:checked + .slider:before {
 }
 
 #config .config-tabulation .config-table thead th:last-child {
-    padding-right: 10.5rem;
+    padding-right: 17.5rem;
+}
+
+#config .config-tabulation--order-edit .config-table thead th:last-child {
+    padding-right: 13rem;
+}
+
+#config .config-order-edit-hint {
+    margin: 0 0 0.65rem;
+    font-size: 0.82rem;
+    color: var(--config-muted);
+}
+
+#config .config-table--order-edit tbody tr.config-table-row--draggable {
+    cursor: grab;
+}
+
+#config .config-table--order-edit tbody tr.config-table-row--draggable:active {
+    cursor: grabbing;
+}
+
+#config .config-table--order-edit tbody tr.config-table-row--draggable.config-table-row--dragging {
+    opacity: 0.72;
+}
+
+#config .config-table-th-order,
+#config .config-table__order-controls {
+    width: 5.5rem;
+    white-space: nowrap;
+}
+
+#config .config-table__order-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+#config .config-order-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    color: var(--config-muted);
+    font-size: 1rem;
+}
+
+#config .config-order-arrows {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+#config .config-order-arrow {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.15rem;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 88, 0.14);
+    border-radius: 4px;
+    background: var(--config-surface);
+    color: var(--primary-blue);
+    cursor: pointer;
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
+#config .config-order-arrow:hover:not(:disabled) {
+    background: rgba(0, 0, 88, 0.05);
+}
+
+#config .config-order-arrow:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
 }
 
 #config .config-tabulation .config-table tbody tr:hover {
@@ -15640,7 +15740,7 @@ input:checked + .slider:before {
     appearance: none;
     background: transparent;
     border: 1.5px solid var(--primary-blue);
-    border-radius: 8px;
+    border-radius: 4px;
     padding: 0.35rem 0.65rem;
     font-size: 0.78rem;
     font-weight: 600;
@@ -15658,6 +15758,16 @@ input:checked + .slider:before {
 
 #config .config-action-btn--edit:hover {
     background: rgba(0, 0, 88, 0.05);
+}
+
+#config .config-action-btn--create {
+    border-color: #1634FF;
+    color: #1634FF;
+    background: transparent;
+}
+
+#config .config-action-btn--create:hover {
+    background: rgba(22, 52, 255, 0.08);
 }
 
 #config .config-action-btn--deactivate {
@@ -15693,12 +15803,18 @@ input:checked + .slider:before {
     margin-bottom: 0.25rem;
 }
 
-#config .config-form-grid--product .config-field:first-child {
-    flex: 1 1 220px;
-    min-width: 180px;
+#config .config-form-grid--product .config-field--produto {
+    flex: 0 0 25%;
+    width: 25%;
+    max-width: 25%;
+    min-width: 120px;
 }
 
 #config .config-form-grid--product .config-field--ordem {
+    flex: 0 0 auto;
+}
+
+#config .config-form-grid--product .config-field--ativo-toggle {
     flex: 0 0 auto;
 }
 
@@ -15803,6 +15919,15 @@ body.velodesk-dark #config .config-action-btn--edit:hover {
     background: rgba(22, 148, 255, 0.12);
 }
 
+body.velodesk-dark #config .config-action-btn--create {
+    border-color: #1634FF;
+    color: #1634FF;
+}
+
+body.velodesk-dark #config .config-action-btn--create:hover {
+    background: rgba(22, 52, 255, 0.14);
+}
+
 body.velodesk-dark #config .config-action-btn--deactivate {
     border-color: #FCC200;
     color: #FCC200;
@@ -15861,6 +15986,56 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
 #config .config-status-badge--inactive {
     background: rgba(100, 116, 139, 0.14);
     color: #475569;
+}
+
+#config .config-ativo-toggle {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-width: 4.75rem;
+    padding: 0.55rem 0.75rem;
+    border: 1.5px solid;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.35;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+#config .config-ativo-toggle:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
+#config .config-ativo-toggle--on {
+    border-color: #1694FF;
+    color: #1694FF;
+    background: rgba(0, 106, 185, 0.15);
+}
+
+#config .config-ativo-toggle--on:hover:not(:disabled) {
+    background: rgba(0, 106, 185, 0.22);
+}
+
+#config .config-ativo-toggle--off {
+    border-color: #FCC200;
+    color: #b42318;
+    background: rgba(39, 42, 48, 0.15);
+}
+
+#config .config-ativo-toggle--off:hover:not(:disabled) {
+    background: rgba(39, 42, 48, 0.22);
+}
+
+#config .config-field--ativo-toggle {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
 }
 
 #config .config-loading {
@@ -15964,12 +16139,29 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     margin-bottom: 0.75rem;
 }
 
-#config .config-panel--editor .forms-editor-back {
+#config .config-editor .forms-editor-back {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    margin-bottom: 0.65rem;
+    align-self: flex-start;
+    width: auto;
+    flex-shrink: 0;
+    margin-bottom: 0.15rem;
+    padding: 0.42rem 0.85rem;
+    font-size: 0.85rem;
     font-weight: 600;
+    line-height: 1.25;
+    border-radius: 4px;
+}
+
+#config .config-editor .forms-editor-back:disabled,
+#config .config-action-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+#config .config-editor .forms-editor-back i {
+    font-size: 1rem;
 }
 
 #config .config-tree-block__children {
@@ -15993,27 +16185,10 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     border-top: 1px solid var(--config-border);
 }
 
-#config .forms-editor-actions .btn-primary,
-#config .forms-editor-actions .btn-secondary {
+#config .forms-editor-actions .config-action-btn,
+#config .config-modal__footer .config-action-btn {
     width: auto;
     flex-shrink: 0;
-}
-
-#config .forms-editor-actions .btn-forms-primary {
-    padding: 0.42rem 0.85rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    line-height: 1.25;
-    border-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 88, 0.22);
-}
-
-#config .forms-editor-actions .btn-forms-primary:hover,
-#config .forms-editor-actions .btn-forms-primary:active {
-    transform: none;
-}
-
-#config .forms-editor-actions .btn-secondary {
     padding: 0.42rem 0.85rem;
     font-size: 0.85rem;
     border-radius: 4px;
