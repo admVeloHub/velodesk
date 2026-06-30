@@ -5,8 +5,8 @@
 #   gcloud builds submit --config cloudbuild.yaml \
 #     --substitutions=_REGION=southamerica-east1,_REPOSITORY=velodesk
 #
-# Trigger GitHub padrão (Dockerfile na raiz) usa ./Dockerfile → velodesk-api.
-# Para web + api via este arquivo, configure o trigger com cloudbuild.yaml.
+# Trigger GitHub padrão (Dockerfile na raiz) usa ./Dockerfile → serviço velodesk (web + api).
+# Para imagens separadas velodesk-api / velodesk-web, configure o trigger com cloudbuild.yaml.
 #
 # Deploy Cloud Run (manual após build):
 #   gcloud run deploy velodesk-api --image .../velodesk-api:$COMMIT_SHA ...

@@ -68,28 +68,32 @@ Scripts npm na raiz: `docker:build`, `docker:up`, `docker:up:detached`, `docker:
 
 ### GCP Cloud Run
 
-- **Trigger GitHub (Dockerfile na raiz):** `./Dockerfile` → imagem **velodesk-api** (backend).
-- **Build web + api:** use `cloudbuild.yaml` (dois serviços).
+**Produção:** serviço `velodesk` — push na `main` dispara build via `Dockerfile` na raiz (web + API no mesmo container).
+
+- **URL:** `https://velodesk-278491073220.us-east1.run.app` (nginx SPA + proxy `/api` → Node interno)
+- **Variáveis no Cloud Run** (Variables & Secrets):
+
+| Variável | Descrição |
+|----------|-----------|
+| `MONGODB_URI` | URI Atlas (`mongodb+srv://...`) |
+| `JWT_SECRET` | Segredo JWT |
+| `GOOGLE_CLIENT_ID` | OAuth Google (login Desk) |
+| `VITE_VELOHUB_API_URL` | API VeloHub (VeloNews) |
+| `ENABLE_WHATSAPP` | `false` |
+
+Atlas → **Network Access** deve permitir Cloud Run (`0.0.0.0/0` ou VPC).
+
+Build alternativo (dois serviços separados): `cloudbuild.yaml` (`velodesk-api` + `velodesk-web`).
+
+- **Trigger GitHub (Dockerfile na raiz):** `./Dockerfile` → serviço **velodesk** (web + api).
+- **Build web + api separados:** use `cloudbuild.yaml`.
 
 1. Build/push via Cloud Build (`cloudbuild.yaml`):
    ```bash
    gcloud builds submit --config cloudbuild.yaml \
      --substitutions=_REGION=southamerica-east1,_REPOSITORY=velodesk
    ```
-2. Deploy **velodesk-api** (imagem `velodesk-api`) com `MONGODB_URI`, `JWT_SECRET`, `ENABLE_WHATSAPP=false`.
-3. Deploy **velodesk-web** (imagem `velodesk-web`) com `BACKEND_URL=https://<url-do-servico-api>`.
-
-**Serviço Cloud Run `velodesk` (trigger GitHub / Dockerfile raiz)** — variáveis obrigatórias no console GCP:
-
-| Variável | Descrição |
-|----------|-----------|
-| `MONGODB_URI` | URI Atlas (`mongodb+srv://...`) — mesma do `.env-velodesk` |
-| `JWT_SECRET` | Segredo JWT (produção) |
-| `GOOGLE_CLIENT_ID` | OAuth Google (login Desk) |
-| `ENABLE_WHATSAPP` | `false` |
-| `NODE_ENV` | `production` (opcional; padrão do container) |
-
-Atlas → **Network Access** deve permitir Cloud Run (`0.0.0.0/0` ou VPC). Sem `MONGODB_URI`, o deploy passa mas `/health` fica `degraded` e `/api/*` falha.
+2. Deploy **velodesk-api** e **velodesk-web** como serviços separados (ver `docker-compose.yml`).
 
 WhatsApp fica desabilitado no container por padrão (`ENABLE_WHATSAPP=false`).
 
@@ -97,13 +101,9 @@ WhatsApp fica desabilitado no container por padrão (`ENABLE_WHATSAPP=false`).
 
 https://github.com/admVeloHub/velodesk
 
-## Deploy (Vercel)
+## Vercel (opcional / legado)
 
-- **Produção:** https://velodesk.vercel.app
-- **Desk v2:** https://velodesk.vercel.app/tickets?desk=v2
-- O `vercel.json` na raiz do repositório aponta o build para `frontend/`.
-- Cada push na branch `main` dispara deploy se o projeto Vercel estiver conectado ao GitHub `admVeloHub/velodesk`.
-- Deploy manual (pasta `frontend`): `npx vercel --prod --yes`
+Não é o ambiente de produção atual. Produção GCP: Cloud Run (`velodesk`).
 
 ## Inbound e-mail (webhook)
 

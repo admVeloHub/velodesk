@@ -1,7 +1,9 @@
 /**
- * velohubApiConfig v1.1.0 — base URL da API VeloHub
- * VERSION: v1.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * velohubApiConfig v1.2.0 — base URL da API VeloHub
+ * VERSION: v1.2.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
+
+import { readRuntimeEnv } from './runtimeEnv';
 
 export const VELOHUB_API_PROXY_PREFIX = '/velohub-api';
 
@@ -16,7 +18,7 @@ export function getVelohubApiBaseUrl() {
     return VELOHUB_API_PROXY_PREFIX;
   }
 
-  const raw = (import.meta.env.VITE_VELOHUB_API_URL || '').trim().replace(/\/$/, '');
+  const raw = readRuntimeEnv('VITE_VELOHUB_API_URL').replace(/\/$/, '');
   return normalizeRemoteBase(raw);
 }
 

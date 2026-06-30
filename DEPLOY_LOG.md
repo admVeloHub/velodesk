@@ -1,10 +1,27 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.7.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.8.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Container Cloud Run combinado (web + API)
+
+- **Data/Hora**: 2026-06-30
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.8.0
+  - Dockerfile (raiz) v2.0.0, start-velodesk.sh v1.0.0
+  - runtimeEnv v1.0.0, googleAuthConfig v1.2.0, velohubApiConfig v1.2.0
+- **Arquivos modificados / incluídos**:
+  - `Dockerfile` — build web (Vite) + API (Node) no mesmo container; nginx :8080 + API :8081
+  - `docker/start-velodesk.sh`, `docker/nginx-cloudrun.conf.template`
+  - `frontend/` — `env-config.js` runtime (Cloud Run env); configs leem `window.__VELODESK_ENV__`
+  - `README.md` — produção GCP Cloud Run (não Vercel)
+- **Descrição**: Serviço `velodesk` passa a servir o Desk (SPA) na URL pública; `/api` proxied para Node interno. Corrige 404/Cannot GET `/` ao abrir a URL do Cloud Run.
+- **Status**: Concluído
 
 ### GitHub Push — Startup Cloud Run: escuta PORT antes do MongoDB
 

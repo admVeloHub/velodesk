@@ -1,10 +1,12 @@
 /**
- * deskAuthMode v1.0.0 — google (fase testes) | velohub (gate futuro)
- * VERSION: v1.0.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * deskAuthMode v1.1.0 — google (fase testes) | velohub (gate futuro)
+ * VERSION: v1.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
 
+import { readRuntimeEnv } from './runtimeEnv';
+
 export function getDeskAuthMode() {
-  return (import.meta.env.VITE_DESK_AUTH_MODE || 'google').trim().toLowerCase();
+  return (readRuntimeEnv('VITE_DESK_AUTH_MODE') || 'google').trim().toLowerCase();
 }
 
 export function isGoogleDeskAuthMode() {
