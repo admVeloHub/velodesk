@@ -1,7 +1,8 @@
-/** boxes.routes v1.3.5 — Kanban via collection boxes (sem seed automático) */
+/** boxes.routes v1.3.6 — 503 se Mongo principal indisponível */
 import { Router, Response } from 'express';
 import mongoose from 'mongoose';
 import { authMiddleware } from '../middleware/auth';
+import { isMongoConnected } from '../config/database';
 import { Box } from '../models/Box';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { User } from '../models/User';
@@ -25,6 +26,9 @@ router.get('/', authMiddleware, async (req, res: Response) => {
   const userId = req.user?.userId;
 
   try {
+    if (!isMongoConnected()) {
+      return res.status(503).json({ message: 'Banco de chamados indisponível' });
+    }
     const dbUser = await resolveDbUser(userId);
     const responsavelCandidates = buildResponsavelCandidates(req.user!, dbUser);
 

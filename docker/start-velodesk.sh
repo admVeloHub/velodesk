@@ -1,6 +1,6 @@
 #!/bin/sh
-# start-velodesk.sh v1.0.2 — nginx (SPA) + Node API + proxy VeloHub
-# VERSION: v1.0.2 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+# start-velodesk.sh v1.0.3 — nginx (SPA) + Node API com auto-restart + proxy VeloHub
+# VERSION: v1.0.3 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
 set -e
 
 API_PORT="${API_INTERNAL_PORT:-8081}"
@@ -38,18 +38,32 @@ fs.writeFileSync(
 );
 "
 
-cd /app/api
-PORT="$API_PORT" NODE_ENV="${NODE_ENV:-production}" ENABLE_WHATSAPP="${ENABLE_WHATSAPP:-false}" \
-  node dist/index.js &
+run_api() {
+  cd /app/api
+  while true; do
+    echo "[start-velodesk] Iniciando API Node na porta ${API_PORT}..."
+    PORT="$API_PORT" NODE_ENV="${NODE_ENV:-production}" ENABLE_WHATSAPP="${ENABLE_WHATSAPP:-false}" \
+      node dist/index.js || echo "[start-velodesk] API encerrou inesperadamente (codigo $?)"
+    echo "[start-velodesk] Reiniciando API em 2s..."
+    sleep 2
+  done
+}
+
+run_api &
 
 i=0
-while [ "$i" -lt 30 ]; do
+while [ "$i" -lt 60 ]; do
   if wget -qO- "http://127.0.0.1:${API_PORT}/health" >/dev/null 2>&1; then
+    echo "[start-velodesk] API respondendo em /health"
     break
   fi
   i=$((i + 1))
   sleep 1
 done
+
+if [ "$i" -ge 60 ]; then
+  echo "[start-velodesk] AVISO: API ainda nao respondeu /health apos 60s — nginx sobe mesmo assim"
+fi
 
 mkdir -p /run/nginx /etc/nginx/http.d
 envsubst '${PORT} ${BACKEND_URL} ${VELOHUB_API_URL} ${VELOHUB_API_HOST}' \

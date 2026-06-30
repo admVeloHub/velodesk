@@ -1,10 +1,10 @@
-﻿/** index v1.3.2 — trust proxy Cloud Run + helmet Google OAuth */
+﻿/** index v1.4.1 — monitor Mongo contínuo; processo não morre em erro não tratado */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { env } from './config/env';
-import { connectDatabase, disconnectDatabase, getAtlasConnectionInfo, getMongoStorageLabel, isCadastrosConnected, isDeskConfigConnected, isMongoConnected } from './config/database';
+import { connectDatabase, disconnectDatabase, getAtlasConnectionInfo, getMongoStorageLabel, isAllMongoReady, isCadastrosConnected, isDeskConfigConnected, isMongoConnected } from './config/database';
 import authRoutes from './routes/auth.routes';
 import ticketsRoutes from './routes/tickets.routes';
 import boxesRoutes from './routes/boxes.routes';
@@ -41,8 +41,9 @@ app.use(
 );
 
 app.get('/api/health', (_req, res) => {
+  const allReady = isAllMongoReady();
   res.json({
-    status: isMongoConnected() ? 'ok' : 'degraded',
+    status: allReady ? 'ok' : 'degraded',
     mongo: isMongoConnected(),
     mongoUriConfigured: Boolean(env.mongoUri?.trim()),
     googleClientIdConfigured: Boolean(env.googleClientId),
@@ -58,8 +59,9 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.get('/health', (_req, res) => {
+  const allReady = isAllMongoReady();
   res.json({
-    status: isMongoConnected() ? 'ok' : 'degraded',
+    status: allReady ? 'ok' : 'degraded',
     mongo: isMongoConnected(),
     mongoUriConfigured: Boolean(env.mongoUri?.trim()),
     googleClientIdConfigured: Boolean(env.googleClientId),
@@ -87,20 +89,23 @@ if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);
 }
 
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[express] erro não tratado:', err);
+  if (!res.headersSent) {
+    res.status(500).json({ message: 'Erro interno do servidor' });
+  }
+});
+
 let mongoRetryTimer: ReturnType<typeof setInterval> | null = null;
 
 async function tryConnectDatabase(): Promise<boolean> {
-  if (isMongoConnected()) return true;
+  if (isAllMongoReady()) return true;
 
   try {
     await connectDatabase();
     await purgeLegacyDemoData();
     await seedDevelopmentData();
-    if (mongoRetryTimer) {
-      clearInterval(mongoRetryTimer);
-      mongoRetryTimer = null;
-    }
-    console.log('[startup] MongoDB conectado.');
+    console.log('[startup] MongoDB conectado (chamados + cadastros + desk_config).');
     return true;
   } catch (err) {
     const msg = (err as Error).message;
@@ -116,15 +121,11 @@ async function tryConnectDatabase(): Promise<boolean> {
 
 function scheduleMongoRetry() {
   if (mongoRetryTimer) return;
-  console.error('[startup] Producao: retentando MongoDB a cada 30s...');
+  console.log('[startup] Monitoramento MongoDB a cada 15s (reconecta se cair).');
   mongoRetryTimer = setInterval(() => {
-    if (isMongoConnected()) {
-      if (mongoRetryTimer) clearInterval(mongoRetryTimer);
-      mongoRetryTimer = null;
-      return;
-    }
+    if (!env.mongoUri?.trim() || isAllMongoReady()) return;
     void tryConnectDatabase();
-  }, 30000);
+  }, 15000);
 }
 
 async function bootstrapDatabase() {
@@ -134,11 +135,10 @@ async function bootstrapDatabase() {
   }
 
   const connected = await tryConnectDatabase();
-  if (!connected && env.nodeEnv !== 'production') {
-    process.exit(1);
-  }
-  if (!connected && env.nodeEnv === 'production') {
+  if (env.nodeEnv === 'production') {
     scheduleMongoRetry();
+  } else if (!connected) {
+    process.exit(1);
   }
 }
 
@@ -153,6 +153,14 @@ async function start() {
     });
   });
 }
+
+process.on('uncaughtException', (err) => {
+  console.error('[fatal] uncaughtException (processo continua):', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[fatal] unhandledRejection (processo continua):', reason);
+});
 
 process.on('SIGINT', async () => {
   await whatsapp.destroyWhatsApp();

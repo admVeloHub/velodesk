@@ -1,4 +1,4 @@
-/** database v1.6.1 — guard MONGODB_URI vazio antes de conectar */
+/** database v1.7.0 — reconexão cadastros/desk_config + não derruba processo */
 import path from 'path';
 import mongoose, { Connection } from 'mongoose';
 import { env, envFile } from './env';
@@ -52,8 +52,26 @@ function maskUri(uri: string): string {
   return maskMongoUri(uri);
 }
 
+export function isAllMongoReady(): boolean {
+  return isMongoConnected() && isCadastrosConnected() && isDeskConfigConnected();
+}
+
+async function resetConnection(conn: Connection | null): Promise<void> {
+  if (!conn) return;
+  try {
+    await conn.close();
+  } catch {
+    /* ignore */
+  }
+}
+
 async function connectCadastros(uri: string): Promise<void> {
   if (cadastrosConnection?.readyState === 1) return;
+
+  if (cadastrosConnection) {
+    await resetConnection(cadastrosConnection);
+    cadastrosConnection = null;
+  }
 
   cadastrosConnection = mongoose.createConnection(uri, {
     dbName: env.mongoCadastrosDbName,
@@ -65,6 +83,11 @@ async function connectCadastros(uri: string): Promise<void> {
 
 async function connectDeskConfig(uri: string): Promise<void> {
   if (deskConfigConnection?.readyState === 1) return;
+
+  if (deskConfigConnection) {
+    await resetConnection(deskConfigConnection);
+    deskConfigConnection = null;
+  }
 
   deskConfigConnection = mongoose.createConnection(uri, {
     dbName: env.mongoDeskConfigDbName,
@@ -85,8 +108,11 @@ export async function connectDatabase(): Promise<void> {
 
   const { uri: atlasUri, method } = await resolveAtlasSrvUri(env.mongoUri);
   const options = { dbName: env.mongoDbName, ...MONGO_DRIVER_OPTIONS };
-  await mongoose.connect(atlasUri, options);
-  console.log(`Atlas conectado: ${env.mongoDbName} @ ${maskUri(atlasUri)} (${method})`);
+
+  if (!isMongoConnected()) {
+    await mongoose.connect(atlasUri, options);
+    console.log(`Atlas conectado: ${env.mongoDbName} @ ${maskUri(atlasUri)} (${method})`);
+  }
 
   await connectCadastros(atlasUri);
   await connectDeskConfig(atlasUri);

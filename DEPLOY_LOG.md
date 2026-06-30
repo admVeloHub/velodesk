@@ -1,10 +1,29 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.13.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.14.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Fix 502: API não morre se desk_config cair
+
+- **Data/Hora**: 2026-06-30
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.14.0
+  - database.ts v1.7.0, index.ts v1.4.1
+  - tabulation.routes v1.2.1, boxes.routes v1.3.6
+  - start-velodesk.sh v1.0.3
+- **Arquivos modificados / incluídos**:
+  - `backend/src/config/database.ts` — reconexão cadastros/desk_config; `isAllMongoReady()`
+  - `backend/src/index.ts` — monitor Mongo 15s; uncaughtException/unhandledRejection não derrubam processo
+  - `backend/src/routes/tabulation.routes.ts` — 503 em vez de crash se desk_config indisponível
+  - `backend/src/routes/boxes.routes.ts` — 503 se Mongo principal indisponível
+  - `docker/start-velodesk.sh` — loop auto-restart do Node se encerrar
+- **Descrição**: Corrige 502 em `/api/boxes`, `/api/tabulation`, `/api/clients` quando conexão desk_config falha e derruba o Node; nginx passa a receber 503/500 em vez de connection refused.
+- **Status**: Concluído
 
 ### GitHub Push — Proxy VeloHub /velohub-api + responsável com usuários logados
 
