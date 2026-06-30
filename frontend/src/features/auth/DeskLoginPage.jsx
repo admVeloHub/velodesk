@@ -1,6 +1,6 @@
 /**
- * DeskLoginPage v1.0.1 — login Google (fase testes)
- * VERSION: v1.0.1 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * DeskLoginPage v1.1.0 — login Google (layout limpo)
+ * VERSION: v1.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
@@ -21,6 +21,23 @@ function getGoogleButtonWidth(containerEl) {
   const width = Math.round(containerEl.getBoundingClientRect().width || 0);
   if (!width) return viewportSafeWidth;
   return Math.max(240, Math.min(width, viewportSafeWidth));
+}
+
+function resolveLoginError(err) {
+  const status = err?.response?.status;
+  const apiMsg = String(err?.response?.data?.message || '').trim();
+
+  if (status === 503 || /mongodb|banco de dados/i.test(apiMsg)) {
+    return '';
+  }
+  if (status === 403) {
+    return 'Usuário sem permissão para acessar o Desk.';
+  }
+  if (status === 401 && apiMsg) {
+    return apiMsg;
+  }
+  if (apiMsg) return apiMsg;
+  return err?.message || 'Não foi possível entrar com Google.';
 }
 
 export default function DeskLoginPage() {
@@ -45,7 +62,7 @@ export default function DeskLoginPage() {
       await bootstrapFromGoogleLogin(data);
       applyProfileFromAccess(data.user.deskProfile || data.user.role);
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Não foi possível entrar com Google.');
+      setError(resolveLoginError(err));
     } finally {
       setLoading(false);
     }
@@ -121,13 +138,7 @@ export default function DeskLoginPage() {
       <div className="desk-login-card">
         <div className="desk-login-brand">
           <span className="desk-login-brand__mark">Velodesk</span>
-          <p className="desk-login-brand__subtitle">Acesso operacional — fase de testes</p>
         </div>
-
-        <p className="desk-login-copy">
-          Entre com sua conta Google <strong>@velotax.com.br</strong> autorizada.
-          A visão (Agente ou Supervisor) é definida pelo seu e-mail.
-        </p>
 
         {error ? (
           <div className="desk-login-error" role="alert">
@@ -140,10 +151,6 @@ export default function DeskLoginPage() {
           <div ref={buttonRef} id="desk-google-signin-button" />
           {loading ? <p className="desk-login-loading">Validando acesso…</p> : null}
         </div>
-
-        <p className="desk-login-footnote">
-          Integração VeloHub permanece preparada para uma fase posterior.
-        </p>
       </div>
     </div>
   );

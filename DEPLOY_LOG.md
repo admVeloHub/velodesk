@@ -1,10 +1,24 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.9.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.10.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Login limpo: remove recados e erro Mongo na tela
+
+- **Data/Hora**: 2026-06-30
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.10.0
+  - DeskLoginPage v1.1.0, desk-login.css v1.0.1
+- **Arquivos modificados / incluídos**:
+  - `frontend/src/features/auth/DeskLoginPage.jsx` — só marca Velodesk + botão Google; sem textos de fase de testes/VeloHub; 503 Mongo não exibe alerta na UI
+  - `frontend/src/features/auth/desk-login.css` — estilos dos blocos removidos
+- **Descrição**: Tela de login enxuta; erros técnicos de banco ficam só no backend/logs.
+- **Status**: Concluído
 
 ### GitHub Push — Retry MongoDB + diagnóstico health + helmet Google OAuth
 

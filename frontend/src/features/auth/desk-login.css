@@ -1,6 +1,6 @@
 /**
- * desk-login.css v1.0.0 — tela de login Google Desk
- * VERSION: v1.0.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * desk-login.css v1.0.1 — tela de login Google Desk
+ * VERSION: v1.0.1 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
 
 .desk-login-page {
@@ -28,23 +28,7 @@
   font-weight: 700;
   color: #000058;
   letter-spacing: -0.02em;
-}
-
-.desk-login-brand__subtitle {
-  margin: 0.35rem 0 0;
-  color: #6b7280;
-  font-size: 0.9rem;
-}
-
-.desk-login-copy {
-  margin: 1.5rem 0 1.25rem;
-  color: #374151;
-  font-size: 0.92rem;
-  line-height: 1.55;
-}
-
-.desk-login-copy strong {
-  color: #000058;
+  margin-bottom: 1.5rem;
 }
 
 .desk-login-error {
@@ -74,14 +58,6 @@
   font-size: 0.85rem;
 }
 
-.desk-login-footnote {
-  margin: 1.25rem 0 0;
-  font-size: 0.78rem;
-  color: #9ca3af;
-  line-height: 1.45;
-  text-align: center;
-}
-
 body.velodesk-dark .desk-login-page {
   background: linear-gradient(160deg, #0f1117 0%, #151922 100%);
 }
@@ -92,12 +68,6 @@ body.velodesk-dark .desk-login-card {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
-body.velodesk-dark .desk-login-brand__mark,
-body.velodesk-dark .desk-login-copy strong {
+body.velodesk-dark .desk-login-brand__mark {
   color: #f3f7fc;
-}
-
-body.velodesk-dark .desk-login-copy,
-body.velodesk-dark .desk-login-brand__subtitle {
-  color: #cbd5e1;
 }
