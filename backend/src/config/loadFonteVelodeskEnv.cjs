@@ -1,6 +1,6 @@
 /**
- * loadFonteVelodeskEnv.cjs — carrega exclusivamente backend/.env
- * VERSION: v2.0.0 | DATE: 2026-06-25 | AUTHOR: VeloHub Development Team
+ * loadFonteVelodeskEnv.cjs — FONTE DA VERDADE/.env-velodesk + backend/.env (override local)
+ * VERSION: v2.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
 'use strict';
 
@@ -21,29 +21,81 @@ function normalizeMongoEnv() {
   }
 }
 
+function normalizeQuotedEnv(key) {
+  const raw = process.env[key];
+  if (!raw) return;
+  process.env[key] = String(raw).trim().replace(/^["']|["']$/g, '').trim();
+}
+
+function normalizeGoogleEnv() {
+  normalizeQuotedEnv('GOOGLE_CLIENT_ID');
+  normalizeQuotedEnv('VITE_GOOGLE_CLIENT_ID');
+  if (!process.env.GOOGLE_CLIENT_ID && process.env.VITE_GOOGLE_CLIENT_ID) {
+    process.env.GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID;
+  }
+}
+
 function applyDefaults() {
   if (!process.env.VELODESK) process.env.VELODESK = DEFAULTS.VELODESK;
   if (!process.env.VELODESK_BACKEND) process.env.VELODESK_BACKEND = DEFAULTS.VELODESK_BACKEND;
   normalizeMongoEnv();
+  normalizeGoogleEnv();
+}
+
+function loadDotenvFile(envPath, override = false) {
+  if (!envPath || !fs.existsSync(envPath)) return false;
+  try {
+    require('dotenv').config({ path: envPath, override });
+    return true;
+  } catch (err) {
+    console.warn(`loadFonteVelodeskEnv v2.1.0: falha ao carregar ${envPath}:`, err.message);
+    return false;
+  }
+}
+
+function findFonteVelodeskEnv(startDir) {
+  let d = path.resolve(startDir);
+  for (let i = 0; i < 16; i++) {
+    const envPath = path.join(d, 'FONTE DA VERDADE', '.env-velodesk');
+    if (fs.existsSync(envPath)) return envPath;
+    const parent = path.dirname(d);
+    if (parent === d) break;
+    d = parent;
+  }
+  return null;
 }
 
 function loadFrom(startDir) {
-  const envPath = path.join(path.resolve(startDir), '.env');
+  const backendDir = path.resolve(startDir);
+  const backendEnvPath = path.join(backendDir, '.env');
+  const fonteEnvPath = findFonteVelodeskEnv(backendDir);
 
-  if (!fs.existsSync(envPath)) {
-    applyDefaults();
-    return { envPath: null, loaded: false, source: 'missing-dotenv' };
+  let source = 'defaults';
+  let envPath = null;
+  let loaded = false;
+
+  if (fonteEnvPath && loadDotenvFile(fonteEnvPath, false)) {
+    envPath = fonteEnvPath;
+    source = 'fonte-da-verdade';
+    loaded = true;
   }
 
-  try {
-    require('dotenv').config({ path: envPath });
-    applyDefaults();
-    return { envPath, loaded: true, source: 'dotenv' };
-  } catch (err) {
-    console.warn('loadFonteVelodeskEnv v2.0.0: falha ao carregar .env:', err.message);
-    applyDefaults();
-    return { envPath, loaded: false, source: 'dotenv-error' };
+  if (loadDotenvFile(backendEnvPath, true)) {
+    envPath = backendEnvPath;
+    source = loaded ? 'fonte-da-verdade+backend-dotenv' : 'backend-dotenv';
+    loaded = true;
   }
+
+  const custom = process.env.VELODESK_DOTENV_PATH;
+  if (custom && fs.existsSync(custom)) {
+    loadDotenvFile(custom, true);
+    envPath = custom;
+    source = 'VELODESK_DOTENV_PATH';
+    loaded = true;
+  }
+
+  applyDefaults();
+  return { envPath, loaded, source, fonteEnvPath, backendEnvPath };
 }
 
 module.exports = { loadFrom };

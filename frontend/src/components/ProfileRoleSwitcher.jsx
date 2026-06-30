@@ -1,6 +1,6 @@
 /**
  * Seletor de perfil operacional — Agente / Supervisor
- * VERSION: v1.0.0 | DATE: 2026-06-19
+ * VERSION: v1.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
 import React, { useState } from 'react';
 import { PROFILES } from '../config/profiles';
@@ -35,14 +35,30 @@ export default function ProfileRoleSwitcher({
   badgeId = 'profileRoleBadge',
   onSelect,
 }) {
-  const { profile, profileId, setProfile } = useProfile();
+  const { profile, profileId, profileLocked, setProfile } = useProfile();
   const [open, setOpen] = useState(false);
 
   const handleSelect = (id) => {
+    if (profileLocked) return;
     setProfile(id);
     setOpen(false);
     onSelect?.(id);
   };
+
+  if (profileLocked && variant === 'badge') {
+    return (
+      <div className={'header-profile-wrap' + (className ? ' ' + className : '')}>
+        <span
+          className="profile-role-badge profile-role-badge--locked"
+          id={badgeId}
+          style={{ background: 'linear-gradient(135deg, ' + profile.color + ', var(--eco-blue, #1634FF))' }}
+        >
+          <i className={'fas ' + profile.icon} aria-hidden="true" />
+          <span>{profile.label}</span>
+        </span>
+      </div>
+    );
+  }
 
   if (variant === 'menu') {
     return (

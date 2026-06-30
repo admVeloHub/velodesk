@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { getDeskDisplayName } from '../../utils/userDisplayName';
 import { getInitials } from '../../services/desk/utils';
 import ProfileRoleSwitcher from '../../components/ProfileRoleSwitcher';
 
@@ -23,7 +24,7 @@ export default function AccountSettingsModal({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return undefined;
-    setName(user?.name || 'Ana Silva');
+    setName(getDeskDisplayName(user) || user?.name || '');
     setEmail(user?.email || '');
     setCurrentPassword('');
     setNewPassword('');
@@ -38,7 +39,7 @@ export default function AccountSettingsModal({ open, onClose }) {
 
   if (!open) return null;
 
-  const initials = getInitials(name || user?.name || 'Ana Silva');
+  const initials = getInitials(getDeskDisplayName(user) || user?.name || '');
 
   const handleSave = () => {
     if (!name.trim()) {

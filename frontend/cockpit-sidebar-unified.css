@@ -490,6 +490,70 @@ body.velo-nav-rail-mode .sidebar-toggle-btn {
     position: relative;
 }
 
+.velo-nav-rail__foot-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+#mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn {
+    width: var(--ws360-bell-size, 40px);
+    height: var(--ws360-bell-size, 40px);
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    border-radius: 50%;
+    font-size: 1rem;
+    color: var(--eco-navy, #04072E);
+    background: #fff;
+    border: 1px solid var(--eco-border, #E4E6EA);
+    box-shadow: 0 2px 8px rgba(0, 0, 88, 0.06);
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+#mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn span {
+    display: none;
+}
+
+.velo-nav-rail-wrap.is-open #mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn {
+    width: calc(100% - 12px);
+    height: auto;
+    min-height: 36px;
+    border-radius: 8px;
+    padding: 0 10px;
+    justify-content: flex-start;
+    gap: 8px;
+}
+
+.velo-nav-rail-wrap.is-open #mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn span {
+    display: inline;
+    font-size: 0.82rem;
+    font-weight: 500;
+}
+
+#mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn:hover {
+    background: #fef2f2;
+    border-color: rgba(185, 28, 28, 0.25);
+    color: #b91c1c;
+}
+
+body.velodesk-dark #mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn {
+    background: #1a1f2b;
+    border-color: #2a3142;
+    color: #e5e7eb;
+}
+
+body.velodesk-dark #mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn:hover {
+    background: #3f1d1d;
+    border-color: rgba(248, 113, 113, 0.35);
+    color: #fca5a5;
+}
+
 #mainSidebar.velo-nav-rail .velo-nav-rail__alerts-bell {
     width: var(--ws360-bell-size, 40px);
     height: var(--ws360-bell-size, 40px);

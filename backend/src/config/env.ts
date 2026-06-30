@@ -1,4 +1,4 @@
-/** env v1.7.0 — inbound e-mail + b2c_chamados + b2c_cadastros + desk_config */
+/** env v1.8.0 — inbound e-mail + b2c_chamados + b2c_cadastros + desk_config + Google SSO */
 import fs from 'fs';
 import path from 'path';
 
@@ -56,5 +56,9 @@ export const env = {
     .filter(Boolean),
   emailFrom: process.env.EMAIL_FROM || '',
   emailApiKey: process.env.EMAIL_API_KEY || '',
+  googleClientId: (process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .trim(),
 };
 

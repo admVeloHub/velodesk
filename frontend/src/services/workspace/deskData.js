@@ -226,7 +226,7 @@ export function computeAgent360View() {
 
   return {
     greeting,
-    agentName: desk.agentName || getAgentName() || 'Ana Silva',
+    agentName: desk.agentName || getAgentName() || 'agente',
     dateTimeLabel: `${dateLabel.charAt(0).toUpperCase()}${dateLabel.slice(1)} · ${timeLabel}`,
     alert,
     kpis: [

@@ -2,7 +2,7 @@
 
  * App raiz — providers + rotas
 
- * VERSION: v2.2.2 | DATE: 2026-06-25 | AUTHOR: VeloHub Development Team
+ * VERSION: v2.3.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
 
  */
 
@@ -25,7 +25,7 @@ import { TabulationProvider } from '../context/TabulationContext';
 
 import ProtectedRoute from '../routes/ProtectedRoute';
 
-import DeskLoadingGate from '../features/auth/DeskLoadingGate';
+import DeskLoginPage from '../features/auth/DeskLoginPage';
 
 import AppShell from '../layout/AppShell';
 
@@ -59,7 +59,7 @@ function AppRoutes() {
 
   return useRoutes([
 
-    { path: '/login', element: React.createElement(DeskLoadingGate) },
+    { path: '/login', element: React.createElement(DeskLoginPage) },
 
     {
 

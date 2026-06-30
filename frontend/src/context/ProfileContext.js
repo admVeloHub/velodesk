@@ -1,6 +1,6 @@
 /**
- * ProfileContext v1.2.0 — perfis + segmentação pós-gate (fase 1: agent)
- * VERSION: v1.2.0 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
+ * ProfileContext v1.3.0 — perfil fixo por allowlist (Google SSO testes)
+ * VERSION: v1.3.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +8,14 @@ import { PROFILES, getProfileMeta } from '../config/profiles';
 import { useNotifications } from './NotificationContext';
 
 const ProfileContext = createContext(null);
+
+function readProfileLocked() {
+  try {
+    return localStorage.getItem('velodesk_profile_locked') === '1';
+  } catch {
+    return false;
+  }
+}
 
 export function ProfileProvider({ children }) {
   const navigate = useNavigate();
@@ -18,6 +26,7 @@ export function ProfileProvider({ children }) {
     if (id !== saved) localStorage.setItem('velodeskProfile', id);
     return id;
   });
+  const [profileLocked, setProfileLocked] = useState(readProfileLocked);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [segmentation, setSegmentation] = useState(() => {
     try {
@@ -36,6 +45,8 @@ export function ProfileProvider({ children }) {
 
   const applyGateProfile = useCallback((colaborador) => {
     localStorage.setItem('velodeskProfile', 'agent');
+    localStorage.removeItem('velodesk_profile_locked');
+    setProfileLocked(false);
     setProfileIdState('agent');
     const meta = colaborador ? {
       atuacao: colaborador.atuacao || [],
@@ -47,7 +58,20 @@ export function ProfileProvider({ children }) {
     }
   }, []);
 
+  const applyProfileFromAccess = useCallback((deskProfile) => {
+    const id = deskProfile === 'supervisor' ? 'supervisor' : 'agent';
+    localStorage.setItem('velodeskProfile', id);
+    localStorage.setItem('velodesk_profile_locked', '1');
+    setProfileIdState(id);
+    setProfileLocked(true);
+    setDropdownOpen(false);
+  }, []);
+
   const setProfile = useCallback((id) => {
+    if (profileLocked) {
+      setDropdownOpen(false);
+      return;
+    }
     if (!PROFILES[id] || id === profileId) {
       setDropdownOpen(false);
       return;
@@ -60,9 +84,12 @@ export function ProfileProvider({ children }) {
     if (defaultPage === 'tickets') navigate('/tickets?desk=v2');
     else if (defaultPage === 'analytics-ia') navigate('/analytics-ia');
     else navigate('/' + defaultPage);
-  }, [navigate, showNotification, profileId]);
+  }, [navigate, showNotification, profileId, profileLocked]);
 
-  const toggleDropdown = useCallback(() => setDropdownOpen((v) => !v), []);
+  const toggleDropdown = useCallback(() => {
+    if (profileLocked) return;
+    setDropdownOpen((v) => !v);
+  }, [profileLocked]);
 
   const isNavAllowed = useCallback((pageId) => profile.nav.indexOf(pageId) >= 0, [profile]);
 
@@ -71,9 +98,11 @@ export function ProfileProvider({ children }) {
       profileId,
       profile,
       segmentation,
+      profileLocked,
       dropdownOpen,
       setProfile,
       applyGateProfile,
+      applyProfileFromAccess,
       toggleDropdown,
       setDropdownOpen,
       isNavAllowed,

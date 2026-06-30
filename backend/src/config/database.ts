@@ -76,7 +76,8 @@ async function connectDeskConfig(uri: string): Promise<void> {
 
 export async function connectDatabase(): Promise<void> {
   const envPath = envFile.envPath || path.join(process.cwd(), '.env');
-  console.log(`[env] backend/.env: ${envPath}`);
+  const envSource = (envFile as { source?: string }).source || 'unknown';
+  console.log(`[env] backend env: ${envPath} (${envSource})`);
 
   const { uri: atlasUri, method } = await resolveAtlasSrvUri(env.mongoUri);
   const options = { dbName: env.mongoDbName, ...MONGO_DRIVER_OPTIONS };

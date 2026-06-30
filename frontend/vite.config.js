@@ -1,6 +1,6 @@
 /**
- * vite.config v1.2.0 — portas/proxy via FONTE DA VERDADE/.env-velodesk (8000/8001)
- * VERSION: v1.2.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * vite.config v1.3.0 — portas/proxy via FONTE DA VERDADE/.env-velodesk (8000/8001)
+ * VERSION: v1.3.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -11,14 +11,31 @@ import react from '@vitejs/plugin-react';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function normalizeEnvValue(raw) {
+  return String(raw || '').trim().replace(/^["']|["']$/g, '').trim();
+}
+
 require('./loadFonteVelodeskEnv.cjs').loadFrom(__dirname);
+
+const googleClientId = normalizeEnvValue(
+  process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
+);
+const deskAuthMode = normalizeEnvValue(process.env.VITE_DESK_AUTH_MODE) || 'google';
+const velohubApiUrl = normalizeEnvValue(process.env.VITE_VELOHUB_API_URL);
+
+if (googleClientId) {
+  process.env.VITE_GOOGLE_CLIENT_ID = googleClientId;
+  process.env.GOOGLE_CLIENT_ID = googleClientId;
+}
+if (deskAuthMode) process.env.VITE_DESK_AUTH_MODE = deskAuthMode;
+if (velohubApiUrl) process.env.VITE_VELOHUB_API_URL = velohubApiUrl;
 
 const frontendPort = parseInt(process.env.VELODESK || '8000', 10);
 const backendPort = parseInt(process.env.VELODESK_BACKEND || '8001', 10);
 const backendUrl = `http://localhost:${backendPort}`;
 const velohubApiTarget = (
-  process.env.VITE_VELOHUB_API_URL || 'https://velohub-278491073220.us-east1.run.app'
-).trim().replace(/\/$/, '').replace(/\/api$/, '');
+  velohubApiUrl || 'https://velohub-278491073220.us-east1.run.app'
+).replace(/\/$/, '').replace(/\/api$/, '');
 
 const velohubProxy = {
   target: velohubApiTarget,
@@ -27,6 +44,10 @@ const velohubProxy = {
 };
 
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(googleClientId),
+    'import.meta.env.VITE_DESK_AUTH_MODE': JSON.stringify(deskAuthMode),
+  },
   plugins: [react()],
   esbuild: {
     loader: 'jsx',

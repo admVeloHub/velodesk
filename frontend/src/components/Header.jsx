@@ -1,6 +1,6 @@
 /**
- * Header — cockpit shell
- * VERSION: v1.0.0 | DATE: 2026-06-18
+ * Header v1.1.0 — cockpit shell
+ * VERSION: v1.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
 import React, { useState } from 'react';
 import { PROFILES } from '../config/profiles';
@@ -9,7 +9,15 @@ import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
 
 export default function Header({ onQuickRegister, onGlobalSearch }) {
-  const { profile, profileId, dropdownOpen, setProfile, toggleDropdown, setDropdownOpen } = useProfile();
+  const {
+    profile,
+    profileId,
+    profileLocked,
+    dropdownOpen,
+    setProfile,
+    toggleDropdown,
+    setDropdownOpen,
+  } = useProfile();
   const { darkMode, toggleDarkMode } = useTheme();
   const { badgeCount, togglePanel } = useNotifications();
   const [search, setSearch] = useState('');
@@ -58,15 +66,18 @@ export default function Header({ onQuickRegister, onGlobalSearch }) {
           <div className="header-profile-wrap">
             <button
               type="button"
-              className="profile-role-badge"
+              className={'profile-role-badge' + (profileLocked ? ' profile-role-badge--locked' : '')}
               id="profileRoleBadge"
-              onClick={toggleDropdown}
+              onClick={profileLocked ? undefined : toggleDropdown}
               style={{ background: 'linear-gradient(135deg, ' + profile.color + ', var(--eco-blue, #1634FF))' }}
+              aria-expanded={profileLocked ? false : dropdownOpen}
+              aria-haspopup={profileLocked ? false : 'true'}
+              title={profileLocked ? 'Visão definida pelo seu acesso' : 'Alterar visão do portal'}
             >
               <i className={'fas ' + profile.icon} /> <span>{profile.label}</span>{' '}
-              <i className="fas fa-chevron-down eco-badge-chevron" />
+              {!profileLocked ? <i className="fas fa-chevron-down eco-badge-chevron" /> : null}
             </button>
-            {dropdownOpen && (
+            {!profileLocked && dropdownOpen && (
               <div className={'eco-profile-dropdown open'} id="ecoProfileDropdown">
                 <div className="eco-profile-dropdown-header">Visão do portal</div>
                 {Object.keys(PROFILES).map((id) => (
@@ -85,7 +96,9 @@ export default function Header({ onQuickRegister, onGlobalSearch }) {
           </div>
         </div>
       </div>
-      {dropdownOpen && <div className="eco-dropdown-backdrop" onClick={() => setDropdownOpen(false)} aria-hidden="true" />}
+      {!profileLocked && dropdownOpen ? (
+        <div className="eco-dropdown-backdrop" onClick={() => setDropdownOpen(false)} aria-hidden="true" />
+      ) : null}
     </header>
   );
 }
