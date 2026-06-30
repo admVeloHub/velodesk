@@ -1,10 +1,26 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.6.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.7.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Startup Cloud Run: escuta PORT antes do MongoDB
+
+- **Data/Hora**: 2026-06-30
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.7.0
+  - index.ts v1.2.0, env.ts v1.9.0, database.ts v1.6.1
+- **Arquivos modificados / incluídos**:
+  - `backend/src/index.ts` — `app.listen` em `0.0.0.0:PORT` antes de conectar Atlas; produção não encerra se Mongo falhar (modo degradado)
+  - `backend/src/config/env.ts` — produção tolera `MONGODB_URI` ausente no boot (log + degradado)
+  - `backend/src/config/database.ts` — guard contra URI vazia
+  - `README.md` — variáveis obrigatórias no serviço Cloud Run `velodesk`
+- **Descrição**: Corrige deploy Cloud Run (`container failed to start and listen on PORT=8080`). O backend só abria a porta após MongoDB; falha de conexão ou env ausente matava o container antes do health check.
+- **Status**: Concluído
 
 ### GitHub Push — Dockerfile na raiz para trigger Cloud Build GCP
 

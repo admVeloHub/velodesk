@@ -1,4 +1,4 @@
-/** env v1.8.0 — inbound e-mail + b2c_chamados + b2c_cadastros + desk_config + Google SSO */
+/** env v1.9.0 — produção tolera MONGODB_URI ausente (modo degradado até Cloud Run env) */
 import fs from 'fs';
 import path from 'path';
 
@@ -18,13 +18,20 @@ const envFileResult = require(resolveEnvLoader()).loadFrom(path.join(__dirname, 
 
 function requireMongoUri(): string {
   const uri = process.env.MONGODB_URI || process.env.MONGO_URI || '';
-  if (!uri.trim()) {
-    const hint = envFileResult?.envPath
-      ? `Verifique MONGODB_URI em ${envFileResult.envPath}`
-      : 'Crie backend/.env a partir de backend/.env.example';
-    throw new Error(`MONGODB_URI ausente — ${hint}`);
+  const trimmed = uri.trim();
+  if (trimmed) return trimmed;
+
+  if (process.env.NODE_ENV === 'production') {
+    console.error(
+      '[env] MONGODB_URI ausente — defina no serviço Cloud Run (Variables & Secrets). API sobe degradada.'
+    );
+    return '';
   }
-  return uri.trim();
+
+  const hint = envFileResult?.envPath
+    ? `Verifique MONGODB_URI em ${envFileResult.envPath}`
+    : 'Crie backend/.env a partir de backend/.env.example';
+  throw new Error(`MONGODB_URI ausente — ${hint}`);
 }
 
 export const envFile = envFileResult as {

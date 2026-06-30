@@ -1,4 +1,4 @@
-/** database v1.6.0 — conexão Atlas + desk_config; resolve SRV via DNS público se necessário */
+/** database v1.6.1 — guard MONGODB_URI vazio antes de conectar */
 import path from 'path';
 import mongoose, { Connection } from 'mongoose';
 import { env, envFile } from './env';
@@ -75,6 +75,10 @@ async function connectDeskConfig(uri: string): Promise<void> {
 }
 
 export async function connectDatabase(): Promise<void> {
+  if (!env.mongoUri?.trim()) {
+    throw new Error('MONGODB_URI ausente');
+  }
+
   const envPath = envFile.envPath || path.join(process.cwd(), '.env');
   const envSource = (envFile as { source?: string }).source || 'unknown';
   console.log(`[env] backend env: ${envPath} (${envSource})`);

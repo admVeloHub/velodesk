@@ -1,4 +1,4 @@
-﻿/** index v1.1.1 — inbound e-mail + falha se MongoDB Atlas indisponível */
+﻿/** index v1.2.0 — escuta PORT antes do Mongo (Cloud Run) + degradado se Atlas indisponível */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -76,31 +76,40 @@ if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);
 }
 
-async function start() {
+async function bootstrapDatabase() {
+  if (!env.mongoUri) {
+    console.error('[startup] MONGODB_URI ausente — configure no Cloud Run. /health retorna degraded.');
+    return;
+  }
+
   try {
     await connectDatabase();
     await purgeLegacyDemoData();
     await seedDevelopmentData();
   } catch (err) {
     const msg = (err as Error).message;
-    console.error('Falha ao conectar ao Atlas â€” backend nÃ£o iniciarÃ¡:', msg);
+    console.error('Falha ao conectar ao Atlas:', msg);
     if (/whitelist|IP address/i.test(msg)) {
-      console.error('');
-      console.error('Atlas â†’ Network Access â†’ adicione o IP pÃºblico desta mÃ¡quina.');
-      console.error('Enquanto o backend nÃ£o subir, o frontend exibe ECONNREFUSED em /api/* (porta 8001).');
+      console.error('Atlas → Network Access → libere 0.0.0.0/0 ou use VPC connector para Cloud Run.');
     } else if (/querySrv|ECONNREFUSED.*mongodb/i.test(msg)) {
-      console.error('');
-      console.error('Falha de DNS SRV local. Reinicie o backend (resolveAtlasUri deve converter a URI).');
+      console.error('Falha de DNS SRV. Verifique MONGODB_URI (mongodb+srv) no Cloud Run.');
     }
-    process.exit(1);
+    if (env.nodeEnv !== 'production') {
+      process.exit(1);
+    }
+    console.error('[startup] Producao: API continua em modo degradado até MongoDB responder.');
   }
+}
 
-  app.listen(env.port, () => {
-    console.log(`API Velodesk v1.0.0 â€” http://localhost:${env.port}`);
-    if (env.enableWhatsapp) {
-      console.log('Inicializando WhatsApp Web...');
-      whatsapp.initializeWhatsApp();
-    }
+async function start() {
+  app.listen(env.port, '0.0.0.0', () => {
+    console.log(`API Velodesk v1.2.0 — http://0.0.0.0:${env.port} (${env.nodeEnv})`);
+    void bootstrapDatabase().then(() => {
+      if (env.enableWhatsapp) {
+        console.log('Inicializando WhatsApp Web...');
+        whatsapp.initializeWhatsApp();
+      }
+    });
   });
 }
 

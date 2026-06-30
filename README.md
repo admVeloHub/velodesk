@@ -79,6 +79,18 @@ Scripts npm na raiz: `docker:build`, `docker:up`, `docker:up:detached`, `docker:
 2. Deploy **velodesk-api** (imagem `velodesk-api`) com `MONGODB_URI`, `JWT_SECRET`, `ENABLE_WHATSAPP=false`.
 3. Deploy **velodesk-web** (imagem `velodesk-web`) com `BACKEND_URL=https://<url-do-servico-api>`.
 
+**Serviço Cloud Run `velodesk` (trigger GitHub / Dockerfile raiz)** — variáveis obrigatórias no console GCP:
+
+| Variável | Descrição |
+|----------|-----------|
+| `MONGODB_URI` | URI Atlas (`mongodb+srv://...`) — mesma do `.env-velodesk` |
+| `JWT_SECRET` | Segredo JWT (produção) |
+| `GOOGLE_CLIENT_ID` | OAuth Google (login Desk) |
+| `ENABLE_WHATSAPP` | `false` |
+| `NODE_ENV` | `production` (opcional; padrão do container) |
+
+Atlas → **Network Access** deve permitir Cloud Run (`0.0.0.0/0` ou VPC). Sem `MONGODB_URI`, o deploy passa mas `/health` fica `degraded` e `/api/*` falha.
+
 WhatsApp fica desabilitado no container por padrão (`ENABLE_WHATSAPP=false`).
 
 ## Repositório
