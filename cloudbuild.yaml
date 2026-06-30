@@ -1,9 +1,12 @@
-# cloudbuild.yaml v1.0.0 — build e push imagens Velodesk (GCP Artifact Registry)
-# VERSION: v1.0.0 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
+# cloudbuild.yaml v1.1.0 — build e push imagens Velodesk (GCP Artifact Registry)
+# VERSION: v1.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
 #
 # Uso (exemplo):
 #   gcloud builds submit --config cloudbuild.yaml \
 #     --substitutions=_REGION=southamerica-east1,_REPOSITORY=velodesk
+#
+# Trigger GitHub padrão (Dockerfile na raiz) usa ./Dockerfile → velodesk-api.
+# Para web + api via este arquivo, configure o trigger com cloudbuild.yaml.
 #
 # Deploy Cloud Run (manual após build):
 #   gcloud run deploy velodesk-api --image .../velodesk-api:$COMMIT_SHA ...

@@ -68,6 +68,9 @@ Scripts npm na raiz: `docker:build`, `docker:up`, `docker:up:detached`, `docker:
 
 ### GCP Cloud Run
 
+- **Trigger GitHub (Dockerfile na raiz):** `./Dockerfile` → imagem **velodesk-api** (backend).
+- **Build web + api:** use `cloudbuild.yaml` (dois serviços).
+
 1. Build/push via Cloud Build (`cloudbuild.yaml`):
    ```bash
    gcloud builds submit --config cloudbuild.yaml \

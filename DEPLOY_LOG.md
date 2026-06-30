@@ -1,10 +1,26 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.5.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.6.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Dockerfile na raiz para trigger Cloud Build GCP
+
+- **Data/Hora**: 2026-06-30
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.6.0
+  - Dockerfile (raiz) v1.0.1
+  - cloudbuild.yaml v1.1.0
+- **Arquivos modificados / incluídos**:
+  - `Dockerfile` — build da API (`velodesk-api`) a partir da raiz do monorepo (contexto `backend/`)
+  - `cloudbuild.yaml` — comentários sobre trigger GitHub vs build web+api
+  - `README.md` — documentação do trigger na raiz
+- **Descrição**: Corrige falha do Cloud Build (`lstat /workspace/Dockerfile: no such file or directory`). O trigger GCP esperava Dockerfile na raiz; o repositório só tinha `backend/Dockerfile` e `frontend/Dockerfile`.
+- **Status**: Concluído
 
 ### GitHub Push — Login Google SSO, allowlist de acesso e logout
 
