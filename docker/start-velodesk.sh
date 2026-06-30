@@ -1,6 +1,6 @@
 #!/bin/sh
-# start-velodesk.sh v1.0.1 — nginx (SPA) + Node API no mesmo container Cloud Run
-# VERSION: v1.0.1 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+# start-velodesk.sh v1.0.2 — nginx (SPA) + Node API + proxy VeloHub
+# VERSION: v1.0.2 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
 set -e
 
 API_PORT="${API_INTERNAL_PORT:-8081}"
@@ -15,6 +15,14 @@ if [ -z "$GOOGLE_CLIENT_ID" ] && [ -z "$VITE_GOOGLE_CLIENT_ID" ]; then
 fi
 if [ -z "$JWT_SECRET" ]; then
   echo "[start-velodesk] AVISO: JWT_SECRET nao definida — usando fallback inseguro"
+fi
+
+export VELOHUB_API_URL="${VITE_VELOHUB_API_URL:-https://velohub-278491073220.us-east1.run.app}"
+export VELOHUB_API_URL="${VELOHUB_API_URL%/}"
+export VELOHUB_API_HOST="$(node -e "try{console.log(new URL(process.env.VELOHUB_API_URL).host)}catch(e){console.log('')}")"
+
+if [ -z "$VELOHUB_API_HOST" ]; then
+  echo "[start-velodesk] AVISO: VELOHUB_API_URL invalida — VeloNews proxy desabilitado"
 fi
 
 node -e "
@@ -44,7 +52,7 @@ while [ "$i" -lt 30 ]; do
 done
 
 mkdir -p /run/nginx /etc/nginx/http.d
-envsubst '${PORT} ${BACKEND_URL}' \
+envsubst '${PORT} ${BACKEND_URL} ${VELOHUB_API_URL} ${VELOHUB_API_HOST}' \
   < /etc/nginx/templates/default.conf.template \
   > /etc/nginx/http.d/default.conf
 

@@ -1,4 +1,4 @@
-﻿/** chamado.mapper v1.2.3 — status explícito no PUT; evita registro duplicado sem mudança */
+﻿/** chamado.mapper v1.2.4 — candidatos responsável incluem prefixo do e-mail */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -358,8 +358,27 @@ export function buildResponsavelCandidates(
   authUser: AuthPayload,
   dbUser?: { name?: string; email?: string } | null
 ): string[] {
-  const values = [authUser.name, authUser.email, authUser.userId, dbUser?.name, dbUser?.email];
-  return [...new Set(values.map((value) => String(value ?? '').trim()).filter(Boolean))];
+  const values: string[] = [];
+  const push = (raw?: string) => {
+    const value = String(raw ?? '').trim();
+    if (value) values.push(value);
+  };
+
+  push(authUser.name);
+  push(authUser.email);
+  push(emailLocalPart(authUser.email));
+  push(authUser.userId);
+  push(dbUser?.name);
+  push(dbUser?.email);
+  push(emailLocalPart(dbUser?.email));
+
+  return [...new Set(values.map((value) => value.toLowerCase()).filter(Boolean))];
+}
+
+function emailLocalPart(email?: string): string {
+  const normalized = String(email ?? '').trim().toLowerCase();
+  if (!normalized.includes('@')) return normalized;
+  return normalized.split('@')[0] ?? '';
 }
 
 export function meusChamadosResponsavelFilter(candidates: string[]) {

@@ -1,6 +1,6 @@
 /**
- * tabulationConfig v1.2.1 — helpers de cascata produto → motivo → detalhe
- * VERSION: v1.2.1 | DATE: 2026-06-25
+ * tabulationConfig v1.2.2 — default responsável = agente logado
+ * VERSION: v1.2.2 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
 
 export const EMPTY_TABULATION = {
@@ -48,8 +48,9 @@ export function buildDefaultRightFields(_config, ticket, getAgentName) {
   const produto = hasSavedTabulationValue(lf.produto) ? String(lf.produto).trim() : '';
   const motivo = produto && hasSavedTabulationValue(lf.motivo) ? String(lf.motivo).trim() : '';
   const detalhe = motivo && hasSavedTabulationValue(lf.detalhe) ? String(lf.detalhe).trim() : '';
+  const agent = typeof getAgentName === 'function' ? getAgentName() : '';
   return {
-    responsavel: lf.responsavel || ticket?.responsibleAgent || (typeof getAgentName === 'function' ? getAgentName() : ''),
+    responsavel: lf.responsavel || ticket?.responsibleAgent || agent,
     canal: lf.canal || ticket?.channel || 'WhatsApp',
     tipo: lf.classificacaoTipo || 'Solicitação',
     produto,

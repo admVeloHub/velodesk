@@ -1,10 +1,11 @@
 /**
- * DeskRightPanel v1.2.4 — cascata dinâmica produto → motivo → detalhe (Mongo)
- * VERSION: v1.2.4 | DATE: 2026-06-30
+ * DeskRightPanel v1.3.0 — responsável com agentes registrados (User API)
+ * VERSION: v1.3.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { buildIaTabulation } from '../../../services/desk/utils';
 import { useTabulation } from '../../../context/TabulationContext';
+import { useDeskAgents } from '../../../hooks/useDeskAgents';
 import { DeskStatusCommitButton } from './DeskComposePanel';
 
 const CANAL_OPTIONS = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
@@ -43,6 +44,16 @@ export default function DeskRightPanel({
   sendDisabled = false,
 }) {
   const { loading, getMotivos, getDetalhes, getProdutoNames } = useTabulation();
+  const { agentOptions, currentAgentValue, loading: agentsLoading } = useDeskAgents();
+
+  useEffect(() => {
+    if (!currentAgentValue || String(rightFields.responsavel || '').trim()) return;
+    onFieldChange('responsavel', currentAgentValue);
+  }, [currentAgentValue, rightFields.responsavel, onFieldChange]);
+
+  const responsavelOptions = agentOptions.length
+    ? agentOptions
+    : (currentAgentValue ? [currentAgentValue] : []);
 
   const thermo = client?.termometro ?? 38;
   const thermoLabel = client?.termometroLabel || (thermo >= 55 ? 'Crítico' : thermo >= 45 ? 'Atenção' : 'Estável');
@@ -81,12 +92,16 @@ export default function DeskRightPanel({
           {loading && (
             <p className="rp-field-hint">Carregando opções de tabulação…</p>
           )}
+          {agentsLoading && (
+            <p className="rp-field-hint">Carregando agentes…</p>
+          )}
           <SelectField
             id="selResponsavel"
             label="Responsável"
             fieldKey="responsavel"
-            value={rightFields.responsavel}
-            readonly
+            value={rightFields.responsavel || currentAgentValue}
+            options={responsavelOptions}
+            showPlaceholder
             onFieldChange={onFieldChange}
           />
           <SelectField

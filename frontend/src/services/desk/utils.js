@@ -261,7 +261,9 @@ export function normalizeTicketForDeskV2(ticket) {
     ticket.lateralForm.canal = ticket.channel || ticket.source;
   }
   if (!ticket.lateralForm.responsavel) {
-    ticket.lateralForm.responsavel = ticket.responsibleAgent || getAgentName();
+    const agent = getAgentName();
+    ticket.lateralForm.responsavel = ticket.responsibleAgent || agent;
+    if (!ticket.responsibleAgent && agent) ticket.responsibleAgent = agent;
   }
 
   ensureTicketSlaFields(ticket);

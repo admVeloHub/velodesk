@@ -1,10 +1,28 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.12.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.13.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Proxy VeloHub /velohub-api + responsável com usuários logados
+
+- **Data/Hora**: 2026-06-30
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.13.0
+  - nginx-cloudrun v1.0.2, start-velodesk.sh v1.0.2, velohubApiConfig v1.3.0
+  - useDeskAgents v1.0.0, DeskRightPanel v1.3.0, chamado.mapper v1.2.4
+- **Arquivos modificados / incluídos**:
+  - `docker/nginx-cloudrun.conf.template` — proxy `/velohub-api/` → VeloHub (CORS VeloNews)
+  - `frontend/src/config/velohubApiConfig.js` — sempre usa proxy same-origin
+  - `frontend/src/hooks/useDeskAgents.js` — lista agentes via `/api/users`
+  - `frontend/src/features/desk/components/DeskRightPanel.jsx` — select Responsável + auto-atribuição
+  - `backend/src/services/chamado.mapper.ts` — fila Meus Chamados reconhece prefixo do e-mail
+- **Descrição**: VeloNews sem CORS em produção GCP; atribuições usam usuários Google registrados no Mongo.
+- **Status**: Concluído
 
 ### GCP Cloud Run — MONGODB_URI apontado para secret MONGO_ENV (VelohubCentral)
 
