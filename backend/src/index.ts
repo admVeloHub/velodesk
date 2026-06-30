@@ -1,4 +1,4 @@
-﻿/** index v1.3.0 — retry Mongo em produção + helmet compatível Google OAuth */
+﻿/** index v1.3.1 — helmet sem COOP (Google OAuth) + retry Mongo */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -23,7 +23,8 @@ const app = express();
 
 app.use(
   helmet({
-    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+    crossOriginOpenerPolicy: false,
+    crossOriginEmbedderPolicy: false,
   }),
 );
 app.use(cors({ origin: true, credentials: true }));

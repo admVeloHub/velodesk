@@ -1,4 +1,4 @@
-/** env v1.9.0 — produção tolera MONGODB_URI ausente (modo degradado até Cloud Run env) */
+/** env v1.9.1 — trim/normaliza MONGODB_URI de secrets Cloud Run */
 import fs from 'fs';
 import path from 'path';
 
@@ -18,7 +18,7 @@ const envFileResult = require(resolveEnvLoader()).loadFrom(path.join(__dirname, 
 
 function requireMongoUri(): string {
   const uri = process.env.MONGODB_URI || process.env.MONGO_URI || '';
-  const trimmed = uri.trim();
+  const trimmed = uri.trim().replace(/^["']|["']$/g, '').replace(/\r?\n/g, '').trim();
   if (trimmed) return trimmed;
 
   if (process.env.NODE_ENV === 'production') {

@@ -1,4 +1,4 @@
-/** resolveAtlasUri v1.0.0 — converte mongodb+srv usando DNS público (Windows SRV local) */
+/** resolveAtlasUri v1.0.1 — suporta mongodb+srv com /dbname no path (Atlas) */
 import { Resolver } from 'dns/promises';
 
 const PUBLIC_DNS = ['8.8.8.8', '1.1.1.1'];
@@ -9,9 +9,9 @@ export function maskMongoUri(uri: string): string {
 }
 
 function parseSrvUri(srvUri: string) {
-  const match = srvUri.match(/^mongodb\+srv:\/\/([^/]+)@([^/?]+)(?:\?(.*))?$/);
+  const match = srvUri.match(/^mongodb\+srv:\/\/([^/]+)@([^/?]+)(?:\/([^?]*))?(?:\?(.*))?$/);
   if (!match) throw new Error('MONGODB_URI mongodb+srv inválida');
-  const [, credentials, hostname, query = ''] = match;
+  const [, credentials, hostname, , query = ''] = match;
   return { credentials, hostname, params: new URLSearchParams(query) };
 }
 

@@ -1,10 +1,27 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.10.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.11.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Fix URI Atlas com /dbname + tabulação só após login
+
+- **Data/Hora**: 2026-06-30
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.11.0
+  - resolveAtlasUri v1.0.1, env.ts v1.9.1, index.ts v1.3.1
+  - TabulationContext v1.1.0
+- **Arquivos modificados / incluídos**:
+  - `backend/src/config/resolveAtlasUri.ts` — parser `mongodb+srv://.../dbname?...` (formato Atlas)
+  - `backend/src/config/env.ts` — trim de secrets (newline/aspas)
+  - `backend/src/index.ts` — helmet sem COOP (Google postMessage)
+  - `frontend/src/context/TabulationContext.jsx` — não chama `/api/tabulation` na tela de login
+- **Descrição**: Corrige 503 no login Google quando `MONGODB_URI` Atlas inclui nome do banco no path; elimina 401 de tabulação antes de autenticar.
+- **Status**: Concluído
 
 ### GitHub Push — Login limpo: remove recados e erro Mongo na tela
 

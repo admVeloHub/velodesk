@@ -1,9 +1,10 @@
 /**
- * TabulationContext v1.0.0 — config dinâmica de tabulação
- * VERSION: v1.0.0 | DATE: 2026-06-25
+ * TabulationContext v1.1.0 — carrega tabulação só após autenticação
+ * VERSION: v1.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { tabulationApi } from '../api/client';
+import { useAuth } from './AuthContext';
 import {
   EMPTY_TABULATION,
   getDetalhes,
@@ -14,11 +15,19 @@ import {
 const TabulationContext = createContext(null);
 
 export function TabulationProvider({ children }) {
+  const { isAuthenticated } = useAuth();
   const [config, setConfig] = useState(EMPTY_TABULATION);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const reload = useCallback(async () => {
+    if (!isAuthenticated) {
+      setConfig(EMPTY_TABULATION);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -30,7 +39,7 @@ export function TabulationProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     reload();
