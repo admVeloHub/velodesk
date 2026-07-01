@@ -1,10 +1,44 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.14.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.16.0 | DATE: 2026-07-01 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Corretor LanguageTool self-hosted no compose
+
+- **Data/Hora**: 2026-07-01
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.16.0
+  - languagetool.service v1.0.2, spellcheckSuggestionRank v1.0.0
+  - spellEngine v2.0.0, languageToolEngine v1.0.0, useComposeSpellCheck v2.0.0
+  - docker-compose v1.1.0, index.ts v1.5.0, env.ts v1.10.0
+- **Arquivos modificados / incluídos**:
+  - `docker-compose.yml` — serviço `languagetool` (erikvl87/languagetool)
+  - `backend/src/services/languagetool.service.ts` — proxy `/v2/check` pt-BR, filtro STYLE/CASING
+  - `backend/src/services/spellcheckSuggestionRank.ts` — ranking atendimento (ex.: criente → cliente)
+  - `backend/src/routes/spellcheck.routes.ts` — `GET /status`, `POST /check` (JWT)
+  - `frontend/src/services/spellcheck/languageToolEngine.js` — adapter via API backend
+  - `frontend/src/hooks/useComposeSpellCheck.js` — debounce, abort, modo degradado
+  - Removido `dictionary-pt-br` do bundle frontend
+- **Descrição**: Substitui Hunspell local por LanguageTool open source self-hosted; bloqueio de envio só com erros reais; fallback se LT offline; sugestões priorizadas para vocabulário de atendimento.
+- **Status**: Concluído
+
+### GCP Cloud Run — MONGODB_URI voltou para velodesk-dev (MONGO_URI)
+
+- **Data/Hora**: 2026-06-30
+- **Tipo**: GCP Cloud Run (gcloud)
+- **Projeto**: velohub-471220
+- **Serviço**: velodesk (us-east1)
+- **Revisões**: velodesk-00018-sg2 → velodesk-00019-tzq
+- **Alterações**:
+  - `MONGODB_URI` ← secret **`MONGO_URI`** (cluster **velodesk-dev** — dados Desk)
+  - Removido secret **`MONGO_ENV`** do container (VelohubCentral reservado ao VeloNews via `VITE_VELOHUB_API_URL`)
+- **Resultado**: `/health` → `status: ok`, `cadastrosConnected: true`, `deskConfigConnected: true`, cluster `appName=velodesk-dev`
+- **Status**: Concluído
 
 ### GitHub Push — Fix 502: API não morre se desk_config cair
 

@@ -357,8 +357,7 @@ export default function DeskV2Root() {
           return null;
         }
       } catch {
-        showNotification('Corretor ortográfico indisponível. Aguarde o carregamento e tente novamente.', 'error');
-        return null;
+        /* LT indisponível — modo degradado: não bloqueia envio */
       }
     }
     setComposeSpellErrors([]);

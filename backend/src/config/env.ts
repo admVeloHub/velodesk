@@ -1,4 +1,4 @@
-/** env v1.9.1 — trim/normaliza MONGODB_URI de secrets Cloud Run */
+/** env v1.10.0 — LanguageTool self-hosted */
 import fs from 'fs';
 import path from 'path';
 
@@ -67,5 +67,9 @@ export const env = {
     .trim()
     .replace(/^["']|["']$/g, '')
     .trim(),
+  languageToolEnabled: process.env.LANGUAGETOOL_ENABLED !== 'false',
+  languageToolUrl: (process.env.LANGUAGETOOL_URL || 'http://localhost:8010').trim().replace(/\/+$/, ''),
+  languageToolLanguage: (process.env.LANGUAGETOOL_LANGUAGE || 'pt-BR').trim(),
+  languageToolTimeoutMs: parseInt(process.env.LANGUAGETOOL_TIMEOUT_MS || '8000', 10),
 };
 

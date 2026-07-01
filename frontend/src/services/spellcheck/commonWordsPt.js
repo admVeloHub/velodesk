@@ -1,6 +1,6 @@
 /**
- * commonWordsPt v1.0.0 — vocabulário básico PT-BR (palavras comuns no atendimento)
- * VERSION: v1.0.0 | DATE: 2026-06-26
+ * commonWordsPt v1.2.0 — vocabulário básico PT-BR (sem variantes sem acento duplicadas)
+ * VERSION: v1.2.0 | DATE: 2026-06-26
  */
 
 /** @type {Set<string>} */
@@ -9,16 +9,23 @@ export const COMMON_WORDS_PT = new Set([
   'um', 'uma', 'uns', 'umas', 'por', 'para', 'com', 'sem', 'sob', 'sobre',
   'que', 'se', 'não', 'nao', 'sim', 'mais', 'menos', 'muito', 'pouco', 'bem',
   'mal', 'já', 'ja', 'ainda', 'também', 'tambem', 'só', 'so', 'apenas',
+  'eu', 'tu', 'ele', 'ela', 'eles', 'elas', 'nós', 'nos', 'vós', 'vos',
+  'me', 'te', 'lhe', 'lhes', 'lo', 'la', 'los', 'las', 'mim', 'ti', 'si',
+  'meu', 'meus', 'minha', 'minhas', 'teu', 'teus', 'tua', 'tuas',
+  'seu', 'seus', 'sua', 'suas', 'dele', 'dela', 'deles', 'delas',
+  'nosso', 'nossos', 'nossa', 'nossas', 'vosso', 'vossos', 'vossa', 'vossas',
+  'este', 'esta', 'estes', 'estas', 'esse', 'essa', 'esses', 'essas',
+  'aquele', 'aquela', 'aqueles', 'aquelas', 'isto', 'isso', 'aquilo',
+  'quem', 'qual', 'quais', 'quanto', 'quantos', 'quantas', 'cujo', 'cuja',
   'olá', 'ola', 'oi', 'bom', 'boa', 'dia', 'tarde', 'noite',
   'obrigado', 'obrigada', 'desculpe', 'desculpa', 'aguarde',
   'você', 'voce', 'senhor', 'senhora', 'cliente', 'prezado', 'prezada',
   'casa', 'caso', 'casos', 'canal', 'contato', 'mensagem', 'resposta',
-  'informação', 'informacao', 'informações', 'informacoes', 'dúvida', 'duvida',
-  'dúvidas', 'duvidas', 'problema', 'problemas', 'solução', 'solucao',
-  'soluções', 'solucoes', 'pedido', 'pedidos', 'solicitação', 'solicitacao',
-  'solicitações', 'solicitacoes', 'reclamação', 'reclamacao',
-  'atendimento', 'atendimentos', 'agente', 'equipe', 'suporte', 'ajuda',
-  'verificar', 'verificando', 'análise', 'analise', 'analisando', 'enviar',
+  'informação', 'informações', 'dúvida', 'dúvidas',
+  'problema', 'problemas', 'solução', 'soluções', 'pedido', 'pedidos',
+  'solicitação', 'solicitações', 'reclamação',
+  'atendimento', 'atendimentos', 'agente', 'equipe', 'suporte',
+  'verificar', 'verificando', 'análise', 'analisando', 'enviar',
   'enviado', 'enviada', 'receber', 'recebido', 'recebida', 'retorno', 'retornar',
   'aguardar', 'aguardando', 'prazo', 'prazos', 'hoje', 'amanhã', 'amanha',
   'ontem', 'semana', 'mês', 'mes', 'ano', 'hora', 'horas', 'minuto', 'minutos',

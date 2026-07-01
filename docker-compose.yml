@@ -1,5 +1,5 @@
-# docker-compose.yml v1.0.0 — Velodesk local / GCP-like stack
-# VERSION: v1.0.0 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
+# docker-compose.yml v1.1.0 — Velodesk + LanguageTool self-hosted
+# VERSION: v1.1.0 | DATE: 2026-06-26 | AUTHOR: VeloHub Development Team
 #
 # Portas expostas no host: frontend 8000, API 8001 (padrão ecossistema).
 # Containers escutam 8080 (compatível com Cloud Run).
@@ -12,6 +12,15 @@ services:
       - "27017:27017"
     volumes:
       - velodesk_mongo_data:/data/db
+
+  languagetool:
+    image: erikvl87/languagetool:latest
+    restart: unless-stopped
+    expose:
+      - "8010"
+    environment:
+      Java_Xms: 512m
+      Java_Xmx: 1024m
 
   api:
     build:
@@ -28,8 +37,13 @@ services:
       MONGODB_CADASTROS_DB_NAME: ${MONGODB_CADASTROS_DB_NAME:-b2c_cadastros}
       JWT_SECRET: ${JWT_SECRET:-velodesk-dev-secret}
       ENABLE_WHATSAPP: ${ENABLE_WHATSAPP:-false}
+      LANGUAGETOOL_ENABLED: ${LANGUAGETOOL_ENABLED:-true}
+      LANGUAGETOOL_URL: ${LANGUAGETOOL_URL:-http://languagetool:8010}
+      LANGUAGETOOL_LANGUAGE: ${LANGUAGETOOL_LANGUAGE:-pt-BR}
+      LANGUAGETOOL_TIMEOUT_MS: ${LANGUAGETOOL_TIMEOUT_MS:-8000}
     depends_on:
       - mongo
+      - languagetool
 
   web:
     build:

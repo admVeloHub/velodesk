@@ -1,6 +1,6 @@
 /**
- * fastSpellEngine v1.1.0 — corretor PT-BR rápido (aff/dic Hunspell sem nspell)
- * VERSION: v1.1.0 | DATE: 2026-06-26
+ * fastSpellEngine v1.3.0 — acento faltante + contexto modal/infinitivo
+ * VERSION: v1.3.0 | DATE: 2026-06-26
  */
 import {
   buildAccentGroups,
@@ -15,6 +15,7 @@ import { isCommonWordPt } from './commonWordsPt';
 import { keyboardAwareWordDistance } from './keyboardDistance';
 import { buildWhitelistFromConfig, shouldSkipWord } from './whitelist';
 import { tokenizeText } from './tokenize';
+import { getModalInfinitiveFix } from './contextualChecks';
 
 /** @type {null | {
  *   stems: Map<string, Set<string>>,
@@ -97,6 +98,81 @@ function isWordFormValid(dict, word) {
   }
 
   return false;
+}
+
+/**
+ * @param {NonNullable<typeof engine>} dict
+ * @param {string} word
+ */
+function getMissingAccentSuggestion(dict, word) {
+  if (!dict || word !== stripAccents(word)) return null;
+  const group = dict.accentGroups.get(stripAccents(word));
+  if (!group) return null;
+  const accented = [...group].filter((form) => form !== stripAccents(form));
+  if (!accented.length) return null;
+  return accented.sort((a, b) => a.length - b.length || a.localeCompare(b, 'pt-BR'))[0];
+}
+
+/**
+ * @param {NonNullable<typeof engine>} dict
+ * @param {string} word
+ */
+function isInfinitiveForm(dict, word) {
+  return isCommonWordPt(word) || isWordFormValid(dict, word);
+}
+
+/**
+ * @typedef {{ tokens?: object[], tokenIndex?: number }} SpellCheckContext
+ */
+
+/**
+ * @param {NonNullable<typeof engine>} dict
+ * @param {SpellCheckContext} [context]
+ */
+function getContextualFix(dict, context) {
+  if (!context?.tokens || context.tokenIndex == null) return null;
+  return getModalInfinitiveFix(
+    context.tokens,
+    context.tokenIndex,
+    (candidate) => isInfinitiveForm(dict, candidate),
+  );
+}
+
+/**
+ * @param {string} word
+ * @param {Set<string>} whitelist
+ * @param {Set<string>} [ignoredWords]
+ * @param {SpellCheckContext} [context]
+ */
+function resolveWordCheck(dict, word, whitelist, ignoredWords, context) {
+  if (shouldSkipWord(word, whitelist, ignoredWords)) {
+    return { valid: true, suggestions: [] };
+  }
+
+  const contextual = dict ? getContextualFix(dict, context) : null;
+  if (contextual?.suggestions?.length) {
+    return { valid: false, suggestions: contextual.suggestions };
+  }
+
+  if (isCommonWordPt(word)) {
+    return { valid: true, suggestions: [] };
+  }
+
+  const accentSuggestion = dict ? getMissingAccentSuggestion(dict, word) : null;
+  if (accentSuggestion) {
+    return { valid: false, suggestions: [accentSuggestion] };
+  }
+
+  if (dict && isWordFormValid(dict, word)) {
+    return { valid: true, suggestions: [] };
+  }
+  if (!dict) return { valid: true, suggestions: [] };
+
+  const suggestions = buildSuggestionsFiltered(dict, word);
+  if (!shouldFlagAsError(word, suggestions)) {
+    return { valid: true, suggestions: [] };
+  }
+  return { valid: false, suggestions };
 }
 
 /**
@@ -263,24 +339,77 @@ function buildSuggestions(dict, word) {
 }
 
 /**
+ * Evita marcar palavra correta ou sugestões absurdas (ex.: sua → sus).
+ * @param {string} word
+ * @param {string[]} suggestions
+ */
+function shouldFlagAsError(word, suggestions) {
+  if (isCommonWordPt(word)) return false;
+  if (!suggestions?.length) return false;
+
+  const best = suggestions[0];
+  const lower = word.toLowerCase();
+  const bestLower = best.toLowerCase();
+
+  if (lower === bestLower) return false;
+
+  // Sigla/dicionário técnico curto para palavra comum minúscula (sus, sla, etc.)
+  if (
+    word === lower
+    && bestLower.length <= 4
+    && !isCommonWordPt(bestLower)
+    && levenshtein(lower, bestLower) === 1
+  ) {
+    return false;
+  }
+
+  const score = suggestionScore(word, best);
+
+  // Sugestão fraca — não travar o atendimento
+  if (score > 16) return false;
+
+  // Palavras curtas: exige sugestão clara e palavra comum
+  if (lower.length <= 4) {
+    if (!isCommonWordPt(bestLower) && score > 10) return false;
+  }
+
+  return true;
+}
+
+/**
+ * @param {string} input
+ * @param {string} candidate
+ */
+function isPlausibleSuggestion(input, candidate) {
+  const lower = input.toLowerCase();
+  const candLower = candidate.toLowerCase();
+  if (lower === candLower) return false;
+  if (input === lower && candidate === candidate.toUpperCase() && candidate.length <= 4) {
+    return false;
+  }
+  if (lower.length <= 4 && candLower.length <= 4 && !isCommonWordPt(candLower)) {
+    return suggestionScore(input, candidate) <= 12;
+  }
+  return true;
+}
+
+/**
+ * @param {NonNullable<typeof engine>} dict
+ * @param {string} word
+ */
+function buildSuggestionsFiltered(dict, word) {
+  return buildSuggestions(dict, word).filter((item) => isPlausibleSuggestion(word, item));
+}
+
+/**
  * @param {string} word
  * @param {Set<string>} whitelist
  * @param {Set<string>} [ignoredWords]
+ * @param {SpellCheckContext} [context]
  */
-export async function checkWord(word, whitelist, ignoredWords) {
-  if (shouldSkipWord(word, whitelist, ignoredWords)) {
-    return { valid: true, suggestions: [] };
-  }
-  if (isCommonWordPt(word)) {
-    return { valid: true, suggestions: [] };
-  }
+export async function checkWord(word, whitelist, ignoredWords, context) {
   const dict = await loadSpellEngine();
-  if (!dict) return { valid: true, suggestions: [] };
-  if (isWordFormValid(dict, word)) {
-    return { valid: true, suggestions: [] };
-  }
-  const suggestions = buildSuggestions(dict, word);
-  return { valid: false, suggestions };
+  return resolveWordCheck(dict, word, whitelist, ignoredWords, context);
 }
 
 /**
@@ -295,15 +424,18 @@ export async function scanText(text, whitelist, ignoredWords) {
   const tokens = tokenizeText(text);
   const errors = [];
 
-  for (const token of tokens) {
-    if (shouldSkipWord(token.word, whitelist, ignoredWords)) continue;
-    if (isCommonWordPt(token.word)) continue;
-    if (isWordFormValid(dict, token.word)) continue;
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    const result = resolveWordCheck(dict, token.word, whitelist, ignoredWords, {
+      tokens,
+      tokenIndex: i,
+    });
+    if (result.valid) continue;
     errors.push({
       word: token.word,
       startIndex: token.startIndex,
       endIndex: token.endIndex,
-      suggestions: buildSuggestions(dict, token.word),
+      suggestions: result.suggestions,
     });
   }
 

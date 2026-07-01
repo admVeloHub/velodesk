@@ -2034,6 +2034,12 @@
     border-color: #fecaca;
 }
 
+#velodeskDeskV2Root .spell-suggestion-bar--warning {
+    color: #92400e;
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
 #velodeskDeskV2Root .spell-suggestion-bar__spin {
     animation: spellSpin 0.9s linear infinite;
 }

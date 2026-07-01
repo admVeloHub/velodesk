@@ -1,4 +1,4 @@
-﻿/** index v1.4.1 — monitor Mongo contínuo; processo não morre em erro não tratado */
+﻿/** index v1.5.0 — proxy LanguageTool spellcheck */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -13,7 +13,9 @@ import statsRoutes from './routes/stats.routes';
 import uploadsRoutes from './routes/uploads.routes';
 import clientsRoutes from './routes/clients.routes';
 import tabulationRoutes from './routes/tabulation.routes';
+import spellcheckRoutes from './routes/spellcheck.routes';
 import inboundRoutes from './routes/inbound.routes';
+import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
 import { seedDevelopmentData, purgeLegacyDemoData } from './services/seed.service';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -34,6 +36,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/inbound', inboundRoutes);
+app.use('/api/spellcheck', spellcheckRoutes);
 
 app.use(
   '/api/',
@@ -55,6 +58,10 @@ app.get('/api/health', (_req, res) => {
     deskConfigDbName: env.mongoDeskConfigDbName,
     deskConfigConnected: isDeskConfigConnected(),
     whatsapp: whatsapp.getWhatsAppHealth(),
+    languageTool: {
+      configured: isLanguageToolConfigured(),
+      url: isLanguageToolConfigured() ? env.languageToolUrl : null,
+    },
   });
 });
 
@@ -73,6 +80,9 @@ app.get('/health', (_req, res) => {
     deskConfigDbName: env.mongoDeskConfigDbName,
     deskConfigConnected: isDeskConfigConnected(),
     whatsapp: whatsapp.getWhatsAppHealth(),
+    languageTool: {
+      configured: isLanguageToolConfigured(),
+    },
   });
 });
 
@@ -145,7 +155,8 @@ async function bootstrapDatabase() {
 async function start() {
   app.listen(env.port, '0.0.0.0', () => {
     console.log(`API Velodesk v1.2.0 — http://0.0.0.0:${env.port} (${env.nodeEnv})`);
-    void bootstrapDatabase().then(() => {
+    void bootstrapDatabase().then(async () => {
+      await logLanguageToolStartupStatus();
       if (env.enableWhatsapp) {
         console.log('Inicializando WhatsApp Web...');
         whatsapp.initializeWhatsApp();

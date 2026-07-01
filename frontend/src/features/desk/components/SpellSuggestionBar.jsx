@@ -13,9 +13,13 @@ export default function SpellSuggestionBar({
   onIgnore,
 }) {
   if (loadError) {
+    const isDegraded = /envio liberado/i.test(loadError);
     return (
-      <div className="spell-suggestion-bar spell-suggestion-bar--error" role="alert">
-        <i className="ti ti-alert-circle" aria-hidden="true" />
+      <div
+        className={'spell-suggestion-bar' + (isDegraded ? ' spell-suggestion-bar--warning' : ' spell-suggestion-bar--error')}
+        role="status"
+      >
+        <i className={'ti ' + (isDegraded ? 'ti-info-circle' : 'ti-alert-circle')} aria-hidden="true" />
         <span>{loadError}</span>
       </div>
     );

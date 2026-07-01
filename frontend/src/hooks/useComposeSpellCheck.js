@@ -1,6 +1,6 @@
 /**
- * useComposeSpellCheck v1.2.0 — sugestões frescas + palavras flagadas persistentes
- * VERSION: v1.2.0 | DATE: 2026-06-26
+ * useComposeSpellCheck v2.0.0 — LanguageTool self-hosted via backend
+ * VERSION: v2.0.0 | DATE: 2026-06-26
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -14,10 +14,24 @@ import {
   getLastWordBeforeCursor,
   getWordAtCursor,
   replaceWordAt,
+  tokenizeText,
 } from '../services/spellcheck/tokenize';
 
 const WORD_BREAK_KEYS = new Set([' ', ',', '.', ';', ':', '!', '?', 'Enter']);
 const SUGGESTION_DISMISS_WORDS = 2;
+
+/** @param {string} fullText @param {{ startIndex: number, endIndex?: number }} wordInfo */
+function buildTokenContext(fullText, wordInfo) {
+  const tokens = tokenizeText(fullText);
+  const tokenIndex = tokens.findIndex((token) => token.startIndex === wordInfo.startIndex);
+  return {
+    text: fullText,
+    tokens,
+    tokenIndex,
+    startIndex: wordInfo.startIndex,
+    endIndex: wordInfo.endIndex,
+  };
+}
 
 /**
  * @param {object} params
@@ -45,6 +59,7 @@ export function useComposeSpellCheck({
   const [spellLoadError, setSpellLoadError] = useState(null);
   const wordsAfterSuggestionRef = useRef(0);
   const onFlaggedErrorsChangeRef = useRef(onFlaggedErrorsChange);
+  const scanAbortRef = useRef(null);
   onFlaggedErrorsChangeRef.current = onFlaggedErrorsChange;
 
   const spellContext = useMemo(
@@ -58,16 +73,16 @@ export function useComposeSpellCheck({
     let active = true;
     setSpellLoading(true);
     loadSpellEngine()
-      .then(() => {
+      .then((ready) => {
         if (active) {
           setSpellLoading(false);
-          setSpellLoadError(null);
+          setSpellLoadError(ready ? null : 'Corretor indisponível — envio liberado.');
         }
       })
-      .catch((err) => {
+      .catch(() => {
         if (active) {
           setSpellLoading(false);
-          setSpellLoadError(err?.message || 'Falha ao carregar corretor ortográfico.');
+          setSpellLoadError('Corretor indisponível — envio liberado.');
         }
       });
     return () => { active = false; };
@@ -91,10 +106,17 @@ export function useComposeSpellCheck({
   }, [trackFlaggedErrors]);
 
   useEffect(() => {
-    if (!trackFlaggedErrors || spellLoading || spellLoadError) return undefined;
+    if (!trackFlaggedErrors || spellLoading) return undefined;
     const timer = setTimeout(async () => {
+      if (scanAbortRef.current) {
+        scanAbortRef.current.abort();
+      }
+      const controller = new AbortController();
+      scanAbortRef.current = controller;
+
       if (!String(text || '').trim()) {
         publishFlaggedErrors([]);
+        setSpellLoadError(null);
         return;
       }
       try {
@@ -102,14 +124,26 @@ export function useComposeSpellCheck({
           text,
           spellContextRef.current.whitelist,
           spellContextRef.current.ignoredWords,
+          controller.signal,
         );
+        if (controller.signal.aborted) return;
         publishFlaggedErrors(errors);
-      } catch {
-        /* scan indisponível */
+        setSpellLoadError(isSpellEngineReady() ? null : 'Corretor indisponível — envio liberado.');
+      } catch (err) {
+        if (err?.name === 'CanceledError' || err?.name === 'AbortError' || err?.code === 'ERR_CANCELED') {
+          return;
+        }
+        publishFlaggedErrors([]);
+        setSpellLoadError('Corretor indisponível — envio liberado.');
       }
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [text, spellLoading, spellLoadError, trackFlaggedErrors, publishFlaggedErrors, ignoredWords, tabulationConfig]);
+    }, 450);
+    return () => {
+      clearTimeout(timer);
+      if (scanAbortRef.current) {
+        scanAbortRef.current.abort();
+      }
+    };
+  }, [text, spellLoading, trackFlaggedErrors, publishFlaggedErrors, ignoredWords, tabulationConfig]);
 
   const showSuggestionForError = useCallback((error) => {
     if (!error) return;
@@ -119,12 +153,13 @@ export function useComposeSpellCheck({
   }, []);
 
   const evaluateWord = useCallback(async (wordInfo) => {
-    if (!wordInfo?.word || spellLoading || spellLoadError) return;
+    if (!wordInfo?.word || spellLoading) return;
     try {
       const result = await checkWord(
         wordInfo.word,
         spellContextRef.current.whitelist,
         spellContextRef.current.ignoredWords,
+        buildTokenContext(text, wordInfo),
       );
       if (result.valid) {
         setActiveSuggestion(null);
@@ -137,9 +172,10 @@ export function useComposeSpellCheck({
         suggestions: result.suggestions,
       });
     } catch {
-      setSpellLoadError('Falha ao verificar ortografia.');
+      setActiveSuggestion(null);
+      setActiveErrorStartIndex(null);
     }
-  }, [spellLoading, spellLoadError, showSuggestionForError]);
+  }, [text, spellLoading, showSuggestionForError]);
 
   const updateSuggestionFromCursor = useCallback((cursorPos) => {
     const wordInfo = getWordAtCursor(text, cursorPos);
@@ -230,10 +266,19 @@ export function useComposeSpellCheck({
 
   const ignoreSuggestion = useCallback(() => {
     if (!activeSuggestion?.word) return;
-    onIgnoreWord?.(activeSuggestion.word.toLowerCase());
+    const lower = activeSuggestion.word.toLowerCase();
+    onIgnoreWord?.(lower);
+    setFlaggedErrors((prev) => {
+      const next = prev.filter((error) => error.word.toLowerCase() !== lower);
+      if (trackFlaggedErrors) {
+        onFlaggedErrorsChangeRef.current?.(next);
+      }
+      return next;
+    });
     setActiveSuggestion(null);
     setActiveErrorStartIndex(null);
-  }, [activeSuggestion, onIgnoreWord]);
+    wordsAfterSuggestionRef.current = 0;
+  }, [activeSuggestion, onIgnoreWord, trackFlaggedErrors]);
 
   const applyErrorFix = useCallback(async (error, replacement) => {
     const liveWord = text.slice(error.startIndex, error.endIndex);
@@ -244,6 +289,7 @@ export function useComposeSpellCheck({
         liveWord,
         spellContextRef.current.whitelist,
         spellContextRef.current.ignoredWords,
+        buildTokenContext(text, error),
       );
       next = fresh.suggestions?.[0];
     }
