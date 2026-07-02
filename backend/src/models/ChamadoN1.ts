@@ -1,4 +1,4 @@
-/** ChamadoN1 v1.3.0 — alteracoes[] histórico + metadados técnicos no registro */
+/** ChamadoN1 v1.4.0 — autor em registro[] (quem realizou a ação) */
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IClienteRef {
@@ -18,6 +18,7 @@ export interface ITabulacao {
 export interface IRegistro {
   data: Date;
   origin: string;
+  autor: string;
   mensagemPublica: string;
   anexosMensagemPublica: string[];
   anotacaoInterna: string;
@@ -63,6 +64,7 @@ const RegistroSchema = new Schema<IRegistro>(
   {
     data: { type: Date, default: Date.now },
     origin: { type: String, default: '' },
+    autor: { type: String, default: '' },
     mensagemPublica: { type: String, default: '' },
     anexosMensagemPublica: { type: [String], default: [] },
     anotacaoInterna: { type: String, default: '' },

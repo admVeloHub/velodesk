@@ -1,6 +1,6 @@
 /**
- * TicketsContext v1.2.0 — estado global tickets / abas + API
- * VERSION: v1.2.1 | DATE: 2026-06-23 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.3.0 — recarrega kanban quando sessão/papel muda
+ * VERSION: v1.3.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { findTicketEntry, getKanbanColumns, refreshKanbanFromApi } from '../services/kanbanStorage';
@@ -23,7 +23,7 @@ function buildTabMeta(entry) {
 }
 
 export function TicketsProvider({ children }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [openTabs, setOpenTabs] = useState([]);
   const [activeTabId, setActiveTabId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -44,7 +44,7 @@ export function TicketsProvider({ children }) {
 
   useEffect(() => {
     if (isAuthenticated) refreshTickets();
-  }, [isAuthenticated, refreshTickets]);
+  }, [isAuthenticated, refreshTickets, user?.email, user?.role]);
 
   useEffect(() => {
     setOpenTabs((prev) =>

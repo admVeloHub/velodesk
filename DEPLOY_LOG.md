@@ -1,10 +1,38 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.18.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.19.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Fila meus-chamados, autor do registro e landing Painel 360°
+
+- **Data/Hora**: 2026-07-02
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.19.0
+  - boxes.routes v1.3.7, tickets.routes v1.3.7, chamado.mapper v1.8.4, ChamadoN1 v1.4.0
+  - responsavelSegmentation v1.1.0, ticketsCache v1.5.0, ticketAdapter v1.4.1
+  - desk/utils v2.8.2, TicketsContext v1.3.0, ProfileContext v1.4.0, profiles v1.3.0
+  - DeskInternalNotesPanel v1.3.4, App v2.4.0, DefaultLandingRedirect v1.0.0
+- **Arquivos modificados / incluídos**:
+  - `backend/src/routes/boxes.routes.ts` — agente sempre recebe fila `meus-chamados` (filtro por tabulacao.responsavel)
+  - `backend/src/services/chamado.mapper.ts` — campo `autor` no registro; executor ≠ responsavel; alteracoes[] só diff de tabulação
+  - `backend/src/models/ChamadoN1.ts` — schema `registro.autor`
+  - `backend/src/routes/tickets.routes.ts` — persiste autor da sessão em mensagens e updates
+  - `backend/src/services/email-inbound.service.ts` — autor cliente em registro inbound
+  - `frontend/src/services/desk/responsavelSegmentation.js` — segmentação meus-chamados por papel da sessão
+  - `frontend/src/services/ticketsCache.js` — `fila=meus-chamados` + filtro defensivo client-side
+  - `frontend/src/api/adapters/ticketAdapter.js` — adaptação colunas meus-chamados; `author` em updates
+  - `frontend/src/services/desk/utils.js` — feed de notas/registro com "Realizado por" correto
+  - `frontend/src/features/desk/components/DeskInternalNotesPanel.jsx` — visão supervisor com ocorrências de registro
+  - `frontend/src/routes/DefaultLandingRedirect.jsx` — landing por perfil (Painel 360°)
+  - `frontend/src/app/App.js`, `ProfileContext.js`, auth pages — redirect pós-login para workspace
+  - `frontend/velodesk-crm.css`, `velodesk-dark-theme.css` — estilos painel notas/registro
+- **Descrição**: Agentes veem apenas tickets em que são responsáveis; supervisor vê fila completa. Registro grava `origin` (cliente/agente) e `autor` (quem executou a ação). Notas internas e alterações de tabulação exibem executor real, não o responsável do chamado. Landing padrão passa a ser Painel 360°.
+- **Status**: Concluído
 
 ### GitHub Push — Compose WYSIWYG e toolbar de formatação com estado ativo
 

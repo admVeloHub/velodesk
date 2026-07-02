@@ -1,4 +1,4 @@
-/** boxes.routes v1.3.6 — 503 se Mongo principal indisponível */
+/** boxes.routes v1.3.7 — agente sempre usa fila meus-chamados */
 import { Router, Response } from 'express';
 import mongoose from 'mongoose';
 import { authMiddleware } from '../middleware/auth';
@@ -22,7 +22,9 @@ async function resolveDbUser(userId?: string) {
 }
 
 router.get('/', authMiddleware, async (req, res: Response) => {
-  const queue = typeof req.query.fila === 'string' ? req.query.fila : undefined;
+  const queueParam = typeof req.query.fila === 'string' ? req.query.fila : undefined;
+  const authRole = String(req.user?.role ?? '').trim().toLowerCase();
+  const queue = authRole === 'agent' ? 'meus-chamados' : queueParam;
   const userId = req.user?.userId;
 
   try {

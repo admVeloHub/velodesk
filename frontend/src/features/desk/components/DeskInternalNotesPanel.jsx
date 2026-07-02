@@ -1,6 +1,6 @@
 /**
- * DeskInternalNotesPanel v1.3.1 — layout registro: autor, anotações, alterações, status
- * VERSION: v1.3.1 | DATE: 2026-07-02
+ * DeskInternalNotesPanel v1.3.4 — status sempre visível no registro
+ * VERSION: v1.3.4 | DATE: 2026-07-02
  */
 import React, { useMemo } from 'react';
 import {
@@ -17,6 +17,11 @@ const KIND_META = {
   sla: { icon: 'ti ti-alert-triangle' },
   registro: { icon: 'ti ti-history' },
 };
+
+function isSameTicketNote(note, ticket) {
+  const noteId = String(note.ticketId ?? '');
+  return noteId === String(ticket?.id ?? '') || noteId === String(ticket?._id ?? '');
+}
 
 function NoteBody({ body, boldSegments }) {
   if (!boldSegments?.length) {
@@ -65,12 +70,10 @@ function RegistroOccurrenceBody({ note }) {
           </ul>
         </div>
       ) : null}
-      {note.statusLabel ? (
-        <p className="crm-note-card__inline-line crm-note-card__status-line">
-          <span className="crm-note-card__body-label">Status:</span>{' '}
-          <span>{note.statusLabel}</span>
-        </p>
-      ) : null}
+      <p className="crm-note-card__inline-line crm-note-card__status-line">
+        <span className="crm-note-card__body-label">Status:</span>{' '}
+        <span>{note.statusLabel || '—'}</span>
+      </p>
     </div>
   );
 }
@@ -135,7 +138,7 @@ export default function DeskInternalNotesPanel({ ticket, client }) {
                   {formatTimestamp(note.timestamp)}
                 </time>
               </header>
-              {note.ticketTitle && String(note.ticketId) !== String(ticket.id) ? (
+              {!supervisorView && note.ticketTitle && !isSameTicketNote(note, ticket) ? (
                 <p className="crm-note-card__ticket-ref">
                   Ticket #{note.ticketId} · {note.ticketTitle}
                 </p>

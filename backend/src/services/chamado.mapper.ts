@@ -1,4 +1,4 @@
-﻿/** chamado.mapper v1.7.0 — registroHistorico[] completo (todos os eventos do registro) */
+﻿/** chamado.mapper v1.8.4 — autor = executor da ação (nunca confundir com responsavel) */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -14,6 +14,7 @@ export interface TicketMessageDto {
   text: string;
   sender: string;
   origin?: RegistroOrigin;
+  author?: string;
   registroIndex?: number;
   type?: string;
   time: Date;
@@ -77,6 +78,33 @@ function diffTabulacao(before: ITabulacao, after: ITabulacao): Record<string, un
   return change;
 }
 
+function readTabulacaoSnapshot(tab?: ITabulacao | null): ITabulacao {
+  if (!tab) {
+    return {
+      tipoChamado: '',
+      produto: '',
+      motivo: '',
+      detalhe: '',
+      responsavel: '',
+      atribuido: '',
+    };
+  }
+
+  const maybeSubdoc = tab as ITabulacao & { toObject?: () => ITabulacao };
+  const plain = typeof maybeSubdoc.toObject === 'function'
+    ? maybeSubdoc.toObject()
+    : tab;
+
+  return {
+    tipoChamado: String(plain.tipoChamado ?? '').trim(),
+    produto: String(plain.produto ?? '').trim(),
+    motivo: String(plain.motivo ?? '').trim(),
+    detalhe: String(plain.detalhe ?? '').trim(),
+    responsavel: String(plain.responsavel ?? '').trim(),
+    atribuido: String(plain.atribuido ?? '').trim(),
+  };
+}
+
 function buildAlteracoesItem(changes: Record<string, unknown>): unknown[] {
   return Object.keys(changes).length ? [changes] : [];
 }
@@ -109,11 +137,51 @@ function senderFromOrigin(origin: RegistroOrigin): string {
   return origin === 'cliente' ? 'them' : 'me';
 }
 
+function isGenericRegistroAutor(value: string): boolean {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return !normalized || normalized === 'agente' || normalized === 'agent';
+}
+
+export function resolveRegistroAutor(
+  origin: RegistroOrigin,
+  options: {
+    authUser?: AuthPayload | null;
+    authorHint?: string;
+    clientName?: string;
+  } = {}
+): string {
+  if (origin === 'cliente') {
+    return String(options.clientName ?? options.authorHint ?? '').trim() || 'Cliente';
+  }
+
+  for (const candidate of [
+    options.authorHint,
+    options.authUser?.name,
+    options.authUser?.email,
+  ]) {
+    const value = String(candidate ?? '').trim();
+    if (value) return value;
+  }
+
+  return '';
+}
+
+function resolveStoredRegistroAutor(
+  reg: IRegistro,
+  origin: RegistroOrigin,
+  clientName?: string
+): string {
+  const stored = String(reg.autor ?? '').trim();
+  if (stored && !isGenericRegistroAutor(stored)) return stored;
+  return resolveRegistroAutor(origin, { clientName });
+}
+
 export interface RegistroHistoricoDto {
   id: string;
   registroIndex: number;
   time: Date;
   origin: RegistroOrigin;
+  autor: string;
   alteracoes: unknown[];
   status: string;
   anotacaoInterna?: string;
@@ -254,7 +322,8 @@ function tabulacaoFromBody(body: Record<string, unknown>, fallbackTitle?: string
 
 export async function createChamadoFromBody(
   body: Record<string, unknown>,
-  status = 'novo'
+  status = 'novo',
+  authUser?: AuthPayload | null
 ): Promise<Partial<IChamadoN1>> {
   const titulo = resolveChamadoTitulo(body);
   const tab = tabulacaoFromBody(body, titulo);
@@ -266,9 +335,15 @@ export async function createChamadoFromBody(
   const protocoloInformed = String(body.chamadoProtocolo ?? '').trim();
   const cliente = await resolveClienteRefFromBody(body);
 
+  const clientName = String(body.clientName ?? '').trim();
   const registro: IRegistro = {
     data: new Date(),
     origin: 'agente',
+    autor: resolveRegistroAutor('agente', {
+      authUser,
+      authorHint: String(body.author ?? '').trim(),
+      clientName,
+    }),
     mensagemPublica: internal ? '' : text,
     anexosMensagemPublica: internal ? [] : attachments,
     anotacaoInterna: internal ? text : '',
@@ -289,8 +364,12 @@ export async function createChamadoFromBody(
   };
 }
 
-export async function applyBodyToChamado(chamado: IChamadoN1, body: Record<string, unknown>): Promise<void> {
-  const beforeTab = { ...(chamado.tabulacao[0] ?? tabulacaoFromBody({})) };
+export async function applyBodyToChamado(
+  chamado: IChamadoN1,
+  body: Record<string, unknown>,
+  authUser?: AuthPayload | null
+): Promise<void> {
+  const beforeTab = readTabulacaoSnapshot(chamado.tabulacao[0]);
   const pendingChanges: Record<string, unknown> = {};
 
   if (
@@ -308,11 +387,18 @@ export async function applyBodyToChamado(chamado: IChamadoN1, body: Record<strin
   }
 
   if (body.lateralForm || body.title || body.chamadoTitulo || body.description || body.responsibleAgent) {
-    const current = chamado.tabulacao[0] ?? tabulacaoFromBody({});
-    const merged = tabulacaoFromBody(
-      { lateralForm: { ...current, ...(body.lateralForm as object) }, ...body },
-      resolveChamadoTitulo(body, chamado.chamadoTitulo || current.motivo)
-    );
+    const merged = readTabulacaoSnapshot(tabulacaoFromBody(
+      {
+        lateralForm: {
+          ...beforeTab,
+          tipoChamado: beforeTab.tipoChamado,
+          classificacaoTipo: beforeTab.tipoChamado,
+          ...(body.lateralForm as object),
+        },
+        ...body,
+      },
+      resolveChamadoTitulo(body, chamado.chamadoTitulo || beforeTab.motivo)
+    ));
     Object.assign(pendingChanges, diffTabulacao(beforeTab, merged));
     chamado.tabulacao = [merged];
   }
@@ -335,14 +421,21 @@ export async function applyBodyToChamado(chamado: IChamadoN1, body: Record<strin
 
   if (Object.keys(pendingChanges).length) {
     const nextStatus = String(pendingChanges.status ?? currentStatus(chamado));
+    const tab = chamado.tabulacao[0];
+    const alteracoesChanges = { ...pendingChanges };
+    delete alteracoesChanges.status;
     chamado.registro.push({
       data: new Date(),
       origin: 'agente',
+      autor: resolveRegistroAutor('agente', {
+        authUser,
+        authorHint: String(body.author ?? '').trim(),
+      }),
       mensagemPublica: '',
       anexosMensagemPublica: [],
       anotacaoInterna: '',
       anexosAnotacaoInterna: [],
-      alteracoes: buildAlteracoesItem(pendingChanges),
+      alteracoes: buildAlteracoesItem(alteracoesChanges),
       metadados: {},
       status: nextStatus,
     });
@@ -362,6 +455,8 @@ export function appendRegistroEntry(
     anexosMensagemPublica?: string[];
     anexosAnotacaoInterna?: string[];
     sender?: string;
+    autor?: string;
+    authUser?: AuthPayload | null;
     alteracoes?: unknown[];
     metadados?: Record<string, unknown>;
   }
@@ -380,9 +475,16 @@ export function appendRegistroEntry(
     .map((url) => String(url).trim())
     .filter(Boolean);
 
+  const regAutor = resolveRegistroAutor(origin, {
+    authUser: payload.authUser,
+    authorHint: payload.autor,
+    clientName: undefined,
+  });
+
   const entry: IRegistro = {
     data: new Date(),
     origin,
+    autor: regAutor,
     mensagemPublica: publicText,
     anexosMensagemPublica: publicAttachments,
     anotacaoInterna: internalText,
@@ -401,6 +503,7 @@ export function appendRegistroEntry(
       text: publicText,
       sender: senderFromOrigin(origin),
       origin,
+      author: regAutor || undefined,
       type: 'public',
       time: entry.data,
       registroIndex: index,
@@ -413,6 +516,7 @@ export function appendRegistroEntry(
       text: internalText,
       sender: 'me',
       origin: 'agente',
+      author: regAutor || undefined,
       type: 'internal',
       time: entry.data,
       registroIndex: index,
@@ -454,13 +558,21 @@ export function appendMessage(
   return dto;
 }
 
+function currentTabulacao(chamado: IChamadoN1) {
+  const tabulacao = chamado.tabulacao ?? [];
+  if (tabulacao.length === 0) return undefined;
+  return tabulacao[tabulacao.length - 1];
+}
+
 export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Promise<TicketDto> {
-  const tab = chamado.tabulacao?.[0];
+  const tab = currentTabulacao(chamado);
   const ref = chamado.cliente?.[0] as LegacyClienteEmbed | undefined;
   const status = currentStatus(chamado);
 
   let cadastro = await loadDadosForRef(ref);
   if (!cadastro) cadastro = legacyDadosFromRef(ref);
+
+  const clientName = cadastro?.clienteNome;
 
   const messages: TicketMessageDto[] = [];
   const internalNotes: TicketMessageDto[] = [];
@@ -472,16 +584,19 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
       registroIndex: index,
       time: reg.data,
       origin,
+      autor: resolveStoredRegistroAutor(reg, origin, clientName),
       alteracoes: businessAlteracoesFromRegistro(reg),
       status: reg.status || 'novo',
       anotacaoInterna: String(reg.anotacaoInterna ?? '').trim() || undefined,
     });
+    const regAutor = resolveStoredRegistroAutor(reg, origin, clientName);
     if (reg.mensagemPublica) {
       messages.push({
         id: `${index}-pub`,
         text: reg.mensagemPublica,
         sender: senderFromOrigin(origin),
         origin,
+        author: regAutor || undefined,
         type: 'public',
         time: reg.data,
         registroIndex: index,
@@ -494,6 +609,7 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
         text: reg.anotacaoInterna,
         sender: 'me',
         origin: 'agente',
+        author: regAutor || undefined,
         type: 'internal',
         time: reg.data,
         registroIndex: index,
@@ -507,7 +623,6 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
     || chamado.chamadoProtocolo;
 
   const clientCpf = ref?.clienteCpf || cadastro?.clienteCpf;
-  const clientName = cadastro?.clienteNome;
 
   return {
     _id: chamado._id.toString(),

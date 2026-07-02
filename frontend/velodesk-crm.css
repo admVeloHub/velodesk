@@ -1,4 +1,4 @@
-/* Velodesk CRM v1.4.0 — scoped under #velodeskDeskV2Root (cockpit desk=v2 + standalone) */
+/* Velodesk CRM v1.4.6 — cards de notas expansíveis (sem corte) */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -1403,11 +1403,30 @@
     max-height: none;
     margin-top: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 12px 16px;
     display: flex;
     flex-direction: column;
     gap: 12px;
     background: #f8fafc;
+}
+
+#velodeskDeskV2Root .tab-panel--notes .crm-internal-notes .crm-note-card {
+    flex-shrink: 0;
+    flex-grow: 0;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+}
+
+#velodeskDeskV2Root .crm-note-card {
+    position: relative;
+    display: flex;
+    background: #fff;
+    border: 0.5px solid #e4e6ea;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    overflow: visible;
 }
 
 #velodeskDeskV2Root .tab-panel--notes .crm-internal-notes--empty {
@@ -1433,16 +1452,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-}
-
-#velodeskDeskV2Root .crm-note-card {
-    position: relative;
-    display: flex;
-    background: #fff;
-    border: 0.5px solid #e4e6ea;
-    border-radius: 12px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-    overflow: hidden;
 }
 
 #velodeskDeskV2Root .crm-note-card__accent {
@@ -1597,6 +1606,9 @@
     font-size: 14px;
     line-height: 1.55;
     color: #374151;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: pre-wrap;
 }
 
 #velodeskDeskV2Root .crm-note-card__body strong {
@@ -1736,8 +1748,10 @@
 }
 
 #velodeskDeskV2Root .msg-bubble--agent {
-    background: #1634FF;
-    color: #fff;
+    /* Mesmo tom do ticket ativo: azul médio ~15% opaco (sólido), sem blend no fundo cinza */
+    background: var(--crm-ticket-active-bg);
+    color: #1a1a2e;
+    border: 0.5px solid color-mix(in srgb, var(--blue-primary) 22%, #ffffff);
     border-radius: 12px 2px 12px 12px;
 }
 

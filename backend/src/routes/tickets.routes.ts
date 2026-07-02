@@ -1,4 +1,4 @@
-/** tickets.routes v1.3.5 — 400 quando tabulação incompleta para em-andamento/resolvido */
+/** tickets.routes v1.3.7 — autor da sessão em mensagens e alterações */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -80,7 +80,7 @@ router.post('/', authMiddleware, async (req, res: Response) => {
   }
 
   try {
-    const chamado = await ChamadoN1.create(await createChamadoFromBody(req.body, status));
+    const chamado = await ChamadoN1.create(await createChamadoFromBody(req.body, status, req.user));
     const ticket = await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes));
     res.status(201).json(ticket);
   } catch (err) {
@@ -101,7 +101,7 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
   }
 
   try {
-    await applyBodyToChamado(chamado, req.body);
+    await applyBodyToChamado(chamado, req.body, req.user);
     await chamado.save();
 
     const boxes = await loadBoxes();
@@ -121,7 +121,7 @@ router.delete('/:id', authMiddleware, async (req, res: Response) => {
 });
 
 router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
-  const { text, sender, internal, attachments, internalText, anotacaoInterna } = req.body;
+  const { text, sender, internal, attachments, internalText, anotacaoInterna, author } = req.body;
   const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
 
@@ -141,6 +141,8 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
     anexosMensagemPublica: isInternalOnly ? [] : attachmentList,
     anexosAnotacaoInterna: isInternalOnly ? attachmentList : [],
     sender: sender || 'me',
+    autor: String(author ?? req.user?.name ?? req.user?.email ?? '').trim() || undefined,
+    authUser: req.user,
   });
 
   if (!result.public && !result.internal) {

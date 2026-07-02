@@ -1,10 +1,10 @@
 /**
- * ProfileContext v1.3.0 — perfil fixo por allowlist (Google SSO testes)
- * VERSION: v1.3.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * ProfileContext v1.4.0 — perfil fixo por allowlist + landing Painel 360°
+ * VERSION: v1.4.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PROFILES, getProfileMeta } from '../config/profiles';
+import { PROFILES, getProfileMeta, getProfileDefaultPath } from '../config/profiles';
 import { useNotifications } from './NotificationContext';
 
 const ProfileContext = createContext(null);
@@ -80,10 +80,7 @@ export function ProfileProvider({ children }) {
     setProfileIdState(id);
     setDropdownOpen(false);
     showNotification('Perfil alterado: ' + PROFILES[id].label, 'success');
-    const defaultPage = PROFILES[id].defaultPage;
-    if (defaultPage === 'tickets') navigate('/tickets?desk=v2');
-    else if (defaultPage === 'analytics-ia') navigate('/analytics-ia');
-    else navigate('/' + defaultPage);
+    navigate(getProfileDefaultPath(id));
   }, [navigate, showNotification, profileId, profileLocked]);
 
   const toggleDropdown = useCallback(() => {

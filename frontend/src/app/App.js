@@ -2,13 +2,13 @@
 
  * App raiz — providers + rotas
 
- * VERSION: v2.3.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * VERSION: v2.4.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
 
  */
 
 import React, { useEffect } from 'react';
 
-import { useRoutes, Navigate } from 'react-router-dom';
+import { useRoutes } from 'react-router-dom';
 
 import CockpitBridge from '../components/CockpitBridge';
 
@@ -24,6 +24,8 @@ import { ProfileProvider } from '../context/ProfileContext';
 import { TabulationProvider } from '../context/TabulationContext';
 
 import ProtectedRoute from '../routes/ProtectedRoute';
+
+import DefaultLandingRedirect from '../routes/DefaultLandingRedirect';
 
 import DeskLoginPage from '../features/auth/DeskLoginPage';
 
@@ -73,7 +75,7 @@ function AppRoutes() {
 
           children: [
 
-            { index: true, element: React.createElement(Navigate, { to: '/tickets?desk=v2', replace: true }) },
+            { index: true, element: React.createElement(DefaultLandingRedirect) },
 
             { path: 'workspace', element: React.createElement(WorkspacePage) },
 
@@ -99,7 +101,7 @@ function AppRoutes() {
 
     },
 
-    { path: '*', element: React.createElement(Navigate, { to: '/tickets?desk=v2', replace: true }) },
+    { path: '*', element: React.createElement(DefaultLandingRedirect) },
 
   ]);
 

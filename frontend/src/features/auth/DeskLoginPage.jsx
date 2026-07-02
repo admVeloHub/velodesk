@@ -1,6 +1,6 @@
 /**
- * DeskLoginPage v1.2.0 — login Google + botão dev quick login
- * VERSION: v1.2.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * DeskLoginPage v1.3.0 — login Google + landing Painel 360°
+ * VERSION: v1.3.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { authApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 import { getGoogleClientId } from '../../config/googleAuthConfig';
+import { getProfileDefaultPath } from '../../config/profiles';
 import { isGoogleDeskAuthMode } from '../../config/deskAuthMode';
 import { loadGoogleGsiScript } from '../../utils/loadGoogleGsiScript';
 import DeskLoadingGate from './DeskLoadingGate';
@@ -44,7 +45,7 @@ function resolveLoginError(err) {
 export default function DeskLoginPage() {
   const useGoogleMode = isGoogleDeskAuthMode();
   const { authStatus, bootstrapFromGoogleLogin, isAuthenticated } = useAuth();
-  const { applyProfileFromAccess } = useProfile();
+  const { applyProfileFromAccess, profileId } = useProfile();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [gsiReady, setGsiReady] = useState(false);
@@ -122,7 +123,7 @@ export default function DeskLoginPage() {
   }
 
   if (authStatus === 'authorized' || isAuthenticated) {
-    return <Navigate to="/tickets?desk=v2" replace />;
+    return <Navigate to={getProfileDefaultPath(profileId)} replace />;
   }
 
   if (!clientId) {

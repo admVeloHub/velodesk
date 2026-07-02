@@ -1,6 +1,6 @@
 /**
  * Velodesk — modo escuro unificado (LAYOUT_GUIDELINES)
- * VERSION: v1.0.5 | DATE: 2026-06-30
+ * VERSION: v1.1.0 | DATE: 2026-07-02
  * Importar por último em src/styles/cockpit/index.css
  */
 
@@ -683,6 +683,12 @@ body.velodesk-dark #velodeskDeskV2Root .crm-ticket-tabs-bar {
 }
 
 body.velodesk-dark #velodeskDeskV2Root .conversation .message-bubble--agent,
+body.velodesk-dark #velodeskDeskV2Root .msg-bubble--agent {
+    background: color-mix(in srgb, var(--blue-primary, #1634FF) 15%, var(--velo-dark-surface-inset));
+    border: 0.5px solid color-mix(in srgb, var(--blue-primary, #1634FF) 22%, var(--velo-dark-surface-inset));
+    color: var(--velo-dark-text);
+}
+
 body.velodesk-dark #velodeskDeskV2Root .octa-panel-box {
     background: var(--velo-dark-surface-inset);
     border-color: var(--velo-dark-border);

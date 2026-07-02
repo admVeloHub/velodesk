@@ -1,7 +1,23 @@
 /**
- * ticketAdapter v1.3.2 — preserva registroHistorico[] para visão supervisão
- * VERSION: v1.3.2 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.4.1 — author do executor em updates de ticket
+ * VERSION: v1.4.1 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
+import { getAgentName } from '../../services/clientDb';
+
+const MEUS_CHAMADOS_BOX_MAP = {
+  'meus-novos': 'novos',
+  'meus-em-aberto': 'em-andamento',
+  'meus-em-andamento': 'em-andamento',
+  'meus-pendente': 'em-espera',
+};
+
+const DEFAULT_KANBAN_BOXES = [
+  { id: 'novos', name: 'Novos', tickets: [] },
+  { id: 'em-andamento', name: 'Em Andamento', tickets: [] },
+  { id: 'em-espera', name: 'Pendente', tickets: [] },
+  { id: 'pendentes', name: 'Aguardando retorno', tickets: [] },
+  { id: 'resolvidos', name: 'Resolvidos', tickets: [] },
+];
 
 function normalizeMessage(msg) {
   if (!msg) return msg;
@@ -53,11 +69,28 @@ export function apiTicketToCockpit(ticket) {
   };
 }
 
-export function adaptColumnsFromApi(columns) {
+export function adaptColumnsFromApi(columns, options = {}) {
+  if (options.fila === 'meus-chamados') {
+    return adaptMeusChamadosColumns(columns);
+  }
   return (columns || []).map((col) => ({
     ...col,
     tickets: (col.tickets || []).map(apiTicketToCockpit),
   }));
+}
+
+function adaptMeusChamadosColumns(columns) {
+  const merged = DEFAULT_KANBAN_BOXES.map((box) => ({ ...box, tickets: [] }));
+
+  (columns || []).forEach((col) => {
+    const targetId = MEUS_CHAMADOS_BOX_MAP[col.id];
+    if (!targetId) return;
+    const target = merged.find((box) => box.id === targetId);
+    if (!target) return;
+    target.tickets.push(...(col.tickets || []).map(apiTicketToCockpit));
+  });
+
+  return merged;
 }
 
 export function cockpitTicketToApi(ticket) {
@@ -80,6 +113,7 @@ export function cockpitTicketToApi(ticket) {
     clientName,
     clientCPF: ticket.clientCPF || lf.clienteCpf || lf.cpf,
     responsibleAgent: ticket.responsibleAgent || lf.responsavel,
+    author: ticket.author || getAgentName() || undefined,
     lateralForm: {
       ...lf,
       cpf: ticket.clientCPF || lf.clienteCpf || lf.cpf,

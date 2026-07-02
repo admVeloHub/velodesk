@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.3.4 — registro único com mensagem pública + anotação interna
- * VERSION: v1.3.4 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.5.0 — meus-chamados obrigatório para agente + filtro defensivo
+ * VERSION: v1.5.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import {
@@ -10,6 +10,8 @@ import {
   buildCreatePayload,
   isDraftTicket,
 } from '../api/adapters/ticketAdapter';
+import { readDeskProfileId, shouldUseMeusChamadosFila, ticketMatchesAgentResponsavel } from './desk/responsavelSegmentation';
+import { getAgentName } from './clientDb';
 
 let columns = [];
 let useApi = true;
@@ -85,14 +87,27 @@ function assertApiReady(action = 'salvar ticket') {
   }
 }
 
+function filterColumnsForAgent(columns) {
+  if (!shouldUseMeusChamadosFila()) return columns;
+  const profileId = readDeskProfileId();
+  return (columns || []).map((box) => ({
+    ...box,
+    tickets: (box.tickets || []).filter((ticket) => ticketMatchesAgentResponsavel(ticket, profileId)),
+  }));
+}
+
 export async function loadKanbanFromApi() {
   if (!useApi || !localStorage.getItem('velodesk_token')) {
     return columns;
   }
   const drafts = collectDraftTickets(columns);
   try {
-    const data = await boxesApi.list();
-    columns = injectDraftTickets(adaptColumnsFromApi(data), drafts);
+    const profileId = readDeskProfileId();
+    const params = shouldUseMeusChamadosFila(profileId) ? { fila: 'meus-chamados' } : undefined;
+    const data = await boxesApi.list(params);
+    columns = filterColumnsForAgent(
+      injectDraftTickets(adaptColumnsFromApi(data, { fila: params?.fila }), drafts)
+    );
   } catch (err) {
     console.warn('ticketsCache: falha ao carregar boxes', err.message);
   }
@@ -165,7 +180,7 @@ export async function addMessageViaApi(ticketId, payload) {
 
     const regKey = Date.now();
     const ts = new Date().toISOString();
-    const author = payload.author || 'Agente';
+    const author = payload.author || getAgentName() || '';
 
     if (publicText) {
       if (!t.messages) t.messages = [];

@@ -1,11 +1,12 @@
 /**
- * DevQuickLoginButton v1.0.0 — login direto dev (canto inferior direito)
- * VERSION: v1.0.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * DevQuickLoginButton v1.1.0 — login direto dev + landing Painel 360°
+ * VERSION: v1.1.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 import React, { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../../api/client';
 import { DEV_QUICK_LOGIN_EMAIL, isDevQuickLoginEnabled } from '../../config/devAuth';
+import { getProfileDefaultPath } from '../../config/profiles';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 
@@ -25,8 +26,9 @@ export default function DevQuickLoginButton() {
         throw new Error('Resposta de autenticação inválida.');
       }
       await bootstrapFromGoogleLogin(data);
-      applyProfileFromAccess(data.user.deskProfile || data.user.role);
-      navigate('/tickets?desk=v2', { replace: true });
+      const deskProfile = data.user.deskProfile || data.user.role;
+      applyProfileFromAccess(deskProfile);
+      navigate(getProfileDefaultPath(deskProfile), { replace: true });
     } catch (err) {
       console.error('[DevQuickLogin]', err?.response?.data?.message || err?.message || err);
     } finally {

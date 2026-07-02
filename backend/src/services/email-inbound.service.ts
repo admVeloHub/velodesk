@@ -144,6 +144,7 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
   const partial = await createChamadoFromBody(ticketBody, 'novo');
   if (partial.registro?.[0]) {
     partial.registro[0].origin = 'cliente';
+    partial.registro[0].autor = displayName;
     partial.registro[0].metadados = {
       ...(partial.registro[0].metadados ?? {}),
       ...emailMeta,

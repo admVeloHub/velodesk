@@ -1,12 +1,13 @@
 /**
- * DeskLoadingGate v1.0.1 — validação sessão VeloHub + conexão backend
- * VERSION: v1.0.1 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
+ * DeskLoadingGate v1.1.0 — validação sessão VeloHub + landing Painel 360°
+ * VERSION: v1.1.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 import { GATE_STATUS, runDeskAccessGate } from '../../services/deskAccessGate';
+import { getProfileDefaultPath } from '../../config/profiles';
 import DeskAccessDenied from './DeskAccessDenied';
 
 const shellStyle = {
@@ -54,7 +55,7 @@ export default function DeskLoadingGate() {
   }, [authStatus, bootstrapFromGate, applyGateProfile]);
 
   if (authStatus === 'authorized' || phase === 'authorized') {
-    return <Navigate to="/tickets?desk=v2" replace />;
+    return <Navigate to={getProfileDefaultPath('agent')} replace />;
   }
 
   if (phase === GATE_STATUS.ACCESS_DENIED) {

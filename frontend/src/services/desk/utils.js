@@ -1,8 +1,9 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v2.6.1 | DATE: 2026-07-02
+ * VERSION: v2.8.2 | DATE: 2026-07-02
  */
 import { getKanbanColumns, saveKanbanColumns, getAllCockpitTickets } from '../kanbanStorage';
+import { ticketMatchesAgentResponsavel } from './responsavelSegmentation';
 import { lookupClient, getAgentName } from '../clientDb';
 
 export function escapeHtml(str) {
@@ -265,10 +266,8 @@ export function normalizeTicketForDeskV2(ticket) {
   if (!ticket.lateralForm.canal && (ticket.channel || ticket.source)) {
     ticket.lateralForm.canal = ticket.channel || ticket.source;
   }
-  if (!ticket.lateralForm.responsavel) {
-    const agent = getAgentName();
-    ticket.lateralForm.responsavel = ticket.responsibleAgent || agent;
-    if (!ticket.responsibleAgent && agent) ticket.responsibleAgent = agent;
+  if (!ticket.lateralForm.responsavel && ticket.responsibleAgent) {
+    ticket.lateralForm.responsavel = ticket.responsibleAgent;
   }
 
   ensureTicketSlaFields(ticket);
@@ -310,6 +309,7 @@ export function filterTickets(activeQueue, searchQuery, activeSort) {
   const filtered = getAllCockpitTickets()
     .filter((entry) => {
       if (entry.queueId !== activeQueue) return false;
+      if (!ticketMatchesAgentResponsavel(entry.ticket)) return false;
       if (!q) return true;
       const t = entry.ticket;
       const cpf = normalizeCpf(t.lateralForm?.cpf || t.clientCPF || '');
@@ -329,6 +329,7 @@ export function resolveDeskSearchEntries(rawQuery, activeSort) {
 
   if (digits.length === 11) {
     const byCpf = all.filter(({ ticket: t }) => {
+      if (!ticketMatchesAgentResponsavel(t)) return false;
       const tCpf = normalizeCpf(t.lateralForm?.cpf || t.clientCPF || '');
       return tCpf === digits;
     });
@@ -339,15 +340,22 @@ export function resolveDeskSearchEntries(rawQuery, activeSort) {
   const idDigits = digits;
 
   if (idDigits.length >= 4) {
-    const exact = all.filter(({ ticket: t }) => String(t.id) === idQuery || String(t.id) === idDigits);
+    const exact = all.filter(({ ticket: t }) => {
+      if (!ticketMatchesAgentResponsavel(t)) return false;
+      return String(t.id) === idQuery || String(t.id) === idDigits;
+    });
     if (exact.length) return sortTicketEntries(exact, activeSort);
 
-    const partial = all.filter(({ ticket: t }) => String(t.id).includes(idDigits));
+    const partial = all.filter(({ ticket: t }) => {
+      if (!ticketMatchesAgentResponsavel(t)) return false;
+      return String(t.id).includes(idDigits);
+    });
     if (partial.length) return sortTicketEntries(partial, activeSort);
   }
 
   if (idQuery.length >= 3) {
     const loose = all.filter(({ ticket: t }) => {
+      if (!ticketMatchesAgentResponsavel(t)) return false;
       const hay = [t.id, t.title, t.clientName, t.solicitante].join(' ').toLowerCase();
       return hay.includes(idQuery.toLowerCase());
     });
@@ -358,7 +366,7 @@ export function resolveDeskSearchEntries(rawQuery, activeSort) {
 }
 
 export function countByQueue(queueId) {
-  return getAllCockpitTickets().filter((e) => e.queueId === queueId).length;
+  return getAllCockpitTickets().filter((e) => e.queueId === queueId && ticketMatchesAgentResponsavel(e.ticket)).length;
 }
 
 export function pickDefaultTicket(activeQueue) {
@@ -538,25 +546,55 @@ const ALTERACAO_FIELD_LABELS = {
   status: 'Status',
 };
 
-function collectRegistroOccurrenceData(entry) {
+const ALTERACAO_STATE_ALIASES = {
+  classificacaoTipo: 'tipoChamado',
+};
+
+function normalizeAlteracaoStateKey(key) {
+  return ALTERACAO_STATE_ALIASES[key] || key;
+}
+
+function extractAlteracaoFields(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+  const rows = [];
+  Object.entries(raw).forEach(([key, value]) => {
+    if (key === 'status') return;
+    const display = String(value ?? '').trim();
+    if (!display) return;
+    rows.push({
+      key: normalizeAlteracaoStateKey(key),
+      field: ALTERACAO_FIELD_LABELS[key] || ALTERACAO_FIELD_LABELS[normalizeAlteracaoStateKey(key)] || key,
+      value: display,
+    });
+  });
+  return rows;
+}
+
+function applyAlteracoesToTabulationState(state, alteracoes) {
+  (alteracoes || []).forEach((raw) => {
+    extractAlteracaoFields(raw).forEach(({ key, value }) => {
+      state[key] = value;
+    });
+  });
+  return state;
+}
+
+function collectRegistroOccurrenceData(entry, previousTabulationState = {}) {
   const tabulationChanges = [];
   const seen = new Set();
 
   (entry.alteracoes || []).forEach((raw) => {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
-    Object.entries(raw).forEach(([key, value]) => {
-      if (key === 'status') return;
-      const display = String(value ?? '').trim();
-      if (!display) return;
-      const field = ALTERACAO_FIELD_LABELS[key] || key;
-      const token = `${field}:${display}`;
+    extractAlteracaoFields(raw).forEach(({ key, field, value }) => {
+      const prevVal = String(previousTabulationState[key] ?? '').trim();
+      if (prevVal === value) return;
+      const token = `${field}:${value}`;
       if (seen.has(token)) return;
       seen.add(token);
-      tabulationChanges.push({ field, value: display });
+      tabulationChanges.push({ field, value });
     });
   });
 
-  const statusLabel = entry.status ? getTicketStatusLabel(entry.status) : '';
+  const statusLabel = getTicketStatusLabel(entry.status || 'novo');
 
   return { tabulationChanges, statusLabel };
 }
@@ -568,20 +606,37 @@ function shouldShowRegistroOccurrence(entry, prevStatus, isFirst) {
   return hasInternal || hasAlteracoes || statusChanged || isFirst;
 }
 
-function mapRegistroOcorrencia(entry, ticket, prevStatus, isFirst) {
+function isGenericRegistroAutorLabel(value) {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return !normalized || normalized === 'agente' || normalized === 'agent';
+}
+
+function resolveRegistroAutorLabel(entry, ticket, client) {
+  const stored = String(entry.autor ?? '').trim();
+  if (stored && !isGenericRegistroAutorLabel(stored)) return stored;
+
+  const origin = entry.origin || 'agente';
+  if (origin === 'cliente') {
+    return ticket?.clientName || ticket?.solicitante || client?.name || 'Cliente';
+  }
+
+  return getAgentName() || '—';
+}
+
+function mapRegistroOcorrencia(entry, ticket, prevStatus, isFirst, client, previousTabulationState = {}) {
   if (!shouldShowRegistroOccurrence(entry, prevStatus, isFirst)) return null;
 
   const ticketId = String(ticket.id || ticket._id);
   const origin = entry.origin || 'agente';
-  const author = origin === 'cliente' ? 'Cliente' : 'Agente';
-  const { tabulationChanges, statusLabel } = collectRegistroOccurrenceData(entry);
+  const author = resolveRegistroAutorLabel(entry, ticket, client);
+  const { tabulationChanges, statusLabel } = collectRegistroOccurrenceData(entry, previousTabulationState);
   const internalExcerpt = String(entry.anotacaoInterna ?? '').trim();
 
   return {
     id: `${ticketId}:${entry.id}`,
     kind: 'registro',
     author,
-    initials: origin === 'cliente' ? 'CL' : 'AG',
+    initials: getInitials(author),
     badge: 'Registro',
     timestamp: entry.time || entry.timestamp || ticket.updatedAt,
     tabulationChanges,
@@ -629,19 +684,22 @@ function buildAgentInternalNotesFeed(tickets) {
   return merged;
 }
 
-function buildSupervisorRegistroFeed(tickets) {
+function buildSupervisorRegistroFeed(tickets, client) {
   const merged = [];
   const seen = new Set();
 
   tickets.forEach((t) => {
     normalizeTicketForDeskV2(t);
     const historico = t.registroHistorico || t.registroAlteracoes || [];
+    const tabulationState = {};
     historico.forEach((entry, idx) => {
       const prevStatus = idx > 0 ? historico[idx - 1].status : null;
-      const mapped = mapRegistroOcorrencia(entry, t, prevStatus, idx === 0);
+      const previousTabulationState = { ...tabulationState };
+      const mapped = mapRegistroOcorrencia(entry, t, prevStatus, idx === 0, client, previousTabulationState);
       if (!mapped || seen.has(mapped.id)) return;
       seen.add(mapped.id);
       merged.push(mapped);
+      applyAlteracoesToTabulationState(tabulationState, entry.alteracoes);
     });
   });
 
@@ -659,7 +717,7 @@ export function buildClientInternalNotesFeed(ticket, client, options = {}) {
   const tickets = clientTickets.length ? clientTickets : [ticket];
 
   if (supervisorView) {
-    return buildSupervisorRegistroFeed(tickets);
+    return buildSupervisorRegistroFeed(tickets, client);
   }
 
   return buildAgentInternalNotesFeed(tickets);
