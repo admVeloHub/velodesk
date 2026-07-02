@@ -720,6 +720,47 @@ body.velodesk-dark #velodeskDeskV2Root .response-textarea.spell-textarea--error 
     box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.2) !important;
 }
 
+body.velodesk-dark #velodeskDeskV2Root .spell-textarea-wrap--formatted .spell-textarea-mirror {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .spell-textarea-wrap--formatted .spell-textarea-input {
+    caret-color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .msg-bubble__formatted b,
+body.velodesk-dark #velodeskDeskV2Root .msg-bubble__formatted strong,
+body.velodesk-dark #velodeskDeskV2Root .msg-bubble__formatted i,
+body.velodesk-dark #velodeskDeskV2Root .msg-bubble__formatted em,
+body.velodesk-dark #velodeskDeskV2Root .msg-bubble__formatted u {
+    color: inherit;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor:empty::before {
+    color: var(--velo-dark-muted, #64748b);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor-wrap--has-errors .compose-rich-editor {
+    border-color: rgba(248, 113, 113, 0.55);
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.18);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-compose-toolbar__btn--active {
+    background: #3b82f6;
+    color: #fff;
+    border-color: #3b82f6;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-compose-toolbar__btn--active:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-compose-toolbar--internal .crm-compose-toolbar__btn--active {
+    background: #d97706;
+    border-color: #d97706;
+}
+
 body.velodesk-dark #velodeskDeskV2Root .spell-textarea-wrap--has-errors .spell-textarea-input {
     border-color: rgba(248, 113, 113, 0.55);
     box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.18);

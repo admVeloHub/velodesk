@@ -1,9 +1,17 @@
 /**
- * ComposeFormatToolbar v1.0.1 — suporte embedded na barra inferior
- * VERSION: v1.0.1 | DATE: 2026-07-02
+ * ComposeFormatToolbar v1.0.3 — destaque visual do botão ativo (queryCommandState)
+ * VERSION: v1.0.3 | DATE: 2026-07-02
  */
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { applyFormatAction, resolveFormatShortcut } from '../../../services/desk/composeTextFormat';
+
+const EMPTY_FORMAT_STATE = {
+  bold: false,
+  italic: false,
+  underline: false,
+  bulletList: false,
+  numberedList: false,
+};
 
 const TOOLBAR_ACTIONS = [
   { id: 'bold', label: 'Negrito', icon: 'ti ti-bold', shortcut: 'Ctrl+B' },
@@ -21,8 +29,31 @@ function restoreSelection(textarea, selectionStart, selectionEnd) {
   });
 }
 
-export function useComposeFormat({ textareaRef, value, onValueChange }) {
+export function useComposeFormat({
+  textareaRef,
+  richEditorRef,
+  mode = 'rich',
+  value,
+  onValueChange,
+}) {
+  const [activeFormats, setActiveFormats] = useState(EMPTY_FORMAT_STATE);
+
+  const handleFormatStateChange = useCallback((nextState) => {
+    setActiveFormats({ ...EMPTY_FORMAT_STATE, ...nextState });
+  }, []);
+
+  const refreshFormatState = useCallback(() => {
+    if (mode !== 'rich') return;
+    const state = richEditorRef?.current?.getFormatState?.();
+    if (state) setActiveFormats({ ...EMPTY_FORMAT_STATE, ...state });
+  }, [mode, richEditorRef]);
+
   const applyAction = useCallback((action) => {
+    if (mode === 'rich') {
+      richEditorRef?.current?.execFormat(action);
+      requestAnimationFrame(() => refreshFormatState());
+      return;
+    }
     const textarea = textareaRef?.current;
     if (!textarea) return;
     const result = applyFormatAction(
@@ -31,9 +62,9 @@ export function useComposeFormat({ textareaRef, value, onValueChange }) {
       textarea.selectionEnd,
       action,
     );
-    onValueChange(result.value);
+    onValueChange?.(result.value);
     restoreSelection(textarea, result.selectionStart, result.selectionEnd);
-  }, [textareaRef, value, onValueChange]);
+  }, [mode, richEditorRef, textareaRef, value, onValueChange, refreshFormatState]);
 
   const handleKeyDown = useCallback((event) => {
     const action = resolveFormatShortcut(event);
@@ -43,10 +74,21 @@ export function useComposeFormat({ textareaRef, value, onValueChange }) {
     return true;
   }, [applyAction]);
 
-  return { applyAction, handleKeyDown };
+  return {
+    applyAction,
+    handleKeyDown,
+    activeFormats,
+    handleFormatStateChange,
+    refreshFormatState,
+  };
 }
 
-export default function ComposeFormatToolbar({ applyAction, variant = 'public', embedded = false }) {
+export default function ComposeFormatToolbar({
+  applyAction,
+  activeFormats = EMPTY_FORMAT_STATE,
+  variant = 'public',
+  embedded = false,
+}) {
   return (
     <div
       className={
@@ -62,9 +104,13 @@ export default function ComposeFormatToolbar({ applyAction, variant = 'public', 
           {index === 3 ? <span className="crm-compose-toolbar__sep" aria-hidden="true" /> : null}
           <button
             type="button"
-            className="toolbar-btn crm-compose-toolbar__btn"
+            className={
+              'toolbar-btn crm-compose-toolbar__btn'
+              + (activeFormats[action.id] ? ' crm-compose-toolbar__btn--active' : '')
+            }
             title={action.shortcut ? `${action.label} (${action.shortcut})` : action.label}
             aria-label={action.label}
+            aria-pressed={Boolean(activeFormats[action.id])}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => applyAction(action.id)}
           >

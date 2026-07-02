@@ -1,10 +1,32 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.17.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.18.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Compose WYSIWYG e toolbar de formatação com estado ativo
+
+- **Data/Hora**: 2026-07-02
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.18.0
+  - ComposeRichEditor v1.0.2, composeRichEditor v1.0.1, ComposeFormatToolbar v1.0.3
+  - DeskComposePanel v1.9.1, DeskConversation v1.2.0, DeskV2Root v3.5.8
+  - useComposeSpellCheck v2.0.1, composeFormatPreview v1.0.0
+- **Arquivos modificados / incluídos**:
+  - `frontend/src/features/desk/components/ComposeRichEditor.jsx` — editor contenteditable WYSIWYG (sem tags visíveis na seleção)
+  - `frontend/src/services/desk/composeRichEditor.js` — sanitização HTML, execCommand, readComposeFormatState
+  - `frontend/src/features/desk/components/ComposeFormatToolbar.jsx` — botões destacam formatação ativa (queryCommandState)
+  - `frontend/src/features/desk/components/DeskComposePanel.jsx` — compose público e anotação interna migrados para rich editor
+  - `frontend/src/hooks/useComposeSpellCheck.js` — onReplaceRange preserva formatação ao corrigir ortografia
+  - `frontend/src/features/desk/DeskV2Root.jsx` — gate ortográfico em texto plano; envio preserva HTML
+  - `frontend/src/features/desk/components/DeskConversation.jsx` — renderização segura de HTML nas mensagens
+  - `frontend/velodesk-crm.css`, `velodesk-dark-theme.css` — estilos editor rich e toolbar ativa
+- **Descrição**: Substitui textarea+mirror por editor WYSIWYG; negrito/itálico/sublinhado/listas aplicam formatação visual; toolbar indica estado ativo; corretor ortográfico opera em texto plano sem destruir markup.
+- **Status**: Concluído
 
 ### GitHub Push — Protocolo sequencial, Assistente IA Gemini e painel cliente
 

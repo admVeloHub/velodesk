@@ -1,15 +1,16 @@
 /**
- * DeskComposePanel v1.8.0 — Assistente IA refina rascunho via Gemini
- * VERSION: v1.8.0 | DATE: 2026-07-02
+ * DeskComposePanel v1.9.1 — toolbar com estado ativo da formatação
+ * VERSION: v1.9.1 | DATE: 2026-07-02
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SEND_STATUS_OPTIONS } from '../../../services/desk/constants';
 import { useComposeSpellCheck } from '../../../hooks/useComposeSpellCheck';
 import { useTabulation } from '../../../context/TabulationContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useNotifications } from '../../../context/NotificationContext';
+import { htmlToPlainText, normalizePlainToHtml } from '../../../services/desk/composeRichEditor';
 import SpellSuggestionBar, { SpellErrorsPanel } from './SpellSuggestionBar';
-import SpellComposeTextarea from './SpellComposeTextarea';
+import ComposeRichEditor from './ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
 import ComposeRefinarModal from './ComposeRefinarModal';
 
@@ -146,10 +147,17 @@ function InternalNoteFields({
   onIgnoreSpellWord,
 }) {
   const tid = String(ticketId);
-  const internalTextareaRef = useRef(null);
+  const internalEditorRef = useRef(null);
+  const internalPlainText = useMemo(() => htmlToPlainText(internalText), [internalText]);
+
+  const handleInternalReplace = useCallback((startIndex, deleteCount, insertText) => {
+    internalEditorRef.current?.replacePlainRange(startIndex, deleteCount, insertText);
+  }, []);
+
   const spell = useComposeSpellCheck({
-    text: internalText,
+    text: internalPlainText,
     onTextChange: onInternalTextChange,
+    onReplaceRange: handleInternalReplace,
     tabulationConfig,
     ignoredWords: spellIgnoredWords,
     onIgnoreWord: onIgnoreSpellWord,
@@ -157,14 +165,24 @@ function InternalNoteFields({
   });
 
   const internalFormat = useComposeFormat({
-    textareaRef: internalTextareaRef,
-    value: internalText,
-    onValueChange: (next) => spell.handleChange({ target: { value: next } }),
+    richEditorRef: internalEditorRef,
+    mode: 'rich',
   });
+
+  const handleInternalChange = useCallback(({ html }) => {
+    onInternalTextChange(html);
+  }, [onInternalTextChange]);
 
   const handleInternalKeyDown = (event) => {
     if (internalFormat.handleKeyDown(event)) return;
-    spell.handleKeyDown(event);
+    spell.handleKeyDown({
+      ...event,
+      target: {
+        ...event.target,
+        selectionStart: internalEditorRef.current?.getCursor?.() ?? internalPlainText.length,
+        value: internalPlainText,
+      },
+    });
   };
 
   return (
@@ -181,24 +199,28 @@ function InternalNoteFields({
         onDismiss={spell.dismissSuggestion}
         onIgnore={spell.ignoreSuggestion}
       />
-      <SpellComposeTextarea
+      <ComposeRichEditor
+        ref={internalEditorRef}
         id={'internalResponse-' + tid}
         className="response-textarea crm-notes-compose__textarea"
         placeholder="Digite uma anotação interna..."
-        rows={5}
         value={internalText}
-        flaggedErrors={spell.flaggedErrors}
-        activeErrorStartIndex={spell.activeErrorStartIndex}
-        onChange={spell.handleChange}
+        hasSpellErrors={spell.flaggedErrors.length > 0}
+        onFormatStateChange={internalFormat.handleFormatStateChange}
+        onChange={handleInternalChange}
         onKeyDown={handleInternalKeyDown}
         onBlur={spell.handleBlur}
         onSelect={spell.handleSelect}
         onClick={spell.handleClick}
-        textareaRef={internalTextareaRef}
       />
       <ComposeBottomBar
         formatToolbar={(
-          <ComposeFormatToolbar applyAction={internalFormat.applyAction} variant="internal" embedded />
+          <ComposeFormatToolbar
+            applyAction={internalFormat.applyAction}
+            activeFormats={internalFormat.activeFormats}
+            variant="internal"
+            embedded
+          />
         )}
       />
     </div>
@@ -219,7 +241,8 @@ export default function DeskComposePanel({
   variant = 'full',
 }) {
   const tid = String(ticketId);
-  const publicTextareaRef = useRef(null);
+  const publicEditorRef = useRef(null);
+  const composePlainText = useMemo(() => htmlToPlainText(composeText), [composeText]);
   const { config: tabulationConfig } = useTabulation();
   const { user, colaborador } = useAuth();
   const { showNotification } = useNotifications();
@@ -233,9 +256,14 @@ export default function DeskComposePanel({
     return full.split(/\s+/)[0] || '';
   }, [user, colaborador]);
 
+  const handlePublicReplace = useCallback((startIndex, deleteCount, insertText) => {
+    publicEditorRef.current?.replacePlainRange(startIndex, deleteCount, insertText);
+  }, []);
+
   const spell = useComposeSpellCheck({
-    text: composeText,
+    text: composePlainText,
     onTextChange: onComposeTextChange,
+    onReplaceRange: handlePublicReplace,
     tabulationConfig,
     ignoredWords: spellIgnoredWords,
     onIgnoreWord: onIgnoreSpellWord,
@@ -244,30 +272,44 @@ export default function DeskComposePanel({
   });
 
   const publicFormat = useComposeFormat({
-    textareaRef: publicTextareaRef,
-    value: composeText,
-    onValueChange: (next) => spell.handleChange({ target: { value: next } }),
+    richEditorRef: publicEditorRef,
+    mode: 'rich',
   });
+
+  const handlePublicChange = useCallback(({ html }) => {
+    onComposeTextChange(html);
+  }, [onComposeTextChange]);
 
   const handlePublicKeyDown = (event) => {
     if (publicFormat.handleKeyDown(event)) return;
-    spell.handleKeyDown(event);
+    spell.handleKeyDown({
+      ...event,
+      target: {
+        ...event.target,
+        selectionStart: publicEditorRef.current?.getCursor?.() ?? composePlainText.length,
+        value: composePlainText,
+      },
+    });
   };
 
   const applyMacro = (value) => {
     const macro = MACROS.find((m) => m.value === value);
-    if (macro) onComposeTextChange(macro.text);
+    if (macro) publicEditorRef.current?.insertPlainText(macro.text);
   };
 
   const handleOpenRefinar = () => {
-    const texto = String(composeText || '').trim();
+    const texto = composePlainText.trim();
     if (!texto) {
       showNotification('Digite um rascunho antes de usar o Assistente IA.', 'warning');
       return;
     }
-    setRefinarDraft(composeText);
+    setRefinarDraft(texto);
     setRefinarOpen(true);
   };
+
+  const handleApplyRefinar = useCallback((plainText) => {
+    onComposeTextChange(normalizePlainToHtml(plainText));
+  }, [onComposeTextChange]);
 
   return (
     <div className={'crm-ticket-compose' + (variant === 'internal-only' ? ' crm-ticket-compose--notes' : '')}>
@@ -311,27 +353,31 @@ export default function DeskComposePanel({
                     onDismiss={spell.dismissSuggestion}
                     onIgnore={spell.ignoreSuggestion}
                   />
-                  <SpellComposeTextarea
+                  <ComposeRichEditor
+                    ref={publicEditorRef}
                     id={'publicResponse-' + tid}
                     className="response-textarea"
                     placeholder="Digite sua resposta ao cliente..."
-                    rows={5}
                     value={composeText}
-                    flaggedErrors={spell.flaggedErrors}
-                    activeErrorStartIndex={spell.activeErrorStartIndex}
-                    onChange={spell.handleChange}
+                    hasSpellErrors={spell.flaggedErrors.length > 0}
+                    onFormatStateChange={publicFormat.handleFormatStateChange}
+                    onChange={handlePublicChange}
                     onKeyDown={handlePublicKeyDown}
                     onBlur={spell.handleBlur}
                     onSelect={spell.handleSelect}
                     onClick={spell.handleClick}
-                    textareaRef={publicTextareaRef}
                   />
                   <ComposeBottomBar
                     showMacros
                     onMacroSelect={applyMacro}
                     onOpenRefinar={handleOpenRefinar}
                     formatToolbar={(
-                      <ComposeFormatToolbar applyAction={publicFormat.applyAction} variant="public" embedded />
+                      <ComposeFormatToolbar
+                        applyAction={publicFormat.applyAction}
+                        activeFormats={publicFormat.activeFormats}
+                        variant="public"
+                        embedded
+                      />
                     )}
                   />
                   <ComposeRefinarModal
@@ -339,7 +385,7 @@ export default function DeskComposePanel({
                     onClose={() => setRefinarOpen(false)}
                     draftText={refinarDraft}
                     nomeOperador={nomeOperador}
-                    onApply={onComposeTextChange}
+                    onApply={handleApplyRefinar}
                   />
                 </div>
               </div>

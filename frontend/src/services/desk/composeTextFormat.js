@@ -1,6 +1,6 @@
 /**
- * composeTextFormat v1.0.0 — utilitários de formatação para textarea do compose
- * VERSION: v1.0.0 | DATE: 2026-07-02
+ * composeTextFormat v1.0.1 — tags HTML visíveis no preview (b/i/u)
+ * VERSION: v1.0.1 | DATE: 2026-07-02
  */
 
 export function wrapTextSelection(value, selectionStart, selectionEnd, before, after) {
@@ -40,9 +40,9 @@ export function prefixSelectedLines(value, selectionStart, selectionEnd, linePre
 export function applyFormatAction(value, selectionStart, selectionEnd, action) {
   switch (action) {
     case 'bold':
-      return wrapTextSelection(value, selectionStart, selectionEnd, '**', '**');
+      return wrapTextSelection(value, selectionStart, selectionEnd, '<b>', '</b>');
     case 'italic':
-      return wrapTextSelection(value, selectionStart, selectionEnd, '_', '_');
+      return wrapTextSelection(value, selectionStart, selectionEnd, '<i>', '</i>');
     case 'underline':
       return wrapTextSelection(value, selectionStart, selectionEnd, '<u>', '</u>');
     case 'bulletList':

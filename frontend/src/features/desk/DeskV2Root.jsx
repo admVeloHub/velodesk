@@ -1,6 +1,6 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.5.7 | DATE: 2026-07-02
+ * VERSION: v3.5.8 | DATE: 2026-07-02
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -36,6 +36,7 @@ import DeskRightPanel from './components/DeskRightPanel';
 import { applyCascadeFieldChange, buildDefaultRightFields, getMotivos, validateTabulationForSendStatus } from '../../services/tabulationConfig';
 import { useTabulation } from '../../context/TabulationContext';
 import { createSpellContext, loadSpellEngine, scanText } from '../../services/spellcheck/spellEngine';
+import { htmlToPlainText } from '../../services/desk/composeRichEditor';
 
 function applyRightFieldsToTicket(t, rightFields, escalonar) {
   const prevLf = t.lateralForm || {};
@@ -342,8 +343,12 @@ export default function DeskV2Root() {
   const handleCommitWithStatus = async (statusId) => {
     if (!ticket || !entry) return null;
     const status = statusId || sendStatus;
-    const messageText = composeText.trim();
-    const internalNoteText = internalText.trim();
+    const messageHtml = String(composeText || '').trim();
+    const internalNoteHtml = String(internalText || '').trim();
+    const messageText = htmlToPlainText(messageHtml).trim();
+    const internalNoteText = htmlToPlainText(internalNoteHtml).trim();
+    const messagePayload = messageHtml || '';
+    const internalNotePayload = internalNoteHtml || '';
 
     const tabulationCheck = validateTabulationForSendStatus(status, rightFields, config);
     if (!tabulationCheck.ok) {
@@ -393,7 +398,7 @@ export default function DeskV2Root() {
             type: 'agent',
             fromClient: false,
             origin: 'agente',
-            text: messageText,
+            text: messagePayload,
             timestamp: ts,
             author,
           });
@@ -404,7 +409,7 @@ export default function DeskV2Root() {
             id: `${regKey}-int`,
             type: 'internal',
             origin: 'agente',
-            text: internalNoteText,
+            text: internalNotePayload,
             timestamp: ts,
             author,
           });
@@ -438,8 +443,8 @@ export default function DeskV2Root() {
 
       if (messageText || internalNoteText) {
         await sendTicketRegistroEntry(ticket.id, {
-          text: messageText,
-          internalText: internalNoteText,
+          text: messagePayload,
+          internalText: internalNotePayload,
           author: getAgentName(),
         });
       }

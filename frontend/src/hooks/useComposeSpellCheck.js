@@ -1,6 +1,6 @@
 /**
- * useComposeSpellCheck v2.0.0 — LanguageTool self-hosted via backend
- * VERSION: v2.0.0 | DATE: 2026-06-26
+ * useComposeSpellCheck v2.0.1 — suporte a onReplaceRange (editor rich)
+ * VERSION: v2.0.1 | DATE: 2026-07-02
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -46,6 +46,7 @@ function buildTokenContext(fullText, wordInfo) {
 export function useComposeSpellCheck({
   text,
   onTextChange,
+  onReplaceRange,
   tabulationConfig,
   ignoredWords,
   onIgnoreWord,
@@ -191,17 +192,19 @@ export function useComposeSpellCheck({
     onTextChange(event.target.value);
   }, [onTextChange]);
 
+  const applyTextReplacement = useCallback((startIndex, word, replacement) => {
+    if (onReplaceRange) {
+      onReplaceRange(startIndex, word.length, replacement);
+      return;
+    }
+    onTextChange(replaceWordAt(text, startIndex, word, replacement));
+  }, [onReplaceRange, onTextChange, text]);
+
   const handleKeyDown = useCallback((event) => {
     if (activeSuggestion && event.key === 'Tab' && activeSuggestion.suggestions?.length) {
       event.preventDefault();
       const replacement = activeSuggestion.suggestions[0];
-      const nextText = replaceWordAt(
-        text,
-        activeSuggestion.startIndex,
-        activeSuggestion.word,
-        replacement,
-      );
-      onTextChange(nextText);
+      applyTextReplacement(activeSuggestion.startIndex, activeSuggestion.word, replacement);
       setActiveSuggestion(null);
       setActiveErrorStartIndex(null);
       wordsAfterSuggestionRef.current = 0;
@@ -227,7 +230,7 @@ export function useComposeSpellCheck({
         updateSuggestionFromCursor(event.target.selectionStart ?? 0);
       });
     }
-  }, [activeSuggestion, text, onTextChange, evaluateWord, updateSuggestionFromCursor]);
+  }, [activeSuggestion, text, applyTextReplacement, evaluateWord, updateSuggestionFromCursor]);
 
   const handleSelect = useCallback((event) => {
     updateSuggestionFromCursor(event.target.selectionStart ?? 0);
@@ -247,17 +250,11 @@ export function useComposeSpellCheck({
     if (!activeSuggestion) return;
     const next = replacement || activeSuggestion.suggestions?.[0];
     if (!next) return;
-    const nextText = replaceWordAt(
-      text,
-      activeSuggestion.startIndex,
-      activeSuggestion.word,
-      next,
-    );
-    onTextChange(nextText);
+    applyTextReplacement(activeSuggestion.startIndex, activeSuggestion.word, next);
     setActiveSuggestion(null);
     setActiveErrorStartIndex(null);
     wordsAfterSuggestionRef.current = 0;
-  }, [activeSuggestion, text, onTextChange]);
+  }, [activeSuggestion, applyTextReplacement]);
 
   const dismissSuggestion = useCallback(() => {
     setActiveSuggestion(null);
@@ -294,11 +291,10 @@ export function useComposeSpellCheck({
       next = fresh.suggestions?.[0];
     }
     if (!next) return;
-    const nextText = replaceWordAt(text, error.startIndex, error.word, next);
-    onTextChange(nextText);
+    applyTextReplacement(error.startIndex, error.word, next);
     setActiveSuggestion(null);
     setActiveErrorStartIndex(null);
-  }, [text, onTextChange]);
+  }, [text, applyTextReplacement]);
 
   return {
     activeSuggestion,

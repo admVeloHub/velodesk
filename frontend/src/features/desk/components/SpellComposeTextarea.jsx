@@ -1,8 +1,12 @@
 /**
- * SpellComposeTextarea v1.0.0 — textarea com destaque de palavras incorretas
- * VERSION: v1.0.0 | DATE: 2026-06-26
+ * SpellComposeTextarea v1.1.0 — preview visual de formatação no mirror
+ * VERSION: v1.1.0 | DATE: 2026-07-02
  */
 import React, { useCallback, useMemo, useRef } from 'react';
+import {
+  buildFormattedMirrorHtml,
+  composeTextHasFormatting,
+} from '../../../services/desk/composeFormatPreview';
 
 const SPELL_INPUT_PROPS = {
   spellCheck: true,
@@ -54,10 +58,18 @@ export default function SpellComposeTextarea({
   onSelect,
   onClick,
   textareaRef,
+  visualFormat = true,
 }) {
   const localRef = useRef(null);
   const mirrorRef = useRef(null);
   const ref = textareaRef || localRef;
+
+  const showVisualFormat = visualFormat && composeTextHasFormatting(value);
+
+  const mirrorHtml = useMemo(
+    () => buildFormattedMirrorHtml(value, flaggedErrors || [], activeErrorStartIndex ?? null),
+    [value, flaggedErrors, activeErrorStartIndex],
+  );
 
   const parts = useMemo(
     () => buildHighlightParts(value, flaggedErrors || [], activeErrorStartIndex ?? null),
@@ -73,26 +85,37 @@ export default function SpellComposeTextarea({
     }
   }, [ref]);
 
+  const wrapClass = 'spell-textarea-wrap'
+    + (flaggedErrors?.length ? ' spell-textarea-wrap--has-errors' : '')
+    + (showVisualFormat ? ' spell-textarea-wrap--formatted' : '');
+
   return (
-    <div className={'spell-textarea-wrap' + (flaggedErrors?.length ? ' spell-textarea-wrap--has-errors' : '')}>
+    <div className={wrapClass}>
       <div
         ref={mirrorRef}
         className={'spell-textarea-mirror ' + className}
         aria-hidden="true"
       >
-        {parts.length ? parts.map((part, index) => {
-          if (part.type === 'error') {
-            return (
-              <mark
-                key={'err-' + index}
-                className={'spell-textarea-mark' + (part.active ? ' spell-textarea-mark--active' : '')}
-              >
-                {part.value}
-              </mark>
-            );
-          }
-          return <span key={'txt-' + index}>{part.value}</span>;
-        }) : (value || '\u00A0')}
+        {showVisualFormat ? (
+          <div
+            className="spell-textarea-mirror__formatted"
+            dangerouslySetInnerHTML={{ __html: mirrorHtml }}
+          />
+        ) : (
+          parts.length ? parts.map((part, index) => {
+            if (part.type === 'error') {
+              return (
+                <mark
+                  key={'err-' + index}
+                  className={'spell-textarea-mark' + (part.active ? ' spell-textarea-mark--active' : '')}
+                >
+                  {part.value}
+                </mark>
+              );
+            }
+            return <span key={'txt-' + index}>{part.value}</span>;
+          }) : (value || '\u00A0')
+        )}
       </div>
       <textarea
         {...SPELL_INPUT_PROPS}

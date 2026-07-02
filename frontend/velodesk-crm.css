@@ -2565,6 +2565,30 @@
     line-height: 1;
 }
 
+#velodeskDeskV2Root .crm-compose-toolbar__btn--active {
+    background: #000058;
+    color: #fff;
+    border-color: #000058;
+}
+
+#velodeskDeskV2Root .crm-compose-toolbar__btn--active:hover {
+    background: #000070;
+    color: #fff;
+    border-color: #000070;
+}
+
+#velodeskDeskV2Root .crm-compose-toolbar--internal .crm-compose-toolbar__btn--active {
+    background: #92400e;
+    color: #fff;
+    border-color: #92400e;
+}
+
+#velodeskDeskV2Root .crm-compose-toolbar--internal .crm-compose-toolbar__btn--active:hover {
+    background: #78350f;
+    color: #fff;
+    border-color: #78350f;
+}
+
 #velodeskDeskV2Root .spell-textarea-wrap {
     position: relative;
     width: 100%;
@@ -2596,6 +2620,33 @@
     z-index: 1;
 }
 
+#velodeskDeskV2Root .spell-textarea-wrap--formatted .spell-textarea-mirror {
+    color: #0f172a;
+}
+
+#velodeskDeskV2Root .spell-textarea-mirror__formatted b,
+#velodeskDeskV2Root .spell-textarea-mirror__formatted strong {
+    font-weight: 700;
+}
+
+#velodeskDeskV2Root .spell-textarea-mirror__formatted i,
+#velodeskDeskV2Root .spell-textarea-mirror__formatted em {
+    font-style: italic;
+}
+
+#velodeskDeskV2Root .spell-textarea-mirror__formatted u {
+    text-decoration: underline;
+}
+
+#velodeskDeskV2Root .spell-textarea-wrap--formatted .spell-textarea-input {
+    color: transparent;
+    caret-color: #0f172a;
+}
+
+#velodeskDeskV2Root .spell-textarea-wrap--formatted .spell-textarea-mark {
+    color: inherit;
+}
+
 #velodeskDeskV2Root .spell-textarea-input {
     position: relative;
     z-index: 2;
@@ -2622,6 +2673,53 @@
     text-decoration-color: #dc2626;
     background: rgba(254, 226, 226, 0.55);
     border-radius: 2px;
+}
+
+#velodeskDeskV2Root .compose-rich-editor-wrap {
+    position: relative;
+    width: 100%;
+}
+
+#velodeskDeskV2Root .compose-rich-editor {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 120px;
+    max-height: min(140px, 22vh);
+    padding: inherit;
+    margin: 0;
+    border: 1px solid transparent;
+    font-size: 14px;
+    font-family: inherit;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    overflow-y: auto;
+    resize: vertical;
+    outline: none;
+    background: transparent;
+    color: inherit;
+}
+
+#velodeskDeskV2Root .compose-rich-editor:empty::before {
+    content: attr(data-placeholder);
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+#velodeskDeskV2Root .compose-rich-editor ul,
+#velodeskDeskV2Root .compose-rich-editor ol {
+    margin: 0.25em 0;
+    padding-left: 1.5em;
+}
+
+#velodeskDeskV2Root .compose-rich-editor li {
+    margin: 0.1em 0;
+}
+
+#velodeskDeskV2Root .compose-rich-editor-wrap--has-errors .compose-rich-editor {
+    border-color: #fca5a5;
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.12);
 }
 
 #velodeskDeskV2Root .crm-send-status--disabled .crm-send-status__trigger-panel,
