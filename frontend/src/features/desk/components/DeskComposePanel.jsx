@@ -1,13 +1,17 @@
 /**
- * DeskComposePanel v1.4.1 — resposta pública / anotação interna + corretor ortográfico
- * VERSION: v1.4.1 | DATE: 2026-06-26
+ * DeskComposePanel v1.8.0 — Assistente IA refina rascunho via Gemini
+ * VERSION: v1.8.0 | DATE: 2026-07-02
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SEND_STATUS_OPTIONS } from '../../../services/desk/constants';
 import { useComposeSpellCheck } from '../../../hooks/useComposeSpellCheck';
 import { useTabulation } from '../../../context/TabulationContext';
+import { useAuth } from '../../../context/AuthContext';
+import { useNotifications } from '../../../context/NotificationContext';
 import SpellSuggestionBar, { SpellErrorsPanel } from './SpellSuggestionBar';
 import SpellComposeTextarea from './SpellComposeTextarea';
+import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
+import ComposeRefinarModal from './ComposeRefinarModal';
 
 const MACROS = [
   { value: 'F1', label: 'F1 — Saudação padrão', text: 'Olá! Obrigado por entrar em contato. Como posso ajudá-lo(a) hoje?' },
@@ -97,6 +101,42 @@ export function DeskStatusCommitButton({ sendStatus, onCommitStatus, variant = '
 /** @deprecated use DeskStatusCommitButton */
 export const DeskComposeFooter = DeskStatusCommitButton;
 
+function ComposeBottomBar({
+  formatToolbar,
+  showMacros = false,
+  onMacroSelect,
+  onOpenRefinar,
+}) {
+  return (
+    <div className="crm-compose-bottom-bar ticket-response-actions" role="group" aria-label="Ferramentas do compose">
+      {formatToolbar}
+      {showMacros ? (
+        <>
+          <span className="crm-compose-bottom-bar__sep" aria-hidden="true" />
+          <div className="crm-compose-bottom-bar__tools">
+            <div className="ticket-macro-hub crm-compose-bottom-bar__macros">
+              <select
+                className="ticket-macro-select"
+                aria-label="Central de opções de resposta"
+                value=""
+                onChange={(e) => onMacroSelect?.(e.target.value)}
+              >
+                <option value="">Central de opções</option>
+                {MACROS.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+            <button type="button" className="btn-secondary crm-compose-bottom-bar__ai" id="btnCrmAiAssistant" onClick={onOpenRefinar}>
+              <i className="fas fa-robot" /> Assistente IA
+            </button>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function InternalNoteFields({
   ticketId,
   internalText,
@@ -106,6 +146,7 @@ function InternalNoteFields({
   onIgnoreSpellWord,
 }) {
   const tid = String(ticketId);
+  const internalTextareaRef = useRef(null);
   const spell = useComposeSpellCheck({
     text: internalText,
     onTextChange: onInternalTextChange,
@@ -114,6 +155,17 @@ function InternalNoteFields({
     onIgnoreWord: onIgnoreSpellWord,
     trackFlaggedErrors: false,
   });
+
+  const internalFormat = useComposeFormat({
+    textareaRef: internalTextareaRef,
+    value: internalText,
+    onValueChange: (next) => spell.handleChange({ target: { value: next } }),
+  });
+
+  const handleInternalKeyDown = (event) => {
+    if (internalFormat.handleKeyDown(event)) return;
+    spell.handleKeyDown(event);
+  };
 
   return (
     <div className="response-form internal-form crm-notes-compose__form spell-compose-wrap">
@@ -138,10 +190,16 @@ function InternalNoteFields({
         flaggedErrors={spell.flaggedErrors}
         activeErrorStartIndex={spell.activeErrorStartIndex}
         onChange={spell.handleChange}
-        onKeyDown={spell.handleKeyDown}
+        onKeyDown={handleInternalKeyDown}
         onBlur={spell.handleBlur}
         onSelect={spell.handleSelect}
         onClick={spell.handleClick}
+        textareaRef={internalTextareaRef}
+      />
+      <ComposeBottomBar
+        formatToolbar={(
+          <ComposeFormatToolbar applyAction={internalFormat.applyAction} variant="internal" embedded />
+        )}
       />
     </div>
   );
@@ -155,13 +213,25 @@ export default function DeskComposePanel({
   onComposeModeChange,
   onComposeTextChange,
   onInternalTextChange,
-  onOpenAi,
   spellIgnoredWords,
   onIgnoreSpellWord,
   onFlaggedErrorsChange,
+  variant = 'full',
 }) {
   const tid = String(ticketId);
+  const publicTextareaRef = useRef(null);
   const { config: tabulationConfig } = useTabulation();
+  const { user, colaborador } = useAuth();
+  const { showNotification } = useNotifications();
+  const [refinarOpen, setRefinarOpen] = useState(false);
+  const [refinarDraft, setRefinarDraft] = useState('');
+  const showPublic = variant === 'full' || variant === 'public-only';
+  const showInternal = variant === 'full' || variant === 'internal-only';
+
+  const nomeOperador = useMemo(() => {
+    const full = String(user?.name || colaborador?.nome || colaborador?.name || '').trim();
+    return full.split(/\s+/)[0] || '';
+  }, [user, colaborador]);
 
   const spell = useComposeSpellCheck({
     text: composeText,
@@ -173,17 +243,39 @@ export default function DeskComposePanel({
     trackFlaggedErrors: true,
   });
 
+  const publicFormat = useComposeFormat({
+    textareaRef: publicTextareaRef,
+    value: composeText,
+    onValueChange: (next) => spell.handleChange({ target: { value: next } }),
+  });
+
+  const handlePublicKeyDown = (event) => {
+    if (publicFormat.handleKeyDown(event)) return;
+    spell.handleKeyDown(event);
+  };
+
   const applyMacro = (value) => {
     const macro = MACROS.find((m) => m.value === value);
     if (macro) onComposeTextChange(macro.text);
   };
 
+  const handleOpenRefinar = () => {
+    const texto = String(composeText || '').trim();
+    if (!texto) {
+      showNotification('Digite um rascunho antes de usar o Assistente IA.', 'warning');
+      return;
+    }
+    setRefinarDraft(composeText);
+    setRefinarOpen(true);
+  };
+
   return (
-    <div className="crm-ticket-compose">
+    <div className={'crm-ticket-compose' + (variant === 'internal-only' ? ' crm-ticket-compose--notes' : '')}>
       <div className="ticket-response octa-comment-panel crm-ticket-response">
         <div className="octa-comment-panel-row">
           <div className="octa-panel-avatar" aria-hidden="true"><i className="fas fa-user" /></div>
           <div className="octa-panel-box">
+            {variant === 'full' ? (
             <div className="response-tabs octa-nav-tabs">
               <button
                 type="button"
@@ -202,8 +294,10 @@ export default function DeskComposePanel({
                 <i className="fas fa-edit" /> Anotação interna
               </button>
             </div>
+            ) : null}
             <div className="response-content octa-response-panel-body">
-              <div className={'response-tab-content' + (composeMode === 'public' ? ' active' : '')} id={'public-' + tid}>
+              {showPublic ? (
+              <div className={'response-tab-content' + (variant === 'full' && composeMode !== 'public' ? '' : ' active')} id={'public-' + tid}>
                 <div className="response-form spell-compose-wrap">
                   <SpellErrorsPanel
                     errors={spell.flaggedErrors}
@@ -226,32 +320,32 @@ export default function DeskComposePanel({
                     flaggedErrors={spell.flaggedErrors}
                     activeErrorStartIndex={spell.activeErrorStartIndex}
                     onChange={spell.handleChange}
-                    onKeyDown={spell.handleKeyDown}
+                    onKeyDown={handlePublicKeyDown}
                     onBlur={spell.handleBlur}
                     onSelect={spell.handleSelect}
                     onClick={spell.handleClick}
+                    textareaRef={publicTextareaRef}
                   />
-                  <div className="response-actions ticket-response-actions">
-                    <div className="ticket-macro-hub">
-                      <select
-                        className="ticket-macro-select"
-                        aria-label="Central de opções de resposta"
-                        value=""
-                        onChange={(e) => applyMacro(e.target.value)}
-                      >
-                        <option value="">Central de opções</option>
-                        {MACROS.map((m) => (
-                          <option key={m.value} value={m.value}>{m.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <button type="button" className="btn-secondary" id="btnCrmAiAssistant" onClick={onOpenAi}>
-                      <i className="fas fa-robot" /> Assistente IA
-                    </button>
-                  </div>
+                  <ComposeBottomBar
+                    showMacros
+                    onMacroSelect={applyMacro}
+                    onOpenRefinar={handleOpenRefinar}
+                    formatToolbar={(
+                      <ComposeFormatToolbar applyAction={publicFormat.applyAction} variant="public" embedded />
+                    )}
+                  />
+                  <ComposeRefinarModal
+                    open={refinarOpen}
+                    onClose={() => setRefinarOpen(false)}
+                    draftText={refinarDraft}
+                    nomeOperador={nomeOperador}
+                    onApply={onComposeTextChange}
+                  />
                 </div>
               </div>
-              <div className={'response-tab-content' + (composeMode === 'internal' ? ' active' : '')} id={'internal-' + tid}>
+              ) : null}
+              {showInternal ? (
+              <div className={'response-tab-content' + (variant === 'full' && composeMode !== 'internal' ? '' : ' active')} id={'internal-' + tid}>
                 <InternalNoteFields
                   ticketId={ticketId}
                   internalText={internalText}
@@ -261,6 +355,7 @@ export default function DeskComposePanel({
                   onIgnoreSpellWord={onIgnoreSpellWord}
                 />
               </div>
+              ) : null}
             </div>
           </div>
         </div>

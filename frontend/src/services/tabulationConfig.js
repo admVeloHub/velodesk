@@ -1,6 +1,6 @@
 /**
- * tabulationConfig v1.2.2 — default responsável = agente logado
- * VERSION: v1.2.2 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * tabulationConfig v1.3.0 — validação de tabulação obrigatória por status
+ * VERSION: v1.3.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 
 export const EMPTY_TABULATION = {
@@ -69,4 +69,40 @@ export function applyCascadeFieldChange(prev, key, value) {
     next.detalhe = '';
   }
   return next;
+}
+
+const SEND_STATUSES_REQUIRING_TABULATION = new Set(['em-andamento', 'resolvidos']);
+
+export function validateTabulationForSendStatus(statusId, rightFields, config) {
+  if (!SEND_STATUSES_REQUIRING_TABULATION.has(statusId)) {
+    return { ok: true, missing: [], message: '' };
+  }
+
+  const missing = [];
+  const produto = String(rightFields?.produto ?? '').trim();
+  const motivo = String(rightFields?.motivo ?? '').trim();
+  const detalhe = String(rightFields?.detalhe ?? '').trim();
+  const responsavel = String(rightFields?.responsavel ?? '').trim();
+  const tipo = String(rightFields?.tipo ?? '').trim();
+
+  if (!produto) missing.push('Produto');
+  if (!tipo) missing.push('Tipo');
+  if (!responsavel) missing.push('Responsável');
+
+  if (produto) {
+    const motivos = getMotivos(config, produto);
+    if (motivos.length > 0 && !motivo) missing.push('Motivo');
+    if (motivo) {
+      const detalhes = getDetalhes(config, produto, motivo);
+      if (detalhes.length > 0 && !detalhe) missing.push('Detalhe');
+    }
+  }
+
+  return {
+    ok: missing.length === 0,
+    missing,
+    message: missing.length
+      ? `Preencha a tabulação antes de enviar: ${missing.join(', ')}.`
+      : '',
+  };
 }

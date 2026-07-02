@@ -14,6 +14,7 @@ import uploadsRoutes from './routes/uploads.routes';
 import clientsRoutes from './routes/clients.routes';
 import tabulationRoutes from './routes/tabulation.routes';
 import spellcheckRoutes from './routes/spellcheck.routes';
+import composeRoutes from './routes/compose.routes';
 import inboundRoutes from './routes/inbound.routes';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
 import { seedDevelopmentData, purgeLegacyDemoData } from './services/seed.service';
@@ -37,6 +38,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/inbound', inboundRoutes);
 app.use('/api/spellcheck', spellcheckRoutes);
+app.use('/api/compose', composeRoutes);
 
 app.use(
   '/api/',

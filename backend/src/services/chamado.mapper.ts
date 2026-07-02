@@ -1,17 +1,122 @@
-﻿/** chamado.mapper v1.2.4 — candidatos responsável incluem prefixo do e-mail */
+﻿/** chamado.mapper v1.7.0 — registroHistorico[] completo (todos os eventos do registro) */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
 import { loadDadosForRef, resolveClienteRefFromBody } from './cliente.service';
+import { allocateNextProtocolo } from './protocolo.service';
 import type { IClienteDados } from '../models/Cliente';
+import { assertTabulacaoForStatus } from './tabulation.service';
+
+export type RegistroOrigin = 'agente' | 'cliente';
 
 export interface TicketMessageDto {
   id?: string;
   text: string;
   sender: string;
+  origin?: RegistroOrigin;
+  registroIndex?: number;
   type?: string;
   time: Date;
   attachments?: string[];
+}
+
+const TABULACAO_TRACKED_FIELDS: (keyof ITabulacao)[] = [
+  'tipoChamado',
+  'produto',
+  'motivo',
+  'detalhe',
+  'responsavel',
+  'atribuido',
+];
+
+function legacyAlteracoesObject(reg: IRegistro): Record<string, unknown> | null {
+  const alt = reg.alteracoes as unknown;
+  if (alt && !Array.isArray(alt) && typeof alt === 'object') {
+    return alt as Record<string, unknown>;
+  }
+  return null;
+}
+
+function registroMetadados(reg: IRegistro): Record<string, unknown> {
+  if (reg.metadados && typeof reg.metadados === 'object' && !Array.isArray(reg.metadados)) {
+    return reg.metadados;
+  }
+  const legacy = legacyAlteracoesObject(reg);
+  if (legacy && (legacy.emailMessageId || legacy.source === 'email-inbound')) {
+    return legacy;
+  }
+  return {};
+}
+
+export function resolveRegistroOrigin(reg: IRegistro): RegistroOrigin {
+  const stored = String(reg.origin ?? '').trim().toLowerCase();
+  if (stored === 'agente' || stored === 'cliente') return stored;
+
+  const meta = registroMetadados(reg);
+  if (String(meta.source ?? '').toLowerCase() === 'email-inbound') return 'cliente';
+
+  const legacy = legacyAlteracoesObject(reg);
+  if (legacy) {
+    const sender = String(legacy.sender ?? '').toLowerCase();
+    if (sender === 'them') return 'cliente';
+    if (sender === 'me') return 'agente';
+    if (String(legacy.source ?? '').toLowerCase() === 'email-inbound') return 'cliente';
+  }
+
+  if (reg.anotacaoInterna && !reg.mensagemPublica) return 'agente';
+  return 'cliente';
+}
+
+function diffTabulacao(before: ITabulacao, after: ITabulacao): Record<string, unknown> {
+  const change: Record<string, unknown> = {};
+  TABULACAO_TRACKED_FIELDS.forEach((key) => {
+    const prev = String(before[key] ?? '').trim();
+    const next = String(after[key] ?? '').trim();
+    if (prev !== next) change[key] = next;
+  });
+  return change;
+}
+
+function buildAlteracoesItem(changes: Record<string, unknown>): unknown[] {
+  return Object.keys(changes).length ? [changes] : [];
+}
+
+function normalizeAlteracoesArray(alt: unknown): unknown[] {
+  if (Array.isArray(alt)) {
+    return alt.filter((item) => item && typeof item === 'object' && !Array.isArray(item));
+  }
+  if (alt && typeof alt === 'object') return [alt];
+  return [];
+}
+
+function isLegacyTechnicalAlteracao(item: unknown): boolean {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return true;
+  const row = item as Record<string, unknown>;
+  if (row.emailMessageId || String(row.source ?? '').toLowerCase() === 'email-inbound') return true;
+  if (row.sender) return true;
+  return false;
+}
+
+function businessAlteracoesFromRegistro(reg: IRegistro): unknown[] {
+  return normalizeAlteracoesArray(reg.alteracoes).filter((item) => !isLegacyTechnicalAlteracao(item));
+}
+
+function originFromSender(sender: string): RegistroOrigin {
+  return sender === 'them' ? 'cliente' : 'agente';
+}
+
+function senderFromOrigin(origin: RegistroOrigin): string {
+  return origin === 'cliente' ? 'them' : 'me';
+}
+
+export interface RegistroHistoricoDto {
+  id: string;
+  registroIndex: number;
+  time: Date;
+  origin: RegistroOrigin;
+  alteracoes: unknown[];
+  status: string;
+  anotacaoInterna?: string;
 }
 
 export interface TicketDto {
@@ -32,6 +137,7 @@ export interface TicketDto {
   lateralForm?: Record<string, unknown>;
   messages?: TicketMessageDto[];
   internalNotes?: TicketMessageDto[];
+  registroHistorico?: RegistroHistoricoDto[];
   openedBy?: string;
   isDemo?: boolean;
   slaBreached?: boolean;
@@ -126,10 +232,8 @@ export function isSlaBreached(chamado: IChamadoN1): boolean {
   return elapsedMs > limitHours * 60 * 60 * 1000;
 }
 
-export function generateProtocolo(): string {
-  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const suffix = Math.floor(Math.random() * 9000 + 1000);
-  return `VD-${stamp}-${suffix}`;
+export async function generateProtocolo(): Promise<string> {
+  return allocateNextProtocolo();
 }
 
 function resolveChamadoTitulo(body: Record<string, unknown>, fallback = ''): string {
@@ -164,16 +268,20 @@ export async function createChamadoFromBody(
 
   const registro: IRegistro = {
     data: new Date(),
+    origin: 'agente',
     mensagemPublica: internal ? '' : text,
     anexosMensagemPublica: internal ? [] : attachments,
     anotacaoInterna: internal ? text : '',
     anexosAnotacaoInterna: internal ? attachments : [],
-    alteracoes: {},
+    alteracoes: [],
+    metadados: {},
     status,
   };
 
+  await assertTabulacaoForStatus(tab, status);
+
   return {
-    chamadoProtocolo: protocoloInformed || generateProtocolo(),
+    chamadoProtocolo: protocoloInformed || await generateProtocolo(),
     chamadoTitulo: titulo,
     cliente,
     tabulacao: [tab],
@@ -182,6 +290,9 @@ export async function createChamadoFromBody(
 }
 
 export async function applyBodyToChamado(chamado: IChamadoN1, body: Record<string, unknown>): Promise<void> {
+  const beforeTab = { ...(chamado.tabulacao[0] ?? tabulacaoFromBody({})) };
+  const pendingChanges: Record<string, unknown> = {};
+
   if (
     body.clientName !== undefined ||
     body.clientCPF !== undefined ||
@@ -202,26 +313,113 @@ export async function applyBodyToChamado(chamado: IChamadoN1, body: Record<strin
       { lateralForm: { ...current, ...(body.lateralForm as object) }, ...body },
       resolveChamadoTitulo(body, chamado.chamadoTitulo || current.motivo)
     );
+    Object.assign(pendingChanges, diffTabulacao(beforeTab, merged));
     chamado.tabulacao = [merged];
+  }
+
+  const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
+  const nextEscalonar = String(lf.escalonar ?? '').trim();
+  const prevWorkflow = String(lf.lastWorkflow ?? '').trim();
+  if (nextEscalonar && nextEscalonar !== prevWorkflow) {
+    pendingChanges.escalonar = nextEscalonar;
   }
 
   if (body.status !== undefined) {
     const nextStatus = String(body.status);
     const current = currentStatus(chamado);
     if (nextStatus !== current) {
-      const registros = chamado.registro ?? [];
-      const last = registros[registros.length - 1];
-      chamado.registro.push({
-        data: new Date(),
-        mensagemPublica: '',
-        anexosMensagemPublica: [],
-        anotacaoInterna: '',
-        anexosAnotacaoInterna: [],
-        alteracoes: { status: { de: last?.status ?? current, para: nextStatus } },
-        status: nextStatus,
-      });
+      await assertTabulacaoForStatus(chamado.tabulacao[0], nextStatus);
+      pendingChanges.status = nextStatus;
     }
   }
+
+  if (Object.keys(pendingChanges).length) {
+    const nextStatus = String(pendingChanges.status ?? currentStatus(chamado));
+    chamado.registro.push({
+      data: new Date(),
+      origin: 'agente',
+      mensagemPublica: '',
+      anexosMensagemPublica: [],
+      anotacaoInterna: '',
+      anexosAnotacaoInterna: [],
+      alteracoes: buildAlteracoesItem(pendingChanges),
+      metadados: {},
+      status: nextStatus,
+    });
+  }
+}
+
+export interface AppendRegistroResult {
+  public?: TicketMessageDto;
+  internal?: TicketMessageDto;
+}
+
+export function appendRegistroEntry(
+  chamado: IChamadoN1,
+  payload: {
+    mensagemPublica?: string;
+    anotacaoInterna?: string;
+    anexosMensagemPublica?: string[];
+    anexosAnotacaoInterna?: string[];
+    sender?: string;
+    alteracoes?: unknown[];
+    metadados?: Record<string, unknown>;
+  }
+): AppendRegistroResult {
+  const publicText = String(payload.mensagemPublica ?? '').trim();
+  const internalText = String(payload.anotacaoInterna ?? '').trim();
+  if (!publicText && !internalText) return {};
+
+  const sender = payload.sender ?? 'me';
+  const origin = originFromSender(sender);
+  const status = currentStatus(chamado);
+  const publicAttachments = (payload.anexosMensagemPublica ?? [])
+    .map((url) => String(url).trim())
+    .filter(Boolean);
+  const internalAttachments = (payload.anexosAnotacaoInterna ?? [])
+    .map((url) => String(url).trim())
+    .filter(Boolean);
+
+  const entry: IRegistro = {
+    data: new Date(),
+    origin,
+    mensagemPublica: publicText,
+    anexosMensagemPublica: publicAttachments,
+    anotacaoInterna: internalText,
+    anexosAnotacaoInterna: internalAttachments,
+    alteracoes: payload.alteracoes ?? [],
+    metadados: payload.metadados ?? {},
+    status,
+  };
+  chamado.registro.push(entry);
+  const index = chamado.registro.length - 1;
+
+  const result: AppendRegistroResult = {};
+  if (publicText) {
+    result.public = {
+      id: `${index}-pub`,
+      text: publicText,
+      sender: senderFromOrigin(origin),
+      origin,
+      type: 'public',
+      time: entry.data,
+      registroIndex: index,
+      attachments: publicAttachments,
+    };
+  }
+  if (internalText) {
+    result.internal = {
+      id: `${index}-int`,
+      text: internalText,
+      sender: 'me',
+      origin: 'agente',
+      type: 'internal',
+      time: entry.data,
+      registroIndex: index,
+      attachments: internalAttachments,
+    };
+  }
+  return result;
 }
 
 export function appendMessage(
@@ -230,28 +428,30 @@ export function appendMessage(
   internal: boolean,
   sender = 'me',
   attachments: string[] = [],
-  extraAlteracoes: Record<string, unknown> = {}
+  metadados: Record<string, unknown> = {}
 ): TicketMessageDto {
-  const status = currentStatus(chamado);
   const safeAttachments = attachments.map((url) => String(url).trim()).filter(Boolean);
-  const entry: IRegistro = {
-    data: new Date(),
+  const result = appendRegistroEntry(chamado, {
     mensagemPublica: internal ? '' : text,
-    anexosMensagemPublica: internal ? [] : safeAttachments,
     anotacaoInterna: internal ? text : '',
+    anexosMensagemPublica: internal ? [] : safeAttachments,
     anexosAnotacaoInterna: internal ? safeAttachments : [],
-    alteracoes: { sender, ...extraAlteracoes },
-    status,
-  };
-  chamado.registro.push(entry);
-  return {
-    id: Date.now().toString(),
-    text,
     sender,
-    type: internal ? 'internal' : 'public',
-    time: entry.data,
-    attachments: safeAttachments,
-  };
+    metadados,
+  });
+  const dto = result.public ?? result.internal;
+  if (!dto) {
+    return {
+      id: Date.now().toString(),
+      text: '',
+      sender,
+      origin: originFromSender(sender),
+      type: internal ? 'internal' : 'public',
+      time: new Date(),
+      attachments: safeAttachments,
+    };
+  }
+  return dto;
 }
 
 export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Promise<TicketDto> {
@@ -264,14 +464,27 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
 
   const messages: TicketMessageDto[] = [];
   const internalNotes: TicketMessageDto[] = [];
+  const registroHistorico: RegistroHistoricoDto[] = [];
   chamado.registro?.forEach((reg, index) => {
+    const origin = resolveRegistroOrigin(reg);
+    registroHistorico.push({
+      id: `${index}-reg`,
+      registroIndex: index,
+      time: reg.data,
+      origin,
+      alteracoes: businessAlteracoesFromRegistro(reg),
+      status: reg.status || 'novo',
+      anotacaoInterna: String(reg.anotacaoInterna ?? '').trim() || undefined,
+    });
     if (reg.mensagemPublica) {
       messages.push({
         id: `${index}-pub`,
         text: reg.mensagemPublica,
-        sender: 'them',
+        sender: senderFromOrigin(origin),
+        origin,
         type: 'public',
         time: reg.data,
+        registroIndex: index,
         attachments: reg.anexosMensagemPublica ?? [],
       });
     }
@@ -280,8 +493,10 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
         id: `${index}-int`,
         text: reg.anotacaoInterna,
         sender: 'me',
+        origin: 'agente',
         type: 'internal',
         time: reg.data,
+        registroIndex: index,
         attachments: reg.anexosAnotacaoInterna ?? [],
       });
     }
@@ -324,6 +539,7 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
     },
     messages,
     internalNotes,
+    registroHistorico,
     slaBreached: isSlaBreached(chamado),
     createdAt: chamado.createdAt,
     updatedAt: chamado.updatedAt,

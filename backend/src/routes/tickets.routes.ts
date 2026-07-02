@@ -1,10 +1,10 @@
-/** tickets.routes v1.3.3 — PUT respeita status explícito (Enviar como) */
+/** tickets.routes v1.3.5 — 400 quando tabulação incompleta para em-andamento/resolvido */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { Box } from '../models/Box';
 import {
-  appendMessage,
+  appendRegistroEntry,
   applyBodyToChamado,
   chamadoToTicket,
   createChamadoFromBody,
@@ -12,6 +12,7 @@ import {
   resolveBoxIdForChamado,
   statusFromBoxName,
 } from '../services/chamado.mapper';
+import { TabulacaoValidationError } from '../services/tabulation.service';
 
 const router = Router();
 
@@ -78,9 +79,16 @@ router.post('/', authMiddleware, async (req, res: Response) => {
     }
   }
 
-  const chamado = await ChamadoN1.create(await createChamadoFromBody(req.body, status));
-  const ticket = await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes));
-  res.status(201).json(ticket);
+  try {
+    const chamado = await ChamadoN1.create(await createChamadoFromBody(req.body, status));
+    const ticket = await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes));
+    res.status(201).json(ticket);
+  } catch (err) {
+    if (err instanceof TabulacaoValidationError) {
+      return res.status(400).json({ message: err.message });
+    }
+    throw err;
+  }
 });
 
 router.put('/:id', authMiddleware, async (req, res: Response) => {
@@ -92,11 +100,18 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
     if (box) req.body.status = statusFromBoxName(box.name);
   }
 
-  await applyBodyToChamado(chamado, req.body);
-  await chamado.save();
+  try {
+    await applyBodyToChamado(chamado, req.body);
+    await chamado.save();
 
-  const boxes = await loadBoxes();
-  res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+    const boxes = await loadBoxes();
+    res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  } catch (err) {
+    if (err instanceof TabulacaoValidationError) {
+      return res.status(400).json({ message: err.message });
+    }
+    throw err;
+  }
 });
 
 router.delete('/:id', authMiddleware, async (req, res: Response) => {
@@ -106,7 +121,7 @@ router.delete('/:id', authMiddleware, async (req, res: Response) => {
 });
 
 router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
-  const { text, sender, internal, attachments } = req.body;
+  const { text, sender, internal, attachments, internalText, anotacaoInterna } = req.body;
   const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
 
@@ -114,15 +129,30 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
     ? attachments.map((item: unknown) => String(item ?? '').trim()).filter(Boolean)
     : [];
 
-  const msg = appendMessage(
-    chamado,
-    String(text ?? ''),
-    Boolean(internal),
-    sender || 'me',
-    attachmentList
-  );
+  const isInternalOnly = Boolean(internal);
+  const publicText = isInternalOnly ? '' : String(text ?? '');
+  const noteText = isInternalOnly
+    ? String(text ?? '')
+    : String(internalText ?? anotacaoInterna ?? '');
+
+  const result = appendRegistroEntry(chamado, {
+    mensagemPublica: publicText,
+    anotacaoInterna: noteText,
+    anexosMensagemPublica: isInternalOnly ? [] : attachmentList,
+    anexosAnotacaoInterna: isInternalOnly ? attachmentList : [],
+    sender: sender || 'me',
+  });
+
+  if (!result.public && !result.internal) {
+    return res.status(400).json({ message: 'Texto da mensagem ou anotação é obrigatório' });
+  }
+
   await chamado.save();
-  res.status(201).json(msg);
+  res.status(201).json({
+    ...(result.public ?? result.internal),
+    publicMessage: result.public,
+    internalNote: result.internal,
+  });
 });
 
 export default router;

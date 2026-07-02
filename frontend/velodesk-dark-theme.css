@@ -631,6 +631,8 @@ body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card.is-active .crm-ticket-ca
 
 body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card__name,
 body.velodesk-dark #velodeskDeskV2Root .ticket-client-profile__name,
+body.velodesk-dark #velodeskDeskV2Root .ticket-client-profile__protocol,
+body.velodesk-dark #velodeskDeskV2Root .ticket-client-profile__field--name,
 body.velodesk-dark #velodeskDeskV2Root .ticket-list-header__title {
     color: var(--velo-dark-text);
 }
@@ -638,6 +640,8 @@ body.velodesk-dark #velodeskDeskV2Root .ticket-list-header__title {
 body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card__preview,
 body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card__meta,
 body.velodesk-dark #velodeskDeskV2Root .ticket-client-profile__contact,
+body.velodesk-dark #velodeskDeskV2Root .ticket-client-profile__field,
+body.velodesk-dark #velodeskDeskV2Root .ticket-client-profile__sep,
 body.velodesk-dark #velodeskDeskV2Root .crm-empty-state {
     color: var(--velo-dark-text-muted);
 }

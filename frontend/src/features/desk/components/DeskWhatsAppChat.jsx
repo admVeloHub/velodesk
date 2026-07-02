@@ -1,6 +1,6 @@
 /**
- * DeskWhatsAppChat v1.0.2 — conversa estilo WhatsApp no ticket
- * VERSION: v1.0.2 | DATE: 2026-06-26
+ * DeskWhatsAppChat v1.1.0 — conversa estilo WhatsApp + notas internas
+ * VERSION: v1.1.0 | DATE: 2026-07-02
  */
 import React, { useState, useRef } from 'react';
 import {
@@ -69,17 +69,17 @@ export default function DeskWhatsAppChat({
             <p>Nenhuma mensagem pública neste atendimento.</p>
           </div>
         ) : (
-          chatMessages.map((msg, i) => (
+          chatMessages.map((msg, i) => {
+            const isOut = msg.type === 'agent' || msg.type === 'internal';
+            const bubbleClass = msg.type === 'internal'
+              ? ' wa-msg__bubble--internal'
+              : (isOut ? ' wa-msg__bubble--out' : ' wa-msg__bubble--in');
+            return (
             <div
               key={i}
-              className={'wa-msg' + (msg.type === 'agent' ? ' wa-msg--out' : ' wa-msg--in')}
+              className={'wa-msg' + (isOut ? ' wa-msg--out' : ' wa-msg--in')}
             >
-              <div
-                className={
-                  'wa-msg__bubble' +
-                  (msg.type === 'agent' ? ' wa-msg__bubble--out' : ' wa-msg__bubble--in')
-                }
-              >
+              <div className={'wa-msg__bubble' + bubbleClass}>
                 <span className="wa-msg__text">{msg.text}</span>
                 <span className="wa-msg__time">
                   {formatWaTime(msg.timestamp)}
@@ -89,7 +89,8 @@ export default function DeskWhatsAppChat({
                 </span>
               </div>
             </div>
-          ))
+            );
+          })
         )}
 
         {iaVisible && (

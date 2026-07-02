@@ -1,10 +1,31 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.16.0 | DATE: 2026-07-01 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.17.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Protocolo sequencial, Assistente IA Gemini e painel cliente
+
+- **Data/Hora**: 2026-07-02
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.17.0
+  - protocolo.service v1.0.2, geminiRefinar.service v1.0.2, compose.routes v1.0.1
+  - DeskClientProfileBar v1.3.1, ComposeRefinarModal v1.0.2, DeskV2Root v3.5.7
+  - clienteAdapter v1.0.4, ticketAdapter v1.3.2, env.ts v1.11.0
+- **Arquivos modificados / incluídos**:
+  - `backend/src/services/protocolo.service.ts` — contador atômico; exibição `0100177678` … `0999999999` → `1000000000+`
+  - `backend/src/services/geminiRefinar.service.ts`, `compose.routes.ts`, `refinarRascunhoPersona.ts` — Assistente IA refinar rascunho (Gemini)
+  - `backend/src/services/chamado.mapper.ts`, `email-inbound.service.ts` — protocolo numérico e regex e-mail
+  - `frontend/src/features/desk/components/DeskClientProfileBar.jsx` — layout protocolo + linha cliente; persistência cadastro
+  - `frontend/src/features/desk/components/ComposeRefinarModal.jsx`, `ComposeFormatToolbar.jsx` — IA com cancelamento; formatação compose
+  - `frontend/src/api/adapters/clienteAdapter.js`, `client.js` — `PUT /clients/:id`, `persistClienteContact`
+  - `frontend/velodesk-crm.css`, `velodesk-dark-theme.css` — estilos painel cliente e modais
+- **Descrição**: Numeração de tickets continua CRM legado (floor 100177678) com zero à esquerda; painel superior redesenhado; edição de contato persiste em `b2c_cadastros.clientes`; Assistente IA Gemini no compose com fallback de modelo e cancelamento.
+- **Status**: Concluído
 
 ### GitHub Push — Corretor LanguageTool self-hosted no compose
 

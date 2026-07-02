@@ -1,20 +1,25 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.4.1 | DATE: 2026-06-30
+ * VERSION: v3.5.7 | DATE: 2026-07-02
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   filterTickets,
   resolveDeskSearchEntries,
   pickDefaultTicket,
-  buildConversationMessages,
+  buildRegistroThread,
   normalizeTicketForDeskV2,
   getAgentName,
   applySendStatus,
+  normalizeCpf,
+  isValidEmailFormat,
+  getTicketProtocolLabel,
 } from '../../services/desk/utils';
-import { findTicketEntry, updateTicketInKanban, sendTicketMessage } from '../../services/kanbanStorage';
+import { findTicketEntry, updateTicketInKanban, sendTicketRegistroEntry } from '../../services/kanbanStorage';
 import { isDraftTicket, persistDraftTicket } from '../../services/ticketsCache';
 import { lookupClient } from '../../services/clientDb';
+import { clientsApi } from '../../api/client';
+import { persistClienteContact } from '../../api/adapters/clienteAdapter';
 import { useTickets } from '../../context/TicketsContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { getAllQueueStatuses, restoreCustomKanbanBoxes } from '../../services/desk/customQueueBoxes';
@@ -26,8 +31,9 @@ import DeskClientProfileBar from './components/DeskClientProfileBar';
 import DeskConversation from './components/DeskConversation';
 import DeskWhatsAppChat from './components/DeskWhatsAppChat';
 import DeskComposePanel from './components/DeskComposePanel';
+import DeskInternalNotesPanel from './components/DeskInternalNotesPanel';
 import DeskRightPanel from './components/DeskRightPanel';
-import { applyCascadeFieldChange, buildDefaultRightFields, getMotivos } from '../../services/tabulationConfig';
+import { applyCascadeFieldChange, buildDefaultRightFields, getMotivos, validateTabulationForSendStatus } from '../../services/tabulationConfig';
 import { useTabulation } from '../../context/TabulationContext';
 import { createSpellContext, loadSpellEngine, scanText } from '../../services/spellcheck/spellEngine';
 
@@ -260,7 +266,9 @@ export default function DeskV2Root() {
   };
 
   const closeTicketTabHandler = (id) => {
-    persistTabSession(activeTabId);
+    if (String(id) === String(activeTabId)) {
+      persistTabSession(activeTabId);
+    }
     delete tabSessionsRef.current[String(id)];
     const isLastTab = openTabs.length === 1 && String(openTabs[0].id) === String(id);
     if (isLastTab) suppressAutoSelectRef.current = true;
@@ -334,9 +342,16 @@ export default function DeskV2Root() {
   const handleCommitWithStatus = async (statusId) => {
     if (!ticket || !entry) return null;
     const status = statusId || sendStatus;
-    const messageText = composeMode === 'public' ? composeText.trim() : '';
+    const messageText = composeText.trim();
+    const internalNoteText = internalText.trim();
 
-    if (messageText && composeMode === 'public') {
+    const tabulationCheck = validateTabulationForSendStatus(status, rightFields, config);
+    if (!tabulationCheck.ok) {
+      showNotification(tabulationCheck.message, 'warning');
+      return null;
+    }
+
+    if (messageText) {
       if (composeSpellErrors.length > 0) {
         showNotification(
           `Corrija ${composeSpellErrors.length} erro${composeSpellErrors.length > 1 ? 's' : ''} ortográfico${composeSpellErrors.length > 1 ? 's' : ''} antes de enviar.`,
@@ -368,35 +383,65 @@ export default function DeskV2Root() {
         const session = tabSessionsRef.current[draftId];
         let prepared = applyRightFieldsToTicket({ ...ticket }, rightFields, escalonar);
         applySendStatus({ ticket: prepared, boxId: entry.boxId }, status);
+        const regKey = Date.now();
+        const ts = new Date().toISOString();
+        const author = getAgentName();
         if (messageText) {
           if (!prepared.messages) prepared.messages = [];
           prepared.messages.push({
-            id: `${draftId}-msg-agent`,
+            id: `${regKey}-pub`,
             type: 'agent',
             fromClient: false,
+            origin: 'agente',
             text: messageText,
-            timestamp: new Date().toISOString(),
-            author: getAgentName(),
+            timestamp: ts,
+            author,
           });
         }
-        const persisted = await persistDraftTicket(prepared, messageText);
+        if (internalNoteText) {
+          if (!prepared.internalNotes) prepared.internalNotes = [];
+          prepared.internalNotes.push({
+            id: `${regKey}-int`,
+            type: 'internal',
+            origin: 'agente',
+            text: internalNoteText,
+            timestamp: ts,
+            author,
+          });
+        }
+        const persisted = await persistDraftTicket(prepared, messageText || internalNoteText);
         const newId = persisted.id || persisted._id;
         delete tabSessionsRef.current[draftId];
-        if (session) tabSessionsRef.current[String(newId)] = { ...session, sendStatus: status };
+        if (session) {
+          tabSessionsRef.current[String(newId)] = {
+            ...session,
+            sendStatus: status,
+            composeText: messageText ? '' : session.composeText,
+            internalText: internalNoteText ? '' : session.internalText,
+          };
+        }
         replaceOpenTabId(draftId, newId, {
           title: persisted.title || ticket.title,
           clientName: persisted.clientName || ticket.clientName,
-          ticketLabel: '#' + String(newId).slice(-6),
+          ticketLabel: getTicketProtocolLabel(persisted) || 'Rascunho',
         });
         setSendStatus(status);
         if (messageText) setComposeText('');
-        showNotification(messageText ? 'Ticket enviado e salvo.' : 'Ticket salvo.', 'success');
+        if (internalNoteText) setInternalText('');
+        showNotification(
+          messageText || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
+          'success',
+        );
         syncTicketViews();
         return newId;
       }
 
-      if (messageText) {
-        await sendTicketMessage(ticket.id, messageText, getAgentName());
+      if (messageText || internalNoteText) {
+        await sendTicketRegistroEntry(ticket.id, {
+          text: messageText,
+          internalText: internalNoteText,
+          author: getAgentName(),
+        });
       }
       await updateTicketInKanban(ticket.id, (t) => {
         applyRightFieldsToTicket(t, rightFields, escalonar);
@@ -405,7 +450,22 @@ export default function DeskV2Root() {
       });
       setSendStatus(status);
       if (messageText) setComposeText('');
-      showNotification(messageText ? 'Ticket enviado e salvo.' : 'Ticket salvo.', 'success');
+      if (internalNoteText) setInternalText('');
+      if (activeTabId) {
+        const sessionKey = String(activeTabId);
+        const session = tabSessionsRef.current[sessionKey];
+        if (session) {
+          tabSessionsRef.current[sessionKey] = {
+            ...session,
+            composeText: messageText ? '' : session.composeText,
+            internalText: internalNoteText ? '' : session.internalText,
+          };
+        }
+      }
+      showNotification(
+        messageText || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
+        'success',
+      );
       syncTicketViews();
       return ticket.id;
     } catch (err) {
@@ -441,43 +501,56 @@ export default function DeskV2Root() {
 
   const handleSaveContact = async (draft) => {
     if (!ticket) return;
-    await updateTicketInKanban(ticket.id, (t) => {
-      t.clientName = draft.name;
-      t.solicitante = draft.name;
-      t.clientEmail = draft.email;
-      t.clientPhone = draft.phone;
-      return t;
-    });
-    showNotification('Contato atualizado.', 'success');
-    syncTicketViews();
-  };
 
-  const handleCloseTicket = async () => {
-    if (!ticket || !entry) return;
-    if (entry.queueId === 'resolvidos' || ticket.status === 'resolvido') {
-      showNotification('Este ticket já está finalizado.', 'info');
-      return;
+    const nome = String(draft?.name || '').trim();
+    const email = String(draft?.email || '').trim();
+    const telefone = String(draft?.phone || '').trim();
+    const cpf = normalizeCpf(ticket.lateralForm?.cpf || ticket.lateralForm?.clienteCpf || ticket.clientCPF);
+
+    if (!nome) {
+      showNotification('Informe o nome do cliente.', 'error');
+      throw new Error('Nome obrigatório');
     }
+    if (email && !isValidEmailFormat(email)) {
+      showNotification('Informe um e-mail válido (ex.: nome@dominio.com).', 'error');
+      throw new Error('E-mail inválido');
+    }
+
     try {
-      let idToClose = ticket.id;
-      if (isDraftTicket(ticket)) {
-        idToClose = await handleCommitWithStatus('resolvidos');
-        if (!idToClose) return;
-      } else {
-        await updateTicketInKanban(ticket.id, (t) => {
-          applyRightFieldsToTicket(t, rightFields, escalonar);
-          t.resolvedAt = new Date().toISOString();
-          applySendStatus({ ticket: t, boxId: entry.boxId }, 'resolvidos');
-          return t;
-        });
-        showNotification('Ticket finalizado.', 'success');
-        syncTicketViews();
-      }
-      suppressAutoSelectRef.current = true;
-      delete tabSessionsRef.current[String(idToClose)];
-      closeTicketTab(idToClose);
-    } catch {
-      showNotification('Erro ao finalizar ticket.', 'error');
+      const clienteDoc = await persistClienteContact(clientsApi, {
+        cpf,
+        nome,
+        email,
+        telefone,
+        clienteId: ticket.clienteId || ticket.lateralForm?.clienteId,
+      });
+      const clienteId = clienteDoc?._id || clienteDoc?.id || ticket.clienteId || ticket.lateralForm?.clienteId;
+
+      await updateTicketInKanban(ticket.id, (t) => {
+        t.clientName = nome;
+        t.solicitante = nome;
+        t.clientEmail = email;
+        t.clientPhone = telefone;
+        if (clienteId) t.clienteId = clienteId;
+        t.lateralForm = {
+          ...t.lateralForm,
+          cpf,
+          clienteCpf: cpf,
+          clienteNome: nome,
+          clienteEmail: email ? [email] : [],
+          clienteTelefone: telefone ? [telefone] : [],
+          clienteId: clienteId || t.lateralForm?.clienteId,
+        };
+        t.updatedAt = new Date().toISOString();
+        return t;
+      });
+
+      showNotification('Contato atualizado.', 'success');
+      syncTicketViews();
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Erro ao salvar contato.';
+      showNotification(msg, 'error');
+      throw err;
     }
   };
 
@@ -506,7 +579,7 @@ export default function DeskV2Root() {
     syncTicketViews();
   };
 
-  const convMsgs = ticket ? buildConversationMessages(ticket) : [];
+  const convMsgs = ticket ? buildRegistroThread(ticket) : [];
 
   return (
     <div className="app-shell" id="deskAppShell">
@@ -606,13 +679,13 @@ export default function DeskV2Root() {
                       />
                       <DeskComposePanel
                         ticketId={ticket.id}
+                        variant="full"
                         composeMode={composeMode}
                         composeText={composeText}
                         internalText={internalText}
                         onComposeModeChange={setComposeMode}
                         onComposeTextChange={setComposeText}
                         onInternalTextChange={setInternalText}
-                        onOpenAi={() => window.dispatchEvent(new CustomEvent('velodesk:open-ai'))}
                         spellIgnoredWords={spellIgnoredWords}
                         onIgnoreSpellWord={handleIgnoreSpellWord}
                         onFlaggedErrorsChange={handleFlaggedErrorsChange}
@@ -622,7 +695,6 @@ export default function DeskV2Root() {
                     <DeskInternalNotesPanel
                       ticket={ticket}
                       client={client}
-                      onNotify={showNotification}
                     />
                   )}
                 </div>
@@ -641,7 +713,6 @@ export default function DeskV2Root() {
           onFieldChange={handleFieldChange}
           onApplyTabulation={handleApplyTabulation}
           onCommitStatus={handleCommitWithStatus}
-          onCloseTicket={handleCloseTicket}
           waChatOpen={waChatOpen}
           onOpenChat={handleOpenChat}
           onCloseChat={() => setWaChatOpen(false)}

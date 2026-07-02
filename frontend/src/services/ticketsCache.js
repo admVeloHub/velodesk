@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.3.2 — cache em memória + draft + API (persistência MongoDB)
- * VERSION: v1.3.2 | DATE: 2026-06-25 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.3.4 — registro único com mensagem pública + anotação interna
+ * VERSION: v1.3.4 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import {
@@ -155,15 +155,42 @@ export async function addMessageViaApi(ticketId, payload) {
     return findInColumns(apiId)?.ticket;
   }
   return updateTicketViaApi(ticketId, (t) => {
-    if (!t.messages) t.messages = [];
-    t.messages.push({
-      type: payload.internal ? 'internal' : 'agent',
-      fromClient: false,
-      text: payload.text,
-      timestamp: new Date().toISOString(),
-      author: payload.author || 'Agente',
-    });
-    t.updatedAt = new Date().toISOString();
+    const isInternalOnly = Boolean(payload.internal);
+    const publicText = isInternalOnly ? '' : String(payload.text ?? '').trim();
+    const internalText = isInternalOnly
+      ? String(payload.text ?? '').trim()
+      : String(payload.internalText ?? payload.anotacaoInterna ?? '').trim();
+
+    if (!publicText && !internalText) return t;
+
+    const regKey = Date.now();
+    const ts = new Date().toISOString();
+    const author = payload.author || 'Agente';
+
+    if (publicText) {
+      if (!t.messages) t.messages = [];
+      t.messages.push({
+        id: `${regKey}-pub`,
+        type: 'agent',
+        fromClient: false,
+        origin: 'agente',
+        text: publicText,
+        timestamp: ts,
+        author,
+      });
+    }
+    if (internalText) {
+      if (!t.internalNotes) t.internalNotes = [];
+      t.internalNotes.push({
+        id: `${regKey}-int`,
+        type: 'internal',
+        origin: 'agente',
+        text: internalText,
+        timestamp: ts,
+        author,
+      });
+    }
+    t.updatedAt = ts;
     return t;
   });
 }

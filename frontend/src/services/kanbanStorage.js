@@ -1,6 +1,6 @@
 /**
  * Kanban / tickets — facade API + cache local
- * VERSION: v1.2.0 | DATE: 2026-06-23 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.4.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 import {
   getCachedColumns,
@@ -81,6 +81,19 @@ export async function updateTicketInKanban(ticketId, updater) {
 
 export async function sendTicketMessage(ticketId, text, author) {
   return addMessageViaApi(ticketId, { text, internal: false, author });
+}
+
+export async function sendInternalNote(ticketId, text, author) {
+  return addMessageViaApi(ticketId, { text, internal: true, author });
+}
+
+export async function sendTicketRegistroEntry(ticketId, { text = '', internalText = '', author } = {}) {
+  return addMessageViaApi(ticketId, {
+    text,
+    internalText,
+    internal: false,
+    author,
+  });
 }
 
 export async function addTicketToBox(boxId, ticket) {

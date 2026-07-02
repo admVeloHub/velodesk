@@ -1,6 +1,6 @@
 /**
- * DeskRightPanel v1.3.0 — responsável com agentes registrados (User API)
- * VERSION: v1.3.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * DeskRightPanel v1.3.1 — fechamento do ticket apenas pelo X da aba
+ * VERSION: v1.3.1 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 import React, { useEffect } from 'react';
 import { buildIaTabulation } from '../../../services/desk/utils';
@@ -37,7 +37,6 @@ export default function DeskRightPanel({
   onFieldChange,
   onApplyTabulation,
   onCommitStatus,
-  onCloseTicket,
   onOpenChat,
   onCloseChat,
   waChatOpen,
@@ -69,19 +68,7 @@ export default function DeskRightPanel({
     <aside className="crm-right-panel" id="crmRightPanel">
       <div className="crm-right-panel__scroll">
         <section className="rp-section">
-          <div className="rp-section__label-row">
-            <div className="rp-section__label">Termômetro do cliente</div>
-            <button
-              type="button"
-              className="rp-section__close-btn"
-              id="btnCloseTicket"
-              title="Finalizar solicitação"
-              aria-label="Finalizar solicitação"
-              onClick={onCloseTicket}
-            >
-              <i className="ti ti-x" />
-            </button>
-          </div>
+          <div className="rp-section__label">Termômetro do cliente</div>
           <div className="thermo-score" id="thermoScore" style={{ color: thermoColor }}>{thermo}</div>
           <div className="thermo-bar"><div className="thermo-fill" id="thermoFill" style={{ width: thermo + '%', background: thermoColor }} /></div>
           <div className="thermo-label" id="thermoLabel" style={{ color: thermoColor }}>{thermoLabel}</div>

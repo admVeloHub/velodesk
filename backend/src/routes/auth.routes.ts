@@ -1,4 +1,4 @@
-/** auth.routes v1.1.0 — login + Google SSO (fase testes Desk) */
+/** auth.routes v1.2.0 — login + Google SSO + dev quick login */
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { User } from '../models/User';
@@ -94,6 +94,68 @@ router.post('/auth/google', async (req: Request, res: Response) => {
     console.error('Erro no login Google:', err);
     const message = err instanceof Error ? err.message : 'Erro no login Google';
     res.status(401).json({ message });
+  }
+});
+
+router.post('/auth/dev-login', async (req: Request, res: Response) => {
+  try {
+    if (env.nodeEnv === 'production') {
+      return res.status(404).json({ message: 'Not found' });
+    }
+
+    if (!isMongoConnected()) {
+      return res.status(503).json({ message: 'Banco de dados indisponível. Aguarde o backend conectar ao MongoDB.' });
+    }
+
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ message: 'Email é obrigatório' });
+    }
+
+    const deskRole = resolveDeskAccessRole(email);
+    if (!deskRole) {
+      return res.status(403).json({ message: 'Usuário sem permissão para acessar o Desk nesta fase de testes.' });
+    }
+
+    const displayName = email.split('@')[0];
+
+    let user = await User.findOne({ email });
+    if (!user) {
+      const hash = await bcrypt.hash(`dev-login:${email}`, 10);
+      user = await User.create({
+        name: displayName,
+        email,
+        password: hash,
+        role: deskRole,
+      });
+    } else if (user.role !== deskRole) {
+      user.role = deskRole;
+      await user.save();
+    }
+
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      name: displayName,
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: displayName,
+        email: user.email,
+        role: user.role,
+        deskProfile: deskRole,
+        picture: null,
+        source: 'google-desk',
+      },
+    });
+  } catch (err) {
+    console.error('Erro no login dev:', err);
+    const message = err instanceof Error ? err.message : 'Erro no login dev';
+    res.status(500).json({ message });
   }
 });
 

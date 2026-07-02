@@ -1,4 +1,4 @@
-/** env v1.10.0 — LanguageTool self-hosted */
+/** env v1.11.0 — GEMINI_API_KEY refinar rascunho */
 import fs from 'fs';
 import path from 'path';
 
@@ -71,5 +71,8 @@ export const env = {
   languageToolUrl: (process.env.LANGUAGETOOL_URL || 'http://localhost:8010').trim().replace(/\/+$/, ''),
   languageToolLanguage: (process.env.LANGUAGETOOL_LANGUAGE || 'pt-BR').trim(),
   languageToolTimeoutMs: parseInt(process.env.LANGUAGETOOL_TIMEOUT_MS || '8000', 10),
+  geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
+  geminiModel: (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim(),
+  ticketSequenceFloor: (process.env.TICKET_SEQUENCE_FLOOR || '100177678').trim(),
 };
 

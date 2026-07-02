@@ -23,8 +23,8 @@ export default function DeskTicketTabsBar({ onSelectTab, onCloseTab }) {
       {openTabs.map((tab) => {
         const isActive = String(activeTabId) === String(tab.id);
         const label = tab.clientName
-          ? `${tab.clientName} · ${tab.ticketLabel || '#' + String(tab.id).slice(-6)}`
-          : tab.title || `Ticket #${tab.id}`;
+          ? `${tab.clientName}${tab.ticketLabel ? ` · ${tab.ticketLabel}` : ''}`
+          : tab.title || 'Ticket';
 
         return (
           <button

@@ -1,20 +1,25 @@
 /**
- * ticketAdapter v1.2.1 — normaliza ticket API ↔ cockpit + draft
- * VERSION: v1.2.1 | DATE: 2026-06-25 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.3.2 — preserva registroHistorico[] para visão supervisão
+ * VERSION: v1.3.2 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 
 function normalizeMessage(msg) {
   if (!msg) return msg;
-  const isClient = msg.fromClient === true
+  const isInternal = msg.type === 'internal';
+  const isClient = !isInternal && (
+    msg.fromClient === true
     || msg.type === 'client'
-    || (msg.type !== 'agent' && msg.type !== 'internal' && msg.sender === 'them');
+    || msg.origin === 'cliente'
+    || (msg.type !== 'agent' && msg.sender === 'them')
+  );
   return {
     ...msg,
     text: msg.text || msg.message || '',
     timestamp: msg.timestamp || msg.time || msg.createdAt || new Date().toISOString(),
+    origin: msg.origin || (msg.sender === 'them' ? 'cliente' : 'agente'),
     fromClient: isClient,
-    type: isClient ? 'client' : (msg.type === 'system' ? 'system' : 'agent'),
-    author: msg.author || msg.sender || '',
+    type: isInternal ? 'internal' : (isClient ? 'client' : (msg.type === 'system' ? 'system' : 'agent')),
+    author: msg.author || (isInternal ? '' : msg.sender) || '',
   };
 }
 
@@ -37,6 +42,11 @@ export function apiTicketToCockpit(ticket) {
     status: ticket.status || 'novo',
     messages: (ticket.messages || []).map(normalizeMessage),
     internalNotes: (ticket.internalNotes || []).map(normalizeMessage),
+    registroHistorico: (ticket.registroHistorico || ticket.registroAlteracoes || []).map((entry) => ({
+      ...entry,
+      time: entry.time || entry.timestamp,
+      timestamp: entry.timestamp || entry.time,
+    })),
     lateralForm: ticket.lateralForm || {},
     createdAt: ticket.createdAt || new Date().toISOString(),
     updatedAt: ticket.updatedAt || ticket.createdAt || new Date().toISOString(),
@@ -52,6 +62,9 @@ export function adaptColumnsFromApi(columns) {
 
 export function cockpitTicketToApi(ticket) {
   const lf = ticket.lateralForm || {};
+  const emailList = lf.clienteEmail ?? (ticket.clientEmail ? [ticket.clientEmail] : []);
+  const phoneList = lf.clienteTelefone ?? (ticket.clientPhone ? [ticket.clientPhone] : []);
+  const clientName = ticket.clientName || ticket.solicitante || lf.clienteNome;
   return {
     chamadoProtocolo: ticket.chamadoProtocolo,
     chamadoTitulo: ticket.chamadoTitulo || ticket.title,
@@ -64,10 +77,18 @@ export function cockpitTicketToApi(ticket) {
     source: ticket.source,
     boxId: ticket.boxId,
     clienteId: ticket.clienteId || lf.clienteId,
-    clientName: ticket.clientName || ticket.solicitante || lf.clienteNome,
+    clientName,
     clientCPF: ticket.clientCPF || lf.clienteCpf || lf.cpf,
     responsibleAgent: ticket.responsibleAgent || lf.responsavel,
-    lateralForm: lf,
+    lateralForm: {
+      ...lf,
+      cpf: ticket.clientCPF || lf.clienteCpf || lf.cpf,
+      clienteCpf: ticket.clientCPF || lf.clienteCpf || lf.cpf,
+      clienteNome: clientName || '',
+      clienteEmail: emailList,
+      clienteTelefone: phoneList,
+      clienteId: ticket.clienteId || lf.clienteId,
+    },
     formData: ticket.formData,
   };
 }
@@ -109,7 +130,5 @@ export function buildCreatePayload(form) {
 }
 
 export function generateProtocolo() {
-  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const suffix = Math.floor(Math.random() * 9000 + 1000);
-  return `VD-${stamp}-${suffix}`;
+  throw new Error('generateProtocolo() é responsabilidade do backend — use chamadoProtocolo da API.');
 }

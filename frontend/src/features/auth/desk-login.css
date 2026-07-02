@@ -1,6 +1,6 @@
 /**
- * desk-login.css v1.0.1 — tela de login Google Desk
- * VERSION: v1.0.1 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * desk-login.css v1.1.0 — tela de login Google Desk + dev quick login
+ * VERSION: v1.1.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 
 .desk-login-page {
@@ -70,4 +70,35 @@ body.velodesk-dark .desk-login-card {
 
 body.velodesk-dark .desk-login-brand__mark {
   color: #f3f7fc;
+}
+
+.dev-quick-login-btn {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #f97316;
+  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.45);
+  cursor: pointer;
+  z-index: 1000;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.dev-quick-login-btn:hover:not(:disabled) {
+  transform: scale(1.06);
+  box-shadow: 0 6px 18px rgba(249, 115, 22, 0.55);
+}
+
+.dev-quick-login-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.dev-quick-login-btn:disabled,
+.dev-quick-login-btn--loading {
+  opacity: 0.65;
+  cursor: wait;
 }

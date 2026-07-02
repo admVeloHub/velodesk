@@ -1,12 +1,13 @@
 /**
- * deskAccessAllowlist v1.0.0 — fase testes Desk (Google SSO)
- * VERSION: v1.0.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * deskAccessAllowlist v1.0.1 — fase testes Desk (Google SSO)
+ * VERSION: v1.0.1 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 
 export const DESK_AGENT_EMAILS = [
   'dimas.nascimento@velotax.com.br',
   'victor.silva@velotax.com.br',
   'monike.silva@velotax.com.br',
+  'lucasmgravina@gmail.com',
 ];
 
 export const DESK_SUPERVISOR_EMAILS = [

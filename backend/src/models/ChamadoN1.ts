@@ -1,4 +1,4 @@
-/** ChamadoN1 v1.1.0 — b2c_chamados.chamados_n1 (DESK_LISTA_SCHEMAS.rb) */
+/** ChamadoN1 v1.3.0 — alteracoes[] histórico + metadados técnicos no registro */
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IClienteRef {
@@ -17,11 +17,15 @@ export interface ITabulacao {
 
 export interface IRegistro {
   data: Date;
+  origin: string;
   mensagemPublica: string;
   anexosMensagemPublica: string[];
   anotacaoInterna: string;
   anexosAnotacaoInterna: string[];
-  alteracoes: Record<string, unknown>;
+  /** Histórico de campos alterados neste evento (valores novos). */
+  alteracoes: unknown[];
+  /** Metadados técnicos do evento (ex.: e-mail inbound), fora do histórico de negócio. */
+  metadados: Record<string, unknown>;
   status: string;
 }
 
@@ -58,11 +62,13 @@ const TabulacaoSchema = new Schema<ITabulacao>(
 const RegistroSchema = new Schema<IRegistro>(
   {
     data: { type: Date, default: Date.now },
+    origin: { type: String, default: '' },
     mensagemPublica: { type: String, default: '' },
     anexosMensagemPublica: { type: [String], default: [] },
     anotacaoInterna: { type: String, default: '' },
     anexosAnotacaoInterna: { type: [String], default: [] },
-    alteracoes: { type: Schema.Types.Mixed, default: {} },
+    alteracoes: { type: [Schema.Types.Mixed], default: [] },
+    metadados: { type: Schema.Types.Mixed, default: {} },
     status: { type: String, default: 'novo' },
   },
   { _id: false }

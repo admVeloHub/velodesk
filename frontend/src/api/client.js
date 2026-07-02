@@ -1,6 +1,6 @@
 /**
- * API client v1.3.0 — integração backend Velodesk + Google SSO
- * VERSION: v1.3.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * API client v1.4.0 — integração backend Velodesk + Google SSO + dev login
+ * VERSION: v1.4.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 
@@ -22,6 +22,8 @@ export const authApi = {
     api.post('/login', { email, password }).then((r) => r.data),
   googleLogin: (credential) =>
     api.post('/auth/google', { credential }).then((r) => r.data),
+  devLogin: (email) =>
+    api.post('/auth/dev-login', { email }).then((r) => r.data),
 };
 
 export const ticketsApi = {
@@ -48,6 +50,7 @@ export const boxesApi = {
 export const clientsApi = {
   getByCpf: (cpf) => api.get('/clients', { params: { cpf } }).then((r) => r.data),
   create: (payload) => api.post('/clients', payload).then((r) => r.data),
+  update: (id, payload) => api.put(`/clients/${encodeURIComponent(id)}`, payload).then((r) => r.data),
 };
 
 export const statsApi = {

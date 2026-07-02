@@ -1,10 +1,11 @@
-﻿/** email-inbound.service v1.0.0 — webhook e-mail → chamados_n1 */
+﻿/** email-inbound.service v1.1.0 — metadados técnicos separados de alteracoes[] */
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { appendMessage, createChamadoFromBody } from './chamado.mapper';
 import { normalizeEmail, resolveClienteRefFromEmail } from './cliente.service';
 import type { InboundEmailPayload, InboundEmailProcessResult } from './inbound-email/types';
 
-export const PROTOCOL_PATTERN = /VD-\d{8}-\d{4}/i;
+export const LEGACY_PROTOCOL_PATTERN = /VD-\d{8}-\d{4}/i;
+export const NUMERIC_PROTOCOL_PATTERN = /\[(\d{8,10})\]/;
 
 export function normalizeMessageId(value: unknown): string {
   return String(value ?? '').trim().replace(/^<|>$/g, '');
@@ -26,11 +27,16 @@ export function resolveEmailBody(payload: InboundEmailPayload): string {
 }
 
 export function extractProtocolFromSubject(subject: string): string | null {
-  const match = subject.match(PROTOCOL_PATTERN);
-  return match ? match[0].toUpperCase() : null;
+  const legacy = subject.match(LEGACY_PROTOCOL_PATTERN);
+  if (legacy) return legacy[0].toUpperCase();
+
+  const bracket = subject.match(NUMERIC_PROTOCOL_PATTERN);
+  if (bracket?.[1]) return bracket[1];
+
+  return null;
 }
 
-export function buildEmailAlteracoes(payload: InboundEmailPayload): Record<string, unknown> {
+export function buildEmailMetadados(payload: InboundEmailPayload): Record<string, unknown> {
   return {
     source: 'email-inbound',
     emailMessageId: normalizeMessageId(payload.messageId),
@@ -41,10 +47,18 @@ export function buildEmailAlteracoes(payload: InboundEmailPayload): Record<strin
   };
 }
 
+/** @deprecated use buildEmailMetadados */
+export const buildEmailAlteracoes = buildEmailMetadados;
+
 export async function findChamadoByEmailMessageId(messageId: string) {
   const normalized = normalizeMessageId(messageId);
   if (!normalized) return null;
-  return ChamadoN1.findOne({ 'registro.alteracoes.emailMessageId': normalized });
+  return ChamadoN1.findOne({
+    $or: [
+      { 'registro.metadados.emailMessageId': normalized },
+      { 'registro.alteracoes.emailMessageId': normalized },
+    ],
+  });
 }
 
 export async function findChamadoForEmailReply(payload: InboundEmailPayload) {
@@ -88,7 +102,7 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
   }
 
   const bodyText = resolveEmailBody(payload);
-  const emailMeta = buildEmailAlteracoes(payload);
+  const emailMeta = buildEmailMetadados(payload);
   const attachments = attachmentUrls(payload);
 
   const existing = await findChamadoForEmailReply(payload);
@@ -129,10 +143,12 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
 
   const partial = await createChamadoFromBody(ticketBody, 'novo');
   if (partial.registro?.[0]) {
-    partial.registro[0].alteracoes = {
-      ...(partial.registro[0].alteracoes ?? {}),
+    partial.registro[0].origin = 'cliente';
+    partial.registro[0].metadados = {
+      ...(partial.registro[0].metadados ?? {}),
       ...emailMeta,
     };
+    partial.registro[0].alteracoes = partial.registro[0].alteracoes ?? [];
   }
 
   if (clienteRef && (!partial.cliente || partial.cliente.length === 0)) {

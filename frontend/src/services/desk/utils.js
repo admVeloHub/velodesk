@@ -1,6 +1,6 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v2.3.2 | DATE: 2026-06-30
+ * VERSION: v2.6.1 | DATE: 2026-07-02
  */
 import { getKanbanColumns, saveKanbanColumns, getAllCockpitTickets } from '../kanbanStorage';
 import { lookupClient, getAgentName } from '../clientDb';
@@ -21,6 +21,11 @@ export function getInitials(name) {
 
 export function normalizeCpf(v) {
   return String(v || '').replace(/\D/g, '');
+}
+
+/** Número de protocolo visível (sem #, sem fallback de _id) */
+export function getTicketProtocolLabel(ticket) {
+  return String(ticket?.chamadoProtocolo || '').trim();
 }
 
 /** Máscara CPF enquanto digita (máx. 11 dígitos): 000.000.000-00 */
@@ -395,6 +400,56 @@ export function buildConversationMessages(ticket) {
   return msgs;
 }
 
+function parseRegistroSortKey(id) {
+  const match = String(id || '').match(/^(\d+)-(pub|int)$/);
+  if (!match) return { index: 999999, part: 9 };
+  return { index: Number(match[1]), part: match[2] === 'pub' ? 0 : 1 };
+}
+
+export function buildRegistroThread(ticket) {
+  if (!ticket) return [];
+
+  const raw = (ticket.messages || [])
+    .filter((m) => {
+      if (!m || m.type === 'system' || m.type === 'internal') return false;
+      const text = String(m.text || m.message || '').trim();
+      return Boolean(text);
+    })
+    .map((m) => ({ ...m, _kind: 'public' }));
+
+  raw.sort((a, b) => {
+    const tsA = new Date(a.timestamp || a.time || a.createdAt || 0).getTime();
+    const tsB = new Date(b.timestamp || b.time || b.createdAt || 0).getTime();
+    if (tsA !== tsB) return tsA - tsB;
+    const keyA = parseRegistroSortKey(a.id);
+    const keyB = parseRegistroSortKey(b.id);
+    if (keyA.index !== keyB.index) return keyA.index - keyB.index;
+    return keyA.part - keyB.part;
+  });
+
+  return raw.map((m) => {
+    const origin = m.origin || (m.sender === 'them' ? 'cliente' : 'agente');
+    const isClient = (
+      origin === 'cliente'
+      || m.fromClient === true
+      || m.type === 'client'
+      || m.sender === 'them'
+    );
+    const bubbleType = isClient ? 'client' : 'agent';
+    const ts = m.timestamp || m.time || m.createdAt;
+    const authorName = isClient
+      ? (ticket.clientName || m.author)
+      : (m.author || getAgentName());
+    return {
+      type: bubbleType,
+      initials: getInitials(isClient ? ticket.clientName || m.author : authorName),
+      text: String(m.text || m.message || '').trim(),
+      meta: formatMsgMeta(ts, authorName),
+      timestamp: ts,
+    };
+  });
+}
+
 export function getClientAnalise(client) {
   if (client?.analise) return client.analise;
   if ((client?.termometro ?? 0) >= 55 || client?.risco === 'Alto') {
@@ -458,31 +513,105 @@ export function formatInternalNoteTimestamp(iso) {
   return `${date} · ${time}`;
 }
 
+export function formatRegistroOccurrenceTimestamp(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const date = d.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `${date} · ${time}`;
+}
+
+const ALTERACAO_FIELD_LABELS = {
+  tipoChamado: 'Tipo',
+  classificacaoTipo: 'Tipo',
+  produto: 'Produto',
+  motivo: 'Motivo',
+  detalhe: 'Detalhe',
+  responsavel: 'Responsável',
+  atribuido: 'Atribuído',
+  escalonar: 'Escalonar',
+  status: 'Status',
+};
+
+function collectRegistroOccurrenceData(entry) {
+  const tabulationChanges = [];
+  const seen = new Set();
+
+  (entry.alteracoes || []).forEach((raw) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+    Object.entries(raw).forEach(([key, value]) => {
+      if (key === 'status') return;
+      const display = String(value ?? '').trim();
+      if (!display) return;
+      const field = ALTERACAO_FIELD_LABELS[key] || key;
+      const token = `${field}:${display}`;
+      if (seen.has(token)) return;
+      seen.add(token);
+      tabulationChanges.push({ field, value: display });
+    });
+  });
+
+  const statusLabel = entry.status ? getTicketStatusLabel(entry.status) : '';
+
+  return { tabulationChanges, statusLabel };
+}
+
+function shouldShowRegistroOccurrence(entry, prevStatus, isFirst) {
+  const hasInternal = Boolean(String(entry.anotacaoInterna ?? '').trim());
+  const hasAlteracoes = (entry.alteracoes || []).length > 0;
+  const statusChanged = Boolean(entry.status && entry.status !== prevStatus);
+  return hasInternal || hasAlteracoes || statusChanged || isFirst;
+}
+
+function mapRegistroOcorrencia(entry, ticket, prevStatus, isFirst) {
+  if (!shouldShowRegistroOccurrence(entry, prevStatus, isFirst)) return null;
+
+  const ticketId = String(ticket.id || ticket._id);
+  const origin = entry.origin || 'agente';
+  const author = origin === 'cliente' ? 'Cliente' : 'Agente';
+  const { tabulationChanges, statusLabel } = collectRegistroOccurrenceData(entry);
+  const internalExcerpt = String(entry.anotacaoInterna ?? '').trim();
+
+  return {
+    id: `${ticketId}:${entry.id}`,
+    kind: 'registro',
+    author,
+    initials: origin === 'cliente' ? 'CL' : 'AG',
+    badge: 'Registro',
+    timestamp: entry.time || entry.timestamp || ticket.updatedAt,
+    tabulationChanges,
+    statusLabel,
+    internalExcerpt,
+    ticketId,
+    ticketTitle: getTicketTitle(ticket),
+  };
+}
+
 function mapStoredInternalNote(note, ticket) {
+  const ticketId = String(ticket.id || ticket._id);
+  const noteKey = note.id || `note-${note.timestamp || Date.now()}`;
   const kind = note.kind || 'agent';
   return {
-    id: note.id || `note-${ticket.id}-${note.timestamp || Date.now()}`,
+    id: `${ticketId}:${noteKey}`,
     kind,
     author: note.author || note.agent || getAgentName(),
     initials: note.initials || getInitials(note.author || getAgentName()),
     badge: note.badge || (kind === 'ai' ? 'Automática' : kind === 'system' ? 'Automático' : kind === 'sla' ? 'Atenção' : 'Interna'),
-    timestamp: note.timestamp || note.createdAt || ticket.updatedAt,
+    timestamp: note.timestamp || note.time || note.createdAt || ticket.updatedAt,
     body: note.text || note.body || '',
     tags: note.tags || [],
-    editable: kind === 'agent',
-    ticketId: String(ticket.id),
+    ticketId,
     ticketTitle: getTicketTitle(ticket),
     boldSegments: note.boldSegments || [],
   };
 }
 
-export function buildClientInternalNotesFeed(ticket, client) {
-  if (!ticket) return [];
-
-  const contact = getClientContactFields(ticket, client);
-  const cpfDigits = normalizeCpf(ticket.lateralForm?.cpf || ticket.clientCPF || client?.cpf || '');
-  const clientTickets = collectClientTickets(cpfDigits, contact.name);
-  const tickets = clientTickets.length ? clientTickets : [ticket];
+function buildAgentInternalNotesFeed(tickets) {
   const merged = [];
   const seen = new Set();
 
@@ -498,6 +627,42 @@ export function buildClientInternalNotesFeed(ticket, client) {
 
   merged.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   return merged;
+}
+
+function buildSupervisorRegistroFeed(tickets) {
+  const merged = [];
+  const seen = new Set();
+
+  tickets.forEach((t) => {
+    normalizeTicketForDeskV2(t);
+    const historico = t.registroHistorico || t.registroAlteracoes || [];
+    historico.forEach((entry, idx) => {
+      const prevStatus = idx > 0 ? historico[idx - 1].status : null;
+      const mapped = mapRegistroOcorrencia(entry, t, prevStatus, idx === 0);
+      if (!mapped || seen.has(mapped.id)) return;
+      seen.add(mapped.id);
+      merged.push(mapped);
+    });
+  });
+
+  merged.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  return merged;
+}
+
+export function buildClientInternalNotesFeed(ticket, client, options = {}) {
+  const { supervisorView = false } = options;
+  if (!ticket) return [];
+
+  const contact = getClientContactFields(ticket, client);
+  const cpfDigits = normalizeCpf(ticket.lateralForm?.cpf || ticket.clientCPF || client?.cpf || '');
+  const clientTickets = collectClientTickets(cpfDigits, contact.name);
+  const tickets = clientTickets.length ? clientTickets : [ticket];
+
+  if (supervisorView) {
+    return buildSupervisorRegistroFeed(tickets);
+  }
+
+  return buildAgentInternalNotesFeed(tickets);
 }
 
 export function applySendStatus(entry, queueId) {

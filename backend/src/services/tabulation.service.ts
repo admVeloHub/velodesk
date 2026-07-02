@@ -1,6 +1,30 @@
-/** tabulation.service v1.2.2 — agregação e cascata produto → motivo → detalhe */
+/** tabulation.service v1.3.0 — validação obrigatória de tabulação por status */
+import type { ITabulacao } from '../models/ChamadoN1';
 import type { ITabulacaoDetalhe, ITabulacaoMotivo, ITabulacaoProduto } from '../models/TabulacaoProduto';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
+
+export class TabulacaoValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TabulacaoValidationError';
+  }
+}
+
+const STATUSES_REQUIRING_TABULATION = new Set(['em-aberto', 'em-andamento', 'resolvido']);
+
+function activeMotivos(config: TabulationActiveDto, produtoName: string): string[] {
+  const produto = config.produtos.find((item) => item.produto === produtoName && item.ativo);
+  if (!produto) return [];
+  return produto.motivos.filter((m) => m.ativo !== false).map((m) => m.motivo);
+}
+
+function activeDetalhes(config: TabulationActiveDto, produtoName: string, motivoName: string): string[] {
+  const produto = config.produtos.find((item) => item.produto === produtoName && item.ativo);
+  if (!produto) return [];
+  const motivo = produto.motivos.find((m) => m.motivo === motivoName && m.ativo !== false);
+  if (!motivo) return [];
+  return (motivo.detalhes || []).filter((d) => d.ativo !== false).map((d) => d.detalhe);
+}
 
 export interface TabulationProdutoDto {
   _id: string;
@@ -138,6 +162,37 @@ export async function deleteProduto(id: string): Promise<boolean> {
   const result = await Model.findByIdAndDelete(id);
   if (result) invalidateTabulationCache();
   return Boolean(result);
+}
+
+export async function assertTabulacaoForStatus(tab: ITabulacao | undefined, status: string): Promise<void> {
+  if (!STATUSES_REQUIRING_TABULATION.has(status)) return;
+
+  const missing: string[] = [];
+  const produto = String(tab?.produto ?? '').trim();
+  const tipo = String(tab?.tipoChamado ?? '').trim();
+  const responsavel = String(tab?.responsavel ?? '').trim();
+  const motivo = String(tab?.motivo ?? '').trim();
+  const detalhe = String(tab?.detalhe ?? '').trim();
+
+  if (!produto) missing.push('Produto');
+  if (!tipo) missing.push('Tipo');
+  if (!responsavel) missing.push('Responsável');
+
+  if (produto) {
+    const config = await getActiveTabulation();
+    const motivos = activeMotivos(config, produto);
+    if (motivos.length > 0 && !motivo) missing.push('Motivo');
+    if (motivo) {
+      const detalhes = activeDetalhes(config, produto, motivo);
+      if (detalhes.length > 0 && !detalhe) missing.push('Detalhe');
+    }
+  }
+
+  if (missing.length) {
+    throw new TabulacaoValidationError(
+      `Preencha a tabulação antes de enviar: ${missing.join(', ')}.`
+    );
+  }
 }
 
 export function validateComboSoft(

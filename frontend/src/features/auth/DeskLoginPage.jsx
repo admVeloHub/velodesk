@@ -1,6 +1,6 @@
 /**
- * DeskLoginPage v1.1.0 — login Google (layout limpo)
- * VERSION: v1.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * DeskLoginPage v1.2.0 — login Google + botão dev quick login
+ * VERSION: v1.2.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
@@ -12,6 +12,7 @@ import { isGoogleDeskAuthMode } from '../../config/deskAuthMode';
 import { loadGoogleGsiScript } from '../../utils/loadGoogleGsiScript';
 import DeskLoadingGate from './DeskLoadingGate';
 import DeskAccessDenied from './DeskAccessDenied';
+import DevQuickLoginButton from './DevQuickLoginButton';
 import './desk-login.css';
 
 function getGoogleButtonWidth(containerEl) {
@@ -152,6 +153,8 @@ export default function DeskLoginPage() {
           {loading ? <p className="desk-login-loading">Validando acesso…</p> : null}
         </div>
       </div>
+
+      <DevQuickLoginButton />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 /**
- * DeskConversation v1.0.2 — thread pública enviada/recebida + sugestão IA
- * VERSION: v1.0.2 | DATE: 2026-06-25
+ * DeskConversation v1.1.0 — thread registro com balões client/agent/internal
+ * VERSION: v1.1.0 | DATE: 2026-07-02
  */
 import React, { useState } from 'react';
 import { buildIaReply } from '../../../services/desk/utils';
@@ -17,15 +17,18 @@ export default function DeskConversation({ ticket, messages, composeText, onUseI
           <p>Nenhuma mensagem pública neste atendimento.</p>
         </div>
       ) : (
-        thread.map((msg, i) => (
-          <div key={i} className={'msg-row' + (msg.type === 'agent' ? ' msg-row--agent' : '')}>
-            <div className={'msg-avatar msg-avatar--' + msg.type}>{msg.initials || '?'}</div>
+        thread.map((msg, i) => {
+          const isRight = msg.type === 'agent' || msg.type === 'internal';
+          return (
+          <div key={i} className={'msg-row' + (isRight ? ' msg-row--agent' : '')}>
+            <div className={'msg-avatar msg-avatar--' + (msg.type === 'internal' ? 'agent' : msg.type)}>{msg.initials || '?'}</div>
             <div className="msg-body">
               <div className={'msg-bubble msg-bubble--' + msg.type}>{msg.text}</div>
               <div className="msg-meta">{msg.meta}</div>
             </div>
           </div>
-        ))
+          );
+        })
       )}
       {iaVisible && (
         <div className="ia-suggestion-bar" id="iaSuggestionBar">

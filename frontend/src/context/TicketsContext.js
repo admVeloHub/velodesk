@@ -4,6 +4,7 @@
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { findTicketEntry, getKanbanColumns, refreshKanbanFromApi } from '../services/kanbanStorage';
+import { getTicketProtocolLabel } from '../services/desk/utils';
 import { useAuth } from './AuthContext';
 
 const TicketsContext = createContext(null);
@@ -11,10 +12,11 @@ const TicketsContext = createContext(null);
 function buildTabMeta(entry) {
   const t = entry.ticket;
   const clientName = t.clientName || t.solicitante || 'Cliente';
-  const ticketLabel = '#' + String(t.id).slice(-6);
+  const protocol = getTicketProtocolLabel(t);
+  const ticketLabel = protocol || (t.isDraft || String(t.id).startsWith('draft-') ? 'Rascunho' : '');
   return {
     id: t.id,
-    title: t.title || 'Ticket #' + t.id,
+    title: t.title || (protocol ? `Ticket ${protocol}` : 'Ticket'),
     clientName,
     ticketLabel,
   };

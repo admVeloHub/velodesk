@@ -1,15 +1,18 @@
 /**
- * DeskClientProfileBar v1.1.0 — cabeçalho do cliente no ticket
- * VERSION: v1.1.0 | DATE: 2026-06-24
+ * DeskClientProfileBar v1.3.1 — protocolo numérico sem prefixo #
+ * VERSION: v1.3.1 | DATE: 2026-07-02
  */
 import React, { useEffect, useState } from 'react';
-import {
-  getClientContactFields,
-  getClientProducts,
-  getProductTagClass,
-} from '../../../services/desk/utils';
+import { getClientContactFields, getTicketProtocolLabel } from '../../../services/desk/utils';
 import ClientTicketHistoryModal from './ClientTicketHistoryModal';
 import TicketOperationProgress from './TicketOperationProgress';
+
+function resolveProtocolLabel(ticket) {
+  const protocol = getTicketProtocolLabel(ticket);
+  if (protocol) return protocol;
+  if (ticket?.isDraft || String(ticket?.id || '').startsWith('draft-')) return 'Rascunho';
+  return '—';
+}
 
 export default function DeskClientProfileBar({
   ticket,
@@ -20,58 +23,90 @@ export default function DeskClientProfileBar({
   onSelectTicket,
 }) {
   const [editOpen, setEditOpen] = useState(false);
-  const [infoOpen, setInfoOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [savingContact, setSavingContact] = useState(false);
   const [draft, setDraft] = useState({ name: '', email: '', phone: '' });
   const contact = getClientContactFields(ticket, client);
-  const products = getClientProducts(ticket, client);
+  const protocolLabel = resolveProtocolLabel(ticket);
+
   const openEdit = () => {
     setDraft({ name: contact.name, email: contact.email, phone: contact.phone });
     setEditOpen(true);
   };
 
-  const saveEdit = () => {
-    if (onSaveContact) onSaveContact(draft);
-    setEditOpen(false);
+  const saveEdit = async () => {
+    if (!onSaveContact || savingContact) return;
+    setSavingContact(true);
+    try {
+      await onSaveContact(draft);
+      setEditOpen(false);
+    } catch {
+      // notificação tratada no DeskV2Root
+    } finally {
+      setSavingContact(false);
+    }
   };
 
   useEffect(() => {
-    if (!infoOpen) return undefined;
-
-    const handlePointer = (e) => {
-      if (e.target.closest?.('#btnClientContactInfo')) return;
-      if (e.target.closest?.('#clientContactInfoPopover')) return;
-      setInfoOpen(false);
-    };
+    if (!editOpen) return undefined;
 
     const handleKey = (e) => {
-      if (e.key === 'Escape') setInfoOpen(false);
+      if (e.key === 'Escape') setEditOpen(false);
     };
-
-    document.addEventListener('mousedown', handlePointer);
     document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handlePointer);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [infoOpen]);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [editOpen]);
 
   return (
     <div className="crm-client-profile-bar">
       <section className="ticket-client-profile ticket-client-profile--compact" id="ticketClientProfile" aria-label="Perfil do cliente">
-        <div className="ticket-client-profile__row ticket-client-profile__row--top">
-          <span className="ticket-client-profile__name-wrap" id="headerInfo">
-            <strong className="ticket-client-profile__name" id="profileName">{contact.name}</strong>
+        <div className="ticket-client-profile__row ticket-client-profile__row--protocol">
+          <span className="ticket-client-profile__protocol" id="profileProtocol">{protocolLabel}</span>
+          <div className="ticket-client-profile__header-actions">
+            <button
+              type="button"
+              className="btn-secondary btn-sm ticket-client-history-btn"
+              id="btnClientHistory"
+              onClick={() => setHistoryOpen(true)}
+            >
+              <i className="fas fa-history" /> Histórico
+            </button>
+            <TicketOperationProgress
+              ticket={ticket}
+              queueId={queueId}
+              escalonar={escalonar}
+            />
+          </div>
+        </div>
+
+        <div className="ticket-client-profile__row ticket-client-profile__row--client" id="headerInfo">
+          <span className="ticket-client-profile__field ticket-client-profile__field--name" id="profileName">
+            {contact.name || '—'}
+          </span>
+          <span className="ticket-client-profile__sep" aria-hidden="true">–</span>
+          <span className="ticket-client-profile__field ticket-client-profile__field--cpf" id="profileCpf">
+            {contact.cpf || '—'}
+          </span>
+          <span className="ticket-client-profile__sep" aria-hidden="true">–</span>
+          <span className="ticket-client-profile__field ticket-client-profile__field--phone" id="profilePhone">
+            {contact.phone || '—'}
+          </span>
+          <span className="ticket-client-profile__sep" aria-hidden="true">–</span>
+          <span className="ticket-client-profile__field ticket-client-profile__field--email" id="profileEmail">
+            {contact.email || '—'}
+          </span>
+          <span className="ticket-client-profile__edit-wrap">
             <button
               type="button"
               className={'crm-edit-client-btn' + (editOpen ? ' is-active' : '')}
               id="btnEditClient"
-              title="Editar contato"
+              title="Editar cadastro"
+              aria-label="Editar cadastro"
               aria-expanded={editOpen}
               aria-controls="clientEditPopover"
               onClick={openEdit}
             >
-              <i className="ti ti-pencil" />
+              <i className="ti ti-pencil" aria-hidden="true" />
             </button>
             {editOpen && (
               <div className="crm-client-edit-popover" id="clientEditPopover" role="dialog" aria-labelledby="clientEditPopoverTitle">
@@ -88,81 +123,18 @@ export default function DeskClientProfileBar({
                   <input type="tel" className="crm-client-edit-popover__input" id="editClientPhone" value={draft.phone} onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))} autoComplete="tel" />
                 </div>
                 <div className="crm-client-edit-popover__footer">
-                  <button type="button" className="crm-client-edit-popover__save" id="btnSaveClientEdit" onClick={saveEdit}>Salvar</button>
+                  <button
+                    type="button"
+                    className="crm-client-edit-popover__save"
+                    id="btnSaveClientEdit"
+                    onClick={saveEdit}
+                    disabled={savingContact}
+                  >
+                    {savingContact ? 'Salvando…' : 'Salvar'}
+                  </button>
                 </div>
               </div>
             )}
-          </span>
-          <span className="ticket-client-profile__info-wrap">
-            <button
-              type="button"
-              className={'crm-client-info-btn' + (infoOpen ? ' is-active' : '')}
-              id="btnClientContactInfo"
-              title="E-mail e telefone"
-              aria-label="Ver e-mail e telefone"
-              aria-expanded={infoOpen}
-              aria-controls="clientContactInfoPopover"
-              onClick={() => setInfoOpen((open) => !open)}
-            >
-              <i className="ti ti-info-circle" aria-hidden="true" />
-            </button>
-            {infoOpen && (
-              <div
-                className="crm-client-contact-popover"
-                id="clientContactInfoPopover"
-                role="dialog"
-                aria-label="Contato do cliente"
-              >
-                <button
-                  type="button"
-                  className="crm-client-contact-popover__close"
-                  id="btnCloseClientContactInfo"
-                  title="Fechar"
-                  aria-label="Fechar"
-                  onClick={() => setInfoOpen(false)}
-                >
-                  <i className="ti ti-x" />
-                </button>
-                <div className="crm-client-contact-popover__row">
-                  <i className="fas fa-envelope" aria-hidden="true" />
-                  <div className="crm-client-contact-popover__field">
-                    <span className="crm-client-contact-popover__label">E-mail</span>
-                    <span className="crm-client-contact-popover__value" id="profileEmail">{contact.email || '—'}</span>
-                  </div>
-                </div>
-                <div className="crm-client-contact-popover__row">
-                  <i className="fas fa-phone" aria-hidden="true" />
-                  <div className="crm-client-contact-popover__field">
-                    <span className="crm-client-contact-popover__label">Telefone</span>
-                    <span className="crm-client-contact-popover__value" id="profilePhone">{contact.phone || '—'}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </span>
-          <span className="ticket-client-profile__cpf">
-            <span className="ticket-client-profile__label">CPF</span> <span id="profileCpf">{contact.cpf || '—'}</span>
-          </span>
-          <span className="ticket-client-profile__products" id="profileProducts">
-            {products.length ? products.map((p) => (
-              <span key={p} className={'velo-product-tag ' + getProductTagClass(p)}>{p}</span>
-            )) : <span className="ticket-client-profile__empty">—</span>}
-          </span>
-          <span className="ticket-client-profile__ticket-meta">
-            <button
-              type="button"
-              className="btn-secondary btn-sm ticket-client-history-btn"
-              id="btnClientHistory"
-              onClick={() => setHistoryOpen(true)}
-            >
-              <i className="fas fa-history" /> Histórico de tickets
-            </button>
-            <TicketOperationProgress
-              ticket={ticket}
-              queueId={queueId}
-              escalonar={escalonar}
-            />
-            <span className="ticket-client-profile__ticket-id" id="profileTicketId">Ticket #{ticket.id}</span>
           </span>
         </div>
       </section>
