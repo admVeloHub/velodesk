@@ -1,9 +1,8 @@
 /**
- * DeskConversation v1.2.0 — renderiza HTML seguro e markup legado nas mensagens
- * VERSION: v1.2.0 | DATE: 2026-07-02
+ * DeskConversation v1.3.0 — sugestão IA via OpenAI + POPs
+ * VERSION: v1.3.0 | DATE: 2026-07-03
  */
-import React, { useState } from 'react';
-import { buildIaReply } from '../../../services/desk/utils';
+import React, { useState, useEffect } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
 import { sanitizeComposeHtml } from '../../../services/desk/composeRichEditor';
 
@@ -29,10 +28,28 @@ function MessageBubbleText({ text }) {
   );
 }
 
-export default function DeskConversation({ ticket, messages, composeText, onUseIaReply }) {
+export default function DeskConversation({
+  ticket,
+  messages,
+  onUseIaReply,
+  iaReply = '',
+  iaReplyLoading = false,
+  iaWaitingMessage = '',
+  iaShowBar = false,
+  iaHasSuggestion = false,
+}) {
   const [iaVisible, setIaVisible] = useState(true);
-  const iaReply = buildIaReply(ticket);
   const thread = messages || [];
+
+  useEffect(() => {
+    setIaVisible(true);
+  }, [ticket?.id]);
+
+  const displayText = iaReplyLoading || !iaHasSuggestion
+    ? (iaWaitingMessage || 'Gerando sugestão com base nos POPs…')
+    : iaReply;
+
+  const canUseReply = iaHasSuggestion && !iaReplyLoading && Boolean(iaReply);
 
   return (
     <div className="conversation" id="conversation">
@@ -56,12 +73,19 @@ export default function DeskConversation({ ticket, messages, composeText, onUseI
           );
         })
       )}
-      {iaVisible && (
-        <div className="ia-suggestion-bar" id="iaSuggestionBar">
+      {iaVisible && iaShowBar && (
+        <div className={'ia-suggestion-bar' + (iaReplyLoading ? ' ia-suggestion-bar--loading' : '')} id="iaSuggestionBar">
           <span className="ia-suggestion-bar__label">IA</span>
-          <span className="ia-suggestion-bar__text" id="iaReplyText">{iaReply}</span>
+          <span className="ia-suggestion-bar__text" id="iaReplyText">{displayText}</span>
           <div className="ia-suggestion-bar__actions">
-            <button type="button" className="ia-suggestion-bar__btn" onClick={() => onUseIaReply(iaReply)}>Usar resposta</button>
+            <button
+              type="button"
+              className="ia-suggestion-bar__btn"
+              disabled={!canUseReply}
+              onClick={() => onUseIaReply(iaReply)}
+            >
+              Usar resposta
+            </button>
             <button type="button" className="ia-suggestion-bar__btn ia-suggestion-bar__btn--dismiss" onClick={() => setIaVisible(false)}>Não usar</button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-/** env v1.11.0 — GEMINI_API_KEY refinar rascunho */
+/** env v1.12.1 — fallback VECTOR_STORE_PATH para vector store OpenAI */
 import fs from 'fs';
 import path from 'path';
 
@@ -73,6 +73,13 @@ export const env = {
   languageToolTimeoutMs: parseInt(process.env.LANGUAGETOOL_TIMEOUT_MS || '8000', 10),
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
   geminiModel: (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim(),
+  openaiApiKey: (process.env.OPENAI_API_KEY || '').trim(),
+  openaiVectorStoreId: (
+    process.env.OPENAI_VECTOR_STORE_ID
+    || process.env.VECTOR_STORE_PATH
+    || ''
+  ).trim(),
+  openaiModel: (process.env.OPENAI_MODEL || 'gpt-4.1-mini').trim(),
   ticketSequenceFloor: (process.env.TICKET_SEQUENCE_FLOOR || '100177678').trim(),
 };
 

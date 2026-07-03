@@ -1,10 +1,9 @@
 /**
- * DeskWhatsAppChat v1.1.0 — conversa estilo WhatsApp + notas internas
- * VERSION: v1.1.0 | DATE: 2026-07-02
+ * DeskWhatsAppChat v1.2.0 — sugestão IA via OpenAI + POPs
+ * VERSION: v1.2.0 | DATE: 2026-07-03
  */
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  buildIaReply,
   getClientContactFields,
   getInitials,
   formatWaTime,
@@ -19,15 +18,30 @@ export default function DeskWhatsAppChat({
   onComposeTextChange,
   onUseIaReply,
   onSend,
+  iaReply = '',
+  iaReplyLoading = false,
+  iaWaitingMessage = '',
+  iaShowBar = false,
+  iaHasSuggestion = false,
 }) {
   const [iaVisible, setIaVisible] = useState(true);
   const inputRef = useRef(null);
   const contact = getClientContactFields(ticket, client);
-  const iaReply = buildIaReply(ticket);
   const chatMessages = messages || [];
   const dateIso = chatMessages[0]?.timestamp || ticket.createdAt;
 
+  useEffect(() => {
+    setIaVisible(true);
+  }, [ticket?.id]);
+
+  const displayText = iaReplyLoading || !iaHasSuggestion
+    ? (iaWaitingMessage || 'Gerando sugestão com base nos POPs…')
+    : iaReply;
+
+  const canUseReply = iaHasSuggestion && !iaReplyLoading && Boolean(iaReply);
+
   const handleEditIa = () => {
+    if (!canUseReply) return;
     onUseIaReply(iaReply);
     inputRef.current?.focus();
   };
@@ -93,17 +107,18 @@ export default function DeskWhatsAppChat({
           })
         )}
 
-        {iaVisible && (
-          <div className="wa-ia-card" id="iaSuggestionBar">
+        {iaVisible && iaShowBar && (
+          <div className={'wa-ia-card' + (iaReplyLoading ? ' wa-ia-card--loading' : '')} id="iaSuggestionBar">
             <div className="wa-ia-card__head">
               <i className="ti ti-sparkles" aria-hidden="true" />
               <span className="wa-ia-card__label">SUGESTÃO IA</span>
             </div>
-            <p className="wa-ia-card__text" id="iaReplyText">{iaReply}</p>
+            <p className="wa-ia-card__text" id="iaReplyText">{displayText}</p>
             <div className="wa-ia-card__actions">
               <button
                 type="button"
                 className="wa-ia-card__btn wa-ia-card__btn--primary"
+                disabled={!canUseReply}
                 onClick={() => onUseIaReply(iaReply)}
               >
                 Usar resposta
@@ -111,6 +126,7 @@ export default function DeskWhatsAppChat({
               <button
                 type="button"
                 className="wa-ia-card__btn wa-ia-card__btn--outline"
+                disabled={!canUseReply}
                 onClick={handleEditIa}
               >
                 Editar

@@ -1,10 +1,11 @@
 /**
- * DeskClientProfileBar v1.3.1 — protocolo numérico sem prefixo #
- * VERSION: v1.3.1 | DATE: 2026-07-02
+ * DeskClientProfileBar v1.4.1 — termômetro à esquerda de status/histórico
+ * VERSION: v1.4.1 | DATE: 2026-07-03
  */
 import React, { useEffect, useState } from 'react';
 import { getClientContactFields, getTicketProtocolLabel } from '../../../services/desk/utils';
 import ClientTicketHistoryModal from './ClientTicketHistoryModal';
+import ClientThermoGauge from './ClientThermoGauge';
 import TicketOperationProgress from './TicketOperationProgress';
 
 function resolveProtocolLabel(ticket) {
@@ -59,27 +60,28 @@ export default function DeskClientProfileBar({
 
   return (
     <div className="crm-client-profile-bar">
-      <section className="ticket-client-profile ticket-client-profile--compact" id="ticketClientProfile" aria-label="Perfil do cliente">
-        <div className="ticket-client-profile__row ticket-client-profile__row--protocol">
-          <span className="ticket-client-profile__protocol" id="profileProtocol">{protocolLabel}</span>
-          <div className="ticket-client-profile__header-actions">
-            <button
-              type="button"
-              className="btn-secondary btn-sm ticket-client-history-btn"
-              id="btnClientHistory"
-              onClick={() => setHistoryOpen(true)}
-            >
-              <i className="fas fa-history" /> Histórico
-            </button>
-            <TicketOperationProgress
-              ticket={ticket}
-              queueId={queueId}
-              escalonar={escalonar}
-            />
-          </div>
+      <section
+        className="ticket-client-profile ticket-client-profile--compact ticket-client-profile--header-grid"
+        id="ticketClientProfile"
+        aria-label="Perfil do cliente"
+      >
+        <span className="ticket-client-profile__protocol ticket-client-profile__cell-protocol" id="profileProtocol">
+          {protocolLabel}
+        </span>
+
+        <div className="ticket-client-profile__cell-status">
+          <TicketOperationProgress
+            ticket={ticket}
+            queueId={queueId}
+            escalonar={escalonar}
+          />
         </div>
 
-        <div className="ticket-client-profile__row ticket-client-profile__row--client" id="headerInfo">
+        <div className="ticket-client-profile__cell-thermo">
+          <ClientThermoGauge client={client} />
+        </div>
+
+        <div className="ticket-client-profile__client-main ticket-client-profile__cell-client" id="headerInfo">
           <span className="ticket-client-profile__field ticket-client-profile__field--name" id="profileName">
             {contact.name || '—'}
           </span>
@@ -136,6 +138,17 @@ export default function DeskClientProfileBar({
               </div>
             )}
           </span>
+        </div>
+
+        <div className="ticket-client-profile__cell-history">
+          <button
+            type="button"
+            className="btn-secondary btn-sm ticket-client-history-btn"
+            id="btnClientHistory"
+            onClick={() => setHistoryOpen(true)}
+          >
+            <i className="fas fa-history" /> Histórico
+          </button>
         </div>
       </section>
       <ClientTicketHistoryModal

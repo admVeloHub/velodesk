@@ -1,9 +1,8 @@
 /**
- * DeskRightPanel v1.3.2 — tipo com default Solicitação no select
- * VERSION: v1.3.2 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
+ * DeskRightPanel v1.4.0 — sugestão IA tabulação via OpenAI + POPs
+ * VERSION: v1.4.0 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
  */
 import React, { useEffect } from 'react';
-import { buildIaTabulation } from '../../../services/desk/utils';
 import { DEFAULT_TIPO } from '../../../services/tabulationConfig';
 import { useTabulation } from '../../../context/TabulationContext';
 import { useDeskAgents } from '../../../hooks/useDeskAgents';
@@ -42,6 +41,12 @@ export default function DeskRightPanel({
   onCloseChat,
   waChatOpen,
   sendDisabled = false,
+  iaTabulationDisplay = '',
+  iaTabulationLoading = false,
+  iaWaitingMessage = '',
+  iaTabulationIncomplete = true,
+  iaHasSuggestion = false,
+  iaShowSection = false,
 }) {
   const { loading, getMotivos, getDetalhes, getProdutoNames } = useTabulation();
   const { agentOptions, currentAgentValue, loading: agentsLoading } = useDeskAgents();
@@ -64,6 +69,12 @@ export default function DeskRightPanel({
   const detalheOptions = rightFields.produto && rightFields.motivo
     ? getDetalhes(rightFields.produto, rightFields.motivo)
     : [];
+
+  const tabulationText = iaTabulationLoading || !iaHasSuggestion
+    ? (iaWaitingMessage || 'Gerando sugestão com base nos POPs…')
+    : (iaTabulationDisplay || 'Tabulação incompleta');
+
+  const canApplyTabulation = iaHasSuggestion && !iaTabulationLoading && !iaTabulationIncomplete;
 
   return (
     <aside className="crm-right-panel" id="crmRightPanel">
@@ -141,13 +152,23 @@ export default function DeskRightPanel({
           )}
         </section>
 
-        <section className="rp-section">
-          <div className="ia-tabulation">
-            <div className="ia-tabulation__label">SUGESTÃO IA</div>
-            <div className="ia-tabulation__text" id="iaTabulationText">{buildIaTabulation(ticket, rightFields)}</div>
-            <button type="button" className="ia-tabulation__btn" id="btnApplyTabulation" onClick={onApplyTabulation}>Aplicar tabulação</button>
-          </div>
-        </section>
+        {iaShowSection && (
+          <section className="rp-section">
+            <div className={'ia-tabulation' + (iaTabulationLoading ? ' ia-tabulation--loading' : '')}>
+              <div className="ia-tabulation__label">SUGESTÃO IA</div>
+              <div className="ia-tabulation__text" id="iaTabulationText">{tabulationText}</div>
+              <button
+                type="button"
+                className="ia-tabulation__btn"
+                id="btnApplyTabulation"
+                disabled={!canApplyTabulation}
+                onClick={onApplyTabulation}
+              >
+                Aplicar tabulação
+              </button>
+            </div>
+          </section>
+        )}
       </div>
       <div className="crm-right-panel__footer">
         <button

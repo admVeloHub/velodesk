@@ -1,10 +1,37 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.20.0 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.21.0 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Sugestão IA de resposta e tabulação na abertura do ticket (OpenAI + POPs)
+
+- **Data/Hora**: 2026-07-03
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.21.0
+  - openaiTicketSuggest.service v1.0.1, ticketSuggestPersona v1.0.0, ticketAi.routes v1.0.0
+  - env v1.12.1, index v1.6.0
+  - useTicketAiSuggestions v1.0.1, client.js v1.5.0, TabulationContext v1.1.1
+  - DeskV2Root v3.6.0, DeskConversation v1.3.0, DeskWhatsAppChat v1.2.0, DeskRightPanel v1.4.0
+- **Arquivos modificados / incluídos**:
+  - `backend/package.json`, `backend/package-lock.json` — dependência `openai`
+  - `backend/src/config/env.ts`, `backend/.env.example` — OPENAI_API_KEY, OPENAI_VECTOR_STORE_ID, VECTOR_STORE_PATH (alias)
+  - `backend/src/services/openaiTicketSuggest.service.ts` — Responses API + file_search na vector store de POPs; fetch nativo (Windows)
+  - `backend/src/services/ticketSuggestPersona.ts` — persona sugestão resposta + tabulação
+  - `backend/src/routes/ticketAi.routes.ts` — POST `/api/ticket-ai/suggest`
+  - `backend/src/index.ts` — rota ticket-ai e log de startup
+  - `frontend/src/hooks/useTicketAiSuggestions.js` — gatilho por canal (mensagem pública vs anotação interna telefone)
+  - `frontend/src/features/desk/DeskV2Root.jsx` — integração hook; aplicar tabulação da IA
+  - `frontend/src/features/desk/components/DeskConversation.jsx`, `DeskWhatsAppChat.jsx`, `DeskRightPanel.jsx` — UI sugestão IA operacional
+  - `frontend/src/context/TabulationContext.jsx` — retry em 503 transitório (desk_config)
+  - `frontend/src/api/client.js` — ticketAiApi
+  - `frontend/src/features/desk/components/ClientThermoGauge.jsx`, `DeskClientProfileBar.jsx`, `DeskComposePanel.jsx`, `frontend/velodesk-crm.css` — termômetro cliente e estilos alinhados
+- **Descrição**: v1 operacional da sugestão IA na abertura do ticket: e-mail/app usam 1ª mensagem pública; telefone usa anotação interna (≥80 chars) + hint de produto. Backend consulta vector store OpenAI com POPs Velotax e valida tabulação contra config ativa. Corrige Premature close do SDK OpenAI no Windows via fetch nativo.
+- **Status**: Concluído
 
 ### GitHub Push — Notas do Desk, fila Novos e fix tabulação Tipo
 

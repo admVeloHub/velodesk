@@ -1,6 +1,6 @@
 /**
- * API client v1.4.0 — integração backend Velodesk + Google SSO + dev login
- * VERSION: v1.4.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * API client v1.5.0 — ticketAiApi sugestão IA na abertura do ticket
+ * VERSION: v1.5.0 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 
@@ -79,4 +79,9 @@ export const whatsappApi = {
     api.get(`/whatsapp/conversations/${encodeURIComponent(id)}/messages`).then((r) => r.data),
   send: (conversationId, message) =>
     api.post('/whatsapp/send-message', { conversationId, message }).then((r) => r.data),
+};
+
+export const ticketAiApi = {
+  suggest: (payload, config) =>
+    api.post('/ticket-ai/suggest', payload, config).then((r) => r.data),
 };

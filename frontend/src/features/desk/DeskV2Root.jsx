@@ -1,6 +1,6 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.5.8 | DATE: 2026-07-02
+ * VERSION: v3.6.0 | DATE: 2026-07-03
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -37,6 +37,7 @@ import { applyCascadeFieldChange, buildDefaultRightFields, getMotivos, mergeRigh
 import { useTabulation } from '../../context/TabulationContext';
 import { createSpellContext, loadSpellEngine, scanText } from '../../services/spellcheck/spellEngine';
 import { htmlToPlainText } from '../../services/desk/composeRichEditor';
+import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
 
 function applyRightFieldsToTicket(t, rightFields, escalonar) {
   const prevLf = t.lateralForm || {};
@@ -499,19 +500,24 @@ export default function DeskV2Root() {
   };
 
   const handleApplyTabulation = () => {
-    const lf = ticket?.lateralForm || {};
+    const tab = ticketAi.tabulacao;
+    if (!tab?.produto && !tab?.tipo) {
+      showNotification('Nenhuma tabulação sugerida disponível.', 'warning');
+      return;
+    }
     setRightFields((f) => {
-      const produto = lf.produto || f.produto;
-      let next = applyCascadeFieldChange(f, 'produto', produto);
-      next = {
-        ...next,
-        tipo: lf.classificacaoTipo || f.tipo,
-        motivo: lf.motivo || next.motivo,
-        detalhe: lf.detalhe || next.detalhe,
-      };
-      if (lf.motivo && next.produto) {
-        next = applyCascadeFieldChange({ ...f, produto: next.produto, tipo: next.tipo }, 'motivo', lf.motivo);
-        next.detalhe = lf.detalhe || next.detalhe;
+      let next = { ...f };
+      if (tab.produto) {
+        next = applyCascadeFieldChange(next, 'produto', tab.produto);
+      }
+      if (tab.motivo && next.produto) {
+        next = applyCascadeFieldChange(next, 'motivo', tab.motivo);
+      }
+      if (tab.detalhe) {
+        next = { ...next, detalhe: tab.detalhe };
+      }
+      if (tab.tipo) {
+        next = { ...next, tipo: tab.tipo };
       }
       return next;
     });
@@ -603,6 +609,7 @@ export default function DeskV2Root() {
   };
 
   const convMsgs = ticket ? buildRegistroThread(ticket) : [];
+  const ticketAi = useTicketAiSuggestions(ticket, rightFields, convMsgs, internalText);
 
   return (
     <div className="app-shell" id="deskAppShell">
@@ -686,6 +693,11 @@ export default function DeskV2Root() {
                     onComposeTextChange={setComposeText}
                     onUseIaReply={setComposeText}
                     onSend={() => handleCommitWithStatus(sendStatus)}
+                    iaReply={ticketAi.respostaSugerida}
+                    iaReplyLoading={ticketAi.loading}
+                    iaWaitingMessage={ticketAi.waitingMessage}
+                    iaShowBar={ticketAi.showIaBar}
+                    iaHasSuggestion={ticketAi.hasSuggestion}
                   />
                 </div>
               ) : (
@@ -699,6 +711,11 @@ export default function DeskV2Root() {
                         ticket={ticket}
                         messages={convMsgs}
                         onUseIaReply={setComposeText}
+                        iaReply={ticketAi.respostaSugerida}
+                        iaReplyLoading={ticketAi.loading}
+                        iaWaitingMessage={ticketAi.waitingMessage}
+                        iaShowBar={ticketAi.showIaBar}
+                        iaHasSuggestion={ticketAi.hasSuggestion}
                       />
                       <DeskComposePanel
                         ticketId={ticket.id}
@@ -740,6 +757,12 @@ export default function DeskV2Root() {
           onOpenChat={handleOpenChat}
           onCloseChat={() => setWaChatOpen(false)}
           sendDisabled={sendDisabledBySpell}
+          iaTabulationDisplay={ticketAi.tabulacaoDisplay}
+          iaTabulationLoading={ticketAi.loading}
+          iaWaitingMessage={ticketAi.waitingMessage}
+          iaTabulationIncomplete={ticketAi.tabulacaoIncomplete}
+          iaHasSuggestion={ticketAi.hasSuggestion}
+          iaShowSection={ticketAi.showIaBar || Boolean(ticketAi.waitingReason)}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-﻿/** index v1.5.0 — proxy LanguageTool spellcheck */
+﻿/** index v1.6.0 — rota ticket-ai sugestão IA */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -15,8 +15,10 @@ import clientsRoutes from './routes/clients.routes';
 import tabulationRoutes from './routes/tabulation.routes';
 import spellcheckRoutes from './routes/spellcheck.routes';
 import composeRoutes from './routes/compose.routes';
+import ticketAiRoutes from './routes/ticketAi.routes';
 import inboundRoutes from './routes/inbound.routes';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
+import { isOpenAiTicketSuggestConfigured } from './services/openaiTicketSuggest.service';
 import { seedDevelopmentData, purgeLegacyDemoData } from './services/seed.service';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -39,6 +41,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/inbound', inboundRoutes);
 app.use('/api/spellcheck', spellcheckRoutes);
 app.use('/api/compose', composeRoutes);
+app.use('/api/ticket-ai', ticketAiRoutes);
 
 app.use(
   '/api/',
@@ -159,6 +162,11 @@ async function start() {
     console.log(`API Velodesk v1.2.0 — http://0.0.0.0:${env.port} (${env.nodeEnv})`);
     void bootstrapDatabase().then(async () => {
       await logLanguageToolStartupStatus();
+      if (isOpenAiTicketSuggestConfigured()) {
+        console.log('[ticket-ai] OpenAI configurado (sugestão resposta + tabulação).');
+      } else {
+        console.warn('[ticket-ai] OpenAI não configurado — defina OPENAI_API_KEY e OPENAI_VECTOR_STORE_ID em backend/.env');
+      }
       if (env.enableWhatsapp) {
         console.log('Inicializando WhatsApp Web...');
         whatsapp.initializeWhatsApp();

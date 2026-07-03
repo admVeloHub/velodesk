@@ -1,6 +1,6 @@
 /**
- * DeskComposePanel v1.9.1 — toolbar com estado ativo da formatação
- * VERSION: v1.9.1 | DATE: 2026-07-02
+ * DeskComposePanel v1.9.2 — remove avatar ao lado do compose
+ * VERSION: v1.9.2 | DATE: 2026-07-03
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SEND_STATUS_OPTIONS } from '../../../services/desk/constants';
@@ -315,7 +315,6 @@ export default function DeskComposePanel({
     <div className={'crm-ticket-compose' + (variant === 'internal-only' ? ' crm-ticket-compose--notes' : '')}>
       <div className="ticket-response octa-comment-panel crm-ticket-response">
         <div className="octa-comment-panel-row">
-          <div className="octa-panel-avatar" aria-hidden="true"><i className="fas fa-user" /></div>
           <div className="octa-panel-box">
             {variant === 'full' ? (
             <div className="response-tabs octa-nav-tabs">

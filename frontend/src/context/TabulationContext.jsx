@@ -1,6 +1,6 @@
 /**
- * TabulationContext v1.1.0 — carrega tabulação só após autenticação
- * VERSION: v1.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * TabulationContext v1.1.1 — retry se desk_config ainda não conectou (503 transitório)
+ * VERSION: v1.1.1 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { tabulationApi } from '../api/client';
@@ -30,14 +30,25 @@ export function TabulationProvider({ children }) {
 
     setLoading(true);
     setError(null);
-    try {
-      const data = await tabulationApi.getActive();
-      setConfig(data || EMPTY_TABULATION);
-    } catch (err) {
-      setError(err?.message || 'Falha ao carregar tabulação');
-      setConfig(EMPTY_TABULATION);
-    } finally {
-      setLoading(false);
+    const maxAttempts = 4;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const data = await tabulationApi.getActive();
+        setConfig(data || EMPTY_TABULATION);
+        setLoading(false);
+        return;
+      } catch (err) {
+        const status = err?.response?.status;
+        const isTransient = status === 503 && attempt < maxAttempts;
+        if (isTransient) {
+          await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
+          continue;
+        }
+        setError(err?.response?.data?.message || err?.message || 'Falha ao carregar tabulação');
+        setConfig(EMPTY_TABULATION);
+        setLoading(false);
+        return;
+      }
     }
   }, [isAuthenticated]);
 
