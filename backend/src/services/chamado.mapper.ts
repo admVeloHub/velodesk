@@ -1,4 +1,4 @@
-﻿/** chamado.mapper v1.8.4 — autor = executor da ação (nunca confundir com responsavel) */
+﻿/** chamado.mapper v1.8.5 — novos sem responsavel visíveis para todos os agentes */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -712,6 +712,22 @@ function emailLocalPart(email?: string): string {
   return normalized.split('@')[0] ?? '';
 }
 
+function lastTabulacaoResponsavelExpr() {
+  return {
+    $toLower: {
+      $ifNull: [
+        {
+          $let: {
+            vars: { lastTab: { $arrayElemAt: ['$tabulacao', -1] } },
+            in: '$$lastTab.responsavel',
+          },
+        },
+        '',
+      ],
+    },
+  };
+}
+
 export function meusChamadosResponsavelFilter(candidates: string[]) {
   if (candidates.length === 0) {
     return { _id: { $exists: false } };
@@ -721,23 +737,26 @@ export function meusChamadosResponsavelFilter(candidates: string[]) {
 
   return {
     $expr: {
-      $in: [
-        {
-          $toLower: {
-            $ifNull: [
-              {
-                $let: {
-                  vars: { lastTab: { $arrayElemAt: ['$tabulacao', -1] } },
-                  in: '$$lastTab.responsavel',
-                },
-              },
-              '',
-            ],
-          },
-        },
-        normalized,
-      ],
+      $in: [lastTabulacaoResponsavelExpr(), normalized],
     },
+  };
+}
+
+/** Novos sem responsável = fila compartilhada; com responsável = só o agente dono */
+export function meusChamadosNovosResponsavelFilter(candidates: string[]) {
+  if (candidates.length === 0) {
+    return { _id: { $exists: false } };
+  }
+
+  return {
+    $or: [
+      meusChamadosResponsavelFilter(candidates),
+      {
+        $expr: {
+          $eq: [lastTabulacaoResponsavelExpr(), ''],
+        },
+      },
+    ],
   };
 }
 
@@ -745,7 +764,10 @@ export function buildChamadoQueryFilter(status: string, queue?: string, responsa
   const filters: Record<string, unknown>[] = [lastStatusFilter(status)];
 
   if (queue === 'meus-chamados' && responsavelCandidates?.length) {
-    filters.push(meusChamadosResponsavelFilter(responsavelCandidates));
+    const responsavelFilter = status === 'novo'
+      ? meusChamadosNovosResponsavelFilter(responsavelCandidates)
+      : meusChamadosResponsavelFilter(responsavelCandidates);
+    filters.push(responsavelFilter);
   }
 
   return filters.length === 1 ? filters[0] : { $and: filters };

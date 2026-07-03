@@ -1,8 +1,9 @@
 /**
- * ticketAdapter v1.4.1 — author do executor em updates de ticket
- * VERSION: v1.4.1 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.4.2 — tipoChamado explícito no payload lateralForm
+ * VERSION: v1.4.2 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
  */
 import { getAgentName } from '../../services/clientDb';
+import { DEFAULT_TIPO } from '../../services/tabulationConfig';
 
 const MEUS_CHAMADOS_BOX_MAP = {
   'meus-novos': 'novos',
@@ -98,6 +99,7 @@ export function cockpitTicketToApi(ticket) {
   const emailList = lf.clienteEmail ?? (ticket.clientEmail ? [ticket.clientEmail] : []);
   const phoneList = lf.clienteTelefone ?? (ticket.clientPhone ? [ticket.clientPhone] : []);
   const clientName = ticket.clientName || ticket.solicitante || lf.clienteNome;
+  const tipo = String(lf.tipoChamado || lf.classificacaoTipo || DEFAULT_TIPO).trim() || DEFAULT_TIPO;
   return {
     chamadoProtocolo: ticket.chamadoProtocolo,
     chamadoTitulo: ticket.chamadoTitulo || ticket.title,
@@ -116,6 +118,8 @@ export function cockpitTicketToApi(ticket) {
     author: ticket.author || getAgentName() || undefined,
     lateralForm: {
       ...lf,
+      classificacaoTipo: tipo,
+      tipoChamado: tipo,
       cpf: ticket.clientCPF || lf.clienteCpf || lf.cpf,
       clienteCpf: ticket.clientCPF || lf.clienteCpf || lf.cpf,
       clienteNome: clientName || '',

@@ -1,10 +1,35 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.19.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.20.0 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Notas do Desk, fila Novos e fix tabulação Tipo
+
+- **Data/Hora**: 2026-07-03
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.20.0
+  - chamado.mapper v1.8.5, boxes.routes v1.3.8
+  - responsavelSegmentation v1.2.0, ticketsCache v1.5.1
+  - tabulationConfig v1.3.1, ticketAdapter v1.4.2
+  - desk/utils v2.9.1, DeskInternalNotesPanel v1.4.0, DeskRightPanel v1.3.2, DeskV2Root v3.5.9
+- **Arquivos modificados / incluídos**:
+  - `backend/src/services/chamado.mapper.ts` — tickets Novos sem responsável visíveis na fila do agente
+  - `backend/src/routes/boxes.routes.ts` — versão alinhada ao filtro Novos
+  - `frontend/src/services/desk/responsavelSegmentation.js` — Novos sem responsável = fila compartilhada
+  - `frontend/src/services/tabulationConfig.js` — default Tipo Solicitação; mergeRightFieldsWithDefaults
+  - `frontend/src/features/desk/DeskV2Root.jsx` — validação/envio com tipoChamado explícito
+  - `frontend/src/api/adapters/ticketAdapter.js` — tipoChamado no payload lateralForm
+  - `frontend/src/services/desk/utils.js` — aba Notas: supervisor (diff tabulação, status, internas); agente (só internas); ordem cronológica
+  - `frontend/src/features/desk/components/DeskInternalNotesPanel.jsx` — UI diff alterações e status
+  - `frontend/src/features/desk/components/DeskRightPanel.jsx` — select Tipo com default
+  - `frontend/src/services/ticketsCache.js` — versão alinhada
+- **Descrição**: Corrige fila Novos vazia para agentes (tickets sem responsável). Corrige erro "Preencha Tipo" ao salvar Em andamento. Aba Notas exibe só conteúdo relevante por perfil (sem mensagens públicas), com diff de tabulação/status e ordem do mais antigo ao mais recente.
+- **Status**: Concluído
 
 ### GitHub Push — Fila meus-chamados, autor do registro e landing Painel 360°
 

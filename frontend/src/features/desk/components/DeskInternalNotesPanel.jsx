@@ -1,6 +1,6 @@
 /**
- * DeskInternalNotesPanel v1.3.4 — status sempre visível no registro
- * VERSION: v1.3.4 | DATE: 2026-07-02
+ * DeskInternalNotesPanel v1.4.0 — Notas: supervisor (registro agente) / agente (só internas)
+ * VERSION: v1.4.0 | DATE: 2026-07-03
  */
 import React, { useMemo } from 'react';
 import {
@@ -45,6 +45,13 @@ function NoteBody({ body, boldSegments }) {
   return <p className="crm-note-card__body">{segments}</p>;
 }
 
+function formatTabulationChange(item) {
+  if (item.previousValue) {
+    return `${item.field}: ${item.previousValue} → ${item.value}`;
+  }
+  return `${item.field}: ${item.value}`;
+}
+
 function RegistroOccurrenceBody({ note }) {
   return (
     <div className="crm-note-card__registro-body">
@@ -54,7 +61,7 @@ function RegistroOccurrenceBody({ note }) {
       </p>
       {note.internalExcerpt ? (
         <div className="crm-note-card__registro-block">
-          <span className="crm-note-card__body-label">Anotações:</span>
+          <span className="crm-note-card__body-label">Anotação interna:</span>
           <p className="crm-note-card__body">{note.internalExcerpt}</p>
         </div>
       ) : null}
@@ -63,17 +70,23 @@ function RegistroOccurrenceBody({ note }) {
           <span className="crm-note-card__body-label">Alterações</span>
           <ul className="crm-note-card__changes">
             {note.tabulationChanges.map((item) => (
-              <li key={`${item.field}-${item.value}`}>
-                {item.field}: {item.value}
+              <li key={`${item.field}-${item.previousValue || ''}-${item.value}`}>
+                {formatTabulationChange(item)}
               </li>
             ))}
           </ul>
         </div>
       ) : null}
-      <p className="crm-note-card__inline-line crm-note-card__status-line">
-        <span className="crm-note-card__body-label">Status:</span>{' '}
-        <span>{note.statusLabel || '—'}</span>
-      </p>
+      {note.statusChanged && note.statusLabel ? (
+        <p className="crm-note-card__inline-line crm-note-card__status-line">
+          <span className="crm-note-card__body-label">Status:</span>{' '}
+          <span>
+            {note.previousStatusLabel
+              ? `${note.previousStatusLabel} → ${note.statusLabel}`
+              : note.statusLabel}
+          </span>
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -109,7 +122,7 @@ export default function DeskInternalNotesPanel({ ticket, client }) {
   if (!notes.length) {
     return (
       <div className="crm-internal-notes crm-internal-notes--empty">
-        <p>{supervisorView ? 'Nenhum registro no histórico.' : 'Nenhuma nota interna registrada.'}</p>
+        <p>{supervisorView ? 'Nenhuma anotação ou alteração de agente registrada.' : 'Nenhuma nota interna registrada.'}</p>
       </div>
     );
   }

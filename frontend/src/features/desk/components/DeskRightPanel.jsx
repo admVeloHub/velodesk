@@ -1,9 +1,10 @@
 /**
- * DeskRightPanel v1.3.1 — fechamento do ticket apenas pelo X da aba
- * VERSION: v1.3.1 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * DeskRightPanel v1.3.2 — tipo com default Solicitação no select
+ * VERSION: v1.3.2 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
  */
 import React, { useEffect } from 'react';
 import { buildIaTabulation } from '../../../services/desk/utils';
+import { DEFAULT_TIPO } from '../../../services/tabulationConfig';
 import { useTabulation } from '../../../context/TabulationContext';
 import { useDeskAgents } from '../../../hooks/useDeskAgents';
 import { DeskStatusCommitButton } from './DeskComposePanel';
@@ -103,7 +104,7 @@ export default function DeskRightPanel({
             id="selTipo"
             label="Tipo"
             fieldKey="tipo"
-            value={rightFields.tipo}
+            value={rightFields.tipo || DEFAULT_TIPO}
             options={TIPO_OPTIONS}
             onFieldChange={onFieldChange}
           />

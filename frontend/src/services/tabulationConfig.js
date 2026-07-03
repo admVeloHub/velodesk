@@ -1,11 +1,13 @@
 /**
- * tabulationConfig v1.3.0 — validação de tabulação obrigatória por status
- * VERSION: v1.3.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * tabulationConfig v1.3.1 — defaults de tipo/responsável na validação
+ * VERSION: v1.3.1 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
  */
 
 export const EMPTY_TABULATION = {
   produtos: [],
 };
+
+export const DEFAULT_TIPO = 'Solicitação';
 
 export function getActiveProdutos(config) {
   return (config?.produtos || []).filter((p) => p.ativo !== false);
@@ -49,14 +51,25 @@ export function buildDefaultRightFields(_config, ticket, getAgentName) {
   const motivo = produto && hasSavedTabulationValue(lf.motivo) ? String(lf.motivo).trim() : '';
   const detalhe = motivo && hasSavedTabulationValue(lf.detalhe) ? String(lf.detalhe).trim() : '';
   const agent = typeof getAgentName === 'function' ? getAgentName() : '';
+  const tipo = String(lf.classificacaoTipo || lf.tipoChamado || DEFAULT_TIPO).trim() || DEFAULT_TIPO;
   return {
     responsavel: lf.responsavel || ticket?.responsibleAgent || agent,
     canal: lf.canal || ticket?.channel || 'WhatsApp',
-    tipo: lf.classificacaoTipo || 'Solicitação',
+    tipo,
     produto,
     motivo,
     detalhe,
   };
+}
+
+/** Garante defaults (tipo, responsável, canal) mesmo quando sessão salva veio incompleta */
+export function mergeRightFieldsWithDefaults(partial, ticket, getAgentName) {
+  const defaults = buildDefaultRightFields(null, ticket, getAgentName);
+  const merged = { ...defaults, ...(partial || {}) };
+  merged.tipo = String(merged.tipo || defaults.tipo || DEFAULT_TIPO).trim() || DEFAULT_TIPO;
+  merged.responsavel = String(merged.responsavel || defaults.responsavel || '').trim() || defaults.responsavel;
+  merged.canal = String(merged.canal || defaults.canal || 'WhatsApp').trim() || defaults.canal;
+  return merged;
 }
 
 export function applyCascadeFieldChange(prev, key, value) {
@@ -83,7 +96,7 @@ export function validateTabulationForSendStatus(statusId, rightFields, config) {
   const motivo = String(rightFields?.motivo ?? '').trim();
   const detalhe = String(rightFields?.detalhe ?? '').trim();
   const responsavel = String(rightFields?.responsavel ?? '').trim();
-  const tipo = String(rightFields?.tipo ?? '').trim();
+  const tipo = String(rightFields?.tipo ?? rightFields?.classificacaoTipo ?? rightFields?.tipoChamado ?? DEFAULT_TIPO).trim() || DEFAULT_TIPO;
 
   if (!produto) missing.push('Produto');
   if (!tipo) missing.push('Tipo');

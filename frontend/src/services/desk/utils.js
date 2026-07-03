@@ -1,6 +1,6 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v2.8.2 | DATE: 2026-07-02
+ * VERSION: v2.9.1 | DATE: 2026-07-03
  */
 import { getKanbanColumns, saveKanbanColumns, getAllCockpitTickets } from '../kanbanStorage';
 import { ticketMatchesAgentResponsavel } from './responsavelSegmentation';
@@ -579,7 +579,7 @@ function applyAlteracoesToTabulationState(state, alteracoes) {
   return state;
 }
 
-function collectRegistroOccurrenceData(entry, previousTabulationState = {}) {
+function collectRegistroOccurrenceData(entry, previousTabulationState = {}, prevStatus = null) {
   const tabulationChanges = [];
   const seen = new Set();
 
@@ -587,23 +587,108 @@ function collectRegistroOccurrenceData(entry, previousTabulationState = {}) {
     extractAlteracaoFields(raw).forEach(({ key, field, value }) => {
       const prevVal = String(previousTabulationState[key] ?? '').trim();
       if (prevVal === value) return;
-      const token = `${field}:${value}`;
+      const token = `${field}:${prevVal}->${value}`;
       if (seen.has(token)) return;
       seen.add(token);
-      tabulationChanges.push({ field, value });
+      tabulationChanges.push({
+        field,
+        value,
+        previousValue: prevVal || undefined,
+      });
     });
   });
 
-  const statusLabel = getTicketStatusLabel(entry.status || 'novo');
+  const statusChanged = Boolean(
+    entry.status
+    && prevStatus !== null
+    && String(entry.status) !== String(prevStatus)
+  );
+  const statusLabel = statusChanged ? getTicketStatusLabel(entry.status) : null;
+  const previousStatusLabel = statusChanged && prevStatus
+    ? getTicketStatusLabel(prevStatus)
+    : null;
 
-  return { tabulationChanges, statusLabel };
+  return { tabulationChanges, statusLabel, previousStatusLabel, statusChanged };
 }
 
-function shouldShowRegistroOccurrence(entry, prevStatus, isFirst) {
+function isAgentRegistroEntry(entry) {
+  return String(entry.origin || 'agente').toLowerCase() !== 'cliente';
+}
+
+/** Supervisor: agente com anotação interna, diff de tabulação ou mudança de status */
+function shouldShowSupervisorRegistroOccurrence(entry, previousTabulationState, prevStatus) {
+  if (!isAgentRegistroEntry(entry)) return false;
+
   const hasInternal = Boolean(String(entry.anotacaoInterna ?? '').trim());
-  const hasAlteracoes = (entry.alteracoes || []).length > 0;
-  const statusChanged = Boolean(entry.status && entry.status !== prevStatus);
-  return hasInternal || hasAlteracoes || statusChanged || isFirst;
+  const { tabulationChanges, statusChanged } = collectRegistroOccurrenceData(
+    entry,
+    previousTabulationState,
+    prevStatus,
+  );
+  return hasInternal || tabulationChanges.length > 0 || statusChanged;
+}
+
+function mapSupervisorRegistroOccurrence(entry, ticket, client, previousTabulationState, prevStatus) {
+  if (!shouldShowSupervisorRegistroOccurrence(entry, previousTabulationState, prevStatus)) return null;
+
+  const ticketId = String(ticket.id || ticket._id);
+  const author = resolveRegistroAutorLabel(entry, ticket, client);
+  const {
+    tabulationChanges,
+    statusLabel,
+    previousStatusLabel,
+    statusChanged,
+  } = collectRegistroOccurrenceData(entry, previousTabulationState, prevStatus);
+  const internalExcerpt = String(entry.anotacaoInterna ?? '').trim();
+
+  return {
+    id: `${ticketId}:${entry.id}`,
+    kind: 'registro',
+    author,
+    initials: getInitials(author),
+    badge: 'Registro',
+    timestamp: entry.time || entry.timestamp || ticket.updatedAt,
+    tabulationChanges,
+    statusLabel,
+    previousStatusLabel,
+    statusChanged,
+    internalExcerpt,
+    ticketId,
+    ticketTitle: getTicketTitle(ticket),
+  };
+}
+
+function buildAgentInternalNotesFeed(ticket) {
+  const merged = [];
+  const seen = new Set();
+
+  normalizeTicketForDeskV2(ticket);
+  const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
+  historico.forEach((entry) => {
+    if (!isAgentRegistroEntry(entry)) return;
+    const text = String(entry.anotacaoInterna ?? '').trim();
+    if (!text) return;
+
+    const mapped = {
+      id: `${ticket.id || ticket._id}:${entry.id}`,
+      kind: 'agent',
+      author: resolveRegistroAutorLabel(entry, ticket, null),
+      initials: getInitials(resolveRegistroAutorLabel(entry, ticket, null)),
+      badge: 'Interna',
+      timestamp: entry.time || entry.timestamp || ticket.updatedAt,
+      body: text,
+      tags: [],
+      ticketId: String(ticket.id || ticket._id),
+      ticketTitle: getTicketTitle(ticket),
+      boldSegments: [],
+    };
+    if (seen.has(mapped.id)) return;
+    seen.add(mapped.id);
+    merged.push(mapped);
+  });
+
+  merged.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  return merged;
 }
 
 function isGenericRegistroAutorLabel(value) {
@@ -623,87 +708,32 @@ function resolveRegistroAutorLabel(entry, ticket, client) {
   return getAgentName() || '—';
 }
 
-function mapRegistroOcorrencia(entry, ticket, prevStatus, isFirst, client, previousTabulationState = {}) {
-  if (!shouldShowRegistroOccurrence(entry, prevStatus, isFirst)) return null;
-
-  const ticketId = String(ticket.id || ticket._id);
-  const origin = entry.origin || 'agente';
-  const author = resolveRegistroAutorLabel(entry, ticket, client);
-  const { tabulationChanges, statusLabel } = collectRegistroOccurrenceData(entry, previousTabulationState);
-  const internalExcerpt = String(entry.anotacaoInterna ?? '').trim();
-
-  return {
-    id: `${ticketId}:${entry.id}`,
-    kind: 'registro',
-    author,
-    initials: getInitials(author),
-    badge: 'Registro',
-    timestamp: entry.time || entry.timestamp || ticket.updatedAt,
-    tabulationChanges,
-    statusLabel,
-    internalExcerpt,
-    ticketId,
-    ticketTitle: getTicketTitle(ticket),
-  };
-}
-
-function mapStoredInternalNote(note, ticket) {
-  const ticketId = String(ticket.id || ticket._id);
-  const noteKey = note.id || `note-${note.timestamp || Date.now()}`;
-  const kind = note.kind || 'agent';
-  return {
-    id: `${ticketId}:${noteKey}`,
-    kind,
-    author: note.author || note.agent || getAgentName(),
-    initials: note.initials || getInitials(note.author || getAgentName()),
-    badge: note.badge || (kind === 'ai' ? 'Automática' : kind === 'system' ? 'Automático' : kind === 'sla' ? 'Atenção' : 'Interna'),
-    timestamp: note.timestamp || note.time || note.createdAt || ticket.updatedAt,
-    body: note.text || note.body || '',
-    tags: note.tags || [],
-    ticketId,
-    ticketTitle: getTicketTitle(ticket),
-    boldSegments: note.boldSegments || [],
-  };
-}
-
-function buildAgentInternalNotesFeed(tickets) {
+function buildSupervisorRegistroFeed(ticket, client) {
   const merged = [];
   const seen = new Set();
 
-  tickets.forEach((t) => {
-    normalizeTicketForDeskV2(t);
-    (t.internalNotes || []).forEach((note) => {
-      const mapped = mapStoredInternalNote(note, t);
-      if (seen.has(mapped.id)) return;
+  normalizeTicketForDeskV2(ticket);
+  const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
+  const tabulationState = {};
+  let prevStatus = null;
+  historico.forEach((entry) => {
+    const previousTabulationState = { ...tabulationState };
+    const mapped = mapSupervisorRegistroOccurrence(
+      entry,
+      ticket,
+      client,
+      previousTabulationState,
+      prevStatus,
+    );
+    if (mapped && !seen.has(mapped.id)) {
       seen.add(mapped.id);
       merged.push(mapped);
-    });
+    }
+    applyAlteracoesToTabulationState(tabulationState, entry.alteracoes);
+    if (entry.status) prevStatus = entry.status;
   });
 
-  merged.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  return merged;
-}
-
-function buildSupervisorRegistroFeed(tickets, client) {
-  const merged = [];
-  const seen = new Set();
-
-  tickets.forEach((t) => {
-    normalizeTicketForDeskV2(t);
-    const historico = t.registroHistorico || t.registroAlteracoes || [];
-    const tabulationState = {};
-    historico.forEach((entry, idx) => {
-      const prevStatus = idx > 0 ? historico[idx - 1].status : null;
-      const previousTabulationState = { ...tabulationState };
-      const mapped = mapRegistroOcorrencia(entry, t, prevStatus, idx === 0, client, previousTabulationState);
-      if (!mapped || seen.has(mapped.id)) return;
-      seen.add(mapped.id);
-      merged.push(mapped);
-      applyAlteracoesToTabulationState(tabulationState, entry.alteracoes);
-    });
-  });
-
-  merged.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  merged.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   return merged;
 }
 
@@ -711,16 +741,11 @@ export function buildClientInternalNotesFeed(ticket, client, options = {}) {
   const { supervisorView = false } = options;
   if (!ticket) return [];
 
-  const contact = getClientContactFields(ticket, client);
-  const cpfDigits = normalizeCpf(ticket.lateralForm?.cpf || ticket.clientCPF || client?.cpf || '');
-  const clientTickets = collectClientTickets(cpfDigits, contact.name);
-  const tickets = clientTickets.length ? clientTickets : [ticket];
-
   if (supervisorView) {
-    return buildSupervisorRegistroFeed(tickets, client);
+    return buildSupervisorRegistroFeed(ticket, client);
   }
 
-  return buildAgentInternalNotesFeed(tickets);
+  return buildAgentInternalNotesFeed(ticket);
 }
 
 export function applySendStatus(entry, queueId) {

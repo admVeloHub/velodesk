@@ -1,6 +1,6 @@
 /**
- * responsavelSegmentation v1.1.0 — segmentação Meus Chamados (tabulacao.responsavel)
- * VERSION: v1.1.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * responsavelSegmentation v1.2.0 — novos sem responsavel = fila compartilhada
+ * VERSION: v1.2.0 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
  */
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 
@@ -78,6 +78,9 @@ export function ticketMatchesAgentResponsavel(ticket, profileId = readDeskProfil
   if (!shouldUseMeusChamadosFila(profileId)) return true;
 
   const responsavel = normalize(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
+  const status = normalize(ticket?.status || '');
+
+  if (!responsavel && status === 'novo') return true;
   if (!responsavel) return false;
 
   const candidates = buildResponsavelCandidates();

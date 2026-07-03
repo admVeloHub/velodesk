@@ -33,21 +33,25 @@ import DeskWhatsAppChat from './components/DeskWhatsAppChat';
 import DeskComposePanel from './components/DeskComposePanel';
 import DeskInternalNotesPanel from './components/DeskInternalNotesPanel';
 import DeskRightPanel from './components/DeskRightPanel';
-import { applyCascadeFieldChange, buildDefaultRightFields, getMotivos, validateTabulationForSendStatus } from '../../services/tabulationConfig';
+import { applyCascadeFieldChange, buildDefaultRightFields, getMotivos, mergeRightFieldsWithDefaults, validateTabulationForSendStatus } from '../../services/tabulationConfig';
 import { useTabulation } from '../../context/TabulationContext';
 import { createSpellContext, loadSpellEngine, scanText } from '../../services/spellcheck/spellEngine';
 import { htmlToPlainText } from '../../services/desk/composeRichEditor';
 
 function applyRightFieldsToTicket(t, rightFields, escalonar) {
   const prevLf = t.lateralForm || {};
+  const tipo = String(
+    rightFields.tipo || prevLf.classificacaoTipo || prevLf.tipoChamado || 'Solicitação'
+  ).trim() || 'Solicitação';
   const nextLf = {
     ...prevLf,
-    classificacaoTipo: rightFields.tipo ?? prevLf.classificacaoTipo,
-    produto: rightFields.produto ?? prevLf.produto,
-    motivo: rightFields.motivo ?? prevLf.motivo,
-    detalhe: rightFields.detalhe ?? prevLf.detalhe,
-    canal: rightFields.canal ?? prevLf.canal,
-    responsavel: rightFields.responsavel ?? prevLf.responsavel,
+    classificacaoTipo: tipo,
+    tipoChamado: tipo,
+    produto: rightFields.produto || prevLf.produto,
+    motivo: rightFields.motivo || prevLf.motivo,
+    detalhe: rightFields.detalhe || prevLf.detalhe,
+    canal: rightFields.canal || prevLf.canal,
+    responsavel: rightFields.responsavel || prevLf.responsavel,
     escalonar,
   };
   if (escalonar) {
@@ -162,9 +166,11 @@ export default function DeskV2Root() {
     const saved = tabSessionsRef.current[String(ticketId)];
     const hasSavedProduto = Boolean((t.lateralForm?.produto || '').trim());
     const session = saved || defaults;
-    const nextRightFields = hasSavedProduto && saved?.rightFields
-      ? saved.rightFields
-      : defaults.rightFields;
+    const nextRightFields = mergeRightFieldsWithDefaults(
+      hasSavedProduto && saved?.rightFields ? saved.rightFields : defaults.rightFields,
+      t,
+      getAgentName,
+    );
     setMainTab(session.mainTab ?? defaults.mainTab);
     setComposeMode(session.composeMode ?? defaults.composeMode);
     setComposeText(session.composeText ?? defaults.composeText);
@@ -248,7 +254,7 @@ export default function DeskV2Root() {
         return defaults;
       }
       if (prev.produto === lf.produto && getMotivos(config, prev.produto).includes(prev.motivo || '')) {
-        return prev;
+        return mergeRightFieldsWithDefaults(prev, entry.ticket, getAgentName);
       }
       return buildDefaultRightFields(config, entry.ticket, getAgentName);
     });
@@ -350,7 +356,11 @@ export default function DeskV2Root() {
     const messagePayload = messageHtml || '';
     const internalNotePayload = internalNoteHtml || '';
 
-    const tabulationCheck = validateTabulationForSendStatus(status, rightFields, config);
+    const tabulationCheck = validateTabulationForSendStatus(
+      status,
+      mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
+      config,
+    );
     if (!tabulationCheck.ok) {
       showNotification(tabulationCheck.message, 'warning');
       return null;
@@ -386,7 +396,11 @@ export default function DeskV2Root() {
       if (isDraftTicket(ticket)) {
         const draftId = String(ticket.id);
         const session = tabSessionsRef.current[draftId];
-        let prepared = applyRightFieldsToTicket({ ...ticket }, rightFields, escalonar);
+        let prepared = applyRightFieldsToTicket(
+          { ...ticket },
+          mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
+          escalonar,
+        );
         applySendStatus({ ticket: prepared, boxId: entry.boxId }, status);
         const regKey = Date.now();
         const ts = new Date().toISOString();
@@ -449,7 +463,11 @@ export default function DeskV2Root() {
         });
       }
       await updateTicketInKanban(ticket.id, (t) => {
-        applyRightFieldsToTicket(t, rightFields, escalonar);
+        applyRightFieldsToTicket(
+          t,
+          mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
+          escalonar,
+        );
         applySendStatus({ ticket: t, boxId: entry.boxId }, status);
         return t;
       });

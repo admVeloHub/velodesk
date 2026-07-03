@@ -1,4 +1,4 @@
-/** boxes.routes v1.3.7 — agente sempre usa fila meus-chamados */
+/** boxes.routes v1.3.8 — novos sem responsavel na fila do agente */
 import { Router, Response } from 'express';
 import mongoose from 'mongoose';
 import { authMiddleware } from '../middleware/auth';

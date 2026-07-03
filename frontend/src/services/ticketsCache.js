@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.5.0 — meus-chamados obrigatório para agente + filtro defensivo
- * VERSION: v1.5.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.5.1 — novos sem responsavel visíveis ao agente
+ * VERSION: v1.5.1 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import {
