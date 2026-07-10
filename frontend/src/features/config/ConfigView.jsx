@@ -1,11 +1,10 @@
 /**
  * Central de Configurações — layout V2
- * VERSION: v3.2.0 | DATE: 2026-06-25
+ * VERSION: v3.3.0 | DATE: 2026-07-07
  */
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useProfile } from '../../context/ProfileContext';
-import { resetVelodeskLabData } from '../../config/cockpitConfig';
 import { CONFIG_SECTIONS, getConfigSection } from './configSections';
 import TabulationFormsSection from './components/TabulationFormsSection';
 
@@ -90,15 +89,7 @@ export default function ConfigView() {
                 </div>
               </header>
 
-              {section === 'backup' ? (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={resetVelodeskLabData}
-                >
-                  Resetar dados demo
-                </button>
-              ) : section === 'forms' ? (
+              {section === 'forms' ? (
                 <TabulationFormsSection />
               ) : (
                 <p className="config-placeholder-msg">

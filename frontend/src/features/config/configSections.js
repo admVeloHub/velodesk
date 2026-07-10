@@ -1,6 +1,6 @@
 /**
  * Seções da Central de Configurações
- * VERSION: v1.1.0 | DATE: 2026-06-19
+ * VERSION: v1.2.0 | DATE: 2026-07-07
  */
 export const CONFIG_SECTIONS = [
   {
@@ -16,14 +16,6 @@ export const CONFIG_SECTIONS = [
     menuDesc: 'Regras e fluxos automáticos',
     cardDesc: 'Automatize etapas do atendimento',
     icon: 'ti-hierarchy-2',
-  },
-  {
-    id: 'backup',
-    label: 'Backup / Restore',
-    cardTitle: 'Backup',
-    menuDesc: 'Exportar e restaurar dados',
-    cardDesc: 'Proteja e restaure seus dados',
-    icon: 'ti-database',
   },
   {
     id: 'api',
@@ -53,6 +45,14 @@ export const CONFIG_SECTIONS = [
     menuDesc: 'Respostas e atalhos prontos',
     cardDesc: 'Crie textos e ações reutilizáveis',
     icon: 'ti-template',
+  },
+  {
+    id: 'backup',
+    label: 'Backup / Restore',
+    cardTitle: 'Backup',
+    menuDesc: 'Exportar e restaurar dados',
+    cardDesc: 'Proteja e restaure seus dados',
+    icon: 'ti-database',
   },
 ];
 

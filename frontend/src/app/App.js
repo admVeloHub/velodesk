@@ -2,7 +2,7 @@
 
  * App raiz — providers + rotas
 
- * VERSION: v2.4.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * VERSION: v2.5.0 | DATE: 2026-07-06 | AUTHOR: VeloHub Development Team
 
  */
 
@@ -41,13 +41,9 @@ import ChatPage from '../pages/ChatPage';
 
 import ConfigPage from '../pages/ConfigPage';
 
-import AnalyticsIaPage from '../pages/AnalyticsIaPage';
-
 import ReportsPage from '../pages/ReportsPage';
 
 import ClientPortalPage from '../pages/ClientPortalPage';
-
-import { clearDemoTickets } from '../services/clearDemoTickets';
 
 import { initCockpitGlobals } from '../config/cockpitConfig';
 
@@ -88,8 +84,6 @@ function AppRoutes() {
             { path: 'chat', element: React.createElement(ChatPage) },
 
             { path: 'config', element: React.createElement(ConfigPage) },
-
-            { path: 'analytics-ia', element: React.createElement(AnalyticsIaPage) },
 
             { path: 'client-portal', element: React.createElement(ClientPortalPage) },
 
@@ -158,8 +152,6 @@ export default function App() {
     initCockpitGlobals();
 
     setApiMode(true);
-
-    clearDemoTickets();
 
     if (!isLocalDevBypass()) {
 

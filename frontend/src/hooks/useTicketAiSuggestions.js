@@ -1,10 +1,11 @@
 /**
- * useTicketAiSuggestions v1.0.1 — evita loop de requests em 503 (serviço não configurado)
- * VERSION: v1.0.1 | DATE: 2026-07-03
+ * useTicketAiSuggestions v1.0.2 — envia nome do agente para formato padrão da resposta
+ * VERSION: v1.0.2 | DATE: 2026-07-10
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ticketAiApi } from '../api/client';
 import { htmlToPlainText } from '../services/desk/composeRichEditor';
+import { getAgentName } from '../services/clientDb';
 
 export const TICKET_AI_INTERNAL_NOTE_MIN_CHARS = 80;
 const PUBLIC_DEBOUNCE_MS = 2000;
@@ -46,15 +47,23 @@ function buildContextHash({ ticketId, contextSource, messages, internalPlain, pr
   ].join('::');
 }
 
+function resolveAgentFirstName() {
+  const full = String(getAgentName() || '').trim();
+  if (!full) return '';
+  return full.split(/\s+/)[0] || full;
+}
+
 function buildPayload({ ticket, rightFields, convMsgs, internalPlain, contextSource }) {
   const apiMessages = mapConvMsgsToApi(convMsgs);
   const canal = resolveCanal(ticket, rightFields);
+  const nomeOperador = resolveAgentFirstName();
   const base = {
     ticketId: ticket?.id || ticket?._id,
     protocolo: ticket?.chamadoProtocolo || ticket?.protocol,
     titulo: ticket?.title || ticket?.chamadoTitulo,
     canal,
     clientName: ticket?.clientName || ticket?.lateralForm?.clienteNome,
+    nomeOperador: nomeOperador || undefined,
     produtoHint: String(rightFields?.produto || '').trim() || undefined,
   };
 

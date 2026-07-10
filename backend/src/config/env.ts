@@ -1,4 +1,4 @@
-/** env v1.12.1 — fallback VECTOR_STORE_PATH para vector store OpenAI */
+/** env v1.14.0 — Gmail Workspace outbound + inbound Pub/Sub */
 import fs from 'fs';
 import path from 'path';
 
@@ -61,7 +61,18 @@ export const env = {
     .split(',')
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean),
+  emailEnabled: process.env.EMAIL_ENABLED === 'true',
+  deskEmailTransportCollection: process.env.DESK_EMAIL_TRANSPORT_COLLECTION || 'email_transport',
+  deskEmailTransportDocumentId: process.env.DESK_EMAIL_TRANSPORT_DOCUMENT_ID || 'desk_email_transport',
+  gmailInboundEnabled: process.env.GMAIL_INBOUND_ENABLED === 'true',
+  gcpProjectId: (process.env.GCP_PROJECT_ID || 'velohub-471220').trim(),
+  gmailPubsubTopic: (process.env.GMAIL_PUBSUB_TOPIC || 'gmail-desk-inbound').trim(),
+  gmailPubsubVerifyToken: (process.env.GMAIL_PUBSUB_VERIFY_TOKEN || '').trim(),
+  gmailWatchStateCollection: process.env.GMAIL_WATCH_STATE_COLLECTION || 'gmail_watch_state',
+  gmailWatchStateDocumentId: process.env.GMAIL_WATCH_STATE_DOCUMENT_ID || 'desk_gmail_watch',
+  /** @deprecated use desk_config.email_transport Gmail API */
   emailFrom: process.env.EMAIL_FROM || '',
+  /** @deprecated use desk_config.email_transport Gmail API */
   emailApiKey: process.env.EMAIL_API_KEY || '',
   googleClientId: (process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '')
     .trim()
@@ -81,5 +92,12 @@ export const env = {
   ).trim(),
   openaiModel: (process.env.OPENAI_MODEL || 'gpt-4.1-mini').trim(),
   ticketSequenceFloor: (process.env.TICKET_SEQUENCE_FLOOR || '100177678').trim(),
+  assignmentRouterEnabled: process.env.ASSIGNMENT_ROUTER_ENABLED === 'true',
+  assignmentRouterStrategy: (process.env.ASSIGNMENT_ROUTER_STRATEGY || 'least_loaded').trim(),
+  assignmentRouterTerminalStatuses: (process.env.ASSIGNMENT_ROUTER_TERMINAL_STATUSES || 'resolvido,cancelado,fechado')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean),
+  inboundAppWebhookSecret: (process.env.INBOUND_APP_WEBHOOK_SECRET || '').trim(),
 };
 

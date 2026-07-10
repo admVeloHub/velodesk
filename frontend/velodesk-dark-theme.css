@@ -721,6 +721,26 @@ body.velodesk-dark #velodeskDeskV2Root .spell-errors-panel__fix {
     color: #86efac;
 }
 
+body.velodesk-dark #velodeskDeskV2Root .spell-errors-panel__ignore {
+    background: var(--velo-dark-surface);
+    color: #cbd5e1;
+    border-color: rgba(148, 163, 184, 0.35);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .spell-errors-panel__ignore:hover {
+    background: rgba(51, 65, 85, 0.45);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .spell-errors-panel__vocab {
+    background: var(--velo-dark-surface);
+    color: #93c5fd;
+    border-color: rgba(59, 130, 246, 0.35);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .spell-errors-panel__vocab:hover {
+    background: rgba(30, 58, 138, 0.35);
+}
+
 body.velodesk-dark #velodeskDeskV2Root .response-textarea.spell-textarea--error {
     border-color: #f87171 !important;
     box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.2) !important;

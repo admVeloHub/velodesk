@@ -1,7 +1,8 @@
-/** tabulation.service v1.3.0 — validação obrigatória de tabulação por status */
+/** tabulation.service v1.4.0 — opções dinâmicas tipo/canal no GET /api/tabulation */
 import type { ITabulacao } from '../models/ChamadoN1';
 import type { ITabulacaoDetalhe, ITabulacaoMotivo, ITabulacaoProduto } from '../models/TabulacaoProduto';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
+import { getActiveOpcoes, type TabulacaoOpcoesActiveDto } from './tabulationOpcoes.service';
 
 export class TabulacaoValidationError extends Error {
   constructor(message: string) {
@@ -36,6 +37,7 @@ export interface TabulationProdutoDto {
 
 export interface TabulationActiveDto {
   produtos: TabulationProdutoDto[];
+  opcoes: TabulacaoOpcoesActiveDto;
 }
 
 let cachedActive: TabulationActiveDto | null = null;
@@ -91,7 +93,13 @@ export async function getProdutoById(id: string): Promise<TabulationProdutoDto |
 export async function getActiveTabulation(): Promise<TabulationActiveDto> {
   if (cachedActive) return cachedActive;
   const produtos = await listProdutos(false);
-  cachedActive = { produtos };
+  let opcoes: TabulacaoOpcoesActiveDto = { tipoChamado: [], canalContato: [] };
+  try {
+    opcoes = await getActiveOpcoes();
+  } catch (err) {
+    console.error('[tabulation] opções indisponíveis — continuando só com produtos:', (err as Error)?.message);
+  }
+  cachedActive = { produtos, opcoes };
   return cachedActive;
 }
 

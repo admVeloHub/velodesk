@@ -1,4 +1,4 @@
-﻿/** inboundAuth v1.0.0 — validação de webhooks inbound */
+﻿/** inboundAuth v1.1.0 — validação webhooks inbound + app-notify */
 import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { env } from '../config/env';
@@ -42,6 +42,26 @@ export function inboundEmailAuthMiddleware(req: Request, res: Response, next: Ne
 
   if (!valid) {
     res.status(401).json({ message: 'Assinatura inbound inválida' });
+    return;
+  }
+
+  next();
+}
+
+export function inboundAppAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const secret = env.inboundAppWebhookSecret;
+  if (!secret) {
+    if (env.nodeEnv !== 'production') {
+      next();
+      return;
+    }
+    res.status(503).json({ message: 'Inbound app desabilitado — secret ausente' });
+    return;
+  }
+
+  const header = String(req.headers['x-inbound-secret'] ?? '').trim();
+  if (header !== secret) {
+    res.status(401).json({ message: 'Secret inbound app inválido' });
     return;
   }
 

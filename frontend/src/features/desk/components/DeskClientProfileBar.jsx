@@ -1,11 +1,10 @@
 /**
- * DeskClientProfileBar v1.4.1 — termômetro à esquerda de status/histórico
- * VERSION: v1.4.1 | DATE: 2026-07-03
+ * DeskClientProfileBar v1.4.2 — remove gauge termômetro do header do cliente
+ * VERSION: v1.4.2 | DATE: 2026-07-06
  */
 import React, { useEffect, useState } from 'react';
 import { getClientContactFields, getTicketProtocolLabel } from '../../../services/desk/utils';
 import ClientTicketHistoryModal from './ClientTicketHistoryModal';
-import ClientThermoGauge from './ClientThermoGauge';
 import TicketOperationProgress from './TicketOperationProgress';
 
 function resolveProtocolLabel(ticket) {
@@ -75,10 +74,6 @@ export default function DeskClientProfileBar({
             queueId={queueId}
             escalonar={escalonar}
           />
-        </div>
-
-        <div className="ticket-client-profile__cell-thermo">
-          <ClientThermoGauge client={client} />
         </div>
 
         <div className="ticket-client-profile__client-main ticket-client-profile__cell-client" id="headerInfo">

@@ -1,6 +1,6 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v2.9.1 | DATE: 2026-07-03
+ * VERSION: v2.10.0 | DATE: 2026-07-07
  */
 import { getKanbanColumns, saveKanbanColumns, getAllCockpitTickets } from '../kanbanStorage';
 import { ticketMatchesAgentResponsavel } from './responsavelSegmentation';
@@ -658,46 +658,13 @@ function mapSupervisorRegistroOccurrence(entry, ticket, client, previousTabulati
   };
 }
 
-function buildAgentInternalNotesFeed(ticket) {
-  const merged = [];
-  const seen = new Set();
-
-  normalizeTicketForDeskV2(ticket);
-  const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
-  historico.forEach((entry) => {
-    if (!isAgentRegistroEntry(entry)) return;
-    const text = String(entry.anotacaoInterna ?? '').trim();
-    if (!text) return;
-
-    const mapped = {
-      id: `${ticket.id || ticket._id}:${entry.id}`,
-      kind: 'agent',
-      author: resolveRegistroAutorLabel(entry, ticket, null),
-      initials: getInitials(resolveRegistroAutorLabel(entry, ticket, null)),
-      badge: 'Interna',
-      timestamp: entry.time || entry.timestamp || ticket.updatedAt,
-      body: text,
-      tags: [],
-      ticketId: String(ticket.id || ticket._id),
-      ticketTitle: getTicketTitle(ticket),
-      boldSegments: [],
-    };
-    if (seen.has(mapped.id)) return;
-    seen.add(mapped.id);
-    merged.push(mapped);
-  });
-
-  merged.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  return merged;
-}
-
 function isGenericRegistroAutorLabel(value) {
   const normalized = String(value ?? '').trim().toLowerCase();
   return !normalized || normalized === 'agente' || normalized === 'agent';
 }
 
 function resolveRegistroAutorLabel(entry, ticket, client) {
-  const stored = String(entry.autor ?? '').trim();
+  const stored = String(entry.autor ?? entry.author ?? '').trim();
   if (stored && !isGenericRegistroAutorLabel(stored)) return stored;
 
   const origin = entry.origin || 'agente';
@@ -705,7 +672,7 @@ function resolveRegistroAutorLabel(entry, ticket, client) {
     return ticket?.clientName || ticket?.solicitante || client?.name || 'Cliente';
   }
 
-  return getAgentName() || '—';
+  return '—';
 }
 
 function buildSupervisorRegistroFeed(ticket, client) {
@@ -737,15 +704,9 @@ function buildSupervisorRegistroFeed(ticket, client) {
   return merged;
 }
 
-export function buildClientInternalNotesFeed(ticket, client, options = {}) {
-  const { supervisorView = false } = options;
+export function buildClientInternalNotesFeed(ticket, client) {
   if (!ticket) return [];
-
-  if (supervisorView) {
-    return buildSupervisorRegistroFeed(ticket, client);
-  }
-
-  return buildAgentInternalNotesFeed(ticket);
+  return buildSupervisorRegistroFeed(ticket, client);
 }
 
 export function applySendStatus(entry, queueId) {

@@ -1,11 +1,23 @@
 /**
- * tabulationConfig v1.3.1 — defaults de tipo/responsável na validação
- * VERSION: v1.3.1 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
+ * tabulationConfig v1.4.1 — responsavel preenchido pela sessão, sem validação manual
+ * VERSION: v1.4.1 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team
  */
 
 export const EMPTY_TABULATION = {
   produtos: [],
+  opcoes: {
+    tipoChamado: [],
+    canalContato: [],
+  },
 };
+
+export const TABULACAO_OPCOES_CATEGORIAS = {
+  TIPO_CHAMADO: 'tipo_chamado',
+  CANAL_CONTATO: 'canal_contato',
+};
+
+export const FALLBACK_TIPO_OPTIONS = ['Reclamação', 'Solicitação', 'Dúvida', 'Informação'];
+export const FALLBACK_CANAL_OPTIONS = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
 
 export const DEFAULT_TIPO = 'Solicitação';
 
@@ -39,6 +51,16 @@ export function getDetalhes(config, produtoName, motivoName) {
     .filter((d) => d.ativo !== false)
     .sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
     .map((d) => d.detalhe);
+}
+
+export function getTipoChamadoOptions(config) {
+  const values = (config?.opcoes?.tipoChamado || []).filter(Boolean);
+  return values.length ? values : FALLBACK_TIPO_OPTIONS;
+}
+
+export function getCanalContatoOptions(config) {
+  const values = (config?.opcoes?.canalContato || []).filter(Boolean);
+  return values.length ? values : FALLBACK_CANAL_OPTIONS;
 }
 
 function hasSavedTabulationValue(value) {
@@ -95,12 +117,10 @@ export function validateTabulationForSendStatus(statusId, rightFields, config) {
   const produto = String(rightFields?.produto ?? '').trim();
   const motivo = String(rightFields?.motivo ?? '').trim();
   const detalhe = String(rightFields?.detalhe ?? '').trim();
-  const responsavel = String(rightFields?.responsavel ?? '').trim();
   const tipo = String(rightFields?.tipo ?? rightFields?.classificacaoTipo ?? rightFields?.tipoChamado ?? DEFAULT_TIPO).trim() || DEFAULT_TIPO;
 
   if (!produto) missing.push('Produto');
   if (!tipo) missing.push('Tipo');
-  if (!responsavel) missing.push('Responsável');
 
   if (produto) {
     const motivos = getMotivos(config, produto);

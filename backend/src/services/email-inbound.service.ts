@@ -1,7 +1,9 @@
-﻿/** email-inbound.service v1.1.0 — metadados técnicos separados de alteracoes[] */
+﻿/** email-inbound.service v1.2.1 — roleta em tabulacao.responsavel only */
 import { ChamadoN1 } from '../models/ChamadoN1';
+import { applyAssignmentIfNeeded } from './assignmentRouter.service';
 import { appendMessage, createChamadoFromBody } from './chamado.mapper';
 import { normalizeEmail, resolveClienteRefFromEmail } from './cliente.service';
+import { notifyTicketOpenedAsync } from './emailNotification.service';
 import type { InboundEmailPayload, InboundEmailProcessResult } from './inbound-email/types';
 
 export const LEGACY_PROTOCOL_PATTERN = /VD-\d{8}-\d{4}/i;
@@ -156,7 +158,10 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
     partial.cliente = [clienteRef];
   }
 
+  await applyAssignmentIfNeeded(partial, { source: 'email-inbound', canal: 'E-mail' });
+
   const chamado = await ChamadoN1.create(partial);
+  notifyTicketOpenedAsync(chamado, payload.from.email);
   return {
     action: 'created',
     chamadoProtocolo: chamado.chamadoProtocolo,

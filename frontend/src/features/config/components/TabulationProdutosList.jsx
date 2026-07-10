@@ -1,13 +1,24 @@
 /**
- * TabulationProdutosList v1.4.3 — lista, ordem, desativar e excluir
- * VERSION: v1.4.3 | DATE: 2026-06-30
+ * TabulationProdutosList v1.5.2 — ícone de editar nos cards tipo/canal
+ * VERSION: v1.5.2 | DATE: 2026-07-07
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { tabulationApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
+import { TABULACAO_OPCOES_CATEGORIAS } from '../../../services/tabulationConfig';
 import TabulationProdutoEditor from './TabulationProdutoEditor';
 import TabulationDeleteConfirmModal, { countDetalhes } from './TabulationDeleteConfirmModal';
+import TabulationOpcoesModal from './TabulationOpcoesModal';
 import ConfigAtivoToggle from './ConfigAtivoToggle';
+
+function computeOpcoesStats(opcoesDocs, categoria) {
+  const doc = (opcoesDocs || []).find((item) => item.categoria === categoria);
+  const list = doc?.opcoes || [];
+  return {
+    total: list.length,
+    ativos: list.filter((item) => item.ativo !== false).length,
+  };
+}
 
 function computeStats(produtos) {
   const list = produtos || [];
@@ -50,19 +61,37 @@ export default function TabulationProdutosList({ id, onChanged }) {
   const [orderDraft, setOrderDraft] = useState([]);
   const [savingOrder, setSavingOrder] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
+  const [opcoesDocs, setOpcoesDocs] = useState([]);
+  const [opcoesModal, setOpcoesModal] = useState(null);
 
   const sortedProdutos = useMemo(() => sortProdutos(produtos), [produtos]);
   const stats = useMemo(() => computeStats(produtos), [produtos]);
+  const tipoStats = useMemo(
+    () => computeOpcoesStats(opcoesDocs, TABULACAO_OPCOES_CATEGORIAS.TIPO_CHAMADO),
+    [opcoesDocs]
+  );
+  const canalStats = useMemo(
+    () => computeOpcoesStats(opcoesDocs, TABULACAO_OPCOES_CATEGORIAS.CANAL_CONTATO),
+    [opcoesDocs]
+  );
   const displayProdutos = orderEditMode ? orderDraft : sortedProdutos;
   const columnCount = orderEditMode ? 3 : 4;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await tabulationApi.listProdutos(true);
-      setProdutos(sortProdutos(data || []));
+      const produtosData = await tabulationApi.listProdutos(true);
+      setProdutos(sortProdutos(produtosData || []));
     } catch {
       showNotification('Erro ao carregar produtos.', 'error');
+    }
+
+    try {
+      const opcoesData = await tabulationApi.listOpcoes(true);
+      setOpcoesDocs(opcoesData || []);
+    } catch {
+      showNotification('Erro ao carregar tipos/canais.', 'warning');
+      setOpcoesDocs([]);
     } finally {
       setLoading(false);
     }
@@ -176,28 +205,64 @@ export default function TabulationProdutosList({ id, onChanged }) {
       className={'config-section-body config-tabulation' + (orderEditMode ? ' config-tabulation--order-edit' : '')}
     >
       <div className="forms-stats-row">
-        <div className="stat-card">
+        <button
+          type="button"
+          className="stat-card stat-card--clickable"
+          onClick={() => setOpcoesModal({
+            categoria: TABULACAO_OPCOES_CATEGORIAS.TIPO_CHAMADO,
+            title: 'Tipos de chamado',
+            description: 'Opções exibidas no campo Tipo do painel lateral do desk.',
+          })}
+        >
+          <span className="stat-card__edit-hint" aria-hidden="true">
+            <i className="ti ti-pencil" />
+          </span>
+          <span className="stat-icon" aria-hidden="true"><i className="ti ti-tag" /></span>
+          <div className="stat-info">
+            <h3>{tipoStats.ativos}</h3>
+            <p>Tipos de chamado</p>
+          </div>
+        </button>
+        <button
+          type="button"
+          className="stat-card stat-card--clickable"
+          onClick={() => setOpcoesModal({
+            categoria: TABULACAO_OPCOES_CATEGORIAS.CANAL_CONTATO,
+            title: 'Canal de contato',
+            description: 'Opções exibidas no campo Canal do painel lateral do desk.',
+          })}
+        >
+          <span className="stat-card__edit-hint" aria-hidden="true">
+            <i className="ti ti-pencil" />
+          </span>
+          <span className="stat-icon" aria-hidden="true"><i className="ti ti-message-circle" /></span>
+          <div className="stat-info">
+            <h3>{canalStats.ativos}</h3>
+            <p>Canais de contato</p>
+          </div>
+        </button>
+        <div className="stat-card stat-card--static">
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-box" /></span>
           <div className="stat-info">
             <h3>{stats.total}</h3>
             <p>Produtos cadastrados</p>
           </div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card stat-card--static">
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-circle-check" /></span>
           <div className="stat-info">
             <h3>{stats.ativos}</h3>
             <p>Ativos no desk</p>
           </div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card stat-card--static">
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-list-tree" /></span>
           <div className="stat-info">
             <h3>{stats.motivos}</h3>
             <p>Motivos na árvore</p>
           </div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card stat-card--static">
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-git-branch" /></span>
           <div className="stat-info">
             <h3>{stats.detalhes}</h3>
@@ -360,6 +425,19 @@ export default function TabulationProdutosList({ id, onChanged }) {
         onCancel={() => { if (!deleting) setDeleteTarget(null); }}
         onConfirm={confirmDelete}
       />
+
+      {opcoesModal && (
+        <TabulationOpcoesModal
+          categoria={opcoesModal.categoria}
+          title={opcoesModal.title}
+          description={opcoesModal.description}
+          onClose={() => setOpcoesModal(null)}
+          onChanged={async () => {
+            await load();
+            onChanged?.();
+          }}
+        />
+      )}
     </div>
   );
 }

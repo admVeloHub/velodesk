@@ -1,15 +1,11 @@
 /**
- * DeskRightPanel v1.4.0 — sugestão IA tabulação via OpenAI + POPs
- * VERSION: v1.4.0 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
+ * DeskRightPanel v1.6.0 — responsavel oculto (sessão automática)
+ * VERSION: v1.6.0 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team
  */
-import React, { useEffect } from 'react';
+import React from 'react';
 import { DEFAULT_TIPO } from '../../../services/tabulationConfig';
 import { useTabulation } from '../../../context/TabulationContext';
-import { useDeskAgents } from '../../../hooks/useDeskAgents';
 import { DeskStatusCommitButton } from './DeskComposePanel';
-
-const CANAL_OPTIONS = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
-const TIPO_OPTIONS = ['Reclamação', 'Solicitação', 'Dúvida', 'Informação'];
 
 function SelectField({ id, label, fieldKey, value, options, readonly, onFieldChange, showPlaceholder = false }) {
   return (
@@ -41,6 +37,7 @@ export default function DeskRightPanel({
   onCloseChat,
   waChatOpen,
   sendDisabled = false,
+  sendDisabledTitle,
   iaTabulationDisplay = '',
   iaTabulationLoading = false,
   iaWaitingMessage = '',
@@ -48,23 +45,15 @@ export default function DeskRightPanel({
   iaHasSuggestion = false,
   iaShowSection = false,
 }) {
-  const { loading, getMotivos, getDetalhes, getProdutoNames } = useTabulation();
-  const { agentOptions, currentAgentValue, loading: agentsLoading } = useDeskAgents();
-
-  useEffect(() => {
-    if (!currentAgentValue || String(rightFields.responsavel || '').trim()) return;
-    onFieldChange('responsavel', currentAgentValue);
-  }, [currentAgentValue, rightFields.responsavel, onFieldChange]);
-
-  const responsavelOptions = agentOptions.length
-    ? agentOptions
-    : (currentAgentValue ? [currentAgentValue] : []);
+  const { loading, getMotivos, getDetalhes, getProdutoNames, getTipoChamadoOptions, getCanalContatoOptions } = useTabulation();
 
   const thermo = client?.termometro ?? 38;
   const thermoLabel = client?.termometroLabel || (thermo >= 55 ? 'Crítico' : thermo >= 45 ? 'Atenção' : 'Estável');
   const thermoColor = thermo >= 55 ? '#FCC200' : thermo >= 45 ? '#FCC200' : '#15A237';
 
   const produtoOptions = getProdutoNames();
+  const tipoOptions = getTipoChamadoOptions();
+  const canalOptions = getCanalContatoOptions();
   const motivoOptions = rightFields.produto ? getMotivos(rightFields.produto) : [];
   const detalheOptions = rightFields.produto && rightFields.motivo
     ? getDetalhes(rightFields.produto, rightFields.motivo)
@@ -91,24 +80,12 @@ export default function DeskRightPanel({
           {loading && (
             <p className="rp-field-hint">Carregando opções de tabulação…</p>
           )}
-          {agentsLoading && (
-            <p className="rp-field-hint">Carregando agentes…</p>
-          )}
-          <SelectField
-            id="selResponsavel"
-            label="Responsável"
-            fieldKey="responsavel"
-            value={rightFields.responsavel || currentAgentValue}
-            options={responsavelOptions}
-            showPlaceholder
-            onFieldChange={onFieldChange}
-          />
           <SelectField
             id="selCanal"
             label="Canal"
             fieldKey="canal"
             value={rightFields.canal}
-            options={CANAL_OPTIONS}
+            options={canalOptions}
             onFieldChange={onFieldChange}
           />
           <SelectField
@@ -116,7 +93,7 @@ export default function DeskRightPanel({
             label="Tipo"
             fieldKey="tipo"
             value={rightFields.tipo || DEFAULT_TIPO}
-            options={TIPO_OPTIONS}
+            options={tipoOptions}
             onFieldChange={onFieldChange}
           />
           <SelectField
@@ -185,6 +162,7 @@ export default function DeskRightPanel({
           onCommitStatus={onCommitStatus}
           variant="panel"
           disabled={sendDisabled}
+          disabledTitle={sendDisabledTitle}
         />
       </div>
     </aside>

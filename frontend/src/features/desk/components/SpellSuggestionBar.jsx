@@ -1,6 +1,6 @@
 /**
- * SpellSuggestionBar v1.0.1 — barra de sugestão ortográfica estilo digitação mobile
- * VERSION: v1.0.1 | DATE: 2026-06-26
+ * SpellSuggestionBar v1.0.3 — barra do cursor sem duplicar o painel geral
+ * VERSION: v1.0.3 | DATE: 2026-07-10
  */
 import React from 'react';
 
@@ -11,6 +11,7 @@ export default function SpellSuggestionBar({
   onApply,
   onDismiss,
   onIgnore,
+  onAddToVocabulary,
 }) {
   if (loadError) {
     const isDegraded = /envio liberado/i.test(loadError);
@@ -57,10 +58,17 @@ export default function SpellSuggestionBar({
           <span className="spell-suggestion-bar__hint">Tab para aplicar</span>
         </>
       ) : (
-        <span className="spell-suggestion-bar__hint">Palavra não reconhecida — corrija antes de enviar</span>
+        <span className="spell-suggestion-bar__hint">Palavra não reconhecida — corrija ou adicione ao vocabulário</span>
       )}
       <button type="button" className="spell-suggestion-bar__action" onClick={onIgnore}>
         Ignorar
+      </button>
+      <button
+        type="button"
+        className="spell-suggestion-bar__action spell-suggestion-bar__action--vocab"
+        onClick={onAddToVocabulary}
+      >
+        Adicionar ao vocabulário
       </button>
       <button
         type="button"
@@ -74,16 +82,17 @@ export default function SpellSuggestionBar({
   );
 }
 
-export function SpellErrorsPanel({ errors, onApplyFix }) {
+export function SpellErrorsPanel({ errors, totalCount, onApplyFix, onIgnoreWord }) {
   if (!errors?.length) return null;
+  const count = totalCount ?? errors.length;
 
   return (
     <div className="spell-errors-panel" role="alert">
       <div className="spell-errors-panel__header">
         <i className="ti ti-alert-circle" aria-hidden="true" />
         <span>
-          Corrija {errors.length} erro{errors.length > 1 ? 's' : ''} ortográfico
-          {errors.length > 1 ? 's' : ''} antes de enviar ao cliente.
+          Corrija {count} erro{count > 1 ? 's' : ''} ortográfico
+          {count > 1 ? 's' : ''} antes de enviar ao cliente.
         </span>
       </div>
       <ul className="spell-errors-panel__list">
@@ -103,8 +112,24 @@ export function SpellErrorsPanel({ errors, onApplyFix }) {
                 </button>
               </>
             ) : (
-              <span className="spell-errors-panel__no-fix">sem sugestão</span>
+              <span className="spell-errors-panel__no-fix">sem sugestão automática</span>
             )}
+            <div className="spell-errors-panel__actions">
+              <button
+                type="button"
+                className="spell-errors-panel__ignore"
+                onClick={() => onIgnoreWord?.(error.word)}
+              >
+                Ignorar
+              </button>
+              <button
+                type="button"
+                className="spell-errors-panel__vocab"
+                onClick={() => onIgnoreWord?.(error.word)}
+              >
+                Adicionar ao vocabulário
+              </button>
+            </div>
           </li>
         ))}
       </ul>

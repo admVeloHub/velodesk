@@ -1,6 +1,6 @@
 /**
  * Desk CRM — constantes de filas e classificação
- * VERSION: v2.0.0 | DATE: 2026-06-18
+ * VERSION: v2.1.0 | DATE: 2026-07-10
  */
 export const QUEUE_STATUSES = [
   { id: 'novos', name: 'Novos', dot: '#1634FF', boxes: ['novos'] },
@@ -37,3 +37,6 @@ export const SLA_LABELS = {
   warning: 'Atenção — SLA',
   critical: 'SLA crítico'
 };
+
+/** Corretor ortográfico do compose — desativado enquanto revisão IA for obrigatória */
+export const COMPOSE_SPELLCHECK_ENABLED = false;

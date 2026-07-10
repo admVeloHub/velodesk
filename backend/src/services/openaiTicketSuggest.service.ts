@@ -1,6 +1,6 @@
 /**
- * openaiTicketSuggest.service v1.0.1 — fetch nativo (evita Premature close no Windows)
- * VERSION: v1.0.1 | DATE: 2026-07-03
+ * openaiTicketSuggest.service v1.0.2 — nome do agente + formato padrão de resposta
+ * VERSION: v1.0.2 | DATE: 2026-07-10
  */
 import OpenAI from 'openai';
 import { env } from '../config/env';
@@ -38,6 +38,7 @@ export interface TicketAiSuggestInput {
   titulo?: string;
   canal?: string;
   clientName?: string;
+  nomeOperador?: string;
   contextSource: TicketAiContextSource;
   messages?: TicketAiMessageInput[];
   internalNote?: string;
@@ -137,6 +138,7 @@ export function validateTicketAiInput(body: unknown):
       titulo: trimStr(b.titulo, MAX_TITULO_CHARS) || undefined,
       canal: trimStr(b.canal, 64) || undefined,
       clientName: trimStr(b.clientName, 200) || undefined,
+      nomeOperador: trimStr(b.nomeOperador, 120) || undefined,
       contextSource,
       messages: contextSource === 'public' ? messages : undefined,
       internalNote: contextSource === 'internal' ? internalNote : undefined,
@@ -173,6 +175,7 @@ function buildUserBlock(params: TicketAiSuggestInput, tabulationCatalog: string)
     `- **Protocolo:** ${params.protocolo || 'não informado'}`,
     `- **Canal:** ${params.canal || 'não informado'}`,
     `- **Cliente:** ${params.clientName || 'não informado'}`,
+    `- **Nome do agente:** ${params.nomeOperador || 'não informado'}`,
     `- **Título:** ${params.titulo || 'não informado'}`,
     `- **Fonte de contexto:** ${params.contextSource === 'internal' ? 'anotação interna (telefone)' : 'mensagens públicas'}`,
   ];
@@ -205,7 +208,7 @@ function buildUserBlock(params: TicketAiSuggestInput, tabulationCatalog: string)
     '',
     '## Tarefa',
     '',
-    'Consulte os POPs na base de conhecimento. Retorne JSON com respostaSugerida (texto ao cliente) e tabulacao (tipo, produto, motivo, detalhe) usando apenas valores da lista fechada.',
+    'Consulte os POPs na base de conhecimento. Retorne JSON com respostaSugerida (texto ao cliente no formato padrão: saudação, identificação do agente, desenvolvimento e despedida com assinatura Velotax) e tabulacao (tipo, produto, motivo, detalhe) usando apenas valores da lista fechada.',
   );
 
   return parts.join('\n');
@@ -312,7 +315,7 @@ export async function generateTicketAiSuggest(
       config = await getActiveTabulation();
     } catch (tabErr) {
       console.warn('[ticket-ai-suggest] tabulação Mongo indisponível — continuando só com POPs:', (tabErr as Error)?.message);
-      config = { produtos: [] };
+      config = { produtos: [], opcoes: { tipoChamado: [], canalContato: [] } };
     }
     const tabulationCatalog = buildTabulationCatalog(config);
     const systemPrompt = getTicketSuggestPersona();

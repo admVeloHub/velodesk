@@ -1,20 +1,17 @@
 # Plano: Entrada de tickets no VeloDesk (foco e-mail)
 
-**Versão:** v1.1.0  
-**Origem:** cópia do plano Cursor (`entrada_tickets_velodesk_47032842.plan.md`)  
-**Status:** Fase 1 implementada (inbound e-mail)
+**Versão:** v1.2.0  
+**Status:** Gmail Workspace implementado (outbound + inbound Pub/Sub)
 
-## Tarefas
+## Tarefas Gmail Workspace
 
-- [x] Estender `cliente.service.ts`: `normalizeEmail`, `findClienteByEmail`, `resolveClienteRefFromEmail`
-- [x] Criar `email-inbound.service.ts`: normalização, idempotência, novo ticket vs resposta, metadados em `alteracoes`
-- [x] Criar `inbound.routes.ts` + `inboundAuth.ts` + adapters de provedor (generic + Mailgun)
-- [x] Adicionar vars `INBOUND_EMAIL_*` em `env.ts` / `.env.example` e montar rotas multipart no `index.ts`
-- [x] Documentar configuração DNS MX/webhook e deploy Cloud Run no README
-- [x] Esboçar `email-outbound.service.ts` para confirmação de protocolo (Fase 1b)
-- [ ] Implementar envio outbound real (Fase 1b)
-- [x] Stub `POST /api/inbound/telephony` (Fase 2 — retorna 501)
-- [ ] Implementar telefonia completa (Fase 2)
+- [x] `EmailTransportConfig` em desk_config + `emailTransport.service` + seed script
+- [x] `gmailApiSend.ts` + `email-outbound.service` + `emailNotification.service`
+- [x] Gatilhos fail-soft em `tickets.routes` e `email-inbound.service`
+- [x] `gmailAuth` + `gmailWatch` + `GmailWatchState` + `gmailMessageParser` + `gmailInbound.service`
+- [x] `POST /api/inbound/gmail/pubsub` + health + bootstrap watch
+- [x] Vars `GMAIL_*` / `EMAIL_ENABLED` em env, `.env.example`, README
+- [ ] Teste E2E com e-mail real (requer SA + Pub/Sub configurados no GCP)
 
 ---
 

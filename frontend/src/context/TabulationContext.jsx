@@ -1,15 +1,17 @@
 /**
- * TabulationContext v1.1.1 — retry se desk_config ainda não conectou (503 transitório)
- * VERSION: v1.1.1 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
+ * TabulationContext v1.2.0 — opções dinâmicas tipo/canal
+ * VERSION: v1.2.0 | DATE: 2026-07-07 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { tabulationApi } from '../api/client';
 import { useAuth } from './AuthContext';
 import {
   EMPTY_TABULATION,
+  getCanalContatoOptions,
   getDetalhes,
   getMotivos,
   getProdutoNames,
+  getTipoChamadoOptions,
 } from '../services/tabulationConfig';
 
 const TabulationContext = createContext(null);
@@ -64,6 +66,8 @@ export function TabulationProvider({ children }) {
     getProdutoNames: () => getProdutoNames(config),
     getMotivos: (produto) => getMotivos(config, produto),
     getDetalhes: (produto, motivo) => getDetalhes(config, produto, motivo),
+    getTipoChamadoOptions: () => getTipoChamadoOptions(config),
+    getCanalContatoOptions: () => getCanalContatoOptions(config),
   }), [config, loading, error, reload]);
 
   return (

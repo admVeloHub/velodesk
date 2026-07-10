@@ -1,6 +1,6 @@
 /**
- * ticketAdapter v1.4.2 — tipoChamado explícito no payload lateralForm
- * VERSION: v1.4.2 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.4.3 — responsavel explícito no payload lateralForm
+ * VERSION: v1.4.3 | DATE: 2026-07-06 | AUTHOR: VeloHub Development Team
  */
 import { getAgentName } from '../../services/clientDb';
 import { DEFAULT_TIPO } from '../../services/tabulationConfig';
@@ -61,6 +61,7 @@ export function apiTicketToCockpit(ticket) {
     internalNotes: (ticket.internalNotes || []).map(normalizeMessage),
     registroHistorico: (ticket.registroHistorico || ticket.registroAlteracoes || []).map((entry) => ({
       ...entry,
+      autor: entry.autor ?? entry.author ?? '',
       time: entry.time || entry.timestamp,
       timestamp: entry.timestamp || entry.time,
     })),
@@ -120,6 +121,7 @@ export function cockpitTicketToApi(ticket) {
       ...lf,
       classificacaoTipo: tipo,
       tipoChamado: tipo,
+      responsavel: String(lf.responsavel ?? ticket.responsibleAgent ?? '').trim(),
       cpf: ticket.clientCPF || lf.clienteCpf || lf.cpf,
       clienteCpf: ticket.clientCPF || lf.clienteCpf || lf.cpf,
       clienteNome: clientName || '',

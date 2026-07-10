@@ -1,5 +1,5 @@
 /**
- * Workspace360Header v1.1.0 — cabeçalho do Painel 360°
+ * Workspace360Header v1.2.0 — cabeçalho do Painel 360°
  */
 import React from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
@@ -12,7 +12,7 @@ export default function Workspace360Header({ greeting, agentName, dateTimeLabel 
     <header className="ws360-header">
       <div className="ws360-header__intro">
         <h2 className="ws360-header__greeting">
-          {greeting}, {agentName} 👋
+          {greeting}, {agentName}
         </h2>
         <p className="ws360-header__datetime">{dateTimeLabel}</p>
       </div>

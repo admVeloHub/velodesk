@@ -1,14 +1,14 @@
 /**
  * KPIs do painel Supervisor — grid 12 colunas (bordas alinhadas ao hero)
- * VERSION: v1.2.0 | DATE: 2026-06-19
+ * VERSION: v1.3.0 | DATE: 2026-07-06
  */
 import React from 'react';
 
 export default function Workspace360SupervisorKpis({ kpis }) {
   const primary = [
-    { value: `${kpis.slaPct}%`, label: 'SLA cumprido' },
-    { value: String(kpis.slaRisk), label: 'Em risco de SLA' },
-    { value: String(kpis.online), label: 'Agentes online' },
+    { value: `${kpis.slaPct ?? 0}%`, label: 'SLA cumprido' },
+    { value: String(kpis.slaRisk ?? 0), label: 'Em risco de SLA' },
+    { value: kpis.online == null ? '—' : String(kpis.online), label: 'Agentes online' },
   ];
 
   const secondary = [

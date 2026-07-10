@@ -9,7 +9,6 @@ const PAGE_ROUTES = {
   reports: '/reports',
   chat: '/chat',
   config: '/config',
-  'analytics-ia': '/analytics-ia',
   'client-portal': '/client-portal'
 };
 

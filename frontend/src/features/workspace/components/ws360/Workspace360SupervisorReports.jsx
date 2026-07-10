@@ -1,12 +1,14 @@
 /**
  * Relatórios operacionais — painel supervisor
- * VERSION: v1.1.0 | DATE: 2026-06-19
+ * VERSION: v2.0.0 | DATE: 2026-07-06
  */
 import React, { useState } from 'react';
 import { useNotifications } from '../../../../context/NotificationContext';
+import { fetchWorkspace360Report } from '../../../../services/workspace/workspace360Api';
 import {
-  buildReportPayload,
   CHANNEL_OPTIONS,
+  downloadReportCsv,
+  normalizeReportPayload,
   PERIOD_OPTIONS,
   REPORT_CARDS,
   TEAM_OPTIONS,
@@ -19,11 +21,20 @@ export default function Workspace360SupervisorReports() {
   const [channel, setChannel] = useState('all');
   const [team, setTeam] = useState('all');
   const [activeReport, setActiveReport] = useState(null);
+  const [loadingReport, setLoadingReport] = useState(false);
 
-  const handleOpenReport = (card) => {
-    const report = buildReportPayload(card.id, { period, channel, team });
-    if (!report) return;
-    setActiveReport(report);
+  const handleOpenReport = async (card) => {
+    setLoadingReport(true);
+    try {
+      const raw = await fetchWorkspace360Report(card.id, { period, channel, team });
+      const report = normalizeReportPayload(raw, { period, channel, team });
+      if (!report) return;
+      setActiveReport(report);
+    } catch {
+      showNotification('Não foi possível carregar o relatório.', 'error');
+    } finally {
+      setLoadingReport(false);
+    }
   };
 
   const handleCloseReport = () => {
@@ -31,6 +42,7 @@ export default function Workspace360SupervisorReports() {
   };
 
   const handleDownloadReport = (report) => {
+    downloadReportCsv(report);
     showNotification(`Relatório "${report.title}" baixado.`, 'success');
   };
 
@@ -95,6 +107,7 @@ export default function Workspace360SupervisorReports() {
               <button
                 type="button"
                 className="btn-primary ws360-reports-card__btn"
+                disabled={loadingReport}
                 onClick={() => handleOpenReport(card)}
               >
                 {card.action}

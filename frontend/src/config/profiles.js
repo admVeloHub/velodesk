@@ -1,6 +1,6 @@
 /**
  * Perfis operacionais — espelho velodesk-ecosystem.js
- * VERSION: v1.3.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.4.0 | DATE: 2026-07-06 | AUTHOR: VeloHub Development Team
  */
 export const PROFILES = {
   agent: {
@@ -41,6 +41,5 @@ export function getProfileDefaultPath(profileId = 'agent') {
   const profile = getProfileMeta(profileId);
   const pageId = profile.defaultPage || 'workspace';
   if (pageId === 'tickets') return '/tickets?desk=v2';
-  if (pageId === 'analytics-ia') return '/analytics-ia';
   return `/${pageId}`;
 }

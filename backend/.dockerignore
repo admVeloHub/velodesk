@@ -5,5 +5,4 @@ dist
 *.log
 .git
 .gitignore
-scripts/clear-demo-chamados.ts
 scripts/migrate-cliente-refs.ts

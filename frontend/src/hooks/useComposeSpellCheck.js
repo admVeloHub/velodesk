@@ -1,7 +1,9 @@
 /**
- * useComposeSpellCheck v2.0.1 — suporte a onReplaceRange (editor rich)
- * VERSION: v2.0.1 | DATE: 2026-07-02
+ * useComposeSpellCheck v2.1.0 — suporte a desativação via flag
+ * VERSION: v2.1.0 | DATE: 2026-07-10
  */
+import { COMPOSE_SPELLCHECK_ENABLED } from '../services/desk/constants';
+import { addSpellWhitelistTerms } from '../services/spellcheck/whitelist';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   checkWord,
@@ -19,6 +21,8 @@ import {
 
 const WORD_BREAK_KEYS = new Set([' ', ',', '.', ';', ':', '!', '?', 'Enter']);
 const SUGGESTION_DISMISS_WORDS = 2;
+
+const noop = () => {};
 
 /** @param {string} fullText @param {{ startIndex: number, endIndex?: number }} wordInfo */
 function buildTokenContext(fullText, wordInfo) {
@@ -39,9 +43,11 @@ function buildTokenContext(fullText, wordInfo) {
  * @param {(value: string) => void} params.onTextChange
  * @param {object|null|undefined} params.tabulationConfig
  * @param {Set<string>} params.ignoredWords
+ * @param {Iterable<string>} [params.extraWhitelistTerms]
  * @param {(word: string) => void} [params.onIgnoreWord]
  * @param {(errors: object[]) => void} [params.onFlaggedErrorsChange]
  * @param {boolean} [params.trackFlaggedErrors]
+ * @param {boolean} [params.enabled]
  */
 export function useComposeSpellCheck({
   text,
@@ -49,28 +55,47 @@ export function useComposeSpellCheck({
   onReplaceRange,
   tabulationConfig,
   ignoredWords,
+  extraWhitelistTerms,
   onIgnoreWord,
   onFlaggedErrorsChange,
   trackFlaggedErrors = true,
+  enabled = COMPOSE_SPELLCHECK_ENABLED,
 }) {
   const [activeSuggestion, setActiveSuggestion] = useState(null);
   const [flaggedErrors, setFlaggedErrors] = useState([]);
   const [activeErrorStartIndex, setActiveErrorStartIndex] = useState(null);
-  const [spellLoading, setSpellLoading] = useState(() => !isSpellEngineReady());
+  const [spellLoading, setSpellLoading] = useState(() => (
+    enabled ? !isSpellEngineReady() : false
+  ));
   const [spellLoadError, setSpellLoadError] = useState(null);
   const wordsAfterSuggestionRef = useRef(0);
   const onFlaggedErrorsChangeRef = useRef(onFlaggedErrorsChange);
   const scanAbortRef = useRef(null);
   onFlaggedErrorsChangeRef.current = onFlaggedErrorsChange;
 
-  const spellContext = useMemo(
-    () => createSpellContext(tabulationConfig, ignoredWords),
-    [tabulationConfig, ignoredWords],
-  );
+  const spellContext = useMemo(() => {
+    const ctx = createSpellContext(tabulationConfig, ignoredWords);
+    for (const term of extraWhitelistTerms || []) {
+      addSpellWhitelistTerms(ctx.whitelist, term);
+    }
+    return ctx;
+  }, [tabulationConfig, ignoredWords, extraWhitelistTerms]);
   const spellContextRef = useRef(spellContext);
   spellContextRef.current = spellContext;
 
   useEffect(() => {
+    if (!enabled) {
+      setActiveSuggestion(null);
+      setFlaggedErrors([]);
+      setActiveErrorStartIndex(null);
+      setSpellLoading(false);
+      setSpellLoadError(null);
+      if (trackFlaggedErrors) {
+        onFlaggedErrorsChangeRef.current?.([]);
+      }
+      return undefined;
+    }
+
     let active = true;
     setSpellLoading(true);
     loadSpellEngine()
@@ -87,17 +112,17 @@ export function useComposeSpellCheck({
         }
       });
     return () => { active = false; };
-  }, []);
+  }, [enabled, trackFlaggedErrors]);
 
   useEffect(() => {
-    if (!activeSuggestion) return;
+    if (!enabled || !activeSuggestion) return;
     const currentWord = text.slice(activeSuggestion.startIndex, activeSuggestion.endIndex);
     if (currentWord !== activeSuggestion.word) {
       setActiveSuggestion(null);
       setActiveErrorStartIndex(null);
       wordsAfterSuggestionRef.current = 0;
     }
-  }, [text, activeSuggestion]);
+  }, [enabled, text, activeSuggestion]);
 
   const publishFlaggedErrors = useCallback((errors) => {
     setFlaggedErrors(errors);
@@ -107,7 +132,7 @@ export function useComposeSpellCheck({
   }, [trackFlaggedErrors]);
 
   useEffect(() => {
-    if (!trackFlaggedErrors || spellLoading) return undefined;
+    if (!enabled || !trackFlaggedErrors || spellLoading) return undefined;
     const timer = setTimeout(async () => {
       if (scanAbortRef.current) {
         scanAbortRef.current.abort();
@@ -144,7 +169,35 @@ export function useComposeSpellCheck({
         scanAbortRef.current.abort();
       }
     };
-  }, [text, spellLoading, trackFlaggedErrors, publishFlaggedErrors, ignoredWords, tabulationConfig]);
+  }, [enabled, text, spellLoading, trackFlaggedErrors, publishFlaggedErrors, ignoredWords, tabulationConfig, extraWhitelistTerms]);
+
+  const registerIgnoredTerms = useCallback((word) => {
+    const raw = String(word || '').trim();
+    if (!raw) return;
+    onIgnoreWord?.(raw);
+  }, [onIgnoreWord]);
+
+  const removeIgnoredFromErrors = useCallback((word) => {
+    const raw = String(word || '').trim().toLowerCase();
+    if (!raw) return;
+    const skipTerms = new Set();
+    addSpellWhitelistTerms(skipTerms, raw);
+    setFlaggedErrors((prev) => {
+      const next = prev.filter((error) => !skipTerms.has(String(error.word || '').toLowerCase()));
+      if (trackFlaggedErrors) {
+        onFlaggedErrorsChangeRef.current?.(next);
+      }
+      return next;
+    });
+    if (activeSuggestion?.word) {
+      const activeLower = activeSuggestion.word.toLowerCase();
+      if (skipTerms.has(activeLower)) {
+        setActiveSuggestion(null);
+        setActiveErrorStartIndex(null);
+      }
+    }
+    wordsAfterSuggestionRef.current = 0;
+  }, [activeSuggestion, trackFlaggedErrors]);
 
   const showSuggestionForError = useCallback((error) => {
     if (!error) return;
@@ -154,7 +207,7 @@ export function useComposeSpellCheck({
   }, []);
 
   const evaluateWord = useCallback(async (wordInfo) => {
-    if (!wordInfo?.word || spellLoading) return;
+    if (!enabled || !wordInfo?.word || spellLoading) return;
     try {
       const result = await checkWord(
         wordInfo.word,
@@ -176,9 +229,10 @@ export function useComposeSpellCheck({
       setActiveSuggestion(null);
       setActiveErrorStartIndex(null);
     }
-  }, [text, spellLoading, showSuggestionForError]);
+  }, [enabled, text, spellLoading, showSuggestionForError]);
 
   const updateSuggestionFromCursor = useCallback((cursorPos) => {
+    if (!enabled) return;
     const wordInfo = getWordAtCursor(text, cursorPos);
     if (!wordInfo?.word) {
       setActiveSuggestion(null);
@@ -186,7 +240,7 @@ export function useComposeSpellCheck({
       return;
     }
     evaluateWord(wordInfo);
-  }, [text, evaluateWord]);
+  }, [enabled, text, evaluateWord]);
 
   const handleChange = useCallback((event) => {
     onTextChange(event.target.value);
@@ -201,6 +255,7 @@ export function useComposeSpellCheck({
   }, [onReplaceRange, onTextChange, text]);
 
   const handleKeyDown = useCallback((event) => {
+    if (!enabled) return;
     if (activeSuggestion && event.key === 'Tab' && activeSuggestion.suggestions?.length) {
       event.preventDefault();
       const replacement = activeSuggestion.suggestions[0];
@@ -230,31 +285,34 @@ export function useComposeSpellCheck({
         updateSuggestionFromCursor(event.target.selectionStart ?? 0);
       });
     }
-  }, [activeSuggestion, text, applyTextReplacement, evaluateWord, updateSuggestionFromCursor]);
+  }, [enabled, activeSuggestion, text, applyTextReplacement, evaluateWord, updateSuggestionFromCursor]);
 
   const handleSelect = useCallback((event) => {
+    if (!enabled) return;
     updateSuggestionFromCursor(event.target.selectionStart ?? 0);
-  }, [updateSuggestionFromCursor]);
+  }, [enabled, updateSuggestionFromCursor]);
 
   const handleClick = useCallback((event) => {
+    if (!enabled) return;
     updateSuggestionFromCursor(event.target.selectionStart ?? 0);
-  }, [updateSuggestionFromCursor]);
+  }, [enabled, updateSuggestionFromCursor]);
 
   const handleBlur = useCallback((event) => {
+    if (!enabled) return;
     const cursor = event.target.selectionStart ?? text.length;
     const wordInfo = getLastWordBeforeCursor(text, cursor);
     if (wordInfo) evaluateWord(wordInfo);
-  }, [text, evaluateWord]);
+  }, [enabled, text, evaluateWord]);
 
   const applySuggestion = useCallback((replacement) => {
-    if (!activeSuggestion) return;
+    if (!enabled || !activeSuggestion) return;
     const next = replacement || activeSuggestion.suggestions?.[0];
     if (!next) return;
     applyTextReplacement(activeSuggestion.startIndex, activeSuggestion.word, next);
     setActiveSuggestion(null);
     setActiveErrorStartIndex(null);
     wordsAfterSuggestionRef.current = 0;
-  }, [activeSuggestion, applyTextReplacement]);
+  }, [enabled, activeSuggestion, applyTextReplacement]);
 
   const dismissSuggestion = useCallback(() => {
     setActiveSuggestion(null);
@@ -262,22 +320,19 @@ export function useComposeSpellCheck({
   }, []);
 
   const ignoreSuggestion = useCallback(() => {
-    if (!activeSuggestion?.word) return;
-    const lower = activeSuggestion.word.toLowerCase();
-    onIgnoreWord?.(lower);
-    setFlaggedErrors((prev) => {
-      const next = prev.filter((error) => error.word.toLowerCase() !== lower);
-      if (trackFlaggedErrors) {
-        onFlaggedErrorsChangeRef.current?.(next);
-      }
-      return next;
-    });
-    setActiveSuggestion(null);
-    setActiveErrorStartIndex(null);
-    wordsAfterSuggestionRef.current = 0;
-  }, [activeSuggestion, onIgnoreWord, trackFlaggedErrors]);
+    if (!enabled || !activeSuggestion?.word) return;
+    registerIgnoredTerms(activeSuggestion.word);
+    removeIgnoredFromErrors(activeSuggestion.word);
+  }, [enabled, activeSuggestion, registerIgnoredTerms, removeIgnoredFromErrors]);
+
+  const ignoreWord = useCallback((word) => {
+    if (!enabled) return;
+    registerIgnoredTerms(word);
+    removeIgnoredFromErrors(word);
+  }, [enabled, registerIgnoredTerms, removeIgnoredFromErrors]);
 
   const applyErrorFix = useCallback(async (error, replacement) => {
+    if (!enabled) return;
     const liveWord = text.slice(error.startIndex, error.endIndex);
     if (liveWord !== error.word) return;
     let next = replacement;
@@ -294,7 +349,28 @@ export function useComposeSpellCheck({
     applyTextReplacement(error.startIndex, error.word, next);
     setActiveSuggestion(null);
     setActiveErrorStartIndex(null);
-  }, [text, applyTextReplacement]);
+  }, [enabled, text, applyTextReplacement]);
+
+  if (!enabled) {
+    return {
+      activeSuggestion: null,
+      flaggedErrors: [],
+      activeErrorStartIndex: null,
+      spellLoading: false,
+      spellLoadError: null,
+      handleChange,
+      handleKeyDown: noop,
+      handleBlur: noop,
+      handleSelect: noop,
+      handleClick: noop,
+      applySuggestion: noop,
+      dismissSuggestion: noop,
+      ignoreSuggestion: noop,
+      ignoreWord: noop,
+      applyErrorFix: noop,
+      spellContext,
+    };
+  }
 
   return {
     activeSuggestion,
@@ -310,6 +386,7 @@ export function useComposeSpellCheck({
     applySuggestion,
     dismissSuggestion,
     ignoreSuggestion,
+    ignoreWord,
     applyErrorFix,
     spellContext,
   };

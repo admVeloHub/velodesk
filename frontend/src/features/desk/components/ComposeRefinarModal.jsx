@@ -1,6 +1,6 @@
 /**
- * ComposeRefinarModal v1.0.2 — cancelamento durante refinamento (abort + fechar)
- * VERSION: v1.0.2 | DATE: 2026-07-02
+ * ComposeRefinarModal v1.0.4 — label Revisão de texto
+ * VERSION: v1.0.4 | DATE: 2026-07-10
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -16,6 +16,7 @@ const MODAL_Z = 11000;
  * @param {string} props.draftText — snapshot do compose ao abrir
  * @param {string} [props.nomeOperador]
  * @param {(text: string) => void} props.onApply
+ * @param {(draftPlainText: string) => void} [props.onReviewComplete]
  */
 export default function ComposeRefinarModal({
   open,
@@ -23,6 +24,7 @@ export default function ComposeRefinarModal({
   draftText,
   nomeOperador = '',
   onApply,
+  onReviewComplete,
 }) {
   const { showNotification } = useNotifications();
   const [result, setResult] = useState('');
@@ -88,6 +90,7 @@ export default function ComposeRefinarModal({
         }
         setResult(typeof data.response === 'string' ? data.response : '');
         setPhase('result');
+        onReviewComplete?.(texto);
       })
       .catch((err) => {
         if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.name === 'AbortError') {
@@ -95,7 +98,7 @@ export default function ComposeRefinarModal({
         }
         const status = err?.response?.status;
         const msg = status === 503
-          ? 'Assistente IA indisponível: Gemini não configurado no servidor.'
+          ? 'Revisão de texto indisponível: Gemini não configurado no servidor.'
           : (err?.response?.data?.error || 'Falha na comunicação com o servidor.');
         showNotification(msg, 'error');
         handleClose();
@@ -104,7 +107,7 @@ export default function ComposeRefinarModal({
     return () => {
       controller.abort();
     };
-  }, [open, draftText, nomeOperador, showNotification, handleClose]);
+  }, [open, draftText, nomeOperador, showNotification, handleClose, onReviewComplete]);
 
   const handleApply = useCallback(() => {
     if (!result.trim()) return;
@@ -136,7 +139,7 @@ export default function ComposeRefinarModal({
       >
         <header className="compose-refinar-modal__header">
           <h3 id="compose-refinar-title" className="compose-refinar-modal__title">
-            <i className="fas fa-robot" aria-hidden="true" /> Assistente IA — Refinar rascunho
+            <i className="fas fa-robot" aria-hidden="true" /> Revisão de texto
           </h3>
           <button
             type="button"

@@ -1,6 +1,6 @@
 /**
- * languagetool.service v1.0.2 — ranking de sugestões (criente → cliente, não criem-te)
- * VERSION: v1.0.2 | DATE: 2026-07-01
+ * languagetool.service v1.0.3 — erros sem sugestão podem ir ao vocabulário
+ * VERSION: v1.0.3 | DATE: 2026-07-10
  */
 import { env } from '../config/env';
 import { rankSpellSuggestions } from './spellcheckSuggestionRank';
@@ -125,7 +125,17 @@ function mapMatchToError(text: string, match: LtMatch): SpellcheckErrorDto | nul
     (match.replacements || []).map((item) => item.value).filter(Boolean),
   );
 
-  if (!suggestions.length) return null;
+  if (!suggestions.length) {
+    return {
+      word,
+      startIndex,
+      endIndex,
+      suggestions: [],
+      message: match.message,
+      category: categoryId,
+      ruleId: match.rule?.id,
+    };
+  }
 
   return {
     word,

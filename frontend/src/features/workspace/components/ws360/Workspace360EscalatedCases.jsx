@@ -1,14 +1,19 @@
 /**
  * Casos escalados em atraso — painel supervisor
- * VERSION: v1.1.0 | DATE: 2026-06-19
+ * VERSION: v2.2.0 | DATE: 2026-07-06
  */
 import React, { useState } from 'react';
-import { ESCALATED_CASES_SUMMARY } from '../../../../services/workspace/escalatedCasesData';
 import Workspace360ChannelVision from './Workspace360ChannelVision';
 
-export default function Workspace360EscalatedCases({ onViewAll, onDismiss }) {
+export default function Workspace360EscalatedCases({
+  escalated,
+  channelVision,
+  onViewAll,
+  onDismiss,
+}) {
   const [visible, setVisible] = useState(true);
-  const { categories, slaCriticalCount, updatedLabel } = ESCALATED_CASES_SUMMARY;
+  const categories = escalated?.categories ?? [];
+  const slaCriticalCount = escalated?.slaCriticalCount ?? 0;
 
   if (!visible) return null;
 
@@ -26,23 +31,22 @@ export default function Workspace360EscalatedCases({ onViewAll, onDismiss }) {
           </span>
           <div>
             <h4 className="ws360-escalated__title">Casos escalados em atraso</h4>
-            <p className="ws360-escalated__updated">{updatedLabel}</p>
           </div>
         </div>
-        <button
-          type="button"
-          className="ws360-escalated__close"
-          onClick={handleDismiss}
-          aria-label="Fechar"
-        >
-          <i className="ti ti-x" />
-        </button>
+        <div className="ws360-escalated__head-actions">
+          <button type="button" className="ws360-escalated__btn ws360-escalated__btn--secondary" onClick={onViewAll}>
+            Ver lista completa
+          </button>
+          <button
+            type="button"
+            className="ws360-escalated__close"
+            onClick={handleDismiss}
+            aria-label="Fechar"
+          >
+            <i className="ti ti-x" />
+          </button>
+        </div>
       </header>
-
-      <p className="ws360-escalated__visibility">
-        <i className="ti ti-eye" aria-hidden="true" />
-        Visível apenas para supervisores
-      </p>
 
       <div className="ws360-escalated__cards">
         {categories.map((cat) => (
@@ -62,13 +66,7 @@ export default function Workspace360EscalatedCases({ onViewAll, onDismiss }) {
         <span>{slaCriticalCount} casos já passaram do prazo crítico de SLA</span>
       </div>
 
-      <div className="ws360-escalated__footer">
-        <button type="button" className="ws360-escalated__btn ws360-escalated__btn--secondary" onClick={onViewAll}>
-          Ver lista completa
-        </button>
-      </div>
-
-      <Workspace360ChannelVision />
+      <Workspace360ChannelVision channels={channelVision} />
     </section>
   );
 }

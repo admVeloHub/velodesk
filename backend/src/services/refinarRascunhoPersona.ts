@@ -1,7 +1,8 @@
 /**
- * refinarRascunhoPersona v1.0.0 — persona Gemini (cópia VeloHub Refinar Rascunho)
- * VERSION: v1.0.0 | DATE: 2026-07-02
+ * refinarRascunhoPersona v1.0.1 — estrutura compartilhada clientResponseFormatPersona
+ * VERSION: v1.0.1 | DATE: 2026-07-10
  */
+import { getVelotaxClientResponseStructureBlock } from './clientResponseFormatPersona';
 
 export function getRefinarRascunhoPersona(): string {
   return `# PERSONA
@@ -29,25 +30,7 @@ Você só pode formalizar respostas relacionadas aos produtos oficiais do Velota
 
 - AÇÃO: Se o rascunho mencionar produto fora do escopo, entregue **apenas** o e-mail no template abaixo e insira no desenvolvimento, com tom profissional, a frase: ATENÇÃO: Este rascunho menciona um serviço não oferecido pelo Velotax.
 
-# ESTRUTURA DO E-MAIL (ÚNICA SAÍDA)
-
-Corpo em **texto simples**, quebras de linha reais entre parágrafos. Substitua [Nome do Operador] pelo nome fornecido na solicitação. Para o destinatário: se o rascunho trouxer o nome do cliente, use-o após "Olá," de forma natural; se não houver nome, use "Olá, tudo bem?" ou "Prezado(a) cliente," — **nunca** deixe placeholders entre colchetes (ex.: [Nome do Cliente]) na resposta final.
-
-Ordem sugerida:
-
-Olá, (cumprimento adequado ao rascunho)
-
-Eu sou [Nome do Operador] do Atendimento Velotax.
-
-(Parágrafo(s) de desenvolvimento — somente com base no rascunho; sem inventar prazos, valores ou procedimentos.)
-
-Atenciosamente,
-
-[Nome do Operador]
-
-Velotax
-
-Sem negrito markdown na saída; apenas texto plano.
+${getVelotaxClientResponseStructureBlock()}
 
 # DIRETRIZES DE QUALIDADE
 

@@ -105,40 +105,64 @@ https://github.com/admVeloHub/velodesk
 
 Não é o ambiente de produção atual. Produção GCP: Cloud Run (`velodesk`).
 
-## Inbound e-mail (webhook)
+## E-mail Gmail Workspace (produção)
 
-Entrada de tickets por e-mail via provedor (Mailgun, SendGrid ou adapter `generic`).
+Integração com Google Workspace via **Service Account + domain-wide delegation** (mesmo padrão do Skynet). Credenciais em `desk_config.email_transport` — não no `.env`.
+
+### Setup inicial
+
+1. **Workspace Admin** → Delegação em todo o domínio → SA com escopos:
+   - `https://www.googleapis.com/auth/gmail.send`
+   - `https://www.googleapis.com/auth/gmail.readonly`
+2. **GCP** (`velohub-471220`): habilitar Gmail API; criar tópico Pub/Sub `gmail-desk-inbound`
+3. Conceder `roles/pubsub.publisher` a `serviceAccount:gmail-api-push@system.gserviceaccount.com` no tópico
+4. Subscription **push** → `https://<velodesk-api>/api/inbound/gmail/pubsub?token=<GMAIL_PUBSUB_VERIFY_TOKEN>`
+5. Seed do transporte:
+   ```powershell
+   cd backend
+   $env:DESK_EMAIL_FROM="chamados@seudominio.com.br"
+   $env:DESK_EMAIL_DELEGATED="chamados@seudominio.com.br"
+   $env:DESK_SERVICE_ACCOUNT_FILE="secrets/desk-gmail-sa.json"
+   npm run seed:email-transport
+   ```
 
 ### Variáveis (`backend/.env`)
+
+```env
+EMAIL_ENABLED=true
+GMAIL_INBOUND_ENABLED=true
+GCP_PROJECT_ID=velohub-471220
+GMAIL_PUBSUB_TOPIC=gmail-desk-inbound
+GMAIL_PUBSUB_VERIFY_TOKEN=seu-token
+```
+
+### Endpoints
+
+| Método | Rota | Função |
+|--------|------|--------|
+| GET | `/api/inbound/gmail/health` | status do watch |
+| POST | `/api/inbound/gmail/pubsub` | push Pub/Sub Gmail |
+| GET | `/api/inbound/email/health` | webhook legado |
+| POST | `/api/inbound/email` | webhook dev/Mailgun |
+
+### Outbound automático
+
+- Abertura de ticket → confirmação com protocolo no assunto
+- Resposta pública do agente → e-mail ao cliente
+
+Plano completo: [docs/PLANO-ENTRADA-TICKETS.md](docs/PLANO-ENTRADA-TICKETS.md)
+
+## Inbound e-mail (webhook dev / fallback)
 
 ```env
 INBOUND_EMAIL_ENABLED=true
 INBOUND_EMAIL_PROVIDER=generic
 INBOUND_EMAIL_WEBHOOK_SECRET=seu-segredo
-INBOUND_EMAIL_ALLOWED_RECIPIENTS=chamados@seudominio.com.br
 ```
-
-### Endpoints
-
-| Método | Rota | Auth |
-|--------|------|------|
-| GET | `/api/inbound/email/health` | nenhuma |
-| POST | `/api/inbound/email` | assinatura Mailgun ou header `X-Inbound-Secret` |
-
-### DNS (produção)
-
-1. Subdomínio inbound (ex.: `chamados.seudominio.com.br`)
-2. Registro **MX** apontando para o provedor
-3. Route/action do provedor → `POST https://<url-cloud-run>/api/inbound/email`
-4. SPF/DKIM para envio futuro (Fase 1b)
-
-Plano completo: [docs/PLANO-ENTRADA-TICKETS.md](docs/PLANO-ENTRADA-TICKETS.md)
-
-### Teste local (adapter generic)
 
 ```bash
 curl -X POST http://localhost:8001/api/inbound/email \
   -H "Content-Type: application/json" \
   -H "X-Inbound-Secret: seu-segredo" \
-  -d "{\"messageId\":\"test-001\",\"from\":\"cliente@example.com\",\"to\":[\"chamados@example.com\"],\"subject\":\"Dúvida sobre pedido\",\"textBody\":\"Preciso de ajuda com meu pedido.\"}"
+  -d "{\"messageId\":\"test-001\",\"from\":\"cliente@example.com\",\"to\":[\"chamados@example.com\"],\"subject\":\"Duvida\",\"textBody\":\"Preciso de ajuda.\"}"
 ```

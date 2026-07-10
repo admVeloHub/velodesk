@@ -1,6 +1,6 @@
 /**
- * whitelist v1.0.0 — termos ignorados pelo corretor ortográfico
- * VERSION: v1.0.0 | DATE: 2026-06-26
+ * whitelist v1.0.1 — termos ignorados pelo corretor ortográfico
+ * VERSION: v1.0.1 | DATE: 2026-07-10
  */
 
 const STATIC_WHITELIST = new Set([
@@ -36,7 +36,7 @@ const STATIC_WHITELIST = new Set([
 ]);
 
 /** @param {Set<string>} set @param {string} str */
-function addWordsFromString(set, str) {
+export function addSpellWhitelistTerms(set, str) {
   const normalized = String(str || '').trim().toLowerCase();
   if (!normalized) return;
   set.add(normalized);
@@ -44,6 +44,11 @@ function addWordsFromString(set, str) {
     const clean = part.replace(/[^a-zà-ÿ0-9]/gi, '');
     if (clean.length >= 2) set.add(clean);
   });
+}
+
+/** @param {Set<string>} set @param {string} str */
+function addWordsFromString(set, str) {
+  addSpellWhitelistTerms(set, str);
 }
 
 /** @param {object|null|undefined} config */
@@ -57,6 +62,15 @@ export function buildWhitelistFromConfig(config) {
         addWordsFromString(words, detalhe.detalhe);
       }
     }
+  }
+  return words;
+}
+
+/** @param {Iterable<string>} [extraTerms] */
+export function buildWhitelistFromTerms(extraTerms) {
+  const words = new Set(STATIC_WHITELIST);
+  for (const term of extraTerms || []) {
+    addSpellWhitelistTerms(words, term);
   }
   return words;
 }

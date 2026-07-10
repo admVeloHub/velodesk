@@ -1,5 +1,10 @@
 /**
  * Painel 360° — view model (re-export de deskData)
- * VERSION: v2.1.0 | DATE: 2026-06-19
+ * VERSION: v3.0.0 | DATE: 2026-07-06
  */
-export { computeAgent360View } from '../../services/workspace/deskData';
+export {
+  buildAgent360View,
+  buildSupervisor360View,
+  computeAgent360View,
+  mapEntryToRow,
+} from '../../services/workspace/deskData';

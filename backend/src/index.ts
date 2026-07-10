@@ -1,4 +1,4 @@
-﻿/** index v1.6.0 — rota ticket-ai sugestão IA */
+﻿/** index v1.7.0 — Gmail Workspace outbound + inbound Pub/Sub */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -17,9 +17,15 @@ import spellcheckRoutes from './routes/spellcheck.routes';
 import composeRoutes from './routes/compose.routes';
 import ticketAiRoutes from './routes/ticketAi.routes';
 import inboundRoutes from './routes/inbound.routes';
+import workspace360Routes from './routes/workspace360.routes';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
 import { isOpenAiTicketSuggestConfigured } from './services/openaiTicketSuggest.service';
-import { seedDevelopmentData, purgeLegacyDemoData } from './services/seed.service';
+import { loadEmailTransport } from './services/emailTransport.service';
+import {
+  ensureGmailWatchFresh,
+  setupGmailWatch,
+  startGmailWatchRenewalLoop,
+} from './services/gmail/gmailWatch.service';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const whatsapp = require('./whatsapp/whatsappModule.js');
@@ -99,6 +105,7 @@ app.use('/api', statsRoutes);
 app.use('/api/uploads', uploadsRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/tabulation', tabulationRoutes);
+app.use('/api/workspace360', workspace360Routes);
 
 if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);
@@ -113,13 +120,20 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 let mongoRetryTimer: ReturnType<typeof setInterval> | null = null;
 
+async function bootstrapEmailServices(): Promise<void> {
+  await loadEmailTransport();
+  if (env.gmailInboundEnabled) {
+    await setupGmailWatch();
+    startGmailWatchRenewalLoop();
+    void ensureGmailWatchFresh();
+  }
+}
+
 async function tryConnectDatabase(): Promise<boolean> {
   if (isAllMongoReady()) return true;
 
   try {
     await connectDatabase();
-    await purgeLegacyDemoData();
-    await seedDevelopmentData();
     console.log('[startup] MongoDB conectado (chamados + cadastros + desk_config).');
     return true;
   } catch (err) {
@@ -161,6 +175,7 @@ async function start() {
   app.listen(env.port, '0.0.0.0', () => {
     console.log(`API Velodesk v1.2.0 — http://0.0.0.0:${env.port} (${env.nodeEnv})`);
     void bootstrapDatabase().then(async () => {
+      await bootstrapEmailServices();
       await logLanguageToolStartupStatus();
       if (isOpenAiTicketSuggestConfigured()) {
         console.log('[ticket-ai] OpenAI configurado (sugestão resposta + tabulação).');

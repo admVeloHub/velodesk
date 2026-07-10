@@ -1,8 +1,8 @@
 /**
- * DeskConversation v1.3.0 — sugestão IA via OpenAI + POPs
- * VERSION: v1.3.0 | DATE: 2026-07-03
+ * DeskConversation v1.3.1 — oculta sugestão IA após usar resposta
+ * VERSION: v1.3.1 | DATE: 2026-07-07
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
 import { sanitizeComposeHtml } from '../../../services/desk/composeRichEditor';
 
@@ -39,17 +39,31 @@ export default function DeskConversation({
   iaHasSuggestion = false,
 }) {
   const [iaVisible, setIaVisible] = useState(true);
+  const lastIaReplyRef = useRef('');
   const thread = messages || [];
 
   useEffect(() => {
     setIaVisible(true);
+    lastIaReplyRef.current = '';
   }, [ticket?.id]);
+
+  useEffect(() => {
+    if (!iaHasSuggestion || !iaReply || iaReply === lastIaReplyRef.current) return;
+    setIaVisible(true);
+  }, [iaReply, iaHasSuggestion]);
 
   const displayText = iaReplyLoading || !iaHasSuggestion
     ? (iaWaitingMessage || 'Gerando sugestão com base nos POPs…')
     : iaReply;
 
   const canUseReply = iaHasSuggestion && !iaReplyLoading && Boolean(iaReply);
+
+  const handleUseIaReply = () => {
+    if (!canUseReply) return;
+    onUseIaReply(iaReply);
+    lastIaReplyRef.current = iaReply;
+    setIaVisible(false);
+  };
 
   return (
     <div className="conversation" id="conversation">
@@ -82,7 +96,7 @@ export default function DeskConversation({
               type="button"
               className="ia-suggestion-bar__btn"
               disabled={!canUseReply}
-              onClick={() => onUseIaReply(iaReply)}
+              onClick={handleUseIaReply}
             >
               Usar resposta
             </button>

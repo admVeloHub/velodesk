@@ -1,6 +1,6 @@
 /**
- * API client v1.5.0 — ticketAiApi sugestão IA na abertura do ticket
- * VERSION: v1.5.0 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
+ * API client v1.6.0 — workspace360Api Painel 360°
+ * VERSION: v1.6.0 | DATE: 2026-07-06 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 
@@ -57,6 +57,11 @@ export const statsApi = {
   dashboard: () => api.get('/dashboard').then((r) => r.data),
 };
 
+export const workspace360Api = {
+  get: (params) => api.get('/workspace360', { params }).then((r) => r.data),
+  agents: () => api.get('/workspace360/agents').then((r) => r.data),
+};
+
 export const usersApi = {
   list: () => api.get('/users').then((r) => r.data),
 };
@@ -70,6 +75,18 @@ export const tabulationApi = {
   updateProduto: (id, data) => api.put(`/tabulation/produtos/${id}`, data).then((r) => r.data),
   patchProduto: (id, data) => api.patch(`/tabulation/produtos/${id}`, data).then((r) => r.data),
   deleteProduto: (id) => api.delete(`/tabulation/produtos/${id}`).then((r) => r.data),
+  listOpcoes: (includeInactive = false) =>
+    api.get('/tabulation/opcoes', { params: { includeInactive: includeInactive ? 'true' : undefined } }).then((r) => r.data),
+  getOpcoes: (categoria, includeInactive = false) =>
+    api.get(`/tabulation/opcoes/${encodeURIComponent(categoria)}`, {
+      params: { includeInactive: includeInactive ? 'true' : undefined },
+    }).then((r) => r.data),
+  createOpcaoItem: (categoria, data) =>
+    api.post(`/tabulation/opcoes/${encodeURIComponent(categoria)}/items`, data).then((r) => r.data),
+  updateOpcaoItem: (categoria, itemId, data) =>
+    api.patch(`/tabulation/opcoes/${encodeURIComponent(categoria)}/items/${encodeURIComponent(itemId)}`, data).then((r) => r.data),
+  deleteOpcaoItem: (categoria, itemId) =>
+    api.delete(`/tabulation/opcoes/${encodeURIComponent(categoria)}/items/${encodeURIComponent(itemId)}`).then((r) => r.data),
 };
 
 export const whatsappApi = {

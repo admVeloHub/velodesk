@@ -1,7 +1,8 @@
-/** protocolo.service v1.0.2 — sequência com prefixo 0 até 0999999999, depois 1000000000+ */
+/** protocolo.service v1.0.4 — sequence_counters em b2c_chamados */
+import mongoose from 'mongoose';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { env } from '../config/env';
-import { getDeskConfigConnection, isDeskConfigConnected } from '../config/database';
+import { isMongoConnected } from '../config/database';
 
 const SEQUENCE_ID = 'chamadoProtocolo';
 const NUMERIC_PROTOCOL_RE = /^\d+$/;
@@ -11,6 +12,10 @@ const PROTOCOL_EXPAND_AT = 1_000_000_000;
 function sequenceFloor(): number {
   const parsed = Number.parseInt(String(env.ticketSequenceFloor || '100177678'), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 100177678;
+}
+
+function sequenceCountersCollection() {
+  return mongoose.connection.collection<{ _id: string; value: number }>('sequence_counters');
 }
 
 export function formatProtocolo(value: number): string {
@@ -41,8 +46,9 @@ async function scanMaxNumericProtocol(): Promise<number> {
   const top = rows[0]?.protocolNum;
   return Number.isFinite(top) && top > 0 ? top : 0;
 }
+
 async function ensureCounterInitialized(): Promise<void> {
-  const coll = getDeskConfigConnection().collection<{ _id: string; value: number }>('sequence_counters');
+  const coll = sequenceCountersCollection();
   const existing = await coll.findOne({ _id: SEQUENCE_ID });
   if (existing) return;
 
@@ -52,7 +58,7 @@ async function ensureCounterInitialized(): Promise<void> {
   try {
     await coll.insertOne({ _id: SEQUENCE_ID, value: startValue });
     console.log(
-      `[protocolo] contador inicializado em ${startValue} → exibição ${formatProtocolo(startValue)} (floor=${sequenceFloor()}, maxDb=${maxInDb})`,
+      `[protocolo] contador em ${env.mongoDbName}.sequence_counters inicializado em ${startValue} → exibição ${formatProtocolo(startValue)} (floor=${sequenceFloor()}, maxDb=${maxInDb})`,
     );
   } catch {
     /* outra instância inicializou em paralelo */
@@ -60,16 +66,15 @@ async function ensureCounterInitialized(): Promise<void> {
 }
 
 export async function allocateNextProtocolo(): Promise<string> {
-  if (!isDeskConfigConnected()) {
+  if (!isMongoConnected()) {
     const maxInDb = await scanMaxNumericProtocol();
     const next = Math.max(sequenceFloor(), maxInDb) + 1;
-    console.warn(`[protocolo] desk_config indisponível — fallback ${formatProtocolo(next)}`);
+    console.warn(`[protocolo] ${env.mongoDbName} indisponível — fallback ${formatProtocolo(next)}`);
     return formatProtocolo(next);
   }
 
   await ensureCounterInitialized();
-  const coll = getDeskConfigConnection().collection<{ _id: string; value: number }>('sequence_counters');
-  const updated = await coll.findOneAndUpdate(
+  const updated = await sequenceCountersCollection().findOneAndUpdate(
     { _id: SEQUENCE_ID },
     { $inc: { value: 1 } },
     { returnDocument: 'after' },

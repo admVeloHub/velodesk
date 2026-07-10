@@ -1,8 +1,8 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.6.0 | DATE: 2026-07-03
+ * VERSION: v3.7.3 | DATE: 2026-07-10
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   filterTickets,
   resolveDeskSearchEntries,
@@ -35,8 +35,10 @@ import DeskInternalNotesPanel from './components/DeskInternalNotesPanel';
 import DeskRightPanel from './components/DeskRightPanel';
 import { applyCascadeFieldChange, buildDefaultRightFields, getMotivos, mergeRightFieldsWithDefaults, validateTabulationForSendStatus } from '../../services/tabulationConfig';
 import { useTabulation } from '../../context/TabulationContext';
+import { COMPOSE_SPELLCHECK_ENABLED } from '../../services/desk/constants';
 import { createSpellContext, loadSpellEngine, scanText } from '../../services/spellcheck/spellEngine';
-import { htmlToPlainText } from '../../services/desk/composeRichEditor';
+import { htmlToPlainText, normalizePlainToHtml } from '../../services/desk/composeRichEditor';
+import { addSpellWhitelistTerms } from '../../services/spellcheck/whitelist';
 import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
 
 function applyRightFieldsToTicket(t, rightFields, escalonar) {
@@ -81,6 +83,7 @@ function buildDefaultSessionFromTicket(ticket, config) {
     escalonar: lf.escalonar || null,
     waChatOpen: false,
     spellIgnoredWords: [],
+    composeAiReviewedFor: '',
   };
 }
 
@@ -115,6 +118,7 @@ export default function DeskV2Root() {
   const [escalonar, setEscalonar] = useState(null);
   const [waChatOpen, setWaChatOpen] = useState(false);
   const [composeSpellErrors, setComposeSpellErrors] = useState([]);
+  const [composeAiReviewedFor, setComposeAiReviewedFor] = useState('');
   const [spellIgnoredWords, setSpellIgnoredWords] = useState(() => new Set());
   const [queueStatuses, setQueueStatuses] = useState(() => getAllQueueStatuses());
   const suppressAutoSelectRef = useRef(false);
@@ -155,8 +159,9 @@ export default function DeskV2Root() {
       escalonar,
       waChatOpen,
       spellIgnoredWords: Array.from(spellIgnoredWords),
+      composeAiReviewedFor,
     };
-  }, [mainTab, composeMode, composeText, internalText, sendStatus, rightFields, escalonar, waChatOpen, spellIgnoredWords]);
+  }, [mainTab, composeMode, composeText, internalText, sendStatus, rightFields, escalonar, waChatOpen, spellIgnoredWords, composeAiReviewedFor]);
 
   const restoreTabSession = useCallback((ticketId) => {
     const ticketEntry = findTicketEntry(ticketId);
@@ -181,10 +186,33 @@ export default function DeskV2Root() {
     setEscalonar(session.escalonar ?? defaults.escalonar);
     setWaChatOpen(session.waChatOpen ?? defaults.waChatOpen);
     setSpellIgnoredWords(new Set(session.spellIgnoredWords ?? defaults.spellIgnoredWords ?? []));
+    setComposeAiReviewedFor(session.composeAiReviewedFor ?? defaults.composeAiReviewedFor ?? '');
     setComposeSpellErrors([]);
   }, [config]);
 
-  const sendDisabledBySpell = composeMode === 'public' && composeSpellErrors.length > 0;
+  const composePlainForAi = useMemo(() => htmlToPlainText(composeText).trim(), [composeText]);
+  const sendBlockedByAiReview = composePlainForAi.length > 0 && composeAiReviewedFor !== composePlainForAi;
+  const sendDisabledBySpell = COMPOSE_SPELLCHECK_ENABLED
+    && composeMode === 'public'
+    && composeSpellErrors.length > 0;
+  const sendDisabled = sendDisabledBySpell || sendBlockedByAiReview;
+  const sendDisabledTitle = sendDisabledBySpell
+    ? 'Corrija os erros ortográficos antes de enviar'
+    : sendBlockedByAiReview
+      ? 'Use a sugestão de resposta da IA ou a Revisão de texto antes de enviar'
+      : undefined;
+
+  const handleComposeAiReviewed = useCallback((plainText) => {
+    setComposeAiReviewedFor(String(plainText || '').trim());
+  }, []);
+
+  const handleUseIaReply = useCallback((replyText) => {
+    const trimmed = String(replyText || '').trim();
+    if (!trimmed) return;
+    setComposeText(waChatOpen ? trimmed : normalizePlainToHtml(trimmed));
+    setComposeAiReviewedFor(trimmed);
+    setComposeMode('public');
+  }, [waChatOpen]);
 
   useEffect(() => {
     restoreCustomKanbanBoxes();
@@ -192,6 +220,7 @@ export default function DeskV2Root() {
   }, []);
 
   useEffect(() => {
+    if (!COMPOSE_SPELLCHECK_ENABLED) return;
     loadSpellEngine().catch(() => {});
   }, []);
 
@@ -330,7 +359,11 @@ export default function DeskV2Root() {
   };
 
   const handleIgnoreSpellWord = useCallback((word) => {
-    setSpellIgnoredWords((prev) => new Set([...prev, word]));
+    setSpellIgnoredWords((prev) => {
+      const next = new Set(prev);
+      addSpellWhitelistTerms(next, word);
+      return next;
+    });
   }, []);
 
   const handleFlaggedErrorsChange = useCallback((errors) => {
@@ -368,27 +401,36 @@ export default function DeskV2Root() {
     }
 
     if (messageText) {
-      if (composeSpellErrors.length > 0) {
+      if (sendBlockedByAiReview) {
+        showNotification('Use a sugestão de resposta da IA ou a Revisão de texto antes de enviar.', 'warning');
+        setComposeMode('public');
+        return null;
+      }
+      if (COMPOSE_SPELLCHECK_ENABLED && composeSpellErrors.length > 0) {
         showNotification(
           `Corrija ${composeSpellErrors.length} erro${composeSpellErrors.length > 1 ? 's' : ''} ortográfico${composeSpellErrors.length > 1 ? 's' : ''} antes de enviar.`,
           'warning',
         );
         return null;
       }
-      try {
-        const spellCtx = createSpellContext(config, spellIgnoredWords);
-        const errors = await scanText(messageText, spellCtx.whitelist, spellCtx.ignoredWords);
-        if (errors.length > 0) {
-          setComposeSpellErrors(errors);
-          setComposeMode('public');
-          showNotification(
-            `Corrija ${errors.length} erro${errors.length > 1 ? 's' : ''} ortográfico${errors.length > 1 ? 's' : ''} antes de enviar.`,
-            'warning',
-          );
-          return null;
+      if (COMPOSE_SPELLCHECK_ENABLED) {
+        try {
+          const spellCtx = createSpellContext(config, spellIgnoredWords);
+          addSpellWhitelistTerms(spellCtx.whitelist, getAgentName());
+          addSpellWhitelistTerms(spellCtx.whitelist, ticket?.clientName || ticket?.lateralForm?.nome);
+          const errors = await scanText(messageText, spellCtx.whitelist, spellCtx.ignoredWords);
+          if (errors.length > 0) {
+            setComposeSpellErrors(errors);
+            setComposeMode('public');
+            showNotification(
+              `Corrija ${errors.length} erro${errors.length > 1 ? 's' : ''} ortográfico${errors.length > 1 ? 's' : ''} antes de enviar.`,
+              'warning',
+            );
+            return null;
+          }
+        } catch {
+          /* LT indisponível — modo degradado: não bloqueia envio */
         }
-      } catch {
-        /* LT indisponível — modo degradado: não bloqueia envio */
       }
     }
     setComposeSpellErrors([]);
@@ -438,6 +480,7 @@ export default function DeskV2Root() {
             sendStatus: status,
             composeText: messageText ? '' : session.composeText,
             internalText: internalNoteText ? '' : session.internalText,
+            composeAiReviewedFor: messageText ? '' : session.composeAiReviewedFor,
           };
         }
         replaceOpenTabId(draftId, newId, {
@@ -446,7 +489,10 @@ export default function DeskV2Root() {
           ticketLabel: getTicketProtocolLabel(persisted) || 'Rascunho',
         });
         setSendStatus(status);
-        if (messageText) setComposeText('');
+        if (messageText) {
+          setComposeText('');
+          setComposeAiReviewedFor('');
+        }
         if (internalNoteText) setInternalText('');
         showNotification(
           messageText || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
@@ -473,7 +519,10 @@ export default function DeskV2Root() {
         return t;
       });
       setSendStatus(status);
-      if (messageText) setComposeText('');
+      if (messageText) {
+        setComposeText('');
+        setComposeAiReviewedFor('');
+      }
       if (internalNoteText) setInternalText('');
       if (activeTabId) {
         const sessionKey = String(activeTabId);
@@ -483,6 +532,7 @@ export default function DeskV2Root() {
             ...session,
             composeText: messageText ? '' : session.composeText,
             internalText: internalNoteText ? '' : session.internalText,
+            composeAiReviewedFor: messageText ? '' : session.composeAiReviewedFor,
           };
         }
       }
@@ -691,7 +741,7 @@ export default function DeskV2Root() {
                     messages={convMsgs}
                     composeText={composeText}
                     onComposeTextChange={setComposeText}
-                    onUseIaReply={setComposeText}
+                    onUseIaReply={handleUseIaReply}
                     onSend={() => handleCommitWithStatus(sendStatus)}
                     iaReply={ticketAi.respostaSugerida}
                     iaReplyLoading={ticketAi.loading}
@@ -710,7 +760,7 @@ export default function DeskV2Root() {
                       <DeskConversation
                         ticket={ticket}
                         messages={convMsgs}
-                        onUseIaReply={setComposeText}
+                        onUseIaReply={handleUseIaReply}
                         iaReply={ticketAi.respostaSugerida}
                         iaReplyLoading={ticketAi.loading}
                         iaWaitingMessage={ticketAi.waitingMessage}
@@ -729,6 +779,9 @@ export default function DeskV2Root() {
                         spellIgnoredWords={spellIgnoredWords}
                         onIgnoreSpellWord={handleIgnoreSpellWord}
                         onFlaggedErrorsChange={handleFlaggedErrorsChange}
+                        onComposeAiReviewed={handleComposeAiReviewed}
+                        aiReviewPending={sendBlockedByAiReview}
+                        clientDisplayName={ticket?.clientName || ticket?.lateralForm?.nome || ''}
                       />
                     </>
                   ) : (
@@ -756,7 +809,8 @@ export default function DeskV2Root() {
           waChatOpen={waChatOpen}
           onOpenChat={handleOpenChat}
           onCloseChat={() => setWaChatOpen(false)}
-          sendDisabled={sendDisabledBySpell}
+          sendDisabled={sendDisabled}
+          sendDisabledTitle={sendDisabledTitle}
           iaTabulationDisplay={ticketAi.tabulacaoDisplay}
           iaTabulationLoading={ticketAi.loading}
           iaWaitingMessage={ticketAi.waitingMessage}

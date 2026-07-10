@@ -1,8 +1,9 @@
-/** tickets.routes v1.3.7 — autor da sessão em mensagens e alterações */
+/** tickets.routes v1.4.0 — responsavel pela sessão no POST manual */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { Box } from '../models/Box';
+import { applySessionResponsavelIfNeeded } from '../services/assignmentRouter.service';
 import {
   appendRegistroEntry,
   applyBodyToChamado,
@@ -13,6 +14,7 @@ import {
   statusFromBoxName,
 } from '../services/chamado.mapper';
 import { TabulacaoValidationError } from '../services/tabulation.service';
+import { notifyAgentReplyAsync, notifyTicketOpenedAsync } from '../services/emailNotification.service';
 
 const router = Router();
 
@@ -80,7 +82,10 @@ router.post('/', authMiddleware, async (req, res: Response) => {
   }
 
   try {
-    const chamado = await ChamadoN1.create(await createChamadoFromBody(req.body, status, req.user));
+    const partial = await createChamadoFromBody(req.body, status, req.user);
+    applySessionResponsavelIfNeeded(partial, req.user);
+    const chamado = await ChamadoN1.create(partial);
+    notifyTicketOpenedAsync(chamado);
     const ticket = await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes));
     res.status(201).json(ticket);
   } catch (err) {
@@ -98,6 +103,10 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
   if (req.body.boxId && (req.body.status === undefined || String(req.body.status).trim() === '')) {
     const box = await Box.findById(req.body.boxId);
     if (box) req.body.status = statusFromBoxName(box.name);
+  }
+
+  if (!String(req.body.author ?? '').trim() && req.user) {
+    req.body.author = req.user.name || req.user.email || '';
   }
 
   try {
@@ -150,6 +159,11 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
   }
 
   await chamado.save();
+
+  if (!isInternalOnly && publicText.trim()) {
+    notifyAgentReplyAsync(chamado, publicText);
+  }
+
   res.status(201).json({
     ...(result.public ?? result.internal),
     publicMessage: result.public,

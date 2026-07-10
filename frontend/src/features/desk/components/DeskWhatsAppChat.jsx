@@ -1,6 +1,6 @@
 /**
- * DeskWhatsAppChat v1.2.0 — sugestão IA via OpenAI + POPs
- * VERSION: v1.2.0 | DATE: 2026-07-03
+ * DeskWhatsAppChat v1.2.1 — oculta sugestão IA após usar resposta
+ * VERSION: v1.2.1 | DATE: 2026-07-07
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -26,13 +26,20 @@ export default function DeskWhatsAppChat({
 }) {
   const [iaVisible, setIaVisible] = useState(true);
   const inputRef = useRef(null);
+  const lastIaReplyRef = useRef('');
   const contact = getClientContactFields(ticket, client);
   const chatMessages = messages || [];
   const dateIso = chatMessages[0]?.timestamp || ticket.createdAt;
 
   useEffect(() => {
     setIaVisible(true);
+    lastIaReplyRef.current = '';
   }, [ticket?.id]);
+
+  useEffect(() => {
+    if (!iaHasSuggestion || !iaReply || iaReply === lastIaReplyRef.current) return;
+    setIaVisible(true);
+  }, [iaReply, iaHasSuggestion]);
 
   const displayText = iaReplyLoading || !iaHasSuggestion
     ? (iaWaitingMessage || 'Gerando sugestão com base nos POPs…')
@@ -40,9 +47,18 @@ export default function DeskWhatsAppChat({
 
   const canUseReply = iaHasSuggestion && !iaReplyLoading && Boolean(iaReply);
 
+  const handleUseIaReply = () => {
+    if (!canUseReply) return;
+    onUseIaReply(iaReply);
+    lastIaReplyRef.current = iaReply;
+    setIaVisible(false);
+  };
+
   const handleEditIa = () => {
     if (!canUseReply) return;
     onUseIaReply(iaReply);
+    lastIaReplyRef.current = iaReply;
+    setIaVisible(false);
     inputRef.current?.focus();
   };
 
@@ -119,7 +135,7 @@ export default function DeskWhatsAppChat({
                 type="button"
                 className="wa-ia-card__btn wa-ia-card__btn--primary"
                 disabled={!canUseReply}
-                onClick={() => onUseIaReply(iaReply)}
+                onClick={handleUseIaReply}
               >
                 Usar resposta
               </button>

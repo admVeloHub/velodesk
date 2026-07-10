@@ -15345,10 +15345,6 @@ input:checked + .slider:before {
     color: var(--config-muted);
 }
 
-#config .config-welcome-card-demo {
-    border-color: rgba(91, 110, 232, 0.35);
-    background: linear-gradient(135deg, #fafbff 0%, #f3f6ff 100%);
-}
 
 #config .config-panel {
     border: none;
@@ -15386,13 +15382,19 @@ input:checked + .slider:before {
 }
 
 #config .config-stats-grid,
-#config .forms-stats-row,
 #config .workflows-stats,
 #config .backup-stats,
 #config .api-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 0.75rem;
+    margin-bottom: 1.1rem;
+}
+
+#config .forms-stats-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.65rem;
     margin-bottom: 1.1rem;
 }
 
@@ -15408,6 +15410,12 @@ input:checked + .slider:before {
     color: var(--primary-blue);
     box-shadow: none;
     gap: 0.75rem;
+}
+
+#config .forms-stats-row .stat-card {
+    padding: 0.65rem 0.7rem;
+    gap: 0.55rem;
+    min-width: 0;
 }
 
 #config .config-stats-grid .stat-card:hover,
@@ -15427,18 +15435,125 @@ input:checked + .slider:before {
     font-size: 1rem;
 }
 
+#config .forms-stats-row .stat-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    font-size: 0.88rem;
+    flex-shrink: 0;
+}
+
+#config .forms-stats-row .stat-info {
+    min-width: 0;
+}
+
 #config .config-stats-grid .stat-info h3,
-#config .forms-stats-row .stat-info h3 {
+#config .forms-stats-row .stat-info h3,
+#config .workflows-stats .stat-info h3,
+#config .backup-stats .stat-info h3,
+#config .api-stats .stat-info h3 {
     font-size: 1.4rem;
     font-weight: 800;
     color: var(--primary-blue);
 }
 
+#config .forms-stats-row .stat-info h3 {
+    font-size: 1.15rem;
+    line-height: 1.1;
+}
+
 #config .config-stats-grid .stat-info p,
-#config .forms-stats-row .stat-info p {
+#config .forms-stats-row .stat-info p,
+#config .workflows-stats .stat-info p,
+#config .backup-stats .stat-info p,
+#config .api-stats .stat-info p {
     font-size: 0.74rem;
     color: var(--config-muted);
     opacity: 1;
+}
+
+#config .forms-stats-row .stat-info p {
+    font-size: 0.67rem;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#config .forms-stats-row .stat-card--clickable {
+    position: relative;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+#config .forms-stats-row .stat-card__edit-hint {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 6px;
+    color: var(--accent-blue);
+    font-size: 0.82rem;
+    line-height: 1;
+    pointer-events: none;
+}
+
+#config .forms-stats-row .stat-card--clickable:hover .stat-card__edit-hint {
+    color: var(--accent-blue);
+}
+
+#config .forms-stats-row .stat-card--clickable:focus-visible {
+    outline: 2px solid var(--primary-blue);
+    outline-offset: 2px;
+}
+
+#config .forms-stats-row .stat-card--static {
+    cursor: default;
+}
+
+#config .forms-stats-row--compact {
+    margin-bottom: 0.85rem;
+}
+
+#config .config-modal__dialog--wide {
+    width: min(720px, 100%);
+}
+
+#config .config-modal__subtitle {
+    margin: 0.35rem 0 0;
+    font-size: 0.82rem;
+    color: var(--config-muted);
+}
+
+#config .config-opcoes-add-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-bottom: 0.85rem;
+}
+
+#config .config-opcoes-add-form__input,
+#config .config-opcoes-edit-input {
+    flex: 1 1 220px;
+    min-width: 180px;
+    border: 1px solid var(--config-border);
+    border-radius: 8px;
+    padding: 0.55rem 0.75rem;
+    font: inherit;
+    color: var(--primary-blue);
+    background: #fff;
+}
+
+#config .config-opcoes-add-form__input:focus,
+#config .config-opcoes-edit-input:focus {
+    outline: 2px solid rgba(0, 0, 88, 0.12);
+    border-color: rgba(0, 0, 88, 0.25);
 }
 
 #config .config-action-bar,
@@ -16007,6 +16122,14 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
 
+#config .config-table .config-ativo-toggle {
+    min-width: 0;
+    padding: 0.35rem 0.65rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    line-height: 1.2;
+}
+
 #config .config-ativo-toggle:disabled {
     opacity: 0.65;
     cursor: wait;
@@ -16206,6 +16329,16 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
 @media (max-width: 1400px) {
     #config .config-welcome-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1100px) {
+    #config .forms-stats-row {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    #config .forms-stats-row .stat-info p {
+        white-space: normal;
     }
 }
 
