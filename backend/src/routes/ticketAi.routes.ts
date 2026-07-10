@@ -1,14 +1,26 @@
-/** ticketAi.routes v1.0.0 — sugestão IA resposta + tabulação na abertura do ticket */
+/** ticketAi.routes v1.0.1 — status de configuração + sugestão IA */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
+import { env } from '../config/env';
 import {
   generateTicketAiSuggest,
-  isOpenAiTicketSuggestConfigured,
+  getOpenAiTicketSuggestStatus,
   statusForOpenAiError,
   validateTicketAiInput,
 } from '../services/openaiTicketSuggest.service';
 
 const router = Router();
+
+router.get('/status', authMiddleware, (_req: Request, res: Response) => {
+  const status = getOpenAiTicketSuggestStatus();
+  return res.json({
+    success: true,
+    configured: status.configured,
+    missing: status.missing,
+    model: env.openaiModel,
+    source: 'ticket_ai_status',
+  });
+});
 
 router.post('/suggest', authMiddleware, async (req: Request, res: Response) => {
   const parsed = validateTicketAiInput(req.body);
@@ -16,10 +28,14 @@ router.post('/suggest', authMiddleware, async (req: Request, res: Response) => {
     return res.status(400).json({ success: false, error: parsed.error });
   }
 
-  if (!isOpenAiTicketSuggestConfigured()) {
+  const configStatus = getOpenAiTicketSuggestStatus();
+  if (!configStatus.configured) {
+    console.warn('[ticket-ai-suggest] 503 — variáveis ausentes no servidor:', configStatus.missing.join(', '));
     return res.status(503).json({
       success: false,
-      error: 'Serviço OpenAI não configurado. Defina OPENAI_API_KEY e OPENAI_VECTOR_STORE_ID (ou VECTOR_STORE_PATH) no backend.',
+      error: 'Serviço OpenAI não configurado no servidor.',
+      missing: configStatus.missing,
+      hint: 'Defina OPENAI_API_KEY e OPENAI_VECTOR_STORE_ID (ou VECTOR_STORE_PATH) no Cloud Run / backend.',
     });
   }
 

@@ -23,6 +23,7 @@ export default function DeskWhatsAppChat({
   iaWaitingMessage = '',
   iaShowBar = false,
   iaHasSuggestion = false,
+  iaError = '',
 }) {
   const [iaVisible, setIaVisible] = useState(true);
   const inputRef = useRef(null);
@@ -41,11 +42,13 @@ export default function DeskWhatsAppChat({
     setIaVisible(true);
   }, [iaReply, iaHasSuggestion]);
 
-  const displayText = iaReplyLoading || !iaHasSuggestion
-    ? (iaWaitingMessage || 'Gerando sugestão com base nos POPs…')
-    : iaReply;
+  const displayText = iaError
+    ? iaError
+    : iaReplyLoading || !iaHasSuggestion
+      ? (iaWaitingMessage || 'Gerando sugestão com base nos POPs…')
+      : iaReply;
 
-  const canUseReply = iaHasSuggestion && !iaReplyLoading && Boolean(iaReply);
+  const canUseReply = iaHasSuggestion && !iaReplyLoading && Boolean(iaReply) && !iaError;
 
   const handleUseIaReply = () => {
     if (!canUseReply) return;
@@ -124,7 +127,7 @@ export default function DeskWhatsAppChat({
         )}
 
         {iaVisible && iaShowBar && (
-          <div className={'wa-ia-card' + (iaReplyLoading ? ' wa-ia-card--loading' : '')} id="iaSuggestionBar">
+          <div className={'wa-ia-card' + (iaReplyLoading ? ' wa-ia-card--loading' : '') + (iaError ? ' wa-ia-card--error' : '')} id="iaSuggestionBar">
             <div className="wa-ia-card__head">
               <i className="ti ti-sparkles" aria-hidden="true" />
               <span className="wa-ia-card__label">SUGESTÃO IA</span>

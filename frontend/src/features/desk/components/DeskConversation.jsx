@@ -1,6 +1,6 @@
 /**
- * DeskConversation v1.3.1 — oculta sugestão IA após usar resposta
- * VERSION: v1.3.1 | DATE: 2026-07-07
+ * DeskConversation v1.3.2 — exibe erro de sugestão IA na barra
+ * VERSION: v1.3.2 | DATE: 2026-07-10
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
@@ -37,6 +37,7 @@ export default function DeskConversation({
   iaWaitingMessage = '',
   iaShowBar = false,
   iaHasSuggestion = false,
+  iaError = '',
 }) {
   const [iaVisible, setIaVisible] = useState(true);
   const lastIaReplyRef = useRef('');
@@ -52,11 +53,13 @@ export default function DeskConversation({
     setIaVisible(true);
   }, [iaReply, iaHasSuggestion]);
 
-  const displayText = iaReplyLoading || !iaHasSuggestion
-    ? (iaWaitingMessage || 'Gerando sugestão com base nos POPs…')
-    : iaReply;
+  const displayText = iaError
+    ? iaError
+    : iaReplyLoading || !iaHasSuggestion
+      ? (iaWaitingMessage || 'Gerando sugestão com base nos POPs…')
+      : iaReply;
 
-  const canUseReply = iaHasSuggestion && !iaReplyLoading && Boolean(iaReply);
+  const canUseReply = iaHasSuggestion && !iaReplyLoading && Boolean(iaReply) && !iaError;
 
   const handleUseIaReply = () => {
     if (!canUseReply) return;
@@ -88,10 +91,12 @@ export default function DeskConversation({
         })
       )}
       {iaVisible && iaShowBar && (
-        <div className={'ia-suggestion-bar' + (iaReplyLoading ? ' ia-suggestion-bar--loading' : '')} id="iaSuggestionBar">
+        <div className={'ia-suggestion-bar' + (iaReplyLoading ? ' ia-suggestion-bar--loading' : '') + (iaError ? ' ia-suggestion-bar--error' : '')} id="iaSuggestionBar">
           <span className="ia-suggestion-bar__label">IA</span>
           <span className="ia-suggestion-bar__text" id="iaReplyText">{displayText}</span>
           <div className="ia-suggestion-bar__actions">
+            {!iaError ? (
+            <>
             <button
               type="button"
               className="ia-suggestion-bar__btn"
@@ -101,6 +106,8 @@ export default function DeskConversation({
               Usar resposta
             </button>
             <button type="button" className="ia-suggestion-bar__btn ia-suggestion-bar__btn--dismiss" onClick={() => setIaVisible(false)}>Não usar</button>
+            </>
+            ) : null}
           </div>
         </div>
       )}

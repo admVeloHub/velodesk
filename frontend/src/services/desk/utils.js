@@ -92,6 +92,7 @@ export function statusMeta(queueId) {
     novos: { label: 'Novo', cls: 'novo' },
     pendente: { label: 'Pendente', cls: 'pendente' },
     resolvidos: { label: 'Resolvido', cls: 'resolvido' },
+    cancelado: { label: 'Cancelado', cls: 'cancelado' },
   };
   return map[queueId] || { label: 'Em andamento', cls: 'andamento' };
 }
@@ -714,6 +715,7 @@ export function applySendStatus(entry, queueId) {
     'em-andamento': { box: 'em-andamento', status: 'em-aberto' },
     pendente: { box: 'em-espera', status: 'pendente' },
     resolvidos: { box: 'resolvidos', status: 'resolvido' },
+    cancelado: { box: 'resolvidos', status: 'cancelado' },
   };
   const cfg = statusMap[queueId] || statusMap['em-andamento'];
   entry.ticket.status = cfg.status;

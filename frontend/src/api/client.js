@@ -99,6 +99,7 @@ export const whatsappApi = {
 };
 
 export const ticketAiApi = {
+  status: () => api.get('/ticket-ai/status').then((r) => r.data),
   suggest: (payload, config) =>
     api.post('/ticket-ai/suggest', payload, config).then((r) => r.data),
 };

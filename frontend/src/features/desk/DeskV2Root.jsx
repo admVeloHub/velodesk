@@ -1,6 +1,6 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.7.3 | DATE: 2026-07-10
+ * VERSION: v3.7.5 | DATE: 2026-07-10
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
@@ -35,9 +35,11 @@ import DeskInternalNotesPanel from './components/DeskInternalNotesPanel';
 import DeskRightPanel from './components/DeskRightPanel';
 import { applyCascadeFieldChange, buildDefaultRightFields, getMotivos, mergeRightFieldsWithDefaults, validateTabulationForSendStatus } from '../../services/tabulationConfig';
 import { useTabulation } from '../../context/TabulationContext';
-import { COMPOSE_SPELLCHECK_ENABLED } from '../../services/desk/constants';
+import { useProfile } from '../../context/ProfileContext';
+import { readAuthDeskRole } from '../../services/desk/responsavelSegmentation';
+import { COMPOSE_SPELLCHECK_ENABLED, getSendStatusOptions, isSupervisorSendRole } from '../../services/desk/constants';
 import { createSpellContext, loadSpellEngine, scanText } from '../../services/spellcheck/spellEngine';
-import { htmlToPlainText, normalizePlainToHtml } from '../../services/desk/composeRichEditor';
+import { htmlToPlainText, normalizeComposePlain, normalizePlainToHtml } from '../../services/desk/composeRichEditor';
 import { addSpellWhitelistTerms } from '../../services/spellcheck/whitelist';
 import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
 
@@ -84,6 +86,7 @@ function buildDefaultSessionFromTicket(ticket, config) {
     waChatOpen: false,
     spellIgnoredWords: [],
     composeAiReviewedFor: '',
+    iaSuggestionApproved: false,
   };
 }
 
@@ -101,6 +104,9 @@ export default function DeskV2Root() {
   } = useTickets();
   const { showNotification } = useNotifications();
   const { config } = useTabulation();
+  const { profileId } = useProfile();
+  const sendRole = readAuthDeskRole() || profileId;
+  const sendStatusOptions = useMemo(() => getSendStatusOptions(sendRole), [sendRole]);
 
   const [activeQueue, setActiveQueue] = useState('em-andamento');
   const [activeSort, setActiveSort] = useState('data');
@@ -119,6 +125,8 @@ export default function DeskV2Root() {
   const [waChatOpen, setWaChatOpen] = useState(false);
   const [composeSpellErrors, setComposeSpellErrors] = useState([]);
   const [composeAiReviewedFor, setComposeAiReviewedFor] = useState('');
+  const [iaSuggestionApproved, setIaSuggestionApproved] = useState(false);
+  const iaSuggestionPlainRef = useRef('');
   const [spellIgnoredWords, setSpellIgnoredWords] = useState(() => new Set());
   const [queueStatuses, setQueueStatuses] = useState(() => getAllQueueStatuses());
   const suppressAutoSelectRef = useRef(false);
@@ -159,9 +167,10 @@ export default function DeskV2Root() {
       escalonar,
       waChatOpen,
       spellIgnoredWords: Array.from(spellIgnoredWords),
-      composeAiReviewedFor,
-    };
-  }, [mainTab, composeMode, composeText, internalText, sendStatus, rightFields, escalonar, waChatOpen, spellIgnoredWords, composeAiReviewedFor]);
+    composeAiReviewedFor,
+    iaSuggestionApproved,
+  };
+  }, [mainTab, composeMode, composeText, internalText, sendStatus, rightFields, escalonar, waChatOpen, spellIgnoredWords, composeAiReviewedFor, iaSuggestionApproved]);
 
   const restoreTabSession = useCallback((ticketId) => {
     const ticketEntry = findTicketEntry(ticketId);
@@ -187,11 +196,21 @@ export default function DeskV2Root() {
     setWaChatOpen(session.waChatOpen ?? defaults.waChatOpen);
     setSpellIgnoredWords(new Set(session.spellIgnoredWords ?? defaults.spellIgnoredWords ?? []));
     setComposeAiReviewedFor(session.composeAiReviewedFor ?? defaults.composeAiReviewedFor ?? '');
+    setIaSuggestionApproved(Boolean(session.iaSuggestionApproved));
+    iaSuggestionPlainRef.current = session.iaSuggestionApproved
+      ? normalizeComposePlain(session.composeText ?? defaults.composeText ?? '')
+      : '';
     setComposeSpellErrors([]);
   }, [config]);
 
-  const composePlainForAi = useMemo(() => htmlToPlainText(composeText).trim(), [composeText]);
-  const sendBlockedByAiReview = composePlainForAi.length > 0 && composeAiReviewedFor !== composePlainForAi;
+  const composePlainForAi = useMemo(() => normalizeComposePlain(composeText), [composeText]);
+  const composeReviewedPlain = useMemo(
+    () => normalizeComposePlain(composeAiReviewedFor),
+    [composeAiReviewedFor],
+  );
+  const sendBlockedByAiReview = composePlainForAi.length > 0
+    && !iaSuggestionApproved
+    && composeReviewedPlain !== composePlainForAi;
   const sendDisabledBySpell = COMPOSE_SPELLCHECK_ENABLED
     && composeMode === 'public'
     && composeSpellErrors.length > 0;
@@ -202,17 +221,38 @@ export default function DeskV2Root() {
       ? 'Use a sugestão de resposta da IA ou a Revisão de texto antes de enviar'
       : undefined;
 
+  useEffect(() => {
+    if (sendStatusOptions.some((opt) => opt.id === sendStatus)) return;
+    setSendStatus('em-andamento');
+  }, [sendStatusOptions, sendStatus]);
+
   const handleComposeAiReviewed = useCallback((plainText) => {
-    setComposeAiReviewedFor(String(plainText || '').trim());
+    setComposeAiReviewedFor(normalizeComposePlain(plainText));
+    setIaSuggestionApproved(false);
+    iaSuggestionPlainRef.current = '';
   }, []);
 
   const handleUseIaReply = useCallback((replyText) => {
-    const trimmed = String(replyText || '').trim();
+    const trimmed = normalizeComposePlain(replyText);
     if (!trimmed) return;
-    setComposeText(waChatOpen ? trimmed : normalizePlainToHtml(trimmed));
-    setComposeAiReviewedFor(trimmed);
+    const html = waChatOpen ? trimmed : normalizePlainToHtml(trimmed);
+    const approvedPlain = normalizeComposePlain(html);
+    setComposeText(html);
+    setComposeAiReviewedFor(approvedPlain);
+    setIaSuggestionApproved(true);
+    iaSuggestionPlainRef.current = approvedPlain;
     setComposeMode('public');
+    console.info('[ticket-ai-desk] Sugestão IA aplicada — envio liberado.', { chars: approvedPlain.length });
   }, [waChatOpen]);
+
+  useEffect(() => {
+    if (!iaSuggestionApproved) return;
+    if (composePlainForAi && iaSuggestionPlainRef.current && composePlainForAi !== iaSuggestionPlainRef.current) {
+      setIaSuggestionApproved(false);
+      iaSuggestionPlainRef.current = '';
+      console.info('[ticket-ai-desk] Envio bloqueado — texto alterado após usar sugestão IA.');
+    }
+  }, [composePlainForAi, iaSuggestionApproved]);
 
   useEffect(() => {
     restoreCustomKanbanBoxes();
@@ -401,6 +441,10 @@ export default function DeskV2Root() {
     }
 
     if (messageText) {
+      if (status === 'cancelado' && !isSupervisorSendRole(sendRole)) {
+        showNotification('Apenas supervisores podem enviar como Cancelado.', 'warning');
+        return null;
+      }
       if (sendBlockedByAiReview) {
         showNotification('Use a sugestão de resposta da IA ou a Revisão de texto antes de enviar.', 'warning');
         setComposeMode('public');
@@ -481,6 +525,7 @@ export default function DeskV2Root() {
             composeText: messageText ? '' : session.composeText,
             internalText: internalNoteText ? '' : session.internalText,
             composeAiReviewedFor: messageText ? '' : session.composeAiReviewedFor,
+            iaSuggestionApproved: messageText ? false : session.iaSuggestionApproved,
           };
         }
         replaceOpenTabId(draftId, newId, {
@@ -492,6 +537,8 @@ export default function DeskV2Root() {
         if (messageText) {
           setComposeText('');
           setComposeAiReviewedFor('');
+          setIaSuggestionApproved(false);
+          iaSuggestionPlainRef.current = '';
         }
         if (internalNoteText) setInternalText('');
         showNotification(
@@ -522,6 +569,8 @@ export default function DeskV2Root() {
       if (messageText) {
         setComposeText('');
         setComposeAiReviewedFor('');
+        setIaSuggestionApproved(false);
+        iaSuggestionPlainRef.current = '';
       }
       if (internalNoteText) setInternalText('');
       if (activeTabId) {
@@ -533,6 +582,7 @@ export default function DeskV2Root() {
             composeText: messageText ? '' : session.composeText,
             internalText: internalNoteText ? '' : session.internalText,
             composeAiReviewedFor: messageText ? '' : session.composeAiReviewedFor,
+            iaSuggestionApproved: messageText ? false : session.iaSuggestionApproved,
           };
         }
       }
@@ -660,6 +710,15 @@ export default function DeskV2Root() {
 
   const convMsgs = ticket ? buildRegistroThread(ticket) : [];
   const ticketAi = useTicketAiSuggestions(ticket, rightFields, convMsgs, internalText);
+  const ticketAiErrorNotifiedRef = useRef(null);
+
+  useEffect(() => {
+    if (!ticketAi.error) return;
+    const key = `${activeTabId || 'none'}::${ticketAi.error}`;
+    if (ticketAiErrorNotifiedRef.current === key) return;
+    ticketAiErrorNotifiedRef.current = key;
+    showNotification(ticketAi.error, 'warning');
+  }, [ticketAi.error, activeTabId, showNotification]);
 
   return (
     <div className="app-shell" id="deskAppShell">
@@ -748,6 +807,7 @@ export default function DeskV2Root() {
                     iaWaitingMessage={ticketAi.waitingMessage}
                     iaShowBar={ticketAi.showIaBar}
                     iaHasSuggestion={ticketAi.hasSuggestion}
+                    iaError={ticketAi.error}
                   />
                 </div>
               ) : (
@@ -766,6 +826,7 @@ export default function DeskV2Root() {
                         iaWaitingMessage={ticketAi.waitingMessage}
                         iaShowBar={ticketAi.showIaBar}
                         iaHasSuggestion={ticketAi.hasSuggestion}
+                        iaError={ticketAi.error}
                       />
                       <DeskComposePanel
                         ticketId={ticket.id}

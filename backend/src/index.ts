@@ -19,7 +19,11 @@ import ticketAiRoutes from './routes/ticketAi.routes';
 import inboundRoutes from './routes/inbound.routes';
 import workspace360Routes from './routes/workspace360.routes';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
-import { isOpenAiTicketSuggestConfigured } from './services/openaiTicketSuggest.service';
+import {
+  generateTicketAiSuggest,
+  getOpenAiTicketSuggestStatus,
+  isOpenAiTicketSuggestConfigured,
+} from './services/openaiTicketSuggest.service';
 import { loadEmailTransport } from './services/emailTransport.service';
 import {
   ensureGmailWatchFresh,
@@ -180,7 +184,11 @@ async function start() {
       if (isOpenAiTicketSuggestConfigured()) {
         console.log('[ticket-ai] OpenAI configurado (sugestão resposta + tabulação).');
       } else {
-        console.warn('[ticket-ai] OpenAI não configurado — defina OPENAI_API_KEY e OPENAI_VECTOR_STORE_ID em backend/.env');
+        const aiStatus = getOpenAiTicketSuggestStatus();
+        console.warn(
+          '[ticket-ai] OpenAI NÃO configurado — sugestão IA retornará 503. Faltam:',
+          aiStatus.missing.join(', ') || '(desconhecido)',
+        );
       }
       if (env.enableWhatsapp) {
         console.log('Inicializando WhatsApp Web...');

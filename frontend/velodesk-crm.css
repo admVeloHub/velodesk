@@ -1,4 +1,4 @@
-/* Velodesk CRM v1.6.1 — fila/lista/painel mais estreitos em notebook */
+/* Velodesk CRM v1.6.2 — opção Cancelado no envio (supervisor) */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -1840,6 +1840,19 @@
     gap: 6px 8px;
 }
 
+#velodeskDeskV2Root .ia-suggestion-bar--error {
+    background: #fff7ed;
+    border-color: #fdba74;
+}
+
+#velodeskDeskV2Root .ia-suggestion-bar--error .ia-suggestion-bar__label {
+    color: #c2410c;
+}
+
+#velodeskDeskV2Root .ia-suggestion-bar--error .ia-suggestion-bar__text {
+    color: #9a3412;
+}
+
 #velodeskDeskV2Root .ia-suggestion-bar__label {
     font-size: 12px;
     font-weight: 700;
@@ -2963,6 +2976,16 @@
 
 #velodeskDeskV2Root .crm-send-status__option--resolvido:hover {
     background: #9ca3af;
+    color: #fff;
+}
+
+#velodeskDeskV2Root .crm-send-status__option--cancelado {
+    background: #FEE2E2;
+    color: #991B1B;
+}
+
+#velodeskDeskV2Root .crm-send-status__option--cancelado:hover {
+    background: #DC2626;
     color: #fff;
 }
 

@@ -20,6 +20,13 @@ export function htmlToPlainText(html) {
   return (div.innerText || div.textContent || '').replace(/\u00A0/g, ' ');
 }
 
+/** Texto plano normalizado para comparar compose vs revisão IA (html ou plain). */
+export function normalizeComposePlain(value) {
+  const raw = String(value ?? '');
+  const plain = /<[a-z][\s\S]*>/i.test(raw) ? htmlToPlainText(raw) : raw;
+  return plain.replace(/\r\n/g, '\n').replace(/\u00A0/g, ' ').trim();
+}
+
 export function composeTextHasFormatting(value) {
   return /(\*\*.+?\*\*|_.+?_|<(?:b|strong|i|em|u)\b)/i.test(String(value || ''));
 }

@@ -1,10 +1,35 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.21.0 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.22.0 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Sugestão IA (nome cliente), envio por perfil e liberação ao usar sugestão
+
+- **Data/Hora**: 2026-07-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.22.0
+  - openaiTicketSuggest.service v1.0.4, ticketSuggestPersona v1.1.1, clientResponseFormatPersona v1.0.1, ticketAi.routes v1.0.1, index (backend)
+  - useTicketAiSuggestions v1.1.1, composeRichEditor v1.0.1, constants v2.2.0, desk/utils, ticketsCache
+  - DeskV2Root v3.7.5, DeskComposePanel v1.12.4, DeskConversation, DeskWhatsAppChat, client.js
+  - velodesk-crm.css v1.6.2
+- **Arquivos modificados / incluídos**:
+  - `backend/src/services/openaiTicketSuggest.service.ts` — primeiro nome do cliente no bloco do prompt; `nomeOperador`; diagnóstico de config OpenAI
+  - `backend/src/services/clientResponseFormatPersona.ts`, `ticketSuggestPersona.ts` — saudação obrigatória com nome do cliente
+  - `backend/src/routes/ticketAi.routes.ts`, `backend/src/index.ts` — GET `/api/ticket-ai/status`; resposta 503 com `missing`
+  - `frontend/src/hooks/useTicketAiSuggestions.js` — resolve nome do cliente; logs de diagnóstico; envia `nomeOperador`
+  - `frontend/src/features/desk/DeskV2Root.jsx` — usar sugestão IA libera envio (`iaSuggestionApproved`); normalização plain/HTML; status Cancelado só supervisor
+  - `frontend/src/features/desk/components/DeskComposePanel.jsx` — opções de envio por perfil; labels só com status
+  - `frontend/src/services/desk/constants.js` — `getSendStatusOptions(agent|supervisor)`; Cancelado exclusivo supervisor
+  - `frontend/src/services/desk/utils.js` — `applySendStatus` para cancelado
+  - `frontend/velodesk-crm.css` — estilo opção Cancelado no dropdown de envio
+- **Descrição**: Prompt da sugestão IA passa a incluir nome do cliente na saudação. Clicar em "Usar resposta" equivale à Revisão de texto e libera o envio. Botão Enviar exibe apenas o status (sem "Enviar como:"). Agentes veem Em andamento/Pendente/Resolvido; supervisores também Cancelado.
+- **Status**: Concluído
 
 ### GitHub Push — Sugestão IA de resposta e tabulação na abertura do ticket (OpenAI + POPs)
 

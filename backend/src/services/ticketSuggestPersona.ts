@@ -1,6 +1,6 @@
 /**
- * ticketSuggestPersona v1.1.0 — formato padrão alinhado à revisão de texto
- * VERSION: v1.1.0 | DATE: 2026-07-10
+ * ticketSuggestPersona v1.1.1 — saudação obrigatória com nome do cliente
+ * VERSION: v1.1.1 | DATE: 2026-07-10
  */
 import { getVelotaxClientResponseStructureBlock } from './clientResponseFormatPersona';
 
@@ -29,6 +29,7 @@ Você só pode sugerir respostas e tabulações relacionadas aos produtos oficia
 - Português brasileiro, tom acolhedor e profissional Velotax B2C.
 - Texto pronto para envio ao cliente (e-mail ou mensagem, conforme canal).
 - Use o nome do agente informado em **Nome do agente** para a identificação e assinatura.
+- **OBRIGATÓRIO:** quando **Primeiro nome do cliente** estiver informado, a primeira linha de respostaSugerida DEVE cumprimentar esse nome (ex.: "Olá, João").
 - Não invente prazos, valores ou procedimentos que não constem nos POPs ou no contexto.
 - Para atendimento telefônico (contextSource internal): traduza o registro interno do agente em linguagem ao cliente — NUNCA cite ou vaze conteúdo da anotação interna literalmente.
 

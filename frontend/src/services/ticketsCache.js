@@ -281,7 +281,7 @@ export function replaceDraftIdInColumns(oldId, newTicket) {
   let boxId = 'novos';
   if (status === 'em-aberto' || status === 'em-andamento') boxId = 'em-andamento';
   else if (status === 'pendente' || status === 'em-espera') boxId = 'em-espera';
-  else if (status === 'resolvido') boxId = 'resolvidos';
+  else if (status === 'resolvido' || status === 'cancelado') boxId = 'resolvidos';
   const box = cols.find((c) => c.id === boxId) || cols[0];
   if (box) {
     if (!box.tickets) box.tickets = [];

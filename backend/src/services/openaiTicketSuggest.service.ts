@@ -1,6 +1,6 @@
 /**
- * openaiTicketSuggest.service v1.0.2 — nome do agente + formato padrão de resposta
- * VERSION: v1.0.2 | DATE: 2026-07-10
+ * openaiTicketSuggest.service v1.0.4 — saudação com primeiro nome do cliente
+ * VERSION: v1.0.4 | DATE: 2026-07-10
  */
 import OpenAI from 'openai';
 import { env } from '../config/env';
@@ -82,8 +82,15 @@ const JSON_SCHEMA = {
   required: ['respostaSugerida', 'tabulacao'],
 } as const;
 
+export function getOpenAiTicketSuggestStatus(): { configured: boolean; missing: string[] } {
+  const missing: string[] = [];
+  if (!env.openaiApiKey?.trim()) missing.push('OPENAI_API_KEY');
+  if (!env.openaiVectorStoreId?.trim()) missing.push('OPENAI_VECTOR_STORE_ID');
+  return { configured: missing.length === 0, missing };
+}
+
 export function isOpenAiTicketSuggestConfigured(): boolean {
-  return Boolean(env.openaiApiKey?.trim() && env.openaiVectorStoreId?.trim());
+  return getOpenAiTicketSuggestStatus().configured;
 }
 
 function trimStr(value: unknown, maxLen: number): string {
@@ -168,17 +175,36 @@ function formatMessagesBlock(messages: TicketAiMessageInput[]): string {
     .join('\n');
 }
 
+function resolveClientFirstName(fullName: string): string {
+  const name = trimStr(fullName, 200);
+  if (!name) return '';
+  return name.split(/\s+/)[0] || name;
+}
+
 function buildUserBlock(params: TicketAiSuggestInput, tabulationCatalog: string): string {
+  const clientFullName = trimStr(params.clientName, 200);
+  const clientFirstName = resolveClientFirstName(clientFullName);
   const parts: string[] = [
     '## Dados do atendimento',
     '',
     `- **Protocolo:** ${params.protocolo || 'não informado'}`,
     `- **Canal:** ${params.canal || 'não informado'}`,
-    `- **Cliente:** ${params.clientName || 'não informado'}`,
+    `- **Cliente:** ${clientFullName || 'não informado'}`,
     `- **Nome do agente:** ${params.nomeOperador || 'não informado'}`,
     `- **Título:** ${params.titulo || 'não informado'}`,
     `- **Fonte de contexto:** ${params.contextSource === 'internal' ? 'anotação interna (telefone)' : 'mensagens públicas'}`,
   ];
+
+  if (clientFirstName) {
+    parts.push(
+      '',
+      '## Nome do cliente (usar na saudação — OBRIGATÓRIO)',
+      '',
+      `- **Nome completo:** ${clientFullName}`,
+      `- **Primeiro nome do cliente:** ${clientFirstName}`,
+      `- **Primeira linha de respostaSugerida:** Olá, ${clientFirstName}`,
+    );
+  }
 
   if (params.produtoHint) {
     parts.push(`- **Produto já identificado pelo agente (priorizar POP):** ${params.produtoHint}`);

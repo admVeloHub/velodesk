@@ -1,13 +1,16 @@
 /**
- * DeskComposePanel v1.12.2 — label Revisão de texto no compose
- * VERSION: v1.12.2 | DATE: 2026-07-10
+ * DeskComposePanel v1.12.4 — status de envio por perfil (agente/supervisor)
+ * VERSION: v1.12.4 | DATE: 2026-07-10
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { COMPOSE_SPELLCHECK_ENABLED, SEND_STATUS_OPTIONS } from '../../../services/desk/constants';import { useComposeSpellCheck } from '../../../hooks/useComposeSpellCheck';
+import { COMPOSE_SPELLCHECK_ENABLED, getSendStatusOptions } from '../../../services/desk/constants';
+import { useComposeSpellCheck } from '../../../hooks/useComposeSpellCheck';
+import { useProfile } from '../../../context/ProfileContext';
+import { readAuthDeskRole } from '../../../services/desk/responsavelSegmentation';
 import { useTabulation } from '../../../context/TabulationContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useNotifications } from '../../../context/NotificationContext';
-import { htmlToPlainText, normalizePlainToHtml } from '../../../services/desk/composeRichEditor';
+import { htmlToPlainText, normalizeComposePlain, normalizePlainToHtml } from '../../../services/desk/composeRichEditor';
 import SpellSuggestionBar, { SpellErrorsPanel } from './SpellSuggestionBar';
 import ComposeRichEditor from './ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
@@ -22,7 +25,10 @@ export function DeskStatusCommitButton({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
-  const currentStatus = SEND_STATUS_OPTIONS.find((o) => o.id === sendStatus) || SEND_STATUS_OPTIONS[0];
+  const { profileId } = useProfile();
+  const sendRole = readAuthDeskRole() || profileId;
+  const sendStatusOptions = useMemo(() => getSendStatusOptions(sendRole), [sendRole]);
+  const currentStatus = sendStatusOptions.find((o) => o.id === sendStatus) || sendStatusOptions[0];
 
   useEffect(() => {
     const close = (e) => {
@@ -66,7 +72,7 @@ export function DeskStatusCommitButton({
         {isPanel ? (
           <>
             <i className="ti ti-send" />
-            Enviar como
+            {currentStatus.label}
             <i className="ti ti-chevron-down" />
           </>
         ) : (
@@ -76,7 +82,7 @@ export function DeskStatusCommitButton({
         )}
       </button>
       <div className="crm-send-status__menu" id="crmStatusMenu" role="listbox" hidden={!menuOpen || disabled}>
-        {SEND_STATUS_OPTIONS.map((opt) => (
+        {sendStatusOptions.map((opt) => (
           <button
             key={opt.id}
             type="button"
@@ -313,9 +319,10 @@ export default function DeskComposePanel({
   };
 
   const handleApplyRefinar = useCallback((plainText) => {
-    const trimmed = String(plainText || '').trim();
-    onComposeTextChange(normalizePlainToHtml(trimmed));
-    onComposeAiReviewed?.(trimmed);
+    const trimmed = normalizeComposePlain(plainText);
+    const html = normalizePlainToHtml(trimmed);
+    onComposeTextChange(html);
+    onComposeAiReviewed?.(normalizeComposePlain(html));
   }, [onComposeTextChange, onComposeAiReviewed]);
 
   const handleReviewComplete = useCallback((draftPlainText) => {
