@@ -1,6 +1,6 @@
 /**
- * spellcheckPtLexicon v1.0.0 — léxico PT-BR atendimento + mapa de typos frequentes
- * VERSION: v1.0.0 | DATE: 2026-07-10
+ * spellcheckPtLexicon v1.0.1 — remove chave duplicada no mapa de typos
+ * VERSION: v1.0.1 | DATE: 2026-07-10
  */
 
 /** Typos frequentes no compose — corrige antes/depois do LanguageTool. */
@@ -15,7 +15,7 @@ export const KNOWN_TYPO_MAP: Record<string, string> = {
   procedimento: 'procedimento',
   criente: 'cliente',
   cleinte: 'cliente',
-  cleinte: 'cliente',
+  clietne: 'cliente',
   atendimeto: 'atendimento',
   pagameto: 'pagamento',
   pagamentu: 'pagamento',
