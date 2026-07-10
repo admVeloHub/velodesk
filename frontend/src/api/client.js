@@ -1,6 +1,6 @@
 /**
- * API client v1.6.0 — workspace360Api Painel 360°
- * VERSION: v1.6.0 | DATE: 2026-07-06 | AUTHOR: VeloHub Development Team
+ * API client v1.6.1 — clientsApi getByEmail
+ * VERSION: v1.6.1 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 
@@ -49,6 +49,8 @@ export const boxesApi = {
 
 export const clientsApi = {
   getByCpf: (cpf) => api.get('/clients', { params: { cpf } }).then((r) => r.data),
+  getByEmail: (email) => api.get('/clients', { params: { email } }).then((r) => r.data),
+  getById: (id) => api.get(`/clients/${encodeURIComponent(id)}`).then((r) => r.data),
   create: (payload) => api.post('/clients', payload).then((r) => r.data),
   update: (id, payload) => api.put(`/clients/${encodeURIComponent(id)}`, payload).then((r) => r.data),
 };

@@ -1,6 +1,6 @@
 /**
- * clienteAdapter v1.0.4 — persistência de contato no cadastro
- * VERSION: v1.0.4 | DATE: 2026-07-02
+ * clienteAdapter v1.0.5 — lookup por e-mail quando CPF ausente
+ * VERSION: v1.0.5 | DATE: 2026-07-10
  */
 import { normalizeCpf } from '../../services/desk/utils';
 
@@ -58,16 +58,29 @@ export async function persistClienteContact(clientsApi, {
   }
 
   const cpfDigits = normalizeCpf(cpf);
-  if (!cpfDigits) {
-    throw new Error('CPF não informado para atualizar o cadastro.');
+  if (cpfDigits) {
+    try {
+      const existing = await clientsApi.getByCpf(cpfDigits);
+      const existingId = existing?._id || existing?.id;
+      if (existingId) return clientsApi.update(existingId, updatePayload);
+    } catch (err) {
+      if (err?.response?.status !== 404) throw err;
+    }
   }
 
-  try {
-    const existing = await clientsApi.getByCpf(cpfDigits);
-    const existingId = existing?._id || existing?.id;
-    if (existingId) return clientsApi.update(existingId, updatePayload);
-  } catch (err) {
-    if (err?.response?.status !== 404) throw err;
+  const emailTrim = String(email || '').trim();
+  if (emailTrim) {
+    try {
+      const existing = await clientsApi.getByEmail(emailTrim);
+      const existingId = existing?._id || existing?.id;
+      if (existingId) return clientsApi.update(existingId, updatePayload);
+    } catch (err) {
+      if (err?.response?.status !== 404) throw err;
+    }
+  }
+
+  if (!cpfDigits && !emailTrim) {
+    throw new Error('CPF ou e-mail necessário para atualizar o cadastro.');
   }
 
   return clientsApi.create(payload);

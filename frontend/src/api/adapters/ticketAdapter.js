@@ -1,6 +1,6 @@
 /**
- * ticketAdapter v1.4.3 — responsavel explícito no payload lateralForm
- * VERSION: v1.4.3 | DATE: 2026-07-06 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.4.4 — preserva clienteId do ticket da API
+ * VERSION: v1.4.4 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team
  */
 import { getAgentName } from '../../services/clientDb';
 import { DEFAULT_TIPO } from '../../services/tabulationConfig';
@@ -50,10 +50,13 @@ export function isDraftTicket(ticket) {
 export function apiTicketToCockpit(ticket) {
   if (!ticket) return ticket;
   const id = ticket._id || ticket.id;
+  const lf = ticket.lateralForm || {};
+  const clienteId = ticket.clienteId || lf.clienteId;
   return {
     ...ticket,
     id,
     _id: id,
+    clienteId,
     title: ticket.title || ticket.chamadoTitulo || ticket.chamadoProtocolo || 'Sem título',
     chamadoTitulo: ticket.chamadoTitulo || ticket.title,
     status: ticket.status || 'novo',
@@ -65,7 +68,10 @@ export function apiTicketToCockpit(ticket) {
       time: entry.time || entry.timestamp,
       timestamp: entry.timestamp || entry.time,
     })),
-    lateralForm: ticket.lateralForm || {},
+    lateralForm: {
+      ...lf,
+      clienteId: clienteId || lf.clienteId,
+    },
     createdAt: ticket.createdAt || new Date().toISOString(),
     updatedAt: ticket.updatedAt || ticket.createdAt || new Date().toISOString(),
   };

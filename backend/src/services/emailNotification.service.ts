@@ -1,7 +1,14 @@
-/** emailNotification.service v1.0.0 — notificações de ticket via Gmail */
+/** emailNotification.service v1.1.0 — formatação rica + thread Gmail */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { loadDadosForRef } from './cliente.service';
 import { buildProtocolSubject, sendOutboundEmail } from './email-outbound.service';
+import { composeHtmlToEmailHtml, escapeHtmlAttribute, htmlToPlainTextForEmail } from './emailHtml.util';
+import {
+  buildOutboundMessageId,
+  buildOutboundThreadHeaders,
+  buildThreadSubject,
+  persistOutboundEmailMeta,
+} from './emailThread.service';
 
 function baseTemplate(title: string, bodyHtml: string): string {
   return `<!DOCTYPE html>
@@ -27,19 +34,25 @@ export async function resolveClienteEmailFromChamado(chamado: IChamadoN1): Promi
   return email?.includes('@') ? email.trim().toLowerCase() : null;
 }
 
-export async function sendTicketOpenedEmail(chamado: IChamadoN1, clienteEmail?: string): Promise<void> {
+export async function sendTicketOpenedEmail(
+  chamado: IChamadoN1,
+  clienteEmail?: string,
+  registroIndex = 0
+): Promise<void> {
   const to = clienteEmail ?? (await resolveClienteEmailFromChamado(chamado));
   if (!to) return;
 
   const protocolo = chamado.chamadoProtocolo;
   const titulo = chamado.chamadoTitulo || protocolo;
-  const subject = buildProtocolSubject(protocolo, `Confirmação — ${titulo}`);
+  const subject = buildThreadSubject(protocolo, titulo, false);
+  const messageId = buildOutboundMessageId(protocolo);
+  const headers = buildOutboundThreadHeaders(chamado, messageId);
 
   const body = `
     <p>Olá,</p>
     <p>Seu chamado foi registrado com sucesso.</p>
-    <p><strong>Protocolo:</strong> ${protocolo}</p>
-    <p><strong>Assunto:</strong> ${titulo}</p>
+    <p><strong>Protocolo:</strong> ${escapeHtmlAttribute(protocolo)}</p>
+    <p><strong>Assunto:</strong> ${escapeHtmlAttribute(titulo)}</p>
     <p>Para responder, utilize este e-mail mantendo o protocolo no assunto.</p>
   `;
 
@@ -48,63 +61,77 @@ export async function sendTicketOpenedEmail(chamado: IChamadoN1, clienteEmail?: 
     subject,
     text: `Protocolo ${protocolo} — ${titulo}`,
     html: baseTemplate('Chamado registrado', body),
+    headers,
   });
 
   if (!result.sent) {
     console.warn('[emailNotification] confirmação não enviada:', result.reason);
+    return;
   }
+
+  persistOutboundEmailMeta(chamado, messageId, registroIndex);
 }
 
 export async function sendAgentReplyEmail(
   chamado: IChamadoN1,
   messageText: string,
-  clienteEmail?: string
+  clienteEmail?: string,
+  registroIndex?: number
 ): Promise<void> {
   const to = clienteEmail ?? (await resolveClienteEmailFromChamado(chamado));
   if (!to || !messageText.trim()) return;
 
   const protocolo = chamado.chamadoProtocolo;
   const titulo = chamado.chamadoTitulo || protocolo;
-  const subject = buildProtocolSubject(protocolo, `Re: ${titulo}`);
-
-  const escaped = messageText
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\n/g, '<br>');
+  const subject = buildThreadSubject(protocolo, titulo, true);
+  const plainMessage = htmlToPlainTextForEmail(messageText);
+  const messageHtml = composeHtmlToEmailHtml(messageText);
+  const safeProtocolo = escapeHtmlAttribute(protocolo);
+  const messageId = buildOutboundMessageId(protocolo);
+  const headers = buildOutboundThreadHeaders(chamado, messageId);
 
   const body = `
     <p>Olá,</p>
-    <p>Há uma nova mensagem sobre seu chamado <strong>${protocolo}</strong>:</p>
-    <div style="background:#fff;padding:12px;border-left:4px solid #1634FF;margin:12px 0">${escaped}</div>
+    <p>Há uma nova mensagem sobre seu chamado <strong>${safeProtocolo}</strong>:</p>
+    <div style="background:#fff;padding:12px;border-left:4px solid #1634FF;margin:12px 0">${messageHtml}</div>
     <p>Responda este e-mail para continuar o atendimento.</p>
   `;
 
   const result = await sendOutboundEmail({
     to,
     subject,
-    text: messageText,
+    text: plainMessage,
     html: baseTemplate('Nova mensagem no seu chamado', body),
+    headers,
   });
 
   if (!result.sent) {
     console.warn('[emailNotification] resposta agente não enviada:', result.reason);
+    return;
   }
+
+  persistOutboundEmailMeta(chamado, messageId, registroIndex);
 }
 
 /** Fail-soft: não propaga erro */
-export function notifyTicketOpenedAsync(chamado: IChamadoN1, clienteEmail?: string): void {
-  void sendTicketOpenedEmail(chamado, clienteEmail).catch((err) => {
+export async function notifyTicketOpenedAsync(chamado: IChamadoN1, clienteEmail?: string): Promise<void> {
+  try {
+    await sendTicketOpenedEmail(chamado, clienteEmail);
+    await chamado.save();
+  } catch (err) {
     console.warn('[emailNotification] notifyTicketOpened:', (err as Error).message);
-  });
+  }
 }
 
-export function notifyAgentReplyAsync(
+export async function notifyAgentReplyAsync(
   chamado: IChamadoN1,
   messageText: string,
-  clienteEmail?: string
-): void {
-  void sendAgentReplyEmail(chamado, messageText, clienteEmail).catch((err) => {
+  clienteEmail?: string,
+  registroIndex?: number
+): Promise<void> {
+  try {
+    await sendAgentReplyEmail(chamado, messageText, clienteEmail, registroIndex);
+  } catch (err) {
     console.warn('[emailNotification] notifyAgentReply:', (err as Error).message);
-  });
+  }
 }

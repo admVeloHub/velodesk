@@ -17,6 +17,7 @@ backend/.wwebjs_cache/
 .env.local
 backend/.env
 backend/.env.local
+backend/secrets/
 frontend/.env
 frontend/.env.local
 

@@ -15,6 +15,7 @@
     "test:mongo": "tsx scripts/test-mongo-connection.ts",
     "test:assignment-router": "tsx scripts/test-assignment-router.ts",
     "seed:email-transport": "tsx scripts/seed-email-transport.ts",
+    "test:email-send": "tsx scripts/test-email-send.ts",
     "test:gmail-modules": "tsx scripts/test-gmail-modules.ts"
   },
   "dependencies": {

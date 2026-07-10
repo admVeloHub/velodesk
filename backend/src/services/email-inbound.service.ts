@@ -58,6 +58,8 @@ export async function findChamadoByEmailMessageId(messageId: string) {
   return ChamadoN1.findOne({
     $or: [
       { 'registro.metadados.emailMessageId': normalized },
+      { 'registro.metadados.emailOutboundMessageId': normalized },
+      { 'registro.metadados.emailThreadRootId': normalized },
       { 'registro.alteracoes.emailMessageId': normalized },
     ],
   });
@@ -161,7 +163,7 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
   await applyAssignmentIfNeeded(partial, { source: 'email-inbound', canal: 'E-mail' });
 
   const chamado = await ChamadoN1.create(partial);
-  notifyTicketOpenedAsync(chamado, payload.from.email);
+  await notifyTicketOpenedAsync(chamado, payload.from.email);
   return {
     action: 'created',
     chamadoProtocolo: chamado.chamadoProtocolo,

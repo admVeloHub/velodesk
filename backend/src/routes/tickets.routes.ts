@@ -85,7 +85,7 @@ router.post('/', authMiddleware, async (req, res: Response) => {
     const partial = await createChamadoFromBody(req.body, status, req.user);
     applySessionResponsavelIfNeeded(partial, req.user);
     const chamado = await ChamadoN1.create(partial);
-    notifyTicketOpenedAsync(chamado);
+    await notifyTicketOpenedAsync(chamado);
     const ticket = await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes));
     res.status(201).json(ticket);
   } catch (err) {
@@ -161,7 +161,8 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
   await chamado.save();
 
   if (!isInternalOnly && publicText.trim()) {
-    notifyAgentReplyAsync(chamado, publicText);
+    await notifyAgentReplyAsync(chamado, publicText, undefined, result.public?.registroIndex);
+    await chamado.save();
   }
 
   res.status(201).json({

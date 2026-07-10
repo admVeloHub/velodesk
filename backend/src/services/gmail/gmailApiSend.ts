@@ -1,4 +1,4 @@
-/** gmailApiSend v1.0.0 — port Skynet: SA + domain-wide delegation */
+/** gmailApiSend v1.1.0 — Message-ID / In-Reply-To / References */
 import { google } from 'googleapis';
 import type { IServiceAccountJson } from '../../models/EmailTransportConfig';
 
@@ -7,6 +7,9 @@ export interface GmailSendParams {
   to: string;
   subject: string;
   html: string;
+  messageId?: string;
+  inReplyTo?: string;
+  references?: string[];
 }
 
 export interface GmailAuthParams {
@@ -21,13 +24,33 @@ function mimeEncodeSubject(subject: string): string {
   return `=?UTF-8?B?${Buffer.from(s, 'utf8').toString('base64')}?=`;
 }
 
-export function buildRawRfc822({ from, to, subject, html }: GmailSendParams): string {
+export function buildRawRfc822({
+  from,
+  to,
+  subject,
+  html,
+  messageId,
+  inReplyTo,
+  references,
+}: GmailSendParams): string {
   const subjectHeader = mimeEncodeSubject(subject);
   const body = html || '';
-  const msg =
+  let msg =
     `From: ${from}\r\n` +
     `To: ${to}\r\n` +
-    `Subject: ${subjectHeader}\r\n` +
+    `Subject: ${subjectHeader}\r\n`;
+
+  if (messageId) {
+    msg += `Message-ID: ${messageId}\r\n`;
+  }
+  if (inReplyTo) {
+    msg += `In-Reply-To: ${inReplyTo}\r\n`;
+  }
+  if (references?.length) {
+    msg += `References: ${references.join(' ')}\r\n`;
+  }
+
+  msg +=
     `MIME-Version: 1.0\r\n` +
     `Content-Type: text/html; charset=UTF-8\r\n` +
     `\r\n` +
@@ -60,6 +83,9 @@ export async function sendViaGmailApi(
     to: String(mail.to || '').trim(),
     subject: String(mail.subject || '').trim(),
     html: mail.html || '',
+    messageId: mail.messageId,
+    inReplyTo: mail.inReplyTo,
+    references: mail.references,
   });
 
   await gmail.users.messages.send({

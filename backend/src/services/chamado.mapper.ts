@@ -1,4 +1,4 @@
-﻿/** chamado.mapper v1.8.5 — novos sem responsavel visíveis para todos os agentes */
+﻿/** chamado.mapper v1.8.6 — expõe clienteId no ticket para edição de contato */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -200,6 +200,7 @@ export interface TicketDto {
   boxId?: string;
   clientName?: string;
   clientCPF?: string;
+  clienteId?: string;
   responsibleAgent?: string;
   formData?: Record<string, unknown>;
   lateralForm?: Record<string, unknown>;
@@ -623,6 +624,7 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
     || chamado.chamadoProtocolo;
 
   const clientCpf = ref?.clienteCpf || cadastro?.clienteCpf;
+  const clienteId = ref?.clienteId ? String(ref.clienteId) : undefined;
 
   return {
     _id: chamado._id.toString(),
@@ -637,6 +639,7 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
     boxId,
     clientName,
     clientCPF: clientCpf,
+    clienteId,
     responsibleAgent: tab?.responsavel,
     lateralForm: {
       tipoChamado: tab?.tipoChamado,
@@ -650,6 +653,7 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
       clienteNome: clientName,
       clienteEmail: cadastro?.clienteEmail?.lista ?? [],
       clienteTelefone: cadastro?.clienteTelefone?.lista ?? [],
+      clienteId,
       cpf: clientCpf,
     },
     messages,

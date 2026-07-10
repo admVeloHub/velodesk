@@ -1,16 +1,18 @@
-﻿/** email-outbound.service v1.1.0 — Gmail API via desk_config */
+﻿/** email-outbound.service v1.2.0 — headers de thread Gmail */
 import { sendViaGmailApi } from './gmail/gmailApiSend';
 import {
   getEffectiveFromAddress,
   getEmailTransportSnapshot,
   isEmailTransportReady,
 } from './emailTransport.service';
+import type { OutboundEmailThreadHeaders } from './emailThread.service';
 
 export interface OutboundEmailPayload {
   to: string;
   subject: string;
   text: string;
   html?: string;
+  headers?: OutboundEmailThreadHeaders;
 }
 
 export interface OutboundEmailResult {
@@ -57,6 +59,9 @@ export async function sendOutboundEmail(payload: OutboundEmailPayload): Promise<
         to,
         subject: payload.subject,
         html: payload.html ?? wrapTextAsHtml(payload.text),
+        messageId: payload.headers?.messageId,
+        inReplyTo: payload.headers?.inReplyTo,
+        references: payload.headers?.references,
       }
     );
     return { sent: true };

@@ -1,10 +1,36 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.22.0 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.23.0 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Cadastro cliente no header, outbound Gmail (formatação e thread)
+
+- **Data/Hora**: 2026-07-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.23.0
+  - chamado.mapper v1.8.6, cliente.service v1.1.1, clients.routes v1.0.5
+  - emailNotification.service v1.1.0, emailHtml.util v1.0.0, emailThread.service v1.0.0
+  - email-outbound.service v1.2.0, gmailApiSend v1.1.0, email-inbound.service v1.2.1
+  - tickets.routes, test-email-send.ts, test-gmail-modules v1.1.0
+  - clienteAdapter v1.0.5, ticketAdapter v1.4.4, client.js v1.6.1, DeskV2Root v3.7.6
+- **Arquivos modificados / incluídos**:
+  - `backend/src/services/chamado.mapper.ts` — expõe `clienteId` no ticket e `lateralForm`
+  - `backend/src/services/cliente.service.ts`, `clients.routes.ts` — upsert por clienteId; GET por e-mail
+  - `backend/src/services/emailNotification.service.ts` — HTML rico no e-mail; thread Gmail (Message-ID, In-Reply-To, References)
+  - `backend/src/services/emailHtml.util.ts`, `emailThread.service.ts` — sanitização compose e metadados de thread em `registro.metadados`
+  - `backend/src/services/gmail/gmailApiSend.ts`, `email-outbound.service.ts` — headers RFC no envio
+  - `backend/scripts/test-email-send.ts` — script de teste de envio Gmail
+  - `frontend/src/api/adapters/clienteAdapter.js` — persistência de contato com fallback por e-mail
+  - `frontend/src/api/adapters/ticketAdapter.js`, `client.js` — preserva `clienteId`; `getByEmail`/`getById`
+  - `.gitignore` — `backend/secrets/`
+- **Descrição**: Corrige edição de cadastro do cliente no cabeçalho do ticket. Outbound Gmail operacional com formatação (negrito/itálico), assunto padronizado e encadeamento de thread. Inbound Gmail (Pub/Sub) permanece pendente de `GMAIL_INBOUND_ENABLED` e URL pública.
+- **Status**: Concluído
 
 ### GitHub Push — Sugestão IA (nome cliente), envio por perfil e liberação ao usar sugestão
 

@@ -1,9 +1,9 @@
-/** clients.routes v1.0.4 — b2c_cadastros.clientes + DELETE por id */
+/** clients.routes v1.0.5 — GET por cpf ou e-mail */
 import { Router, Response } from 'express';
 import mongoose from 'mongoose';
 import { authMiddleware } from '../middleware/auth';
 import { getClienteModel } from '../models/Cliente';
-import { findClienteByCpf, normalizeCpf } from '../services/cliente.service';
+import { findClienteByCpf, findClienteByEmail, normalizeCpf } from '../services/cliente.service';
 import { env } from '../config/env';
 import { getMongoStorageLabel, isCadastrosConnected } from '../config/database';
 
@@ -16,16 +16,20 @@ router.get('/', authMiddleware, async (req, res: Response) => {
     }
 
     const cpf = normalizeCpf(req.query.cpf);
-    if (!cpf) {
-      return res.status(400).json({ message: 'Query cpf é obrigatória' });
+    const email = String(req.query.email ?? '').trim().toLowerCase();
+
+    if (!cpf && !email) {
+      return res.status(400).json({ message: 'Query cpf ou email é obrigatória' });
     }
 
-    const cliente = await findClienteByCpf(cpf);
+    const cliente = cpf ? await findClienteByCpf(cpf) : await findClienteByEmail(email);
     if (!cliente) {
-      console.log(`[clients] GET cpf=${cpf} → 404 | db=${env.mongoCadastrosDbName} storage=${getMongoStorageLabel()}`);
+      const lookup = cpf ? `cpf=${cpf}` : `email=${email}`;
+      console.log(`[clients] GET ${lookup} → 404 | db=${env.mongoCadastrosDbName} storage=${getMongoStorageLabel()}`);
       return res.status(404).json({ message: 'Cliente não encontrado' });
     }
-    console.log(`[clients] GET cpf=${cpf} → 200 _id=${cliente._id} | storage=${getMongoStorageLabel()}`);
+    const lookup = cpf ? `cpf=${cpf}` : `email=${email}`;
+    console.log(`[clients] GET ${lookup} → 200 _id=${cliente._id} | storage=${getMongoStorageLabel()}`);
     res.json(cliente);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -1,4 +1,4 @@
-﻿/** cliente.service v1.1.0 — b2c_cadastros.clientes + lookup por e-mail */
+﻿/** cliente.service v1.1.1 — upsert por clienteId quando CPF ausente */
 import mongoose from 'mongoose';
 import { getClienteModel, ICliente, IClienteDados } from '../models/Cliente';
 import type { IClienteRef } from '../models/ChamadoN1';
@@ -129,19 +129,38 @@ export async function loadDadosForRef(ref?: IClienteRef | null): Promise<IClient
   return null;
 }
 
+function applyDadosToCliente(existing: ICliente, dados: IClienteDados): void {
+  if (!existing.clienteDados?.length) {
+    existing.clienteDados = [dados];
+    return;
+  }
+  if (dados.clienteNome) existing.clienteDados[0].clienteNome = dados.clienteNome;
+  if (dados.clienteCpf) existing.clienteDados[0].clienteCpf = dados.clienteCpf;
+  if (dados.clienteEmail.lista.length) existing.clienteDados[0].clienteEmail = dados.clienteEmail;
+  if (dados.clienteTelefone.lista.length) existing.clienteDados[0].clienteTelefone = dados.clienteTelefone;
+}
+
 export async function upsertClienteFromBody(body: Record<string, unknown>): Promise<ICliente | null> {
   const dados = dadosFromBody(body);
   if (!dados) return null;
 
   const Cliente = getClienteModel();
   const cpf = dados.clienteCpf || normalizeCpf(body.clientCPF);
+  const clienteIdRaw = body.clienteId ?? (body.cliente as { clienteId?: unknown }[] | undefined)?.[0]?.clienteId;
+
+  if (clienteIdRaw && mongoose.Types.ObjectId.isValid(String(clienteIdRaw))) {
+    const byId = await findClienteById(clienteIdRaw);
+    if (byId) {
+      applyDadosToCliente(byId, dados);
+      await byId.save();
+      return byId;
+    }
+  }
 
   if (cpf) {
     const existing = await Cliente.findOne({ 'clienteDados.clienteCpf': cpf });
     if (existing) {
-      if (dados.clienteNome) existing.clienteDados[0].clienteNome = dados.clienteNome;
-      if (dados.clienteEmail.lista.length) existing.clienteDados[0].clienteEmail = dados.clienteEmail;
-      if (dados.clienteTelefone.lista.length) existing.clienteDados[0].clienteTelefone = dados.clienteTelefone;
+      applyDadosToCliente(existing, dados);
       await existing.save();
       return existing;
     }

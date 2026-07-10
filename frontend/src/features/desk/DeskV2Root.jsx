@@ -1,6 +1,6 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.7.5 | DATE: 2026-07-10
+ * VERSION: v3.7.6 | DATE: 2026-07-10
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
@@ -660,7 +660,9 @@ export default function DeskV2Root() {
         t.solicitante = nome;
         t.clientEmail = email;
         t.clientPhone = telefone;
-        if (clienteId) t.clienteId = clienteId;
+        if (clienteId) {
+          t.clienteId = clienteId;
+        }
         t.lateralForm = {
           ...t.lateralForm,
           cpf,

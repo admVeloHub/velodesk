@@ -1,8 +1,10 @@
-/** test-gmail-modules.ts v1.0.0 — smoke test dos módulos Gmail (sem credenciais reais) */
+/** test-gmail-modules.ts v1.1.0 — smoke test Gmail + HTML e-mail */
 import { buildProtocolSubject } from '../src/services/email-outbound.service';
 import { buildRawRfc822 } from '../src/services/gmail/gmailApiSend';
 import { decodePubSubMessage } from '../src/services/gmail/gmailInbound.service';
 import { gmailMessageToInboundPayload, shouldSkipGmailMessage } from '../src/services/gmail/gmailMessageParser';
+import { composeHtmlToEmailHtml } from '../src/services/emailHtml.util';
+import { buildThreadSubject } from '../src/services/emailThread.service';
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
@@ -19,8 +21,28 @@ function testBuildRawRfc822() {
     to: 'cliente@test.com',
     subject: 'Teste',
     html: '<p>oi</p>',
+    messageId: '<desk.test@velotax.com.br>',
+    inReplyTo: '<desk.root@velotax.com.br>',
+    references: ['<desk.root@velotax.com.br>'],
   });
   assert(raw.length > 10, 'raw vazio');
+  const decoded = Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+  assert(decoded.includes('Message-ID:'), 'Message-ID ausente');
+  assert(decoded.includes('In-Reply-To:'), 'In-Reply-To ausente');
+  assert(decoded.includes('References:'), 'References ausente');
+}
+
+function testComposeHtmlToEmailHtml() {
+  const html = composeHtmlToEmailHtml('Olá <strong>negrito</strong> e <em>itálico</em>');
+  assert(html.includes('<strong>negrito</strong>'), 'negrito perdido');
+  assert(html.includes('<em>itálico</em>'), 'itálico perdido');
+}
+
+function testBuildThreadSubject() {
+  const first = buildThreadSubject('0100177678', 'Dúvida', false);
+  const reply = buildThreadSubject('0100177678', 'Dúvida', true);
+  assert(first === '[0100177678] Dúvida', `first: ${first}`);
+  assert(reply === 'Re: [0100177678] Dúvida', `reply: ${reply}`);
 }
 
 function testDecodePubSub() {
@@ -58,6 +80,8 @@ function testGmailMessageParser() {
 function main() {
   testBuildProtocolSubject();
   testBuildRawRfc822();
+  testComposeHtmlToEmailHtml();
+  testBuildThreadSubject();
   testDecodePubSub();
   testGmailMessageParser();
   console.log('OK — smoke tests Gmail modules');
