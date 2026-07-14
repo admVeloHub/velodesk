@@ -1,8 +1,9 @@
 /**
- * responsavelSegmentation v1.2.0 — novos sem responsavel = fila compartilhada
- * VERSION: v1.2.0 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
+ * responsavelSegmentation v1.3.0 — novos sem responsavel = fila compartilhada
+ * VERSION: v1.3.0 | DATE: 2026-07-13 | AUTHOR: VeloHub Development Team
  */
 import { getDeskDisplayName } from '../../utils/userDisplayName';
+import { normalizeProfileId } from '../../config/profiles';
 
 function normalize(value) {
   return String(value ?? '').trim().toLowerCase();
@@ -32,7 +33,7 @@ function readStoredColaborador() {
 
 export function readDeskProfileId() {
   try {
-    return localStorage.getItem('velodeskProfile') || 'agent';
+    return normalizeProfileId(localStorage.getItem('velodeskProfile') || 'agent');
   } catch {
     return 'agent';
   }
@@ -50,7 +51,8 @@ export function shouldUseMeusChamadosFila(profileId = readDeskProfileId()) {
   const authRole = readAuthDeskRole();
   if (authRole === 'agent') return true;
   if (authRole === 'supervisor') return false;
-  return profileId !== 'supervisor';
+  const normalized = normalizeProfileId(profileId);
+  return !['gestao', 'workflow'].includes(normalized);
 }
 
 export function buildResponsavelCandidates() {

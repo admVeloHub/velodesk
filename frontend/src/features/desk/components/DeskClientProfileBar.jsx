@@ -1,11 +1,13 @@
 /**
- * DeskClientProfileBar v1.4.2 — remove gauge termômetro do header do cliente
- * VERSION: v1.4.2 | DATE: 2026-07-06
+ * DeskClientProfileBar v1.4.1 — termômetro à esquerda de status/histórico
+ * VERSION: v1.4.1 | DATE: 2026-07-03
  */
 import React, { useEffect, useState } from 'react';
-import { getClientContactFields, getTicketProtocolLabel } from '../../../services/desk/utils';
+import { getClientContactFields, getClientActiveProducts, getProductTagClass, getTicketProtocolLabel } from '../../../services/desk/utils';
 import ClientTicketHistoryModal from './ClientTicketHistoryModal';
-import TicketOperationProgress from './TicketOperationProgress';
+import TicketWorkflowStepper from './TicketWorkflowStepper';
+import TicketWorkflowActions from './TicketWorkflowActions';
+import { isTicketInWorkflow } from '../../../services/desk/utils';
 
 function resolveProtocolLabel(ticket) {
   const protocol = getTicketProtocolLabel(ticket);
@@ -17,8 +19,6 @@ function resolveProtocolLabel(ticket) {
 export default function DeskClientProfileBar({
   ticket,
   client,
-  queueId,
-  escalonar,
   onSaveContact,
   onSelectTicket,
 }) {
@@ -27,7 +27,9 @@ export default function DeskClientProfileBar({
   const [savingContact, setSavingContact] = useState(false);
   const [draft, setDraft] = useState({ name: '', email: '', phone: '' });
   const contact = getClientContactFields(ticket, client);
+  const activeProducts = getClientActiveProducts(ticket, client);
   const protocolLabel = resolveProtocolLabel(ticket);
+  const inWorkflow = isTicketInWorkflow(ticket);
 
   const openEdit = () => {
     setDraft({ name: contact.name, email: contact.email, phone: contact.phone });
@@ -64,18 +66,6 @@ export default function DeskClientProfileBar({
         id="ticketClientProfile"
         aria-label="Perfil do cliente"
       >
-        <span className="ticket-client-profile__protocol ticket-client-profile__cell-protocol" id="profileProtocol">
-          {protocolLabel}
-        </span>
-
-        <div className="ticket-client-profile__cell-status">
-          <TicketOperationProgress
-            ticket={ticket}
-            queueId={queueId}
-            escalonar={escalonar}
-          />
-        </div>
-
         <div className="ticket-client-profile__client-main ticket-client-profile__cell-client" id="headerInfo">
           <span className="ticket-client-profile__field ticket-client-profile__field--name" id="profileName">
             {contact.name || '—'}
@@ -89,9 +79,11 @@ export default function DeskClientProfileBar({
             {contact.phone || '—'}
           </span>
           <span className="ticket-client-profile__sep" aria-hidden="true">–</span>
-          <span className="ticket-client-profile__field ticket-client-profile__field--email" id="profileEmail">
-            {contact.email || '—'}
-          </span>
+          <div className="ticket-client-profile__contact-stack">
+            <span className="ticket-client-profile__field ticket-client-profile__field--email" id="profileEmail">
+              {contact.email || '—'}
+            </span>
+          </div>
           <span className="ticket-client-profile__edit-wrap">
             <button
               type="button"
@@ -135,17 +127,45 @@ export default function DeskClientProfileBar({
           </span>
         </div>
 
-        <div className="ticket-client-profile__cell-history">
-          <button
-            type="button"
-            className="btn-secondary btn-sm ticket-client-history-btn"
-            id="btnClientHistory"
-            onClick={() => setHistoryOpen(true)}
-          >
-            <i className="fas fa-history" /> Histórico
-          </button>
+        <div className="ticket-client-profile__protocol-row ticket-client-profile__cell-protocol">
+          <span className="ticket-client-profile__protocol" id="profileProtocol">
+            {protocolLabel}
+          </span>
+          {activeProducts.length ? (
+            <div
+              className="ticket-client-profile__products ticket-client-profile__products--protocol"
+              id="profileProducts"
+              aria-label="Produtos ativos do cliente"
+            >
+              {activeProducts.map((produto) => (
+                <span
+                  key={produto}
+                  className={'velo-product-tag velo-tag ' + getProductTagClass(produto)}
+                  title={`Produto ativo: ${produto}`}
+                >
+                  {produto}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
+      <div className="crm-client-profile-bar__history">
+        <button
+          type="button"
+          className="btn-secondary btn-sm ticket-client-history-btn"
+          id="btnClientHistory"
+          onClick={() => setHistoryOpen(true)}
+        >
+          <i className="fas fa-history" /> Histórico
+        </button>
+      </div>
+      {inWorkflow ? (
+        <div className="crm-client-profile-bar__workflow">
+          <TicketWorkflowStepper ticket={ticket} />
+          <TicketWorkflowActions ticket={ticket} />
+        </div>
+      ) : null}
       <ClientTicketHistoryModal
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}

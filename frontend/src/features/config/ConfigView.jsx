@@ -7,6 +7,7 @@ import { Navigate } from 'react-router-dom';
 import { useProfile } from '../../context/ProfileContext';
 import { CONFIG_SECTIONS, getConfigSection } from './configSections';
 import TabulationFormsSection from './components/TabulationFormsSection';
+import WorkflowsConfigSection from './workflow/WorkflowsConfigSection';
 
 export default function ConfigView() {
   const { isNavAllowed } = useProfile();
@@ -81,16 +82,20 @@ export default function ConfigView() {
             </>
           ) : (
             <>
-              <header className="config-content-header">
-                <span className="config-content-eyebrow">Central de configurações</span>
-                <div className="config-content-title-row">
-                  <h3>{active?.label}</h3>
-                  <p>{active?.menuDesc}</p>
-                </div>
-              </header>
+              {section !== 'workflows' ? (
+                <header className="config-content-header">
+                  <span className="config-content-eyebrow">Central de configurações</span>
+                  <div className="config-content-title-row">
+                    <h3>{active?.label}</h3>
+                    <p>{active?.menuDesc}</p>
+                  </div>
+                </header>
+              ) : null}
 
               {section === 'forms' ? (
                 <TabulationFormsSection />
+              ) : section === 'workflows' ? (
+                <WorkflowsConfigSection />
               ) : (
                 <p className="config-placeholder-msg">
                   Editor de {active?.label?.toLowerCase()} — em desenvolvimento.

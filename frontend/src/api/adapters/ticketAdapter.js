@@ -134,6 +134,11 @@ export function cockpitTicketToApi(ticket) {
       clienteEmail: emailList,
       clienteTelefone: phoneList,
       clienteId: ticket.clienteId || lf.clienteId,
+      escalonar: lf.escalonar,
+      wasEscalated: lf.wasEscalated,
+      lastWorkflow: lf.lastWorkflow,
+      retornoN1: lf.retornoN1,
+      workflow: lf.workflow,
     },
     formData: ticket.formData,
   };
@@ -171,6 +176,7 @@ export function buildCreatePayload(form) {
       wasEscalated: lf.wasEscalated,
       lastWorkflow: lf.lastWorkflow,
       retornoN1: lf.retornoN1,
+      workflow: lf.workflow,
     },
   };
 }

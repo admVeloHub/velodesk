@@ -626,7 +626,22 @@ body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card.is-active .crm-ticket-ca
 }
 
 body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card.is-active .crm-ticket-card__sla {
-    box-shadow: 0 0 0 2px rgba(22, 148, 255, 0.2);
+    box-shadow: 0 0 0 1px rgba(22, 148, 255, 0.25);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card__sla--ok {
+    background: rgba(21, 162, 55, 0.18);
+    color: #86efac;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card__sla--warning {
+    background: rgba(252, 194, 0, 0.16);
+    color: #fde68a;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card__sla--critical {
+    background: rgba(239, 68, 68, 0.18);
+    color: #fca5a5;
 }
 
 body.velodesk-dark #velodeskDeskV2Root .crm-ticket-card__name,
@@ -648,6 +663,41 @@ body.velodesk-dark #velodeskDeskV2Root .crm-empty-state {
 
 body.velodesk-dark #velodeskDeskV2Root .tab-panel--notes .crm-internal-notes {
     background: var(--velo-dark-surface-inset);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas {
+    background: var(--velo-dark-surface-inset);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas__title {
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas__subtitle,
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas__section-title {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas__summary,
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas__summary-card span,
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product__desc,
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product__meta dd {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas__analise {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas__empty {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+    color: var(--velo-dark-text-muted);
 }
 
 body.velodesk-dark #velodeskDeskV2Root .crm-note-card {
@@ -1062,4 +1112,106 @@ body.velodesk-dark .queue-box-modal__close:hover {
 #config .forms-editor-actions .config-action-btn,
 #config .config-modal__footer .config-action-btn {
     border-radius: 4px !important;
+}
+
+/* Desk workflow visual — tema escuro */
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-stepper {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-stepper__eyebrow,
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-stepper__label,
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-timeline__row strong,
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-timeline__title {
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-stepper__status {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-stepper__status--sla {
+    color: #fde68a;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-actions__hint,
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-actions__step {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-client-profile-bar__workflow {
+    border-top-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-banner {
+    background: rgba(252, 194, 0, 0.12);
+    border-color: rgba(252, 194, 0, 0.3);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-timeline__meta,
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-timeline__team {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-tag--workflow {
+    background: rgba(22, 52, 255, 0.16);
+    color: #93c5fd;
+    border-color: rgba(22, 52, 255, 0.28);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .msg-bubble--system {
+    background: rgba(22, 148, 255, 0.12);
+    border-color: rgba(22, 52, 255, 0.22);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-compose-lock {
+    background: rgba(22, 52, 255, 0.1);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .ia-tabulation__btn--processos {
+    background: #000058;
+    color: #fff;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .ia-tabulation__btn--apply {
+    background: var(--velo-dark-accent);
+    color: #fff;
+}
+
+body.velodesk-dark .ia-processos-drawer__backdrop {
+    background: rgba(0, 0, 0, 0.45);
+}
+
+body.velodesk-dark .ia-processos-drawer__panel {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
+}
+
+body.velodesk-dark .ia-processos-drawer__title,
+body.velodesk-dark .ia-processos-drawer__result-title {
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .ia-processos-drawer__select {
+    background: var(--velo-dark-surface-hover);
+    border-color: var(--velo-dark-border);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ia-processos-drawer__meta dd,
+body.velodesk-dark .ia-processos-drawer__resumo,
+body.velodesk-dark .ia-processos-drawer__text,
+body.velodesk-dark .ia-processos-drawer__list,
+body.velodesk-dark .ia-processos-drawer__steps {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ia-processos-drawer__tag {
+    background: rgba(22, 52, 255, 0.16);
+    color: #93c5fd;
 }

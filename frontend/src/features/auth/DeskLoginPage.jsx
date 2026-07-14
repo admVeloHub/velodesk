@@ -3,13 +3,14 @@
  * VERSION: v1.3.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { authApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 import { getGoogleClientId } from '../../config/googleAuthConfig';
 import { getProfileDefaultPath } from '../../config/profiles';
 import { isGoogleDeskAuthMode } from '../../config/deskAuthMode';
+import { DEV_QUICK_LOGIN_EMAIL, isDevQuickLoginEnabled } from '../../config/devAuth';
 import { loadGoogleGsiScript } from '../../utils/loadGoogleGsiScript';
 import DeskLoadingGate from './DeskLoadingGate';
 import DeskAccessDenied from './DeskAccessDenied';
@@ -30,7 +31,7 @@ function resolveLoginError(err) {
   const apiMsg = String(err?.response?.data?.message || '').trim();
 
   if (status === 503 || /mongodb|banco de dados/i.test(apiMsg)) {
-    return '';
+    return 'Aguardando o backend conectar ao banco de dados. Tente novamente em alguns segundos.';
   }
   if (status === 403) {
     return 'Usuário sem permissão para acessar o Desk.';
@@ -42,8 +43,18 @@ function resolveLoginError(err) {
   return err?.message || 'Não foi possível entrar com Google.';
 }
 
+function getPostLoginPath(location, profileId) {
+  const from = location?.state?.from;
+  if (from?.pathname) {
+    return `${from.pathname}${from.search || ''}`;
+  }
+  return getProfileDefaultPath(profileId);
+}
+
 export default function DeskLoginPage() {
   const useGoogleMode = isGoogleDeskAuthMode();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { authStatus, bootstrapFromGoogleLogin, isAuthenticated } = useAuth();
   const { applyProfileFromAccess, profileId } = useProfile();
   const [error, setError] = useState('');
@@ -53,22 +64,28 @@ export default function DeskLoginPage() {
   const initializedRef = useRef(false);
   const clientId = getGoogleClientId();
 
+  const completeLogin = useCallback(async (data) => {
+    if (!data?.token || !data?.user) {
+      throw new Error('Resposta de autenticação inválida.');
+    }
+    await bootstrapFromGoogleLogin(data);
+    const deskProfile = data.user.deskProfile || data.user.role;
+    applyProfileFromAccess(deskProfile);
+    navigate(getPostLoginPath(location, deskProfile), { replace: true });
+  }, [applyProfileFromAccess, bootstrapFromGoogleLogin, location, navigate]);
+
   const handleCredential = useCallback(async (response) => {
     setLoading(true);
     setError('');
     try {
       const data = await authApi.googleLogin(response.credential);
-      if (!data?.token || !data?.user) {
-        throw new Error('Resposta de autenticação inválida.');
-      }
-      await bootstrapFromGoogleLogin(data);
-      applyProfileFromAccess(data.user.deskProfile || data.user.role);
+      await completeLogin(data);
     } catch (err) {
       setError(resolveLoginError(err));
     } finally {
       setLoading(false);
     }
-  }, [bootstrapFromGoogleLogin, applyProfileFromAccess]);
+  }, [completeLogin]);
 
   const mountGoogleButton = useCallback(() => {
     if (!window.google?.accounts?.id || !buttonRef.current || !clientId) return;
@@ -112,6 +129,40 @@ export default function DeskLoginPage() {
   }, [useGoogleMode, clientId, handleCredential, mountGoogleButton]);
 
   useEffect(() => {
+    if (!isDevQuickLoginEnabled() || clientId || isAuthenticated) return undefined;
+
+    let active = true;
+    let retryTimer = null;
+
+    const attemptDevLogin = async () => {
+      if (!active) return;
+      setLoading(true);
+      setError('');
+      try {
+        const data = await authApi.devLogin(DEV_QUICK_LOGIN_EMAIL);
+        if (!active) return;
+        await completeLogin(data);
+      } catch (err) {
+        if (!active) return;
+        const message = resolveLoginError(err) || 'Não foi possível entrar no ambiente local. Verifique se o backend está rodando.';
+        setError(message);
+        if (/banco de dados|backend/i.test(message)) {
+          retryTimer = window.setTimeout(attemptDevLogin, 3000);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void attemptDevLogin();
+
+    return () => {
+      active = false;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [clientId, completeLogin, isAuthenticated]);
+
+  useEffect(() => {
     if (!gsiReady) return undefined;
     const onResize = () => mountGoogleButton();
     window.addEventListener('resize', onResize);
@@ -123,10 +174,33 @@ export default function DeskLoginPage() {
   }
 
   if (authStatus === 'authorized' || isAuthenticated) {
-    return <Navigate to={getProfileDefaultPath(profileId)} replace />;
+    return <Navigate to={getPostLoginPath(location, profileId)} replace />;
   }
 
   if (!clientId) {
+    if (isDevQuickLoginEnabled()) {
+      return (
+        <div className="desk-login-page">
+          <div className="desk-login-card">
+            <div className="desk-login-brand">
+              <span className="desk-login-brand__mark">Velodesk</span>
+            </div>
+            <p className="desk-login-dev-hint">
+              Ambiente local sem Google OAuth — use o login rápido de desenvolvimento.
+            </p>
+            {loading ? <p className="desk-login-loading">Entrando no Desk…</p> : null}
+            {error ? (
+              <div className="desk-login-error" role="alert">
+                <i className="ti ti-alert-circle" aria-hidden="true" />
+                <span>{error}</span>
+              </div>
+            ) : null}
+          </div>
+          <DevQuickLoginButton />
+        </div>
+      );
+    }
+
     return (
       <DeskAccessDenied
         title="Login não configurado"

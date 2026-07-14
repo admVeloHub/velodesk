@@ -1,32 +1,31 @@
 /**
- * ProfileContext v1.4.0 — perfil fixo por allowlist + landing Painel 360°
- * VERSION: v1.4.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * ProfileContext v1.5.0 — seletor Agente / Gestão / Workflow
+ * VERSION: v1.5.0 | DATE: 2026-07-13 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PROFILES, getProfileMeta, getProfileDefaultPath } from '../config/profiles';
+import { PROFILES, getProfileMeta, getProfileDefaultPath, normalizeProfileId } from '../config/profiles';
 import { useNotifications } from './NotificationContext';
 
 const ProfileContext = createContext(null);
 
-function readProfileLocked() {
+function readInitialProfileId() {
   try {
-    return localStorage.getItem('velodesk_profile_locked') === '1';
+    const saved = localStorage.getItem('velodeskProfile') || 'agent';
+    const id = normalizeProfileId(saved);
+    if (id !== saved) localStorage.setItem('velodeskProfile', id);
+    localStorage.removeItem('velodesk_profile_locked');
+    return id;
   } catch {
-    return false;
+    return 'agent';
   }
 }
 
 export function ProfileProvider({ children }) {
   const navigate = useNavigate();
   const { showNotification } = useNotifications();
-  const [profileId, setProfileIdState] = useState(() => {
-    const saved = localStorage.getItem('velodeskProfile') || 'agent';
-    const id = PROFILES[saved] ? saved : 'agent';
-    if (id !== saved) localStorage.setItem('velodeskProfile', id);
-    return id;
-  });
-  const [profileLocked, setProfileLocked] = useState(readProfileLocked);
+  const [profileId, setProfileIdState] = useState(readInitialProfileId);
+  const [profileLocked] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [segmentation, setSegmentation] = useState(() => {
     try {
@@ -46,7 +45,6 @@ export function ProfileProvider({ children }) {
   const applyGateProfile = useCallback((colaborador) => {
     localStorage.setItem('velodeskProfile', 'agent');
     localStorage.removeItem('velodesk_profile_locked');
-    setProfileLocked(false);
     setProfileIdState('agent');
     const meta = colaborador ? {
       atuacao: colaborador.atuacao || [],
@@ -59,34 +57,29 @@ export function ProfileProvider({ children }) {
   }, []);
 
   const applyProfileFromAccess = useCallback((deskProfile) => {
-    const id = deskProfile === 'supervisor' ? 'supervisor' : 'agent';
+    const id = deskProfile === 'supervisor' ? 'gestao' : 'agent';
     localStorage.setItem('velodeskProfile', id);
-    localStorage.setItem('velodesk_profile_locked', '1');
+    localStorage.removeItem('velodesk_profile_locked');
     setProfileIdState(id);
-    setProfileLocked(true);
     setDropdownOpen(false);
   }, []);
 
   const setProfile = useCallback((id) => {
-    if (profileLocked) {
+    const normalized = normalizeProfileId(id);
+    if (!PROFILES[normalized] || normalized === profileId) {
       setDropdownOpen(false);
       return;
     }
-    if (!PROFILES[id] || id === profileId) {
-      setDropdownOpen(false);
-      return;
-    }
-    localStorage.setItem('velodeskProfile', id);
-    setProfileIdState(id);
+    localStorage.setItem('velodeskProfile', normalized);
+    setProfileIdState(normalized);
     setDropdownOpen(false);
-    showNotification('Perfil alterado: ' + PROFILES[id].label, 'success');
-    navigate(getProfileDefaultPath(id));
-  }, [navigate, showNotification, profileId, profileLocked]);
+    showNotification('Perfil alterado: ' + PROFILES[normalized].label, 'success');
+    navigate(getProfileDefaultPath(normalized));
+  }, [navigate, showNotification, profileId]);
 
   const toggleDropdown = useCallback(() => {
-    if (profileLocked) return;
     setDropdownOpen((v) => !v);
-  }, [profileLocked]);
+  }, []);
 
   const isNavAllowed = useCallback((pageId) => profile.nav.indexOf(pageId) >= 0, [profile]);
 

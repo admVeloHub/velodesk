@@ -1,8 +1,8 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.7.6 | DATE: 2026-07-10
+ * VERSION: v3.6.0 | DATE: 2026-07-03
  */
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   filterTickets,
   resolveDeskSearchEntries,
@@ -14,6 +14,11 @@ import {
   normalizeCpf,
   isValidEmailFormat,
   getTicketProtocolLabel,
+  isTicketInWorkflow,
+  maybeActivateWorkflowForTicket,
+  injectWorkflowSystemMessage,
+  getWorkflowProgress,
+  syncTicketWorkflowOnCommit,
 } from '../../services/desk/utils';
 import { findTicketEntry, updateTicketInKanban, sendTicketRegistroEntry } from '../../services/kanbanStorage';
 import { isDraftTicket, persistDraftTicket } from '../../services/ticketsCache';
@@ -29,18 +34,18 @@ import DeskTicketList from './components/DeskTicketList';
 import DeskTicketTabsBar from './components/DeskTicketTabsBar';
 import DeskClientProfileBar from './components/DeskClientProfileBar';
 import DeskConversation from './components/DeskConversation';
+import TicketWorkflowInfoRequestCallout from './components/TicketWorkflowInfoRequestCallout';
+import { markWorkflowInfoRequestsReadForTicket } from '../../services/workflow/workflowInfoNotifications';
 import DeskWhatsAppChat from './components/DeskWhatsAppChat';
 import DeskComposePanel from './components/DeskComposePanel';
 import DeskInternalNotesPanel from './components/DeskInternalNotesPanel';
+import DeskConsultasPanel from './components/DeskConsultasPanel';
 import DeskRightPanel from './components/DeskRightPanel';
-import { applyCascadeFieldChange, buildDefaultRightFields, getMotivos, mergeRightFieldsWithDefaults, validateTabulationForSendStatus } from '../../services/tabulationConfig';
+import TicketWorkflowBanner from './components/TicketWorkflowBanner';
+import { applyCascadeFieldChange, applyTabulationSuggestion, buildDefaultRightFields, getMotivos, hasApplyableTabulation, mergeRightFieldsWithDefaults, parseTabulationDisplay, validateTabulationForSendStatus } from '../../services/tabulationConfig';
 import { useTabulation } from '../../context/TabulationContext';
-import { useProfile } from '../../context/ProfileContext';
-import { readAuthDeskRole } from '../../services/desk/responsavelSegmentation';
-import { COMPOSE_SPELLCHECK_ENABLED, getSendStatusOptions, isSupervisorSendRole } from '../../services/desk/constants';
 import { createSpellContext, loadSpellEngine, scanText } from '../../services/spellcheck/spellEngine';
-import { htmlToPlainText, normalizeComposePlain, normalizePlainToHtml } from '../../services/desk/composeRichEditor';
-import { addSpellWhitelistTerms } from '../../services/spellcheck/whitelist';
+import { htmlToPlainText } from '../../services/desk/composeRichEditor';
 import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
 
 function applyRightFieldsToTicket(t, rightFields, escalonar) {
@@ -58,6 +63,7 @@ function applyRightFieldsToTicket(t, rightFields, escalonar) {
     canal: rightFields.canal || prevLf.canal,
     responsavel: rightFields.responsavel || prevLf.responsavel,
     escalonar,
+    workflow: prevLf.workflow,
   };
   if (escalonar) {
     nextLf.wasEscalated = true;
@@ -85,8 +91,6 @@ function buildDefaultSessionFromTicket(ticket, config) {
     escalonar: lf.escalonar || null,
     waChatOpen: false,
     spellIgnoredWords: [],
-    composeAiReviewedFor: '',
-    iaSuggestionApproved: false,
   };
 }
 
@@ -104,9 +108,6 @@ export default function DeskV2Root() {
   } = useTickets();
   const { showNotification } = useNotifications();
   const { config } = useTabulation();
-  const { profileId } = useProfile();
-  const sendRole = readAuthDeskRole() || profileId;
-  const sendStatusOptions = useMemo(() => getSendStatusOptions(sendRole), [sendRole]);
 
   const [activeQueue, setActiveQueue] = useState('em-andamento');
   const [activeSort, setActiveSort] = useState('data');
@@ -124,9 +125,6 @@ export default function DeskV2Root() {
   const [escalonar, setEscalonar] = useState(null);
   const [waChatOpen, setWaChatOpen] = useState(false);
   const [composeSpellErrors, setComposeSpellErrors] = useState([]);
-  const [composeAiReviewedFor, setComposeAiReviewedFor] = useState('');
-  const [iaSuggestionApproved, setIaSuggestionApproved] = useState(false);
-  const iaSuggestionPlainRef = useRef('');
   const [spellIgnoredWords, setSpellIgnoredWords] = useState(() => new Set());
   const [queueStatuses, setQueueStatuses] = useState(() => getAllQueueStatuses());
   const suppressAutoSelectRef = useRef(false);
@@ -167,10 +165,8 @@ export default function DeskV2Root() {
       escalonar,
       waChatOpen,
       spellIgnoredWords: Array.from(spellIgnoredWords),
-    composeAiReviewedFor,
-    iaSuggestionApproved,
-  };
-  }, [mainTab, composeMode, composeText, internalText, sendStatus, rightFields, escalonar, waChatOpen, spellIgnoredWords, composeAiReviewedFor, iaSuggestionApproved]);
+    };
+  }, [mainTab, composeMode, composeText, internalText, sendStatus, rightFields, escalonar, waChatOpen, spellIgnoredWords]);
 
   const restoreTabSession = useCallback((ticketId) => {
     const ticketEntry = findTicketEntry(ticketId);
@@ -195,64 +191,10 @@ export default function DeskV2Root() {
     setEscalonar(session.escalonar ?? defaults.escalonar);
     setWaChatOpen(session.waChatOpen ?? defaults.waChatOpen);
     setSpellIgnoredWords(new Set(session.spellIgnoredWords ?? defaults.spellIgnoredWords ?? []));
-    setComposeAiReviewedFor(session.composeAiReviewedFor ?? defaults.composeAiReviewedFor ?? '');
-    setIaSuggestionApproved(Boolean(session.iaSuggestionApproved));
-    iaSuggestionPlainRef.current = session.iaSuggestionApproved
-      ? normalizeComposePlain(session.composeText ?? defaults.composeText ?? '')
-      : '';
     setComposeSpellErrors([]);
   }, [config]);
 
-  const composePlainForAi = useMemo(() => normalizeComposePlain(composeText), [composeText]);
-  const composeReviewedPlain = useMemo(
-    () => normalizeComposePlain(composeAiReviewedFor),
-    [composeAiReviewedFor],
-  );
-  const sendBlockedByAiReview = composePlainForAi.length > 0
-    && !iaSuggestionApproved
-    && composeReviewedPlain !== composePlainForAi;
-  const sendDisabledBySpell = COMPOSE_SPELLCHECK_ENABLED
-    && composeMode === 'public'
-    && composeSpellErrors.length > 0;
-  const sendDisabled = sendDisabledBySpell || sendBlockedByAiReview;
-  const sendDisabledTitle = sendDisabledBySpell
-    ? 'Corrija os erros ortográficos antes de enviar'
-    : sendBlockedByAiReview
-      ? 'Use a sugestão de resposta da IA ou a Revisão de texto antes de enviar'
-      : undefined;
-
-  useEffect(() => {
-    if (sendStatusOptions.some((opt) => opt.id === sendStatus)) return;
-    setSendStatus('em-andamento');
-  }, [sendStatusOptions, sendStatus]);
-
-  const handleComposeAiReviewed = useCallback((plainText) => {
-    setComposeAiReviewedFor(normalizeComposePlain(plainText));
-    setIaSuggestionApproved(false);
-    iaSuggestionPlainRef.current = '';
-  }, []);
-
-  const handleUseIaReply = useCallback((replyText) => {
-    const trimmed = normalizeComposePlain(replyText);
-    if (!trimmed) return;
-    const html = waChatOpen ? trimmed : normalizePlainToHtml(trimmed);
-    const approvedPlain = normalizeComposePlain(html);
-    setComposeText(html);
-    setComposeAiReviewedFor(approvedPlain);
-    setIaSuggestionApproved(true);
-    iaSuggestionPlainRef.current = approvedPlain;
-    setComposeMode('public');
-    console.info('[ticket-ai-desk] Sugestão IA aplicada — envio liberado.', { chars: approvedPlain.length });
-  }, [waChatOpen]);
-
-  useEffect(() => {
-    if (!iaSuggestionApproved) return;
-    if (composePlainForAi && iaSuggestionPlainRef.current && composePlainForAi !== iaSuggestionPlainRef.current) {
-      setIaSuggestionApproved(false);
-      iaSuggestionPlainRef.current = '';
-      console.info('[ticket-ai-desk] Envio bloqueado — texto alterado após usar sugestão IA.');
-    }
-  }, [composePlainForAi, iaSuggestionApproved]);
+  const sendDisabledBySpell = composeMode === 'public' && composeSpellErrors.length > 0;
 
   useEffect(() => {
     restoreCustomKanbanBoxes();
@@ -260,7 +202,6 @@ export default function DeskV2Root() {
   }, []);
 
   useEffect(() => {
-    if (!COMPOSE_SPELLCHECK_ENABLED) return;
     loadSpellEngine().catch(() => {});
   }, []);
 
@@ -268,15 +209,23 @@ export default function DeskV2Root() {
     const openCreate = () => setCreateOpen(true);
     const closeCreate = () => setCreateOpen(false);
     const onRefreshTickets = () => { reload(); };
+    const onWorkflowInfoChanged = () => { syncTicketViews(); };
     window.addEventListener('velodesk:quick-register', openCreate);
     window.addEventListener('velodesk:quick-register-close', closeCreate);
     window.addEventListener('velodesk:refresh-tickets', onRefreshTickets);
+    window.addEventListener('velodesk:workflow-info-changed', onWorkflowInfoChanged);
     return () => {
       window.removeEventListener('velodesk:quick-register', openCreate);
       window.removeEventListener('velodesk:quick-register-close', closeCreate);
       window.removeEventListener('velodesk:refresh-tickets', onRefreshTickets);
+      window.removeEventListener('velodesk:workflow-info-changed', onWorkflowInfoChanged);
     };
-  }, [reload]);
+  }, [reload, syncTicketViews]);
+
+  useEffect(() => {
+    if (!ticket) return;
+    markWorkflowInfoRequestsReadForTicket(ticket);
+  }, [ticket?.id]);
 
   useEffect(() => {
     if (suppressAutoSelectRef.current && !activeTabId) return;
@@ -311,6 +260,10 @@ export default function DeskV2Root() {
     setRightFields((prev) => {
       if (!(lf.produto || '').trim()) {
         const defaults = buildDefaultRightFields(config, entry.ticket, getAgentName);
+        const hasLocalTabulation = Boolean(prev.produto || prev.motivo || prev.detalhe);
+        if (hasLocalTabulation) {
+          return mergeRightFieldsWithDefaults(prev, entry.ticket, getAgentName);
+        }
         if (
           prev.responsavel === defaults.responsavel
           && prev.canal === defaults.canal
@@ -361,6 +314,8 @@ export default function DeskV2Root() {
     setActiveQueue(queueId);
     setSearchDraft('');
     setAppliedSearch('');
+    localStorage.setItem('velodeskCrmTicketListCollapsed', '0');
+    setListCollapsed(false);
     if (openTabs.length === 0) {
       const def = pickDefaultTicket(queueId);
       if (def) openTicket(def);
@@ -399,11 +354,7 @@ export default function DeskV2Root() {
   };
 
   const handleIgnoreSpellWord = useCallback((word) => {
-    setSpellIgnoredWords((prev) => {
-      const next = new Set(prev);
-      addSpellWhitelistTerms(next, word);
-      return next;
-    });
+    setSpellIgnoredWords((prev) => new Set([...prev, word]));
   }, []);
 
   const handleFlaggedErrorsChange = useCallback((errors) => {
@@ -441,40 +392,27 @@ export default function DeskV2Root() {
     }
 
     if (messageText) {
-      if (status === 'cancelado' && !isSupervisorSendRole(sendRole)) {
-        showNotification('Apenas supervisores podem enviar como Cancelado.', 'warning');
-        return null;
-      }
-      if (sendBlockedByAiReview) {
-        showNotification('Use a sugestão de resposta da IA ou a Revisão de texto antes de enviar.', 'warning');
-        setComposeMode('public');
-        return null;
-      }
-      if (COMPOSE_SPELLCHECK_ENABLED && composeSpellErrors.length > 0) {
+      if (composeSpellErrors.length > 0) {
         showNotification(
           `Corrija ${composeSpellErrors.length} erro${composeSpellErrors.length > 1 ? 's' : ''} ortográfico${composeSpellErrors.length > 1 ? 's' : ''} antes de enviar.`,
           'warning',
         );
         return null;
       }
-      if (COMPOSE_SPELLCHECK_ENABLED) {
-        try {
-          const spellCtx = createSpellContext(config, spellIgnoredWords);
-          addSpellWhitelistTerms(spellCtx.whitelist, getAgentName());
-          addSpellWhitelistTerms(spellCtx.whitelist, ticket?.clientName || ticket?.lateralForm?.nome);
-          const errors = await scanText(messageText, spellCtx.whitelist, spellCtx.ignoredWords);
-          if (errors.length > 0) {
-            setComposeSpellErrors(errors);
-            setComposeMode('public');
-            showNotification(
-              `Corrija ${errors.length} erro${errors.length > 1 ? 's' : ''} ortográfico${errors.length > 1 ? 's' : ''} antes de enviar.`,
-              'warning',
-            );
-            return null;
-          }
-        } catch {
-          /* LT indisponível — modo degradado: não bloqueia envio */
+      try {
+        const spellCtx = createSpellContext(config, spellIgnoredWords);
+        const errors = await scanText(messageText, spellCtx.whitelist, spellCtx.ignoredWords);
+        if (errors.length > 0) {
+          setComposeSpellErrors(errors);
+          setComposeMode('public');
+          showNotification(
+            `Corrija ${errors.length} erro${errors.length > 1 ? 's' : ''} ortográfico${errors.length > 1 ? 's' : ''} antes de enviar.`,
+            'warning',
+          );
+          return null;
         }
+      } catch {
+        /* LT indisponível — modo degradado: não bloqueia envio */
       }
     }
     setComposeSpellErrors([]);
@@ -488,6 +426,16 @@ export default function DeskV2Root() {
           mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
           escalonar,
         );
+        const wfDraft = syncTicketWorkflowOnCommit(
+          prepared,
+          mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
+          escalonar,
+          status,
+          getAgentName(),
+        );
+        if (wfDraft.activated) {
+          showNotification('Workflow ativado para este ticket.', 'success');
+        }
         applySendStatus({ ticket: prepared, boxId: entry.boxId }, status);
         const regKey = Date.now();
         const ts = new Date().toISOString();
@@ -524,8 +472,6 @@ export default function DeskV2Root() {
             sendStatus: status,
             composeText: messageText ? '' : session.composeText,
             internalText: internalNoteText ? '' : session.internalText,
-            composeAiReviewedFor: messageText ? '' : session.composeAiReviewedFor,
-            iaSuggestionApproved: messageText ? false : session.iaSuggestionApproved,
           };
         }
         replaceOpenTabId(draftId, newId, {
@@ -534,12 +480,7 @@ export default function DeskV2Root() {
           ticketLabel: getTicketProtocolLabel(persisted) || 'Rascunho',
         });
         setSendStatus(status);
-        if (messageText) {
-          setComposeText('');
-          setComposeAiReviewedFor('');
-          setIaSuggestionApproved(false);
-          iaSuggestionPlainRef.current = '';
-        }
+        if (messageText) setComposeText('');
         if (internalNoteText) setInternalText('');
         showNotification(
           messageText || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
@@ -556,22 +497,29 @@ export default function DeskV2Root() {
           author: getAgentName(),
         });
       }
+      let workflowActivated = false;
       await updateTicketInKanban(ticket.id, (t) => {
         applyRightFieldsToTicket(
           t,
           mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
           escalonar,
         );
+        const wfResult = syncTicketWorkflowOnCommit(
+          t,
+          mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
+          escalonar,
+          status,
+          getAgentName(),
+        );
+        if (wfResult.activated) workflowActivated = true;
         applySendStatus({ ticket: t, boxId: entry.boxId }, status);
         return t;
       });
-      setSendStatus(status);
-      if (messageText) {
-        setComposeText('');
-        setComposeAiReviewedFor('');
-        setIaSuggestionApproved(false);
-        iaSuggestionPlainRef.current = '';
+      if (workflowActivated) {
+        showNotification('Workflow ativado para este ticket.', 'success');
       }
+      setSendStatus(status);
+      if (messageText) setComposeText('');
       if (internalNoteText) setInternalText('');
       if (activeTabId) {
         const sessionKey = String(activeTabId);
@@ -581,8 +529,6 @@ export default function DeskV2Root() {
             ...session,
             composeText: messageText ? '' : session.composeText,
             internalText: internalNoteText ? '' : session.internalText,
-            composeAiReviewedFor: messageText ? '' : session.composeAiReviewedFor,
-            iaSuggestionApproved: messageText ? false : session.iaSuggestionApproved,
           };
         }
       }
@@ -599,34 +545,68 @@ export default function DeskV2Root() {
     }
   };
 
-  const handleApplyTabulation = () => {
-    const tab = ticketAi.tabulacao;
-    if (!tab?.produto && !tab?.tipo) {
-      showNotification('Nenhuma tabulação sugerida disponível.', 'warning');
-      return;
-    }
-    setRightFields((f) => {
-      let next = { ...f };
-      if (tab.produto) {
-        next = applyCascadeFieldChange(next, 'produto', tab.produto);
-      }
-      if (tab.motivo && next.produto) {
-        next = applyCascadeFieldChange(next, 'motivo', tab.motivo);
-      }
-      if (tab.detalhe) {
-        next = { ...next, detalhe: tab.detalhe };
-      }
-      if (tab.tipo) {
-        next = { ...next, tipo: tab.tipo };
-      }
-      return next;
-    });
-    showNotification('Tabulação sugerida pela IA aplicada.', 'success');
-  };
-
   const handleFieldChange = (key, value) => {
     setRightFields((f) => applyCascadeFieldChange(f, key, value));
   };
+
+  const handleEscalonarChange = (value) => {
+    setEscalonar(value || null);
+  };
+
+  const workflowActivatingRef = useRef(false);
+
+  useEffect(() => {
+    if (!ticket || isDraftTicket(ticket) || isTicketInWorkflow(ticket) || workflowActivatingRef.current) {
+      return undefined;
+    }
+
+    const fields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
+    const isSolicitacao = String(fields.tipo || '').trim() === 'Solicitação';
+    if (!isSolicitacao && !escalonar) return undefined;
+    if (!fields.produto && !escalonar) return undefined;
+
+    const { activated, workflow, template } = maybeActivateWorkflowForTicket(
+      ticket,
+      fields,
+      escalonar,
+      getAgentName(),
+    );
+    if (!activated || !workflow || !template) return undefined;
+
+    workflowActivatingRef.current = true;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        await updateTicketInKanban(ticket.id, (t) => {
+          if (cancelled) return t;
+          applyRightFieldsToTicket(t, fields, escalonar);
+          t.lateralForm = { ...(t.lateralForm || {}), workflow };
+          injectWorkflowSystemMessage(t, template, escalonar);
+          return t;
+        });
+        if (!cancelled) {
+          showNotification('Workflow ativado para este ticket.', 'success');
+          syncTicketViews();
+        }
+      } catch {
+        if (!cancelled) showNotification('Não foi possível ativar o workflow.', 'error');
+      } finally {
+        workflowActivatingRef.current = false;
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [
+    ticket,
+    rightFields.produto,
+    rightFields.motivo,
+    rightFields.detalhe,
+    rightFields.tipo,
+    escalonar,
+    showNotification,
+    syncTicketViews,
+  ]);
 
   const handleSaveContact = async (draft) => {
     if (!ticket) return;
@@ -660,9 +640,7 @@ export default function DeskV2Root() {
         t.solicitante = nome;
         t.clientEmail = email;
         t.clientPhone = telefone;
-        if (clienteId) {
-          t.clienteId = clienteId;
-        }
+        if (clienteId) t.clienteId = clienteId;
         t.lateralForm = {
           ...t.lateralForm,
           cpf,
@@ -712,15 +690,69 @@ export default function DeskV2Root() {
 
   const convMsgs = ticket ? buildRegistroThread(ticket) : [];
   const ticketAi = useTicketAiSuggestions(ticket, rightFields, convMsgs, internalText);
-  const ticketAiErrorNotifiedRef = useRef(null);
+
+  const handleApplyTabulation = useCallback(async () => {
+    const tab = ticketAi.tabulacao || parseTabulationDisplay(ticketAi.tabulacaoDisplay);
+    if (!hasApplyableTabulation(tab)) {
+      showNotification('Nenhuma tabulação sugerida disponível.', 'warning');
+      return;
+    }
+
+    const merged = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
+    const next = applyTabulationSuggestion(merged, tab, config);
+    const changed = ['tipo', 'produto', 'motivo', 'detalhe'].some(
+      (key) => String(next[key] || '') !== String(merged[key] || ''),
+    );
+
+    if (!changed) {
+      showNotification(
+        'Não foi possível aplicar a sugestão. Verifique se produto, motivo e detalhe existem na tabulação ativa.',
+        'warning',
+      );
+      return;
+    }
+
+    setRightFields(next);
+
+    if (activeTabId) {
+      const sessionKey = String(activeTabId);
+      tabSessionsRef.current[sessionKey] = {
+        ...(tabSessionsRef.current[sessionKey] || {}),
+        rightFields: next,
+      };
+    }
+
+    if (ticket && !isDraftTicket(ticket)) {
+      try {
+        await updateTicketInKanban(ticket.id, (t) => applyRightFieldsToTicket(t, next, escalonar));
+        syncTicketViews();
+      } catch {
+        showNotification('Tabulação aplicada nos campos, mas não foi possível salvar no ticket.', 'warning');
+        return;
+      }
+    }
+
+    showNotification('Tabulação sugerida pela IA aplicada nos campos.', 'success');
+  }, [
+    activeTabId,
+    config,
+    escalonar,
+    rightFields,
+    showNotification,
+    syncTicketViews,
+    ticket,
+    ticketAi.tabulacao,
+    ticketAi.tabulacaoDisplay,
+  ]);
+
+  const workflowProgress = ticket ? getWorkflowProgress(ticket) : null;
+  const workflowComposeLocked = Boolean(workflowProgress?.composeLocked);
 
   useEffect(() => {
-    if (!ticketAi.error) return;
-    const key = `${activeTabId || 'none'}::${ticketAi.error}`;
-    if (ticketAiErrorNotifiedRef.current === key) return;
-    ticketAiErrorNotifiedRef.current = key;
-    showNotification(ticketAi.error, 'warning');
-  }, [ticketAi.error, activeTabId, showNotification]);
+    if (workflowComposeLocked && composeMode === 'public') {
+      setComposeMode('internal');
+    }
+  }, [workflowComposeLocked, composeMode]);
 
   return (
     <div className="app-shell" id="deskAppShell">
@@ -771,8 +803,6 @@ export default function DeskV2Root() {
             <DeskClientProfileBar
               ticket={ticket}
               client={client}
-              queueId={entry?.queueId}
-              escalonar={escalonar}
               onSaveContact={handleSaveContact}
               onSelectTicket={selectTicket}
             />
@@ -791,6 +821,13 @@ export default function DeskV2Root() {
               >
                 <i className="ti ti-file-text" /> Notas
               </button>
+              <button
+                type="button"
+                className={'tab-btn' + (mainTab === 'consultas' ? ' is-active' : '')}
+                onClick={() => selectMainTab('consultas')}
+              >
+                <i className="ti ti-search" /> Consultas
+              </button>
             </nav>
             <div className={'crm-conversation-wrap' + (waChatOpen ? ' crm-conversation-wrap--wa' : '')}>
               {mainTab === 'conversa' && waChatOpen ? (
@@ -802,33 +839,37 @@ export default function DeskV2Root() {
                     messages={convMsgs}
                     composeText={composeText}
                     onComposeTextChange={setComposeText}
-                    onUseIaReply={handleUseIaReply}
+                    onUseIaReply={setComposeText}
                     onSend={() => handleCommitWithStatus(sendStatus)}
                     iaReply={ticketAi.respostaSugerida}
                     iaReplyLoading={ticketAi.loading}
                     iaWaitingMessage={ticketAi.waitingMessage}
                     iaShowBar={ticketAi.showIaBar}
                     iaHasSuggestion={ticketAi.hasSuggestion}
-                    iaError={ticketAi.error}
                   />
                 </div>
               ) : (
                 <div
-                  className={'tab-panel is-active' + (mainTab === 'notas' ? ' tab-panel--notes' : '')}
-                  data-panel={mainTab === 'notas' ? 'notas' : 'conversa'}
+                  className={
+                    'tab-panel is-active'
+                    + (mainTab === 'notas' ? ' tab-panel--notes' : '')
+                    + (mainTab === 'consultas' ? ' tab-panel--consultas' : '')
+                  }
+                  data-panel={mainTab}
                 >
                   {mainTab === 'conversa' ? (
                     <>
+                      <TicketWorkflowInfoRequestCallout ticket={ticket} />
+                      <TicketWorkflowBanner ticket={ticket} />
                       <DeskConversation
                         ticket={ticket}
                         messages={convMsgs}
-                        onUseIaReply={handleUseIaReply}
+                        onUseIaReply={setComposeText}
                         iaReply={ticketAi.respostaSugerida}
                         iaReplyLoading={ticketAi.loading}
                         iaWaitingMessage={ticketAi.waitingMessage}
                         iaShowBar={ticketAi.showIaBar}
                         iaHasSuggestion={ticketAi.hasSuggestion}
-                        iaError={ticketAi.error}
                       />
                       <DeskComposePanel
                         ticketId={ticket.id}
@@ -842,13 +883,17 @@ export default function DeskV2Root() {
                         spellIgnoredWords={spellIgnoredWords}
                         onIgnoreSpellWord={handleIgnoreSpellWord}
                         onFlaggedErrorsChange={handleFlaggedErrorsChange}
-                        onComposeAiReviewed={handleComposeAiReviewed}
-                        aiReviewPending={sendBlockedByAiReview}
-                        clientDisplayName={ticket?.clientName || ticket?.lateralForm?.nome || ''}
+                        workflowLocked={workflowComposeLocked}
+                        workflowTeamLabel={workflowProgress?.awaitingTeamLabel}
                       />
                     </>
-                  ) : (
+                  ) : mainTab === 'notas' ? (
                     <DeskInternalNotesPanel
+                      ticket={ticket}
+                      client={client}
+                    />
+                  ) : (
+                    <DeskConsultasPanel
                       ticket={ticket}
                       client={client}
                     />
@@ -864,21 +909,24 @@ export default function DeskV2Root() {
         <DeskRightPanel
           ticket={ticket}
           client={client}
+          queueId={entry?.queueId}
           rightFields={rightFields}
           sendStatus={sendStatus}
+          escalonar={escalonar}
           onFieldChange={handleFieldChange}
+          onEscalonarChange={handleEscalonarChange}
           onApplyTabulation={handleApplyTabulation}
           onCommitStatus={handleCommitWithStatus}
           waChatOpen={waChatOpen}
           onOpenChat={handleOpenChat}
           onCloseChat={() => setWaChatOpen(false)}
-          sendDisabled={sendDisabled}
-          sendDisabledTitle={sendDisabledTitle}
+          sendDisabled={sendDisabledBySpell}
           iaTabulationDisplay={ticketAi.tabulacaoDisplay}
+          iaTabulation={ticketAi.tabulacao}
           iaTabulationLoading={ticketAi.loading}
           iaWaitingMessage={ticketAi.waitingMessage}
-          iaTabulationIncomplete={ticketAi.tabulacaoIncomplete}
           iaHasSuggestion={ticketAi.hasSuggestion}
+          iaHasTabulationSuggestion={ticketAi.hasTabulationSuggestion}
           iaShowSection={ticketAi.showIaBar || Boolean(ticketAi.waitingReason)}
         />
       )}

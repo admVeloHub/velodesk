@@ -232,6 +232,7 @@
 }
 
 body[data-velodesk-profile="supervisor"] .btn-header-quick,
+body[data-velodesk-profile="gestao"] .btn-header-quick,
 body[data-velodesk-profile="management"] .btn-header-quick { display: none !important; }
 
 @media (max-width: 768px) {

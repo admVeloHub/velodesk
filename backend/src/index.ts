@@ -1,5 +1,6 @@
-﻿/** index v1.7.0 — Gmail Workspace outbound + inbound Pub/Sub */
+/** index v1.7.0 — fallback MongoDB em memória no dev local */
 import express from 'express';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -17,19 +18,9 @@ import spellcheckRoutes from './routes/spellcheck.routes';
 import composeRoutes from './routes/compose.routes';
 import ticketAiRoutes from './routes/ticketAi.routes';
 import inboundRoutes from './routes/inbound.routes';
-import workspace360Routes from './routes/workspace360.routes';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
-import {
-  generateTicketAiSuggest,
-  getOpenAiTicketSuggestStatus,
-  isOpenAiTicketSuggestConfigured,
-} from './services/openaiTicketSuggest.service';
-import { loadEmailTransport } from './services/emailTransport.service';
-import {
-  ensureGmailWatchFresh,
-  setupGmailWatch,
-  startGmailWatchRenewalLoop,
-} from './services/gmail/gmailWatch.service';
+import { isOpenAiTicketSuggestConfigured } from './services/openaiTicketSuggest.service';
+import { seedDevelopmentData, purgeLegacyDemoData } from './services/seed.service';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const whatsapp = require('./whatsapp/whatsappModule.js');
@@ -109,7 +100,6 @@ app.use('/api', statsRoutes);
 app.use('/api/uploads', uploadsRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/tabulation', tabulationRoutes);
-app.use('/api/workspace360', workspace360Routes);
 
 if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);
@@ -123,32 +113,47 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 let mongoRetryTimer: ReturnType<typeof setInterval> | null = null;
+let devMemoryServer: MongoMemoryServer | null = null;
+let activeMongoUri = env.mongoUri;
 
-async function bootstrapEmailServices(): Promise<void> {
-  await loadEmailTransport();
-  if (env.gmailInboundEnabled) {
-    await setupGmailWatch();
-    startGmailWatchRenewalLoop();
-    void ensureGmailWatchFresh();
-  }
-}
-
-async function tryConnectDatabase(): Promise<boolean> {
+async function tryConnectDatabase(uri?: string): Promise<boolean> {
   if (isAllMongoReady()) return true;
 
+  const targetUri = (uri || activeMongoUri || '').trim();
+  if (!targetUri) return false;
+
   try {
-    await connectDatabase();
+    await connectDatabase(targetUri);
+    activeMongoUri = targetUri;
+    await purgeLegacyDemoData();
+    await seedDevelopmentData();
     console.log('[startup] MongoDB conectado (chamados + cadastros + desk_config).');
     return true;
   } catch (err) {
     const msg = (err as Error).message;
-    console.error('Falha ao conectar ao Atlas:', msg);
+    console.error('Falha ao conectar ao MongoDB:', msg);
     if (/whitelist|IP address/i.test(msg)) {
       console.error('Atlas → Network Access → libere 0.0.0.0/0 ou use VPC connector para Cloud Run.');
-    } else if (/querySrv|ECONNREFUSED.*mongodb/i.test(msg)) {
-      console.error('Falha de DNS SRV. Verifique MONGODB_URI (mongodb+srv) no Cloud Run.');
+    } else if (/querySrv|ECONNREFUSED|ECONNREFUSED.*mongodb/i.test(msg)) {
+      console.error('MongoDB indisponível. Em dev local, o backend tentará memória embarcada ou reconectar.');
     }
     return false;
+  }
+}
+
+async function tryDevMemoryMongo(): Promise<string | null> {
+  if (env.nodeEnv === 'production') return null;
+
+  try {
+    if (!devMemoryServer) {
+      devMemoryServer = await MongoMemoryServer.create();
+    }
+    const uri = devMemoryServer.getUri('velodesk');
+    console.log('[startup] MongoDB em memória (dev) — dados não persistem entre reinícios.');
+    return uri;
+  } catch (err) {
+    console.error('[startup] Falha ao iniciar MongoDB em memória:', err);
+    return null;
   }
 }
 
@@ -156,8 +161,8 @@ function scheduleMongoRetry() {
   if (mongoRetryTimer) return;
   console.log('[startup] Monitoramento MongoDB a cada 15s (reconecta se cair).');
   mongoRetryTimer = setInterval(() => {
-    if (!env.mongoUri?.trim() || isAllMongoReady()) return;
-    void tryConnectDatabase();
+    if (!activeMongoUri?.trim() || isAllMongoReady()) return;
+    void tryConnectDatabase(activeMongoUri);
   }, 15000);
 }
 
@@ -167,11 +172,19 @@ async function bootstrapDatabase() {
     return;
   }
 
-  const connected = await tryConnectDatabase();
-  if (env.nodeEnv === 'production') {
+  let connected = await tryConnectDatabase(env.mongoUri);
+  if (!connected && env.nodeEnv !== 'production') {
+    const memoryUri = await tryDevMemoryMongo();
+    if (memoryUri) {
+      connected = await tryConnectDatabase(memoryUri);
+    }
+  }
+
+  if (!connected) {
     scheduleMongoRetry();
-  } else if (!connected) {
-    process.exit(1);
+    if (env.nodeEnv !== 'production') {
+      console.warn('[startup] API ativa sem MongoDB — aguardando reconexão ou login dev após subir o banco.');
+    }
   }
 }
 
@@ -179,16 +192,11 @@ async function start() {
   app.listen(env.port, '0.0.0.0', () => {
     console.log(`API Velodesk v1.2.0 — http://0.0.0.0:${env.port} (${env.nodeEnv})`);
     void bootstrapDatabase().then(async () => {
-      await bootstrapEmailServices();
       await logLanguageToolStartupStatus();
       if (isOpenAiTicketSuggestConfigured()) {
         console.log('[ticket-ai] OpenAI configurado (sugestão resposta + tabulação).');
       } else {
-        const aiStatus = getOpenAiTicketSuggestStatus();
-        console.warn(
-          '[ticket-ai] OpenAI NÃO configurado — sugestão IA retornará 503. Faltam:',
-          aiStatus.missing.join(', ') || '(desconhecido)',
-        );
+        console.warn('[ticket-ai] OpenAI não configurado — defina OPENAI_API_KEY e OPENAI_VECTOR_STORE_ID em backend/.env');
       }
       if (env.enableWhatsapp) {
         console.log('Inicializando WhatsApp Web...');

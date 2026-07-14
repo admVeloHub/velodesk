@@ -1,0 +1,68 @@
+/**
+ * TicketWorkflowStepper v1.1.0 — stepper horizontal do workflow ativo (mockup)
+ */
+import React from 'react';
+import { getWorkflowProgress } from '../../../services/desk/utils';
+import { getWorkflowStepSubtitle } from '../../../services/desk/workflowDefinitions';
+
+function StepIcon({ step }) {
+  if (step.state === 'completed') {
+    return <i className="ti ti-check" aria-hidden="true" />;
+  }
+  return <i className={'ti ' + step.icon} aria-hidden="true" />;
+}
+
+export default function TicketWorkflowStepper({ ticket }) {
+  const progress = getWorkflowProgress(ticket);
+  if (!progress) return null;
+
+  const { template, stepsWithState } = progress;
+
+  return (
+    <section className="desk-workflow-stepper" aria-label={`Workflow ativo: ${template.title}`}>
+      <p className="desk-workflow-stepper__eyebrow">
+        <i className="ti ti-arrows-exchange" aria-hidden="true" />
+        WORKFLOW ATIVO · {template.title}
+      </p>
+      <ol className="desk-workflow-stepper__track">
+        {stepsWithState.map((step, index) => {
+          const subtitle = getWorkflowStepSubtitle(step, progress);
+          return (
+            <React.Fragment key={step.id}>
+              {index > 0 && (
+                <li
+                  className={
+                    'desk-workflow-stepper__connector'
+                    + (stepsWithState[index - 1].state === 'completed' ? ' is-completed' : '')
+                  }
+                  aria-hidden="true"
+                />
+              )}
+              <li
+                className={'desk-workflow-stepper__step desk-workflow-stepper__step--' + step.state}
+                title={step.label}
+              >
+                <span className="desk-workflow-stepper__circle">
+                  <StepIcon step={step} />
+                </span>
+                <div className="desk-workflow-stepper__text">
+                  <span className="desk-workflow-stepper__label">{step.label}</span>
+                  {subtitle ? (
+                    <span
+                      className={
+                        'desk-workflow-stepper__status'
+                        + (step.state === 'active' && progress.slaRemainingLabel ? ' desk-workflow-stepper__status--sla' : '')
+                      }
+                    >
+                      {subtitle}
+                    </span>
+                  ) : null}
+                </div>
+              </li>
+            </React.Fragment>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}

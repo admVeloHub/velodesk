@@ -1,7 +1,7 @@
-/**
- * Sidebar rail unificada — 3 estados: 5px | hover 52px | chevron fixa 220px
+﻿/**
+ * Sidebar rail unificada â€” 3 estados: 5px | hover 52px | chevron fixa 220px
  * VERSION: v1.10.0 | DATE: 2026-06-30
- * Perfil: VeloHub (sem botão local na barra)
+ * Perfil: VeloHub (sem botÃ£o local na barra)
  */
 import React, { useCallback, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -82,11 +82,12 @@ export default function Sidebar({ onOpenAI }) {
     });
 
   const handleNavClick = useCallback((item) => {
-    if (typeof window.navigateToPage === 'function') {
+    const path = item.id === 'tickets' ? '/tickets?desk=v2' : item.path;
+    if (typeof window.navigateToPage === 'function' && item.id !== 'workflow-inbox') {
       window.navigateToPage(item.id);
       return;
     }
-    navigate(item.id === 'tickets' ? '/tickets?desk=v2' : item.path);
+    navigate(path);
   }, [navigate]);
 
   const isActive = (item) => {
@@ -109,7 +110,7 @@ export default function Sidebar({ onOpenAI }) {
       <nav
         className="sidebar collapsed velo-nav-rail"
         id="mainSidebar"
-        aria-label="Navegação"
+        aria-label="NavegaÃ§Ã£o"
         onMouseEnter={handleSidebarEnter}
         onMouseLeave={handleSidebarLeave}
         onFocus={handleSidebarEnter}
@@ -172,17 +173,17 @@ export default function Sidebar({ onOpenAI }) {
               className={'notification-bell ws360-notification-bell velo-nav-rail__alerts-bell' + (popoverOpen ? ' is-open' : '')}
               id="btnAlertsNav"
               data-tooltip="VeloNews"
-              title="VeloNews — alertas e notícias"
+              title="VeloNews â€” alertas e notÃ­cias"
               onClick={togglePopover}
               onKeyDown={(e) => navKeyActivate(e, togglePopover)}
               role="button"
               tabIndex={0}
-              aria-label="VeloNews — alertas e notícias"
+              aria-label="VeloNews â€” alertas e notÃ­cias"
               aria-expanded={popoverOpen}
             >
               <i className="fas fa-bell" />
               {unreadCount > 0 ? (
-                <span className="notification-badge" aria-label={`${unreadCount} não lidos`}>
+                <span className="notification-badge" aria-label={`${unreadCount} nÃ£o lidos`}>
                   {unreadCount}
                 </span>
               ) : null}

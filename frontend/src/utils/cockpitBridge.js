@@ -1,18 +1,29 @@
-/**
+﻿/**
  * Ponte global — navegação e ações do cockpit ↔ React Router
- * VERSION: v2.0.0 | DATE: 2026-06-18
+ * VERSION: v2.1.0 | DATE: 2026-07-13
  */
 const PAGE_ROUTES = {
   workspace: '/workspace',
   dashboard: '/dashboard',
   tickets: '/tickets?desk=v2',
+  'workflow-inbox': '/workflow',
   reports: '/reports',
   chat: '/chat',
   config: '/config',
-  'client-portal': '/client-portal'
+  'analytics-ia': '/analytics-ia',
+  'client-portal': '/client-portal',
 };
 
+function resolveOpenTicketPath(profileId, ticketId) {
+  if (profileId === 'workflow') {
+    return ticketId ? `/workflow?ticket=${ticketId}` : '/workflow';
+  }
+  return '/tickets?desk=v2';
+}
+
 export function installCockpitBridge(navigate, showNotification, ticketActions = {}) {
+  const profileId = ticketActions.profileId || 'agent';
+
   window.navigateToPage = function navigateToPage(page) {
     document.querySelectorAll('.page').forEach((p) => {
       p.classList.remove('active', 'ticket-tab-open');
@@ -29,6 +40,11 @@ export function installCockpitBridge(navigate, showNotification, ticketActions =
       }
     }
 
+    if (page === 'tickets' && profileId === 'workflow') {
+      navigate('/workflow');
+      return;
+    }
+
     navigate(PAGE_ROUTES[page] || '/workspace');
   };
 
@@ -41,6 +57,10 @@ export function installCockpitBridge(navigate, showNotification, ticketActions =
   };
 
   window.openQuickRegisterModal = function openQuickRegisterModal() {
+    if (profileId === 'workflow') {
+      navigate('/workflow');
+      return;
+    }
     navigate('/tickets?desk=v2');
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent('velodesk:quick-register'));
@@ -53,8 +73,10 @@ export function installCockpitBridge(navigate, showNotification, ticketActions =
 
   if (ticketActions.openTicket) {
     window.openTicket = function openTicket(ticketId) {
-      ticketActions.openTicket(ticketId);
-      navigate('/tickets?desk=v2');
+      if (profileId !== 'workflow') {
+        ticketActions.openTicket(ticketId);
+      }
+      navigate(resolveOpenTicketPath(profileId, ticketId));
     };
   }
 

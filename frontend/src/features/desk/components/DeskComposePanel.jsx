@@ -1,34 +1,30 @@
 /**
- * DeskComposePanel v1.12.4 — status de envio por perfil (agente/supervisor)
- * VERSION: v1.12.4 | DATE: 2026-07-10
+ * DeskComposePanel v1.9.2 — remove avatar ao lado do compose
+ * VERSION: v1.9.2 | DATE: 2026-07-03
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { COMPOSE_SPELLCHECK_ENABLED, getSendStatusOptions } from '../../../services/desk/constants';
+import { SEND_STATUS_OPTIONS } from '../../../services/desk/constants';
 import { useComposeSpellCheck } from '../../../hooks/useComposeSpellCheck';
-import { useProfile } from '../../../context/ProfileContext';
-import { readAuthDeskRole } from '../../../services/desk/responsavelSegmentation';
 import { useTabulation } from '../../../context/TabulationContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useNotifications } from '../../../context/NotificationContext';
-import { htmlToPlainText, normalizeComposePlain, normalizePlainToHtml } from '../../../services/desk/composeRichEditor';
+import { htmlToPlainText, normalizePlainToHtml } from '../../../services/desk/composeRichEditor';
 import SpellSuggestionBar, { SpellErrorsPanel } from './SpellSuggestionBar';
 import ComposeRichEditor from './ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
 import ComposeRefinarModal from './ComposeRefinarModal';
 
-export function DeskStatusCommitButton({
-  sendStatus,
-  onCommitStatus,
-  variant = 'compose',
-  disabled = false,
-  disabledTitle,
-}) {
+const MACROS = [
+  { value: 'F1', label: 'F1 — Saudação padrão', text: 'Olá! Obrigado por entrar em contato. Como posso ajudá-lo(a) hoje?' },
+  { value: 'F2', label: 'F2 — Aguardar retorno', text: 'Estamos analisando sua solicitação e retornaremos em breve.' },
+  { value: 'F3', label: 'F3 — Escalonamento', text: 'Encaminhei sua solicitação para a equipe especializada.' },
+  { value: 'F4', label: 'F4 — Encerramento NPS', text: 'Agradecemos o contato. Por favor, avalie nosso atendimento.' },
+];
+
+export function DeskStatusCommitButton({ sendStatus, onCommitStatus, variant = 'compose', disabled = false }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
-  const { profileId } = useProfile();
-  const sendRole = readAuthDeskRole() || profileId;
-  const sendStatusOptions = useMemo(() => getSendStatusOptions(sendRole), [sendRole]);
-  const currentStatus = sendStatusOptions.find((o) => o.id === sendStatus) || sendStatusOptions[0];
+  const currentStatus = SEND_STATUS_OPTIONS.find((o) => o.id === sendStatus) || SEND_STATUS_OPTIONS[0];
 
   useEffect(() => {
     const close = (e) => {
@@ -63,7 +59,7 @@ export function DeskStatusCommitButton({
         aria-expanded={menuOpen}
         aria-disabled={disabled}
         disabled={disabled}
-        title={disabled ? (disabledTitle || 'Envio indisponível') : undefined}
+        title={disabled ? 'Corrija os erros ortográficos antes de enviar' : undefined}
         onClick={() => {
           if (disabled) return;
           setMenuOpen((v) => !v);
@@ -72,7 +68,7 @@ export function DeskStatusCommitButton({
         {isPanel ? (
           <>
             <i className="ti ti-send" />
-            {currentStatus.label}
+            Enviar como
             <i className="ti ti-chevron-down" />
           </>
         ) : (
@@ -82,7 +78,7 @@ export function DeskStatusCommitButton({
         )}
       </button>
       <div className="crm-send-status__menu" id="crmStatusMenu" role="listbox" hidden={!menuOpen || disabled}>
-        {sendStatusOptions.map((opt) => (
+        {SEND_STATUS_OPTIONS.map((opt) => (
           <button
             key={opt.id}
             type="button"
@@ -108,25 +104,32 @@ export const DeskComposeFooter = DeskStatusCommitButton;
 
 function ComposeBottomBar({
   formatToolbar,
+  showMacros = false,
+  onMacroSelect,
   onOpenRefinar,
-  aiReviewPending = false,
 }) {
   return (
     <div className="crm-compose-bottom-bar ticket-response-actions" role="group" aria-label="Ferramentas do compose">
       {formatToolbar}
-      {onOpenRefinar ? (
+      {showMacros ? (
         <>
           <span className="crm-compose-bottom-bar__sep" aria-hidden="true" />
           <div className="crm-compose-bottom-bar__tools">
-            <button
-              type="button"
-              className={'btn-secondary crm-compose-bottom-bar__ai' + (aiReviewPending ? ' crm-compose-bottom-bar__ai--required' : '')}
-              id="btnCrmAiAssistant"
-              title={aiReviewPending ? 'Use a sugestão de resposta da IA ou a Revisão de texto antes de enviar' : undefined}
-              onClick={onOpenRefinar}
-            >
-              <i className="fas fa-robot" /> Revisão de texto
-              {aiReviewPending ? <span className="crm-compose-bottom-bar__ai-badge" aria-hidden="true">*</span> : null}
+            <div className="ticket-macro-hub crm-compose-bottom-bar__macros">
+              <select
+                className="ticket-macro-select"
+                aria-label="Central de opções de resposta"
+                value=""
+                onChange={(e) => onMacroSelect?.(e.target.value)}
+              >
+                <option value="">Central de opções</option>
+                {MACROS.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+            <button type="button" className="btn-secondary crm-compose-bottom-bar__ai" id="btnCrmAiAssistant" onClick={onOpenRefinar}>
+              <i className="fas fa-robot" /> Assistente IA
             </button>
           </div>
         </>
@@ -142,7 +145,7 @@ function InternalNoteFields({
   tabulationConfig,
   spellIgnoredWords,
   onIgnoreSpellWord,
-  extraWhitelistTerms,
+  placeholder = 'Digite uma anotação interna...',
 }) {
   const tid = String(ticketId);
   const internalEditorRef = useRef(null);
@@ -158,7 +161,6 @@ function InternalNoteFields({
     onReplaceRange: handleInternalReplace,
     tabulationConfig,
     ignoredWords: spellIgnoredWords,
-    extraWhitelistTerms,
     onIgnoreWord: onIgnoreSpellWord,
     trackFlaggedErrors: false,
   });
@@ -174,7 +176,6 @@ function InternalNoteFields({
 
   const handleInternalKeyDown = (event) => {
     if (internalFormat.handleKeyDown(event)) return;
-    if (!COMPOSE_SPELLCHECK_ENABLED) return;
     spell.handleKeyDown({
       ...event,
       target: {
@@ -186,35 +187,32 @@ function InternalNoteFields({
   };
 
   return (
-    <div className={'response-form internal-form crm-notes-compose__form' + (COMPOSE_SPELLCHECK_ENABLED ? ' spell-compose-wrap' : '')}>
+    <div className="response-form internal-form crm-notes-compose__form spell-compose-wrap">
       <div className="crm-notes-compose__header">
         <i className="fas fa-lock" aria-hidden="true" />
         <span>Anotação interna — não será enviada ao cliente</span>
       </div>
-      {COMPOSE_SPELLCHECK_ENABLED ? (
-        <SpellSuggestionBar
-          suggestion={spell.activeSuggestion}
-          loading={spell.spellLoading}
-          loadError={spell.spellLoadError}
-          onApply={spell.applySuggestion}
-          onDismiss={spell.dismissSuggestion}
-          onIgnore={spell.dismissSuggestion}
-          onAddToVocabulary={spell.ignoreWord}
-        />
-      ) : null}
+      <SpellSuggestionBar
+        suggestion={spell.activeSuggestion}
+        loading={spell.spellLoading}
+        loadError={spell.spellLoadError}
+        onApply={spell.applySuggestion}
+        onDismiss={spell.dismissSuggestion}
+        onIgnore={spell.ignoreSuggestion}
+      />
       <ComposeRichEditor
         ref={internalEditorRef}
         id={'internalResponse-' + tid}
         className="response-textarea crm-notes-compose__textarea"
-        placeholder="Digite uma anotação interna..."
+        placeholder={placeholder}
         value={internalText}
-        hasSpellErrors={COMPOSE_SPELLCHECK_ENABLED && spell.flaggedErrors.length > 0}
+        hasSpellErrors={spell.flaggedErrors.length > 0}
         onFormatStateChange={internalFormat.handleFormatStateChange}
         onChange={handleInternalChange}
         onKeyDown={handleInternalKeyDown}
-        onBlur={COMPOSE_SPELLCHECK_ENABLED ? spell.handleBlur : undefined}
-        onSelect={COMPOSE_SPELLCHECK_ENABLED ? spell.handleSelect : undefined}
-        onClick={COMPOSE_SPELLCHECK_ENABLED ? spell.handleClick : undefined}
+        onBlur={spell.handleBlur}
+        onSelect={spell.handleSelect}
+        onClick={spell.handleClick}
       />
       <ComposeBottomBar
         formatToolbar={(
@@ -241,10 +239,9 @@ export default function DeskComposePanel({
   spellIgnoredWords,
   onIgnoreSpellWord,
   onFlaggedErrorsChange,
-  onComposeAiReviewed,
-  aiReviewPending = false,
-  clientDisplayName = '',
   variant = 'full',
+  workflowLocked = false,
+  workflowTeamLabel = '',
 }) {
   const tid = String(ticketId);
   const publicEditorRef = useRef(null);
@@ -256,19 +253,18 @@ export default function DeskComposePanel({
   const [refinarDraft, setRefinarDraft] = useState('');
   const showPublic = variant === 'full' || variant === 'public-only';
   const showInternal = variant === 'full' || variant === 'internal-only';
+  const publicLocked = workflowLocked && composeMode === 'public';
+  const internalPlaceholder = workflowLocked
+    ? `Aguardando ${workflowTeamLabel || 'equipe'} • Você pode adicionar uma nota interna...`
+    : 'Digite uma anotação interna...';
+  const publicPlaceholder = workflowLocked
+    ? `Aguardando ${workflowTeamLabel || 'equipe'} • resposta pública indisponível`
+    : 'Digite sua resposta ao cliente...';
 
   const nomeOperador = useMemo(() => {
     const full = String(user?.name || colaborador?.nome || colaborador?.name || '').trim();
     return full.split(/\s+/)[0] || '';
   }, [user, colaborador]);
-
-  const spellExtraNames = useMemo(() => (
-    [
-      user?.name,
-      colaborador?.nome || colaborador?.name,
-      clientDisplayName,
-    ].map((item) => String(item || '').trim()).filter(Boolean)
-  ), [user, colaborador, clientDisplayName]);
 
   const handlePublicReplace = useCallback((startIndex, deleteCount, insertText) => {
     publicEditorRef.current?.replacePlainRange(startIndex, deleteCount, insertText);
@@ -280,7 +276,6 @@ export default function DeskComposePanel({
     onReplaceRange: handlePublicReplace,
     tabulationConfig,
     ignoredWords: spellIgnoredWords,
-    extraWhitelistTerms: spellExtraNames,
     onIgnoreWord: onIgnoreSpellWord,
     onFlaggedErrorsChange,
     trackFlaggedErrors: true,
@@ -297,7 +292,6 @@ export default function DeskComposePanel({
 
   const handlePublicKeyDown = (event) => {
     if (publicFormat.handleKeyDown(event)) return;
-    if (!COMPOSE_SPELLCHECK_ENABLED) return;
     spell.handleKeyDown({
       ...event,
       target: {
@@ -308,10 +302,15 @@ export default function DeskComposePanel({
     });
   };
 
+  const applyMacro = (value) => {
+    const macro = MACROS.find((m) => m.value === value);
+    if (macro) publicEditorRef.current?.insertPlainText(macro.text);
+  };
+
   const handleOpenRefinar = () => {
     const texto = composePlainText.trim();
     if (!texto) {
-      showNotification('Digite um rascunho antes de usar a Revisão de texto.', 'warning');
+      showNotification('Digite um rascunho antes de usar o Assistente IA.', 'warning');
       return;
     }
     setRefinarDraft(texto);
@@ -319,25 +318,15 @@ export default function DeskComposePanel({
   };
 
   const handleApplyRefinar = useCallback((plainText) => {
-    const trimmed = normalizeComposePlain(plainText);
-    const html = normalizePlainToHtml(trimmed);
-    onComposeTextChange(html);
-    onComposeAiReviewed?.(normalizeComposePlain(html));
-  }, [onComposeTextChange, onComposeAiReviewed]);
-
-  const handleReviewComplete = useCallback((draftPlainText) => {
-    onComposeAiReviewed?.(String(draftPlainText || '').trim());
-  }, [onComposeAiReviewed]);
-
-  const spellPanelErrors = useMemo(() => {
-    if (!spell.activeSuggestion) return spell.flaggedErrors;
-    return spell.flaggedErrors.filter(
-      (error) => error.startIndex !== spell.activeSuggestion.startIndex,
-    );
-  }, [spell.flaggedErrors, spell.activeSuggestion]);
+    onComposeTextChange(normalizePlainToHtml(plainText));
+  }, [onComposeTextChange]);
 
   return (
-    <div className={'crm-ticket-compose' + (variant === 'internal-only' ? ' crm-ticket-compose--notes' : '')}>
+    <div className={
+      'crm-ticket-compose'
+      + (variant === 'internal-only' ? ' crm-ticket-compose--notes' : '')
+      + (workflowLocked ? ' crm-ticket-compose--workflow-locked' : '')
+    }>
       <div className="ticket-response octa-comment-panel crm-ticket-response">
         <div className="octa-comment-panel-row">
           <div className="octa-panel-box">
@@ -348,6 +337,7 @@ export default function DeskComposePanel({
                 className={'response-tab octa-nav-tab octa-tab-public' + (composeMode === 'public' ? ' active' : '')}
                 data-compose="public"
                 onClick={() => onComposeModeChange('public')}
+                disabled={workflowLocked}
               >
                 <i className="fas fa-envelope" /> Resposta pública
               </button>
@@ -364,43 +354,37 @@ export default function DeskComposePanel({
             <div className="response-content octa-response-panel-body">
               {showPublic ? (
               <div className={'response-tab-content' + (variant === 'full' && composeMode !== 'public' ? '' : ' active')} id={'public-' + tid}>
-                <div className={'response-form' + (COMPOSE_SPELLCHECK_ENABLED ? ' spell-compose-wrap' : '')}>
-                  {COMPOSE_SPELLCHECK_ENABLED ? (
-                    <>
-                      <SpellErrorsPanel
-                        errors={spellPanelErrors}
-                        totalCount={spell.flaggedErrors.length}
-                        onApplyFix={spell.applyErrorFix}
-                        onIgnoreWord={spell.ignoreWord}
-                      />
-                      <SpellSuggestionBar
-                        suggestion={spell.activeSuggestion}
-                        loading={spell.spellLoading}
-                        loadError={spell.spellLoadError}
-                        onApply={spell.applySuggestion}
-                        onDismiss={spell.dismissSuggestion}
-                        onIgnore={spell.dismissSuggestion}
-                        onAddToVocabulary={spell.ignoreWord}
-                      />
-                    </>
-                  ) : null}
+                <div className="response-form spell-compose-wrap">
+                  <SpellErrorsPanel
+                    errors={spell.flaggedErrors}
+                    onApplyFix={spell.applyErrorFix}
+                  />
+                  <SpellSuggestionBar
+                    suggestion={spell.activeSuggestion}
+                    loading={spell.spellLoading}
+                    loadError={spell.spellLoadError}
+                    onApply={spell.applySuggestion}
+                    onDismiss={spell.dismissSuggestion}
+                    onIgnore={spell.ignoreSuggestion}
+                  />
                   <ComposeRichEditor
                     ref={publicEditorRef}
                     id={'publicResponse-' + tid}
                     className="response-textarea"
-                    placeholder="Digite sua resposta ao cliente..."
+                    placeholder={publicPlaceholder}
                     value={composeText}
-                    hasSpellErrors={COMPOSE_SPELLCHECK_ENABLED && spell.flaggedErrors.length > 0}
+                    hasSpellErrors={spell.flaggedErrors.length > 0}
                     onFormatStateChange={publicFormat.handleFormatStateChange}
                     onChange={handlePublicChange}
                     onKeyDown={handlePublicKeyDown}
-                    onBlur={COMPOSE_SPELLCHECK_ENABLED ? spell.handleBlur : undefined}
-                    onSelect={COMPOSE_SPELLCHECK_ENABLED ? spell.handleSelect : undefined}
-                    onClick={COMPOSE_SPELLCHECK_ENABLED ? spell.handleClick : undefined}
+                    onBlur={spell.handleBlur}
+                    onSelect={spell.handleSelect}
+                    onClick={spell.handleClick}
                   />
                   <ComposeBottomBar
+                    showMacros
+                    onMacroSelect={applyMacro}
                     onOpenRefinar={handleOpenRefinar}
-                    aiReviewPending={aiReviewPending}
                     formatToolbar={(
                       <ComposeFormatToolbar
                         applyAction={publicFormat.applyAction}
@@ -416,7 +400,6 @@ export default function DeskComposePanel({
                     draftText={refinarDraft}
                     nomeOperador={nomeOperador}
                     onApply={handleApplyRefinar}
-                    onReviewComplete={handleReviewComplete}
                   />
                 </div>
               </div>
@@ -430,7 +413,7 @@ export default function DeskComposePanel({
                   tabulationConfig={tabulationConfig}
                   spellIgnoredWords={spellIgnoredWords}
                   onIgnoreSpellWord={onIgnoreSpellWord}
-                  extraWhitelistTerms={spellExtraNames}
+                  placeholder={internalPlaceholder}
                 />
               </div>
               ) : null}
@@ -438,6 +421,12 @@ export default function DeskComposePanel({
           </div>
         </div>
       </div>
+      {workflowLocked ? (
+        <div className="desk-workflow-compose-lock" role="status">
+          <i className="ti ti-lock" aria-hidden="true" />
+          <span>Workflow ativo • aprovação pendente</span>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -3,7 +3,7 @@
  * VERSION: v1.0.1 | DATE: 2026-06-24
  */
 import React from 'react';
-import { SLA_LABELS } from '../../../services/desk/constants';
+import { SLA_LABELS, SLA_SHORT_LABELS } from '../../../services/desk/constants';
 import {
   buildTags,
   formatTicketDate,
@@ -73,7 +73,7 @@ export default function DeskTicketList({
         </div>
         <ul className="ticket-cards" id="ticketCards">
           {entries.length === 0 ? (
-            <li className="crm-empty-state" style={{ padding: 16, fontSize: 14 }}>
+            <li className="crm-empty-state" style={{ padding: 16 }}>
               {searchActive ? 'Nenhum ticket encontrado na busca' : 'Nenhum ticket nesta fila'}
             </li>
           ) : entries.map(({ ticket: t, queueId }) => {
@@ -104,11 +104,22 @@ export default function DeskTicketList({
                 {tags.length > 0 && (
                   <div className="crm-ticket-card__tags">
                     {tags.map((tag) => (
-                      <span key={tag} className="crm-tag">{tag}</span>
+                      <span
+                        key={tag}
+                        className={'crm-tag' + (tag === 'Workflow' ? ' crm-tag--workflow' : '')}
+                      >
+                        {tag}
+                      </span>
                     ))}
                   </div>
                 )}
-                <span className={'crm-ticket-card__sla crm-ticket-card__sla--' + sla} title={SLA_LABELS[sla]} aria-label={SLA_LABELS[sla]} />
+                <span
+                  className={'crm-ticket-card__sla crm-ticket-card__sla--' + sla}
+                  title={SLA_LABELS[sla]}
+                  aria-label={SLA_LABELS[sla]}
+                >
+                  {SLA_SHORT_LABELS[sla]}
+                </span>
               </li>
             );
           })}

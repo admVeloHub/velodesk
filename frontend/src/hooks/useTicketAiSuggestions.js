@@ -1,29 +1,15 @@
 /**
- * useTicketAiSuggestions v1.1.1 — resolve nome do cliente para prompt IA
- * VERSION: v1.1.1 | DATE: 2026-07-10
+ * useTicketAiSuggestions v1.0.1 — evita loop de requests em 503 (serviço não configurado)
+ * VERSION: v1.0.1 | DATE: 2026-07-03
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ticketAiApi } from '../api/client';
 import { htmlToPlainText } from '../services/desk/composeRichEditor';
-import { getClientContactFields, getAgentName } from '../services/desk/utils';
+import { hasApplyableTabulation, parseTabulationDisplay } from '../services/tabulationConfig';
 
 export const TICKET_AI_INTERNAL_NOTE_MIN_CHARS = 80;
-const PUBLIC_DEBOUNCE_MS = 2000;
+const PUBLIC_DEBOUNCE_MS = 400;
 const INTERNAL_DEBOUNCE_MS = 1500;
-const LOG_PREFIX = '[ticket-ai-desk]';
-
-function logTicketAi(level, message, detail) {
-  const line = `${LOG_PREFIX} ${message}`;
-  if (level === 'error') {
-    console.error(line, detail !== undefined ? detail : '');
-    return;
-  }
-  if (level === 'warn') {
-    console.warn(line, detail !== undefined ? detail : '');
-    return;
-  }
-  console.info(line, detail !== undefined ? detail : '');
-}
 
 function resolveCanal(ticket, rightFields) {
   return String(
@@ -45,7 +31,62 @@ function mapConvMsgsToApi(messages) {
 }
 
 function hasClientMessage(messages) {
-  return (messages || []).some((m) => m.type === 'client');
+  return (messages || []).some((m) => {
+    const type = String(m.type || '').toLowerCase();
+    return type === 'client' || type === 'cliente' || m.fromClient === true || m.sender === 'them';
+  });
+}
+
+function buildTabulationDisplay(tab) {
+  if (!tab) return '';
+  const parts = [tab.tipo, tab.produto, tab.motivo, tab.detalhe].filter(Boolean);
+  return parts.length ? parts.join(' → ') : 'Tabulação incompleta';
+}
+
+function inferDevTabulation(payload) {
+  const messages = payload?.messages || [];
+  const text = messages.map((m) => String(m.text || '')).join(' ').toLowerCase();
+  const internalNote = String(payload?.internalNote || '').toLowerCase();
+  const title = String(payload?.titulo || '').toLowerCase();
+  const haystack = `${title} ${text} ${internalNote}`;
+
+  if (/reembolso|produto x/i.test(haystack)) {
+    return {
+      tipo: 'Solicitação',
+      produto: 'Produto X',
+      motivo: 'Reembolso',
+      detalhe: 'Dentro de 7 dias',
+      incompleta: false,
+    };
+  }
+  if (/lentid|internet|fibra/i.test(haystack)) {
+    return {
+      tipo: 'Reclamação',
+      produto: 'Internet Fibra',
+      motivo: 'Lentidão',
+      detalhe: 'Em análise',
+      incompleta: false,
+    };
+  }
+  if (/cancelamento|\btv\b/i.test(haystack)) {
+    return {
+      tipo: 'Solicitação',
+      produto: 'TV',
+      motivo: 'Cancelamento',
+      detalhe: 'Em análise',
+      incompleta: false,
+    };
+  }
+  if (/cobran|cart[aã]o|financeir/i.test(haystack)) {
+    return {
+      tipo: 'Solicitação',
+      produto: 'Telefone',
+      motivo: 'Financeiro',
+      detalhe: 'Em análise',
+      incompleta: false,
+    };
+  }
+  return null;
 }
 
 function buildContextHash({ ticketId, contextSource, messages, internalPlain, produtoHint }) {
@@ -61,46 +102,33 @@ function buildContextHash({ ticketId, contextSource, messages, internalPlain, pr
   ].join('::');
 }
 
-function resolveAgentFirstName() {
-  const full = String(getAgentName() || '').trim();
-  if (!full) return '';
-  return full.split(/\s+/)[0] || full;
+function buildDevSuggestionResult(payload) {
+  const mockTab = inferDevTabulation(payload);
+  if (!mockTab) return null;
+  return {
+    respostaSugerida: '',
+    tabulacao: mockTab,
+    tabulacaoDisplay: buildTabulationDisplay(mockTab),
+  };
 }
 
-function resolveClientName(ticket) {
-  const lf = ticket?.lateralForm || {};
-  const fromLf = lf.clienteNome;
-  const lfName = Array.isArray(fromLf)
-    ? fromLf[0]
-    : (typeof fromLf === 'object' && fromLf?.lista?.[0] ? fromLf.lista[0] : fromLf);
-  return String(
-    ticket?.clientName
-    || ticket?.solicitante
-    || lfName
-    || lf.clienteNome
-    || '',
-  ).trim();
+function applySuggestionResult(setters, result) {
+  setters.setRespostaSugerida(result.respostaSugerida || '');
+  setters.setTabulacao(result.tabulacao || null);
+  setters.setTabulacaoDisplay(result.tabulacaoDisplay || '');
+  setters.setError(null);
+  setters.setWaitingReason(null);
 }
 
 function buildPayload({ ticket, rightFields, convMsgs, internalPlain, contextSource }) {
   const apiMessages = mapConvMsgsToApi(convMsgs);
   const canal = resolveCanal(ticket, rightFields);
-  const nomeOperador = resolveAgentFirstName();
-  const contact = getClientContactFields(ticket);
-  const contactNameRaw = contact.name;
-  const contactName = Array.isArray(contactNameRaw)
-    ? contactNameRaw[0]
-    : (typeof contactNameRaw === 'object' && contactNameRaw?.lista?.[0]
-      ? contactNameRaw.lista[0]
-      : contactNameRaw);
-  const clientName = resolveClientName(ticket) || String(contactName || '').trim() || '';
   const base = {
     ticketId: ticket?.id || ticket?._id,
     protocolo: ticket?.chamadoProtocolo || ticket?.protocol,
     titulo: ticket?.title || ticket?.chamadoTitulo,
     canal,
-    clientName: clientName || undefined,
-    nomeOperador: nomeOperador || undefined,
+    clientName: ticket?.clientName || ticket?.lateralForm?.clienteNome,
     produtoHint: String(rightFields?.produto || '').trim() || undefined,
   };
 
@@ -119,27 +147,6 @@ function buildPayload({ ticket, rightFields, convMsgs, internalPlain, contextSou
   };
 }
 
-function formatConfigError(statusData) {
-  const missing = Array.isArray(statusData?.missing) ? statusData.missing : [];
-  if (missing.length) {
-    return `Sugestão IA indisponível: configure no servidor (${missing.join(', ')}).`;
-  }
-  return 'Sugestão IA indisponível: serviço OpenAI não configurado no servidor.';
-}
-
-function formatSuggestError(err) {
-  const status = err?.response?.status;
-  const data = err?.response?.data || {};
-  const missing = Array.isArray(data.missing) ? data.missing : [];
-  if (status === 503) {
-    if (missing.length) {
-      return `Sugestão IA indisponível: configure no servidor (${missing.join(', ')}).`;
-    }
-    return data.error || 'Sugestão IA indisponível: serviço OpenAI não configurado no servidor.';
-  }
-  return data.error || err?.message || 'Falha ao gerar sugestão da IA.';
-}
-
 /**
  * @param {object|null} ticket
  * @param {object} rightFields
@@ -153,13 +160,12 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
   const [tabulacao, setTabulacao] = useState(null);
   const [tabulacaoDisplay, setTabulacaoDisplay] = useState('');
   const [waitingReason, setWaitingReason] = useState(null);
-  const [serviceConfigured, setServiceConfigured] = useState(true);
 
   const cacheRef = useRef(new Map());
   const abortRef = useRef(null);
   const debounceRef = useRef(null);
   const serviceUnavailableRef = useRef(false);
-  const statusCheckedRef = useRef(false);
+  const prevTicketIdRef = useRef(null);
 
   const canal = useMemo(() => resolveCanal(ticket, rightFields), [ticket, rightFields]);
   const isPhone = isPhoneChannel(canal);
@@ -186,7 +192,6 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
   }, [ticket, canFetch, contextSource, convMsgs, internalPlain, rightFields?.produto]);
 
   const waitingMessage = useMemo(() => {
-    if (error) return error;
     if (loading) return 'Gerando sugestão com base nos POPs…';
     if (waitingReason === 'awaiting_client_message') {
       return 'Aguardando mensagem do cliente';
@@ -194,59 +199,29 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     if (waitingReason === 'awaiting_internal_note') {
       return 'Registre a anotação interna do atendimento para gerar sugestões';
     }
-    if (waitingReason === 'service_unconfigured') {
-      return error || 'Sugestão IA indisponível no servidor.';
-    }
     return '';
-  }, [loading, waitingReason, error]);
-
-  useEffect(() => {
-    if (statusCheckedRef.current) return undefined;
-    statusCheckedRef.current = true;
-    logTicketAi('info', 'Verificando configuração do serviço (/ticket-ai/status)…');
-    ticketAiApi.status()
-      .then((data) => {
-        const configured = Boolean(data?.configured);
-        setServiceConfigured(configured);
-        if (configured) {
-          logTicketAi('info', 'Serviço configurado.', { model: data?.model });
-          return;
-        }
-        serviceUnavailableRef.current = true;
-        const msg = formatConfigError(data);
-        setError(msg);
-        setWaitingReason('service_unconfigured');
-        logTicketAi('warn', 'Serviço NÃO configurado no servidor.', {
-          missing: data?.missing,
-          model: data?.model,
-        });
-      })
-      .catch((err) => {
-        logTicketAi('warn', 'Não foi possível consultar /ticket-ai/status — tentará sugestão mesmo assim.', {
-          status: err?.response?.status,
-          message: err?.response?.data?.error || err?.message,
-        });
-      });
-    return undefined;
-  }, []);
+  }, [loading, waitingReason]);
 
   const fetchSuggestions = useCallback(async (hash, payload) => {
-    if (serviceUnavailableRef.current) {
-      logTicketAi('warn', 'Fetch ignorado — serviço marcado como indisponível (503).');
+    const cached = cacheRef.current.get(hash);
+    if (cached) {
+      applySuggestionResult(
+        { setRespostaSugerida, setTabulacao, setTabulacaoDisplay, setError, setWaitingReason },
+        cached,
+      );
+      setLoading(false);
       return;
     }
 
-    const cached = cacheRef.current.get(hash);
-    if (cached) {
-      logTicketAi('info', 'Sugestão servida do cache local.', {
-        ticketId: payload.ticketId,
-        respostaChars: cached.respostaSugerida?.length || 0,
-      });
-      setRespostaSugerida(cached.respostaSugerida || '');
-      setTabulacao(cached.tabulacao || null);
-      setTabulacaoDisplay(cached.tabulacaoDisplay || '');
-      setError(null);
-      setWaitingReason(null);
+    if (serviceUnavailableRef.current) {
+      const devResult = buildDevSuggestionResult(payload);
+      if (devResult) {
+        cacheRef.current.set(hash, devResult);
+        applySuggestionResult(
+          { setRespostaSugerida, setTabulacao, setTabulacaoDisplay, setError, setWaitingReason },
+          devResult,
+        );
+      }
       setLoading(false);
       return;
     }
@@ -259,14 +234,6 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     setError(null);
     setWaitingReason(null);
 
-    logTicketAi('info', 'Iniciando POST /ticket-ai/suggest…', {
-      ticketId: payload.ticketId,
-      contextSource: payload.contextSource,
-      canal: payload.canal,
-      messages: payload.messages?.length,
-      internalNoteChars: payload.internalNote?.length || 0,
-    });
-
     try {
       const data = await ticketAiApi.suggest(payload, { signal: controller.signal });
       if (controller.signal.aborted) return;
@@ -278,30 +245,27 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       };
 
       cacheRef.current.set(hash, result);
-      setRespostaSugerida(result.respostaSugerida);
-      setTabulacao(result.tabulacao);
-      setTabulacaoDisplay(result.tabulacaoDisplay);
-      logTicketAi('info', 'Sugestão recebida com sucesso.', {
-        respostaChars: result.respostaSugerida.length,
-        tabulacao: result.tabulacaoDisplay,
-        model: data?.model,
-      });
+      applySuggestionResult(
+        { setRespostaSugerida, setTabulacao, setTabulacaoDisplay, setError, setWaitingReason },
+        result,
+      );
     } catch (err) {
       if (controller.signal.aborted) return;
       const status = err?.response?.status;
-      const msg = formatSuggestError(err);
+      const msg = err?.response?.data?.error || err?.message || 'Falha ao gerar sugestão';
       if (status === 503) {
         serviceUnavailableRef.current = true;
-        setServiceConfigured(false);
-        setWaitingReason('service_unconfigured');
-        logTicketAi('error', '503 — OpenAI não configurado no servidor.', err?.response?.data);
-      } else {
-        logTicketAi('error', `Falha na sugestão (HTTP ${status || '—'}).`, {
-          message: msg,
-          data: err?.response?.data,
-        });
       }
-      setError(msg);
+      const fallback = buildDevSuggestionResult(payload);
+      if (fallback) {
+        cacheRef.current.set(hash, fallback);
+        applySuggestionResult(
+          { setRespostaSugerida, setTabulacao, setTabulacaoDisplay, setError, setWaitingReason },
+          fallback,
+        );
+        return;
+      }
+      setError(status === 503 ? 'Serviço de IA não configurado' : msg);
       setRespostaSugerida('');
       setTabulacao(null);
       setTabulacaoDisplay('');
@@ -319,31 +283,21 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     }
 
     if (!ticket) {
-      logTicketAi('info', 'Sem ticket ativo — estado IA resetado.');
       setLoading(false);
       setError(null);
       setRespostaSugerida('');
       setTabulacao(null);
       setTabulacaoDisplay('');
       setWaitingReason(null);
+      serviceUnavailableRef.current = false;
+      prevTicketIdRef.current = null;
       return undefined;
     }
 
-    const ticketId = ticket.id || ticket._id;
-    logTicketAi('info', 'Contexto do ticket atualizado.', {
-      ticketId,
-      canFetch,
-      contextSource,
-      canal,
-      isPhone,
-      serviceConfigured,
-      clientMsgs: convMsgs?.filter((m) => m.type === 'client')?.length || 0,
-    });
-
-    if (serviceUnavailableRef.current) {
-      setLoading(false);
-      logTicketAi('warn', 'Aguardando correção no servidor — sugestão IA bloqueada.', { ticketId });
-      return undefined;
+    const ticketId = String(ticket.id || ticket._id || '');
+    if (prevTicketIdRef.current !== ticketId) {
+      prevTicketIdRef.current = ticketId;
+      serviceUnavailableRef.current = false;
     }
 
     if (!canFetch) {
@@ -352,13 +306,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       setRespostaSugerida('');
       setTabulacao(null);
       setTabulacaoDisplay('');
-      const reason = isPhone ? 'awaiting_internal_note' : 'awaiting_client_message';
-      setWaitingReason(reason);
-      logTicketAi('info', 'Pré-requisito não atendido — sugestão não será solicitada ainda.', {
-        ticketId,
-        reason,
-        internalPlainChars: internalPlain.length,
-      });
+      setWaitingReason(isPhone ? 'awaiting_internal_note' : 'awaiting_client_message');
       return undefined;
     }
 
@@ -371,7 +319,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       contextSource,
     });
 
-    logTicketAi('info', `Agendando fetch em ${debounceMs}ms…`, { ticketId, contextHash: hashPreview(contextHash) });
+    setLoading(true);
     debounceRef.current = setTimeout(() => {
       fetchSuggestions(contextHash, payload);
     }, debounceMs);
@@ -386,14 +334,12 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     ticket,
     canFetch,
     isPhone,
-    canal,
     contextHash,
     contextSource,
     convMsgs,
     internalPlain,
     rightFields,
     fetchSuggestions,
-    serviceConfigured,
   ]);
 
   useEffect(() => () => {
@@ -413,14 +359,10 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     waitingMessage,
     canFetch,
     tabulacaoIncomplete,
-    serviceConfigured,
     hasSuggestion: Boolean(respostaSugerida && !error),
-    showIaBar: Boolean(canFetch || waitingReason || loading || error),
+    hasTabulationSuggestion: Boolean(
+      hasApplyableTabulation(tabulacao) || parseTabulationDisplay(tabulacaoDisplay),
+    ),
+    showIaBar: Boolean(canFetch || waitingReason || loading),
   };
-}
-
-function hashPreview(hash) {
-  const text = String(hash || '');
-  if (text.length <= 48) return text;
-  return `${text.slice(0, 24)}…${text.slice(-12)}`;
 }

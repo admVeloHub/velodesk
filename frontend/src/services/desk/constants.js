@@ -55,7 +55,14 @@ export const ESCALONAR_OPTIONS = [
 export const SLA_LABELS = {
   ok: 'Dentro do prazo',
   warning: 'Atenção — SLA',
-  critical: 'SLA crítico'
+  critical: 'SLA crítico',
+};
+
+/** Rótulo curto exibido no card da fila */
+export const SLA_SHORT_LABELS = {
+  ok: 'No prazo',
+  warning: 'Atenção',
+  critical: 'Crítico',
 };
 
 /** Corretor ortográfico do compose — desativado enquanto revisão IA for obrigatória */

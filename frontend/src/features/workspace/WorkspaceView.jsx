@@ -1,6 +1,6 @@
 /**
- * Painel 360° — roteamento por perfil
- * VERSION: v2.3.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * Painel 360° — roteamento por perfil (Agente / Gestão / Workflow)
+ * VERSION: v2.4.0 | DATE: 2026-07-13 | AUTHOR: VeloHub Development Team
  */
 import React, { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
@@ -9,11 +9,20 @@ import { computeAgent360View } from '../../services/workspace/deskData';
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 import Workspace360Header from './components/ws360/Workspace360Header';
 import AgentPanel from './AgentPanel';
-import SupervisorPanel from './SupervisorPanel';
+import GestaoPanel from './GestaoPanel';
+import WorkflowPanel from './WorkflowPanel';
+
+function resolveWorkspacePanel(profileId) {
+  if (profileId === 'gestao') return GestaoPanel;
+  if (profileId === 'workflow') return WorkflowPanel;
+  return AgentPanel;
+}
 
 export default function WorkspaceView() {
   const { profileId } = useProfile();
   const { user } = useAuth();
+  const Panel = resolveWorkspacePanel(profileId);
+
   const header = useMemo(() => {
     const view = computeAgent360View();
     const agentName = getDeskDisplayName(user) || view.agentName || '';
@@ -33,7 +42,7 @@ export default function WorkspaceView() {
             agentName={header.agentName}
             dateTimeLabel={header.dateTimeLabel}
           />
-          {profileId === 'supervisor' ? <SupervisorPanel /> : <AgentPanel />}
+          <Panel />
         </div>
       </div>
     </div>

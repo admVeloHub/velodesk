@@ -76,6 +76,19 @@ export default function DeskConversation({
         </div>
       ) : (
         thread.map((msg, i) => {
+          if (msg.type === 'system') {
+            const isWorkflowInfo = /Pedido de informação/i.test(String(msg.text || ''));
+            return (
+              <div key={i} className="msg-row msg-row--system">
+                <div className="msg-body msg-body--system">
+                  <div className={'msg-bubble msg-bubble--system' + (isWorkflowInfo ? ' msg-bubble--workflow-info' : '')}>
+                    <MessageBubbleText text={msg.text} />
+                  </div>
+                  {msg.meta ? <div className="msg-meta">{msg.meta}</div> : null}
+                </div>
+              </div>
+            );
+          }
           const isRight = msg.type === 'agent' || msg.type === 'internal';
           return (
           <div key={i} className={'msg-row' + (isRight ? ' msg-row--agent' : '')}>

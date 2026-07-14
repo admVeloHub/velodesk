@@ -1,15 +1,18 @@
-/**
+﻿/**
  * Abas de tickets abertos
- * VERSION: v2.0.0 | DATE: 2026-06-18
+ * VERSION: v2.1.0 | DATE: 2026-07-13
  */
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTickets } from '../context/TicketsContext';
+import { useProfile } from '../context/ProfileContext';
 
 export default function TicketTabsBar() {
   const navigate = useNavigate();
   const { openTabs, activeTabId, closeTicketTab, setActiveTabId } = useTickets();
-  if (!openTabs.length) return null;
+  const { profileId } = useProfile();
+
+  if (profileId === 'workflow' || !openTabs.length) return null;
 
   return (
     <div className="ticket-tabs-bar" id="ticketTabsBar">

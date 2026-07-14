@@ -1,20 +1,49 @@
 /**
- * DeskInternalNotesPanel v1.5.0 — Realizado por por evento (registro.autor)
- * VERSION: v1.5.0 | DATE: 2026-07-07
+ * DeskInternalNotesPanel v1.4.0 — Notas: supervisor (registro agente) / agente (só internas)
+ * VERSION: v1.4.0 | DATE: 2026-07-03
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import {
   buildClientInternalNotesFeed,
+  formatInternalNoteTimestamp,
   formatRegistroOccurrenceTimestamp,
 } from '../../../services/desk/utils';
+import { useProfile } from '../../../context/ProfileContext';
 
 const KIND_META = {
+  agent: { icon: null, useInitials: true },
+  ai: { icon: 'ti ti-sparkles' },
+  system: { icon: 'ti ti-terminal-2' },
+  sla: { icon: 'ti ti-alert-triangle' },
   registro: { icon: 'ti ti-history' },
+  workflow: { icon: 'ti ti-message-question' },
 };
 
 function isSameTicketNote(note, ticket) {
   const noteId = String(note.ticketId ?? '');
   return noteId === String(ticket?.id ?? '') || noteId === String(ticket?._id ?? '');
+}
+
+function NoteBody({ body, boldSegments }) {
+  if (!boldSegments?.length) {
+    return <p className="crm-note-card__body">{body}</p>;
+  }
+
+  let segments = [body];
+  boldSegments.forEach((bold) => {
+    segments = segments.flatMap((part, partIdx) => {
+      if (typeof part !== 'string') return [part];
+      return part.split(bold).flatMap((chunk, idx, arr) => {
+        const items = [chunk];
+        if (idx < arr.length - 1) {
+          items.push(<strong key={`${bold}-${partIdx}-${idx}`}>{bold}</strong>);
+        }
+        return items;
+      });
+    });
+  });
+
+  return <p className="crm-note-card__body">{segments}</p>;
 }
 
 function formatTabulationChange(item) {
@@ -64,7 +93,14 @@ function RegistroOccurrenceBody({ note }) {
 }
 
 function NoteAvatar({ note }) {
-  const meta = KIND_META[note.kind] || KIND_META.registro;
+  const meta = KIND_META[note.kind] || KIND_META.agent;
+  if (meta.useInitials) {
+    return (
+      <span className="crm-note-card__avatar" aria-hidden="true">
+        {String(note.initials || note.author || '??').slice(0, 2).toUpperCase()}
+      </span>
+    );
+  }
   return (
     <span className="crm-note-card__avatar crm-note-card__avatar--icon" aria-hidden="true">
       <i className={meta.icon} />
@@ -73,15 +109,29 @@ function NoteAvatar({ note }) {
 }
 
 export default function DeskInternalNotesPanel({ ticket, client }) {
+  const { profileId } = useProfile();
+  const supervisorView = profileId === 'gestao';
+  const [infoRevision, setInfoRevision] = useState(0);
+
+  useEffect(() => {
+    const onInfoChanged = () => setInfoRevision((value) => value + 1);
+    window.addEventListener('velodesk:workflow-info-changed', onInfoChanged);
+    return () => window.removeEventListener('velodesk:workflow-info-changed', onInfoChanged);
+  }, []);
+
   const notes = useMemo(
-    () => buildClientInternalNotesFeed(ticket, client),
-    [ticket, client],
+    () => buildClientInternalNotesFeed(ticket, client, { supervisorView }),
+    [ticket, client, supervisorView, infoRevision],
   );
+
+  const formatTimestamp = supervisorView
+    ? formatRegistroOccurrenceTimestamp
+    : formatInternalNoteTimestamp;
 
   if (!notes.length) {
     return (
       <div className="crm-internal-notes crm-internal-notes--empty">
-        <p>Nenhuma anotação ou alteração registrada neste ticket.</p>
+        <p>{supervisorView ? 'Nenhuma anotação ou alteração de agente registrada.' : 'Nenhuma nota interna registrada.'}</p>
       </div>
     );
   }
@@ -99,18 +149,34 @@ export default function DeskInternalNotesPanel({ ticket, client }) {
                   <NoteAvatar note={note} />
                   <div className="crm-note-card__meta">
                     <strong className="crm-note-card__author">{note.badge}</strong>
+                    {!supervisorView ? (
+                      <span className={`crm-note-card__badge crm-note-card__badge--${note.kind}`}>
+                        {note.author}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 <time className="crm-note-card__time" dateTime={note.timestamp}>
-                  {formatRegistroOccurrenceTimestamp(note.timestamp)}
+                  {formatTimestamp(note.timestamp)}
                 </time>
               </header>
-              {note.ticketTitle && !isSameTicketNote(note, ticket) ? (
+              {!supervisorView && note.ticketTitle && !isSameTicketNote(note, ticket) ? (
                 <p className="crm-note-card__ticket-ref">
                   Ticket #{note.ticketId} · {note.ticketTitle}
                 </p>
               ) : null}
-              <RegistroOccurrenceBody note={note} />
+              {supervisorView && note.kind === 'registro' ? (
+                <RegistroOccurrenceBody note={note} />
+              ) : (
+                <NoteBody body={note.body} boldSegments={note.boldSegments} />
+              )}
+              {!supervisorView && note.tags?.length ? (
+                <div className="crm-note-card__tags">
+                  {note.tags.map((tag) => (
+                    <span key={tag} className="crm-note-card__tag">{tag}</span>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </article>
         </React.Fragment>

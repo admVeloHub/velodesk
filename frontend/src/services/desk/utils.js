@@ -1,10 +1,21 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v2.10.0 | DATE: 2026-07-07
+ * VERSION: v3.0.0 | DATE: 2026-07-08
  */
 import { getKanbanColumns, saveKanbanColumns, getAllCockpitTickets } from '../kanbanStorage';
+import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
 import { ticketMatchesAgentResponsavel } from './responsavelSegmentation';
 import { lookupClient, getAgentName } from '../clientDb';
+import {
+  advanceWorkflowStep,
+  buildEscalonarWorkflowTemplate,
+  buildWorkflowAdvanceMessage,
+  createWorkflowState,
+  evaluateWorkflowAutoAdvance,
+  getWorkflowTeamLabel,
+  getWorkflowTemplateById,
+  resolveWorkflowForTicket,
+} from './workflowDefinitions';
 
 export function escapeHtml(str) {
   return String(str || '')
@@ -92,7 +103,6 @@ export function statusMeta(queueId) {
     novos: { label: 'Novo', cls: 'novo' },
     pendente: { label: 'Pendente', cls: 'pendente' },
     resolvidos: { label: 'Resolvido', cls: 'resolvido' },
-    cancelado: { label: 'Cancelado', cls: 'cancelado' },
   };
   return map[queueId] || { label: 'Em andamento', cls: 'andamento' };
 }
@@ -100,10 +110,11 @@ export function statusMeta(queueId) {
 export function buildTags(ticket) {
   const tags = [];
   const lf = ticket.lateralForm || {};
+  if (isTicketInWorkflow(ticket)) tags.push('Workflow');
   if (lf.produto) tags.push(lf.produto.replace(/Internet\s+/i, '').trim() || lf.produto);
   if (lf.motivo) tags.push(lf.motivo);
   if (!tags.length && ticket.priority) tags.push(ticket.priority);
-  return tags.slice(0, 3);
+  return tags.slice(0, 4);
 }
 
 export function getClientContactFields(ticket, client) {
@@ -137,6 +148,43 @@ export function getClientProducts(ticket, client) {
   if (prod && products.indexOf(prod) < 0) products.unshift(prod);
   if (!products.length && prod) return [prod];
   return products;
+}
+
+function normalizeClientProductEntry(entry) {
+  if (typeof entry === 'string') {
+    const name = entry.trim();
+    return name ? { name, active: true } : null;
+  }
+  if (entry && typeof entry === 'object') {
+    const name = String(entry.nome || entry.produto || entry.name || '').trim();
+    if (!name) return null;
+    return { name, active: entry.ativo !== false && entry.active !== false };
+  }
+  return null;
+}
+
+/** Produtos com contrato ativo — exclui itens marcados como inativos no cadastro */
+export function getClientActiveProducts(ticket, client) {
+  if (Array.isArray(client?.produtosAtivos) && client.produtosAtivos.length) {
+    return client.produtosAtivos
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : String(entry?.nome || entry?.produto || '').trim()))
+      .filter(Boolean);
+  }
+
+  const seen = new Set();
+  const list = [];
+
+  (client?.produtos || []).forEach((entry) => {
+    const normalized = normalizeClientProductEntry(entry);
+    if (!normalized?.active || seen.has(normalized.name)) return;
+    seen.add(normalized.name);
+    list.push(normalized.name);
+  });
+
+  const ticketProd = String(ticket?.lateralForm?.produto || '').trim();
+  if (ticketProd && !seen.has(ticketProd)) list.unshift(ticketProd);
+
+  return list;
 }
 
 export function buildIaReply(ticket) {
@@ -211,6 +259,243 @@ export function getTicketOperationAreaLabel(ticket) {
   if (activeStep === 2 && workflowArea) return workflowArea;
   if (activeStep === 3) return 'N1 — Finalização';
   return 'N1';
+}
+
+export function isTicketInWorkflow(ticket) {
+  return Boolean(ticket?.lateralForm?.workflow?.templateId);
+}
+
+export function getWorkflowTemplateForTicket(ticket) {
+  const wf = ticket?.lateralForm?.workflow;
+  if (!wf?.templateId) return null;
+  return getWorkflowTemplateById(wf.templateId)
+    || (wf.templateId.startsWith('escalonar-') ? buildEscalonarWorkflowTemplate(wf.templateId.replace('escalonar-', '')) : null);
+}
+
+function formatDurationMs(ms) {
+  if (ms <= 0) return '0min';
+  const totalMin = Math.ceil(ms / 60000);
+  const hours = Math.floor(totalMin / 60);
+  const minutes = totalMin % 60;
+  if (hours > 0) return `${hours}h ${minutes}min`;
+  return `${minutes}min`;
+}
+
+function getStepStartedAt(workflow, stepId) {
+  const entry = (workflow?.stepHistory || []).find((h) => h.stepId === stepId);
+  return entry?.at || workflow?.startedAt || null;
+}
+
+export function getWorkflowProgress(ticket) {
+  const workflow = ticket?.lateralForm?.workflow;
+  const template = getWorkflowTemplateForTicket(ticket);
+  if (!workflow || !template) return null;
+
+  const currentStepId = workflow.currentStepId || template.defaultActiveStepId;
+  const currentIndex = template.steps.findIndex((s) => s.id === currentStepId);
+  const activeStepIndex = currentIndex >= 0 ? currentIndex : 0;
+  const activeStep = template.steps[activeStepIndex];
+
+  const completedIds = new Set(
+    (workflow.stepHistory || [])
+      .filter((h) => h.status === 'completed')
+      .map((h) => h.stepId),
+  );
+
+  const stepsWithState = template.steps.map((step, index) => {
+    let state = 'pending';
+    if (completedIds.has(step.id)) state = 'completed';
+    else if (step.id === currentStepId) state = 'active';
+    else if (index < activeStepIndex) state = 'completed';
+
+    const historyEntry = (workflow.stepHistory || []).find((h) => h.stepId === step.id);
+    return {
+      ...step,
+      state,
+      teamLabel: getWorkflowTeamLabel(step.team),
+      completedAt: historyEntry?.status === 'completed' ? historyEntry.at : null,
+    };
+  });
+
+  let slaRemainingMs = null;
+  let slaTotalHours = null;
+  if (activeStep?.slaHours) {
+    slaTotalHours = activeStep.slaHours;
+    const startedAt = getStepStartedAt(workflow, activeStep.id);
+    if (startedAt) {
+      const deadline = new Date(startedAt).getTime() + activeStep.slaHours * 3600000;
+      slaRemainingMs = Math.max(0, deadline - Date.now());
+    }
+  }
+
+  const externalTeamActive = activeStep && !['n1', 'agent'].includes(activeStep.team);
+
+  return {
+    workflow,
+    template,
+    activeStepIndex,
+    activeStep,
+    stepsWithState,
+    slaRemainingMs,
+    slaRemainingLabel: slaRemainingMs != null ? formatDurationMs(slaRemainingMs) : null,
+    slaTotalHours,
+    externalTeamActive,
+    awaitingTeamLabel: externalTeamActive ? getWorkflowTeamLabel(activeStep.team) : null,
+    composeLocked: Boolean(externalTeamActive),
+  };
+}
+
+export function buildWorkflowSystemMessage(template, escalonar) {
+  if (escalonar) {
+    return `Workflow **${template.title}** iniciado após encaminhamento do ticket.`;
+  }
+  return `Workflow **${template.title}** iniciado automaticamente com base na classificação do ticket.`;
+}
+
+export function maybeActivateWorkflowForTicket(ticket, rightFields, escalonar, author) {
+  const lf = ticket.lateralForm || {};
+  if (lf.workflow?.templateId) {
+    return { activated: false, workflow: lf.workflow, template: getWorkflowTemplateForTicket(ticket) };
+  }
+
+  let template = resolveWorkflowForTicket(ticket, rightFields);
+  if (!template && escalonar) {
+    template = buildEscalonarWorkflowTemplate(escalonar);
+  }
+  if (!template) {
+    return { activated: false, workflow: null, template: null };
+  }
+
+  const workflow = createWorkflowState(template, {
+    by: author || getAgentName() || 'sistema',
+    trigger: escalonar ? 'escalonar' : 'tabulation',
+  });
+  return { activated: true, workflow, template };
+}
+
+function pushWorkflowSystemMessage(ticket, text) {
+  const ts = new Date().toISOString();
+  if (!ticket.messages) ticket.messages = [];
+  ticket.messages.push({
+    id: `wf-sys-${Date.now()}`,
+    type: 'system',
+    fromClient: false,
+    origin: 'sistema',
+    text,
+    timestamp: ts,
+    author: 'Sistema',
+  });
+}
+
+/** Ativa workflow no encaminhamento/commit e aplica avanço automático por status */
+export function syncTicketWorkflowOnCommit(ticket, rightFields, escalonar, statusId, author) {
+  if (!ticket) return { activated: false, advanced: false };
+
+  const lf = ticket.lateralForm || {};
+  let workflow = lf.workflow;
+  let template = getWorkflowTemplateForTicket(ticket);
+  let activated = false;
+  let advanced = false;
+
+  if (!workflow?.templateId) {
+    const activation = maybeActivateWorkflowForTicket(ticket, rightFields, escalonar, author);
+    if (activation.activated && activation.workflow && activation.template) {
+      workflow = activation.workflow;
+      template = activation.template;
+      activated = true;
+    }
+  }
+
+  if (workflow?.templateId && !template) {
+    template = getWorkflowTemplateById(workflow.templateId)
+      || (workflow.templateId.startsWith('escalonar-')
+        ? buildEscalonarWorkflowTemplate(workflow.templateId.replace('escalonar-', ''))
+        : null);
+  }
+
+  if (workflow && template && workflow.status !== 'completed') {
+    const auto = evaluateWorkflowAutoAdvance(workflow, template, { statusId });
+    if (auto.advanced) {
+      workflow = auto.workflow;
+      advanced = true;
+      const prevId = auto.previousStepId;
+      const nextId = auto.nextStepId;
+      if (prevId) {
+        pushWorkflowSystemMessage(
+          ticket,
+          buildWorkflowAdvanceMessage(template, prevId, nextId, author),
+        );
+      }
+    }
+  }
+
+  if (workflow) {
+    ticket.lateralForm = { ...lf, workflow, escalonar: escalonar || lf.escalonar };
+  }
+
+  if (activated && template) {
+    injectWorkflowSystemMessage(ticket, template, escalonar);
+  }
+
+  return { activated, advanced, workflow, template };
+}
+
+export function advanceTicketWorkflow(ticket, author) {
+  const lf = ticket?.lateralForm || {};
+  const workflow = lf.workflow;
+  const template = getWorkflowTemplateForTicket(ticket);
+  if (!workflow || !template || workflow.status === 'completed') {
+    return { advanced: false, completed: false };
+  }
+
+  const result = advanceWorkflowStep(workflow, template, {
+    by: author || getAgentName() || 'sistema',
+    trigger: 'manual',
+  });
+
+  if (!result.advanced) return { advanced: false, completed: false };
+
+  ticket.lateralForm = { ...lf, workflow: result.workflow };
+  pushWorkflowSystemMessage(
+    ticket,
+    buildWorkflowAdvanceMessage(template, result.previousStepId, result.nextStepId, author),
+  );
+
+  return {
+    advanced: true,
+    completed: result.completed,
+    workflow: result.workflow,
+    template,
+  };
+}
+
+export function injectWorkflowSystemMessage(ticket, template, escalonar) {
+  if (!ticket || !template) return ticket;
+  const lf = ticket.lateralForm || {};
+  if (lf.workflow?.systemMessageInjected) return ticket;
+
+  const text = buildWorkflowSystemMessage(template, escalonar);
+  const ts = new Date().toISOString();
+  if (!ticket.messages) ticket.messages = [];
+  ticket.messages.push({
+    id: `wf-sys-${Date.now()}`,
+    type: 'system',
+    fromClient: false,
+    origin: 'sistema',
+    text,
+    timestamp: ts,
+    author: 'Sistema',
+  });
+
+  ticket.lateralForm = {
+    ...lf,
+    workflow: {
+      ...(lf.workflow || {}),
+      systemMessage: text,
+      systemMessageInjected: true,
+    },
+  };
+  return ticket;
 }
 
 export function getCascadeCategoryLabel(id) {
@@ -415,28 +700,113 @@ function parseRegistroSortKey(id) {
   return { index: Number(match[1]), part: match[2] === 'pub' ? 0 : 1 };
 }
 
+function isWorkflowInfoNoteText(text) {
+  return /^\[Workflow\].*Pedido de informação/i.test(String(text || '').trim());
+}
+
+function buildWorkflowInfoThreadEntries(ticket, mapped) {
+  const entries = [];
+  const existingTexts = new Set(mapped.map((m) => String(m.text || '').trim()));
+
+  const wf = ticket?.lateralForm?.workflow;
+  if (wf?.infoRequestedAt && wf?.infoRequestNote) {
+    const author = wf.infoRequestedBy || 'Operador Workflow';
+    const progress = getWorkflowProgress(ticket);
+    const stepLabel = progress?.activeStep?.label || 'Aprovação';
+    const text = `[Workflow] Pedido de informação — ${author} (${stepLabel}): ${wf.infoRequestNote}`;
+    if (!existingTexts.has(text)) {
+      entries.push({
+        type: 'system',
+        text,
+        meta: 'Pedido de info · Workflow',
+        timestamp: wf.infoRequestedAt,
+      });
+      existingTexts.add(text);
+    }
+  }
+
+  getWorkflowInfoRequestsForTicket(ticket).forEach((req) => {
+    const text = `[Workflow] Pedido de informação — ${req.requestedBy} (${req.stepLabel}): ${req.message}`;
+    if (existingTexts.has(text)) return;
+    entries.push({
+      type: 'system',
+      text,
+      meta: 'Pedido de info · Workflow',
+      timestamp: req.createdAt,
+    });
+    existingTexts.add(text);
+  });
+
+  return entries;
+}
+
+function mapAgentInternalNote(note, ticket) {
+  const text = String(note.text || '').trim();
+  if (!text) return null;
+
+  const isWorkflowInfo = isWorkflowInfoNoteText(text);
+  const author = note.author || 'Agente';
+
+  return {
+    id: note.id || `int-${note.timestamp}`,
+    kind: isWorkflowInfo ? 'workflow' : 'agent',
+    author: isWorkflowInfo ? (note.author || 'Workflow') : author,
+    initials: isWorkflowInfo ? 'WF' : getInitials(author),
+    badge: isWorkflowInfo ? 'Pedido de info' : 'Interna',
+    timestamp: note.timestamp || ticket.updatedAt,
+    body: isWorkflowInfo ? text.replace(/^\[Workflow\]\s*/i, '') : text,
+    tags: isWorkflowInfo ? ['Workflow'] : [],
+    ticketId: String(ticket.id || ticket._id),
+    ticketTitle: getTicketTitle(ticket),
+    boldSegments: [],
+  };
+}
+
 export function buildRegistroThread(ticket) {
   if (!ticket) return [];
 
+  const wf = ticket?.lateralForm?.workflow;
+  const workflowSystem = wf?.systemMessage
+    ? [{
+      type: 'system',
+      text: wf.systemMessage,
+      meta: 'Sistema',
+      timestamp: wf.startedAt || ticket.createdAt,
+    }]
+    : [];
+
   const raw = (ticket.messages || [])
     .filter((m) => {
-      if (!m || m.type === 'system' || m.type === 'internal') return false;
+      if (!m || m.type === 'internal') return false;
+      if (m.type === 'system') return Boolean(String(m.text || m.message || '').trim());
       const text = String(m.text || m.message || '').trim();
       return Boolean(text);
     })
-    .map((m) => ({ ...m, _kind: 'public' }));
+    .map((m) => {
+      if (m.type === 'system') {
+        return {
+          type: 'system',
+          text: String(m.text || m.message || '').trim(),
+          meta: 'Sistema',
+          timestamp: m.timestamp || m.time || m.createdAt,
+        };
+      }
+      return { ...m, _kind: 'public' };
+    });
 
   raw.sort((a, b) => {
     const tsA = new Date(a.timestamp || a.time || a.createdAt || 0).getTime();
     const tsB = new Date(b.timestamp || b.time || b.createdAt || 0).getTime();
     if (tsA !== tsB) return tsA - tsB;
+    if (a.type === 'system' || b.type === 'system') return 0;
     const keyA = parseRegistroSortKey(a.id);
     const keyB = parseRegistroSortKey(b.id);
     if (keyA.index !== keyB.index) return keyA.index - keyB.index;
     return keyA.part - keyB.part;
   });
 
-  return raw.map((m) => {
+  const mapped = raw.map((m) => {
+    if (m.type === 'system') return m;
     const origin = m.origin || (m.sender === 'them' ? 'cliente' : 'agente');
     const isClient = (
       origin === 'cliente'
@@ -457,6 +827,17 @@ export function buildRegistroThread(ticket) {
       timestamp: ts,
     };
   });
+
+  const infoEntries = buildWorkflowInfoThreadEntries(ticket, mapped);
+  const combined = [...mapped, ...infoEntries].sort(
+    (a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0),
+  );
+
+  const hasSystem = combined.some((m) => m.type === 'system');
+  if (!hasSystem && workflowSystem.length) {
+    return [...workflowSystem, ...combined];
+  }
+  return combined;
 }
 
 export function getClientAnalise(client) {
@@ -659,13 +1040,72 @@ function mapSupervisorRegistroOccurrence(entry, ticket, client, previousTabulati
   };
 }
 
+function buildAgentInternalNotesFeed(ticket) {
+  const merged = [];
+  const seen = new Set();
+
+  normalizeTicketForDeskV2(ticket);
+  const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
+  historico.forEach((entry) => {
+    if (!isAgentRegistroEntry(entry)) return;
+    const text = String(entry.anotacaoInterna ?? '').trim();
+    if (!text) return;
+
+    const mapped = {
+      id: `${ticket.id || ticket._id}:${entry.id}`,
+      kind: 'agent',
+      author: resolveRegistroAutorLabel(entry, ticket, null),
+      initials: getInitials(resolveRegistroAutorLabel(entry, ticket, null)),
+      badge: 'Interna',
+      timestamp: entry.time || entry.timestamp || ticket.updatedAt,
+      body: text,
+      tags: [],
+      ticketId: String(ticket.id || ticket._id),
+      ticketTitle: getTicketTitle(ticket),
+      boldSegments: [],
+    };
+    if (seen.has(mapped.id)) return;
+    seen.add(mapped.id);
+    merged.push(mapped);
+  });
+
+  (ticket.internalNotes || []).forEach((note) => {
+    const mappedNote = mapAgentInternalNote(note, ticket);
+    if (!mappedNote || seen.has(mappedNote.id)) return;
+    seen.add(mappedNote.id);
+    merged.push(mappedNote);
+  });
+
+  getWorkflowInfoRequestsForTicket(ticket).forEach((req) => {
+    const id = req.id || `wf-req-${req.createdAt}`;
+    if (seen.has(id)) return;
+    seen.add(id);
+    merged.push({
+      id,
+      kind: 'workflow',
+      author: req.requestedBy || 'Workflow',
+      initials: 'WF',
+      badge: 'Pedido de info',
+      timestamp: req.createdAt,
+      body: `${req.message} (${req.stepLabel || 'Aprovação'})`,
+      tags: ['Workflow'],
+      ticketId: String(ticket.id || ticket._id),
+      ticketTitle: getTicketTitle(ticket),
+      boldSegments: [],
+    });
+  });
+
+  merged.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  return merged;
+}
+
 function isGenericRegistroAutorLabel(value) {
   const normalized = String(value ?? '').trim().toLowerCase();
   return !normalized || normalized === 'agente' || normalized === 'agent';
 }
 
 function resolveRegistroAutorLabel(entry, ticket, client) {
-  const stored = String(entry.autor ?? entry.author ?? '').trim();
+  const stored = String(entry.autor ?? '').trim();
   if (stored && !isGenericRegistroAutorLabel(stored)) return stored;
 
   const origin = entry.origin || 'agente';
@@ -673,7 +1113,7 @@ function resolveRegistroAutorLabel(entry, ticket, client) {
     return ticket?.clientName || ticket?.solicitante || client?.name || 'Cliente';
   }
 
-  return '—';
+  return getAgentName() || '—';
 }
 
 function buildSupervisorRegistroFeed(ticket, client) {
@@ -705,9 +1145,15 @@ function buildSupervisorRegistroFeed(ticket, client) {
   return merged;
 }
 
-export function buildClientInternalNotesFeed(ticket, client) {
+export function buildClientInternalNotesFeed(ticket, client, options = {}) {
+  const { supervisorView = false } = options;
   if (!ticket) return [];
-  return buildSupervisorRegistroFeed(ticket, client);
+
+  if (supervisorView) {
+    return buildSupervisorRegistroFeed(ticket, client);
+  }
+
+  return buildAgentInternalNotesFeed(ticket);
 }
 
 export function applySendStatus(entry, queueId) {
@@ -715,7 +1161,6 @@ export function applySendStatus(entry, queueId) {
     'em-andamento': { box: 'em-andamento', status: 'em-aberto' },
     pendente: { box: 'em-espera', status: 'pendente' },
     resolvidos: { box: 'resolvidos', status: 'resolvido' },
-    cancelado: { box: 'resolvidos', status: 'cancelado' },
   };
   const cfg = statusMap[queueId] || statusMap['em-andamento'];
   entry.ticket.status = cfg.status;

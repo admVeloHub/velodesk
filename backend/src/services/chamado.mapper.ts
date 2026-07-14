@@ -1,4 +1,4 @@
-﻿/** chamado.mapper v1.8.6 — expõe clienteId no ticket para edição de contato */
+/** chamado.mapper v1.8.5 — novos sem responsavel visíveis para todos os agentes */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -47,6 +47,30 @@ function registroMetadados(reg: IRegistro): Record<string, unknown> {
     return legacy;
   }
   return {};
+}
+
+function findLatestWorkflowFromRegistro(chamado: IChamadoN1): Record<string, unknown> | null {
+  const registros = chamado.registro ?? [];
+  for (let i = registros.length - 1; i >= 0; i -= 1) {
+    const meta = registroMetadados(registros[i]);
+    const workflow = meta.workflow;
+    if (workflow && typeof workflow === 'object' && !Array.isArray(workflow)) {
+      return workflow as Record<string, unknown>;
+    }
+  }
+  return null;
+}
+
+function findLatestApprovalFromRegistro(chamado: IChamadoN1): Record<string, unknown> | null {
+  const registros = chamado.registro ?? [];
+  for (let i = registros.length - 1; i >= 0; i -= 1) {
+    const meta = registroMetadados(registros[i]);
+    const approval = meta.approval;
+    if (approval && typeof approval === 'object' && !Array.isArray(approval)) {
+      return approval as Record<string, unknown>;
+    }
+  }
+  return null;
 }
 
 export function resolveRegistroOrigin(reg: IRegistro): RegistroOrigin {
@@ -200,7 +224,6 @@ export interface TicketDto {
   boxId?: string;
   clientName?: string;
   clientCPF?: string;
-  clienteId?: string;
   responsibleAgent?: string;
   formData?: Record<string, unknown>;
   lateralForm?: Record<string, unknown>;
@@ -406,9 +429,18 @@ export async function applyBodyToChamado(
 
   const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
   const nextEscalonar = String(lf.escalonar ?? '').trim();
-  const prevWorkflow = String(lf.lastWorkflow ?? '').trim();
-  if (nextEscalonar && nextEscalonar !== prevWorkflow) {
+  const prevWorkflow = findLatestWorkflowFromRegistro(chamado);
+  const nextWorkflow = lf.workflow;
+  const prevWorkflowStr = prevWorkflow ? JSON.stringify(prevWorkflow) : '';
+  const nextWorkflowStr = nextWorkflow ? JSON.stringify(nextWorkflow) : '';
+  const workflowChanged = Boolean(nextWorkflow) && nextWorkflowStr !== prevWorkflowStr;
+
+  if (nextEscalonar && nextEscalonar !== String(lf.lastWorkflow ?? '').trim()) {
     pendingChanges.escalonar = nextEscalonar;
+  }
+
+  if (workflowChanged) {
+    pendingChanges.workflow = nextWorkflow;
   }
 
   if (body.status !== undefined) {
@@ -424,7 +456,9 @@ export async function applyBodyToChamado(
     const nextStatus = String(pendingChanges.status ?? currentStatus(chamado));
     const tab = chamado.tabulacao[0];
     const alteracoesChanges = { ...pendingChanges };
+    const workflowMeta = alteracoesChanges.workflow;
     delete alteracoesChanges.status;
+    delete alteracoesChanges.workflow;
     chamado.registro.push({
       data: new Date(),
       origin: 'agente',
@@ -437,7 +471,7 @@ export async function applyBodyToChamado(
       anotacaoInterna: '',
       anexosAnotacaoInterna: [],
       alteracoes: buildAlteracoesItem(alteracoesChanges),
-      metadados: {},
+      metadados: workflowMeta ? { workflow: workflowMeta } : {},
       status: nextStatus,
     });
   }
@@ -624,7 +658,8 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
     || chamado.chamadoProtocolo;
 
   const clientCpf = ref?.clienteCpf || cadastro?.clienteCpf;
-  const clienteId = ref?.clienteId ? String(ref.clienteId) : undefined;
+  const persistedWorkflow = findLatestWorkflowFromRegistro(chamado);
+  const persistedApproval = findLatestApprovalFromRegistro(chamado);
 
   return {
     _id: chamado._id.toString(),
@@ -639,7 +674,6 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
     boxId,
     clientName,
     clientCPF: clientCpf,
-    clienteId,
     responsibleAgent: tab?.responsavel,
     lateralForm: {
       tipoChamado: tab?.tipoChamado,
@@ -653,8 +687,9 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
       clienteNome: clientName,
       clienteEmail: cadastro?.clienteEmail?.lista ?? [],
       clienteTelefone: cadastro?.clienteTelefone?.lista ?? [],
-      clienteId,
       cpf: clientCpf,
+      workflow: persistedWorkflow ?? undefined,
+      approval: persistedApproval ?? undefined,
     },
     messages,
     internalNotes,

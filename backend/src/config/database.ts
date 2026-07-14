@@ -97,8 +97,9 @@ async function connectDeskConfig(uri: string): Promise<void> {
   console.log(`Atlas desk_config conectado: ${env.mongoDeskConfigDbName}`);
 }
 
-export async function connectDatabase(): Promise<void> {
-  if (!env.mongoUri?.trim()) {
+export async function connectDatabase(uriOverride?: string): Promise<void> {
+  const mongoUri = (uriOverride || env.mongoUri || '').trim();
+  if (!mongoUri) {
     throw new Error('MONGODB_URI ausente');
   }
 
@@ -106,7 +107,7 @@ export async function connectDatabase(): Promise<void> {
   const envSource = (envFile as { source?: string }).source || 'unknown';
   console.log(`[env] backend env: ${envPath} (${envSource})`);
 
-  const { uri: atlasUri, method } = await resolveAtlasSrvUri(env.mongoUri);
+  const { uri: atlasUri, method } = await resolveAtlasSrvUri(mongoUri);
   const options = { dbName: env.mongoDbName, ...MONGO_DRIVER_OPTIONS };
 
   if (!isMongoConnected()) {

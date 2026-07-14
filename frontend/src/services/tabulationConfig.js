@@ -106,6 +106,106 @@ export function applyCascadeFieldChange(prev, key, value) {
   return next;
 }
 
+function normalizeMatchText(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function resolveOptionValue(options, rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) return '';
+  if (!options?.length) return value;
+
+  if (options.includes(value)) return value;
+
+  const normalized = normalizeMatchText(value);
+  const exact = options.find((option) => normalizeMatchText(option) === normalized);
+  if (exact) return exact;
+
+  const partial = options.find((option) => {
+    const candidate = normalizeMatchText(option);
+    return candidate.includes(normalized) || normalized.includes(candidate);
+  });
+  if (partial) return partial;
+
+  const tokenMatch = options.find((option) => {
+    const candidate = normalizeMatchText(option);
+    const valueTokens = normalized.split(/\s+/).filter(Boolean);
+    return valueTokens.length > 0 && valueTokens.every((token) => candidate.includes(token));
+  });
+
+  return tokenMatch || '';
+}
+
+export function hasApplyableTabulation(tabulation) {
+  if (!tabulation) return false;
+  return Boolean(
+    String(tabulation.tipo || tabulation.tipoChamado || tabulation.classificacaoTipo || '').trim()
+    || String(tabulation.produto || '').trim()
+    || String(tabulation.motivo || '').trim()
+    || String(tabulation.detalhe || '').trim()
+  );
+}
+
+/** Converte texto "Tipo → Produto → Motivo → Detalhe" em objeto de tabulação */
+export function parseTabulationDisplay(display) {
+  const text = String(display || '').trim();
+  if (!text || /incompleta|aguardando|gerando|sugestão/i.test(text)) return null;
+  const parts = text.split(/\s*(?:→|->)\s*/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  return {
+    tipo: parts[0] || '',
+    produto: parts[1] || '',
+    motivo: parts[2] || '',
+    detalhe: parts[3] || '',
+  };
+}
+
+/** Preenche rightFields com valores sugeridos pela IA, resolvendo opções da tabulação ativa */
+export function applyTabulationSuggestion(prev, tabulation, config) {
+  if (!tabulation) return { ...(prev || {}) };
+
+  let next = { ...(prev || {}) };
+
+  const tipo = String(
+    tabulation.tipo || tabulation.tipoChamado || tabulation.classificacaoTipo || ''
+  ).trim();
+  if (tipo) next.tipo = tipo;
+
+  const produtoRaw = String(tabulation.produto || '').trim();
+  if (produtoRaw) {
+    const produto = config
+      ? resolveOptionValue(getProdutoNames(config), produtoRaw)
+      : produtoRaw;
+    if (produto) {
+      next = applyCascadeFieldChange(next, 'produto', produto);
+
+      const motivoRaw = String(tabulation.motivo || '').trim();
+      if (motivoRaw) {
+        const motivo = config
+          ? resolveOptionValue(getMotivos(config, produto), motivoRaw)
+          : motivoRaw;
+        if (motivo) {
+          next = applyCascadeFieldChange(next, 'motivo', motivo);
+
+          const detalheRaw = String(tabulation.detalhe || '').trim();
+          if (detalheRaw) {
+            const detalhe = config
+              ? resolveOptionValue(getDetalhes(config, produto, motivo), detalheRaw)
+              : detalheRaw;
+            if (detalhe) next.detalhe = detalhe;
+          }
+        }
+      }
+    }
+  }
+
+  return next;
+}
+
 const SEND_STATUSES_REQUIRING_TABULATION = new Set(['em-andamento', 'resolvidos']);
 
 export function validateTabulationForSendStatus(statusId, rightFields, config) {

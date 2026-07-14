@@ -31,6 +31,14 @@
   margin-bottom: 1.5rem;
 }
 
+.desk-login-dev-hint {
+  margin: 0 0 1rem;
+  color: #6b7280;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .desk-login-error {
   display: flex;
   align-items: flex-start;

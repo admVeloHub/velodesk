@@ -3,19 +3,20 @@
  * VERSION: v1.2.0 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
  */
 import React, { useEffect } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { loadKanbanFromApi } from '../services/ticketsCache';
 
 export default function ProtectedRoute() {
   const { isAuthenticated, authStatus } = useAuth();
+  const location = useLocation();
 
   useEffect(() => {
     if (isAuthenticated) loadKanbanFromApi();
   }, [isAuthenticated]);
 
   if (authStatus !== 'authorized' || !isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   return <Outlet />;

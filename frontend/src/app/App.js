@@ -44,6 +44,7 @@ import ConfigPage from '../pages/ConfigPage';
 import ReportsPage from '../pages/ReportsPage';
 
 import ClientPortalPage from '../pages/ClientPortalPage';
+import WorkflowPage from '../pages/WorkflowPage';
 
 import { initCockpitGlobals } from '../config/cockpitConfig';
 
@@ -74,6 +75,8 @@ function AppRoutes() {
             { index: true, element: React.createElement(DefaultLandingRedirect) },
 
             { path: 'workspace', element: React.createElement(WorkspacePage) },
+
+            { path: 'workflow', element: React.createElement(WorkflowPage) },
 
             { path: 'dashboard', element: React.createElement(DashboardPage) },
 
