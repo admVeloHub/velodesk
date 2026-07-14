@@ -20,6 +20,7 @@ const ACTION_CONFIG = {
 
 export default function WorkflowApprovalActions({
   actions,
+  actionLabels = {},
   busy,
   infoPanelOpen,
   onApprove,
@@ -32,12 +33,17 @@ export default function WorkflowApprovalActions({
     request_info: onRequestInfoOpen,
   };
 
-  const list = (actions || ['approve', 'reject', 'request_info']).filter((id) => ACTION_CONFIG[id]);
+  const list = (actions || ['approve', 'reject', 'request_info']).filter((id) => ACTION_CONFIG[id] || actionLabels[id]);
 
   return (
     <div className="wf-approval-actions">
       {list.map((id) => {
-        const cfg = ACTION_CONFIG[id];
+        const cfg = ACTION_CONFIG[id] || {
+          label: actionLabels[id] || id,
+          icon: 'ti ti-circle',
+          className: 'wf-approval-action',
+        };
+        const label = actionLabels[id] || cfg.label;
         return (
           <button
             key={id}
@@ -48,7 +54,7 @@ export default function WorkflowApprovalActions({
             aria-expanded={id === 'request_info' ? infoPanelOpen : undefined}
           >
             <i className={cfg.icon} aria-hidden="true" />
-            {cfg.label}
+            {label}
           </button>
         );
       })}

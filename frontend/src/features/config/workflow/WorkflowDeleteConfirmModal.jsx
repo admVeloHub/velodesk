@@ -20,7 +20,8 @@ export default function WorkflowDeleteConfirmModal({
 
   if (!workflow) return null;
 
-  const stepsCount = (workflow.steps || []).length;
+  const stepsCount = (workflow?.steps || workflow?.passos || []).length;
+  const title = workflow?.title || workflow?.titulo || 'Workflow';
 
   return (
     <div className="config-modal" role="presentation">
@@ -41,7 +42,7 @@ export default function WorkflowDeleteConfirmModal({
         </header>
         <div className="config-modal__body">
           <p>
-            Ao excluir o workflow <strong>{workflow.title}</strong>, todas as
+            Ao excluir o workflow <strong>{title}</strong>, todas as
             {' '}{stepsCount} etapa(s) configuradas serão removidas.
           </p>
           <p className="config-modal__warning">Esta operação não é reversível.</p>

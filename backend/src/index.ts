@@ -14,6 +14,7 @@ import statsRoutes from './routes/stats.routes';
 import uploadsRoutes from './routes/uploads.routes';
 import clientsRoutes from './routes/clients.routes';
 import tabulationRoutes from './routes/tabulation.routes';
+import workflowsRoutes from './routes/workflows.routes';
 import spellcheckRoutes from './routes/spellcheck.routes';
 import composeRoutes from './routes/compose.routes';
 import ticketAiRoutes from './routes/ticketAi.routes';
@@ -25,7 +26,7 @@ import {
   getOpenAiTicketSuggestStatus,
   isOpenAiTicketSuggestConfigured,
 } from './services/openaiTicketSuggest.service';
-import { seedDevelopmentData, purgeLegacyDemoData } from './services/seed.service';
+import { seedDevelopmentData, purgeAllMockTickets } from './services/seed.service';
 import { getAgentsStatus } from './services/agents/openaiAgent.util';
 import { startGestaoChamadosJob } from './jobs/gestaoChamados.job';
 import { loadEmailTransport } from './services/emailTransport.service';
@@ -114,6 +115,7 @@ app.use('/api', statsRoutes);
 app.use('/api/uploads', uploadsRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/tabulation', tabulationRoutes);
+app.use('/api/workflows', workflowsRoutes);
 app.use('/api/workspace360', workspace360Routes);
 
 if (env.enableWhatsapp) {
@@ -149,7 +151,7 @@ async function tryConnectDatabase(uri?: string): Promise<boolean> {
   try {
     await connectDatabase(targetUri);
     activeMongoUri = targetUri;
-    await purgeLegacyDemoData();
+    await purgeAllMockTickets();
     await seedDevelopmentData();
     console.log('[startup] MongoDB conectado (chamados + cadastros + desk_config).');
     return true;

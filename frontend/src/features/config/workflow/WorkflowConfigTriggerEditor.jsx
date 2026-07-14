@@ -7,11 +7,9 @@ export default function WorkflowConfigTriggerEditor({
   onCancel,
 }) {
   const [pathValues, setPathValues] = useState(() => buildInitialValues(trigger));
-  const [description, setDescription] = useState(trigger?.description || '');
 
   useEffect(() => {
     setPathValues(buildInitialValues(trigger));
-    setDescription(trigger?.description || '');
   }, [trigger]);
 
   const handleSubmit = (event) => {
@@ -22,7 +20,6 @@ export default function WorkflowConfigTriggerEditor({
     onSave({
       type: trigger?.type || 'tabulation',
       path,
-      description: description.trim(),
     });
   };
 
@@ -60,16 +57,6 @@ export default function WorkflowConfigTriggerEditor({
         ))}
       </div>
 
-      <label className="wf-config-trigger-editor__desc-label">
-        Descrição do gatilho
-        <textarea
-          rows={3}
-          value={description}
-          placeholder="Explique quando este workflow deve ser ativado."
-          onChange={(e) => setDescription(e.target.value)}
-        />
-      </label>
-
       <div className="wf-config-trigger-editor__actions">
         <button type="button" className="wf-config-btn wf-config-btn--ghost" onClick={onCancel}>
           Cancelar
@@ -89,8 +76,14 @@ export default function WorkflowConfigTriggerEditor({
 
 function buildInitialValues(trigger) {
   const path = trigger?.path || [];
-  return TRIGGER_PATH_FIELDS.reduce((acc, field, index) => {
-    acc[field.key] = path[index] || '';
+  const fieldMap = {
+    produto: 0,
+    tipo: 1,
+    motivo: 2,
+    detalhe: 3,
+  };
+  return TRIGGER_PATH_FIELDS.reduce((acc, field) => {
+    acc[field.key] = path[fieldMap[field.key]] || '';
     return acc;
   }, {});
 }

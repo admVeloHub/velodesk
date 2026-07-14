@@ -1,4 +1,4 @@
-/** seed.service v1.5.1 — purge demo legado + dev seed admin + tabulacao_campos */
+/** seed.service v1.6.0 — purge mock unificado + seed workflow config */
 import bcrypt from 'bcryptjs';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { User } from '../models/User';
@@ -8,41 +8,56 @@ import {
   DEFAULT_TABULACAO_PRODUTOS,
   invalidateTabulationCache,
 } from './tabulation.service';
-import { seedWorkflowTestTickets } from './workflowTestSeed.service';
+import { WORKFLOW_TEST_PROTOCOL_PREFIX } from './workflowTestSeed.service';
+import { seedWorkflowConfig } from './workflowConfigSeed.service';
 import { env } from '../config/env';
 
 const DEMO_CPFS = ['12345678901', '11122233300'];
 
-/** Remove resíduos do seed antigo (Maria Silva, CPF teste, etc.) em chamados_n1 e clientes */
-export async function purgeLegacyDemoData() {
+const TEST_CLIENT_CPFS = [
+  '90100000001', '90100000002', '90100000003', '90100000004', '90100000005',
+  '90100000006', '90100000007', '90100000008', '90100000009',
+];
+
+const ALL_DEMO_CPFS = [...DEMO_CPFS, ...TEST_CLIENT_CPFS];
+
+/** Remove tickets e clientes mock (legado + WF-TEST + [TESTE]) */
+export async function purgeAllMockTickets(): Promise<{ tickets: number; clients: number }> {
   const ticketFilter = {
     $or: [
-      { 'cliente.clienteCpf': { $in: DEMO_CPFS } },
+      { chamadoProtocolo: { $regex: `^${WORKFLOW_TEST_PROTOCOL_PREFIX}` } },
+      { chamadoTitulo: { $regex: /^\[TESTE\]/i } },
+      { 'cliente.clienteCpf': { $in: ALL_DEMO_CPFS } },
       { chamadoTitulo: { $regex: /maria silva|teste persistencia|lentidão internet fibra/i } },
       { chamadoTitulo: 'Lentidão Internet Fibra' },
+      { 'registro.metadados.seedSource': 'workflow-test-seed' },
     ],
   };
 
-  const beforeCount = await ChamadoN1.countDocuments(ticketFilter);
   const tickets = await ChamadoN1.deleteMany(ticketFilter);
-  const afterCount = await ChamadoN1.countDocuments(ticketFilter);
-
-  console.log(
-    `Purge v1.4.0: chamados demo antes=${beforeCount} removidos=${tickets.deletedCount} restantes=${afterCount}`
-  );
 
   const Cliente = getClienteModel();
-  const clientFilter = {
+  const clients = await Cliente.deleteMany({
     $or: [
-      { 'clienteDados.clienteCpf': { $in: DEMO_CPFS } },
+      { 'clienteDados.clienteCpf': { $in: ALL_DEMO_CPFS } },
       { 'clienteDados.clienteNome': { $regex: /maria silva|teste de cadastro/i } },
+      { 'clienteDados.clienteEmail.lista': { $regex: /@email-teste\.com$/i } },
     ],
-  };
+  });
 
-  const clients = await Cliente.deleteMany(clientFilter);
-  if (clients.deletedCount > 0) {
-    console.log(`Purge v1.4.0: removidos ${clients.deletedCount} cliente(s) demo de b2c_cadastros`);
-  }
+  console.log(
+    `Purge mock tickets: chamados removidos=${tickets.deletedCount ?? 0}, clientes removidos=${clients.deletedCount ?? 0}`,
+  );
+
+  return {
+    tickets: tickets.deletedCount ?? 0,
+    clients: clients.deletedCount ?? 0,
+  };
+}
+
+/** @deprecated use purgeAllMockTickets */
+export async function purgeLegacyDemoData() {
+  await purgeAllMockTickets();
 }
 
 export async function seedDevelopmentData() {
@@ -61,16 +76,7 @@ export async function seedDevelopmentData() {
   }
 
   await seedTabulationConfig();
-  await seedWorkflowTestData();
-}
-
-async function seedWorkflowTestData() {
-  const { created, skipped } = await seedWorkflowTestTickets();
-  if (created > 0) {
-    console.log(`Seed: ${created} ticket(s) de teste de workflow criado(s) (WF-TEST-*)`);
-  } else if (skipped > 0) {
-    console.log(`Seed: ${skipped} ticket(s) de teste de workflow sincronizado(s) (WF-TEST-*)`);
-  }
+  await seedWorkflowConfig();
 }
 
 async function seedTabulationConfig() {
@@ -82,7 +88,7 @@ async function seedTabulationConfig() {
         ...item,
         ativo: true,
         updatedBy: 'seed',
-      }))
+      })),
     );
     console.log(`Seed: ${DEFAULT_TABULACAO_PRODUTOS.length} produto(s) de tabulação criados`);
   }

@@ -68,6 +68,23 @@ export const usersApi = {
   list: () => api.get('/users').then((r) => r.data),
 };
 
+export const workflowApi = {
+  getActive: () => api.get('/workflows').then((r) => r.data),
+  listAll: (includeInactive = false) =>
+    api.get('/workflows/all', { params: { includeInactive: includeInactive ? 'true' : undefined } }).then((r) => r.data),
+  get: (id) => api.get(`/workflows/${id}`).then((r) => r.data),
+  create: (data) => api.post('/workflows', data).then((r) => r.data),
+  update: (id, data) => api.put(`/workflows/${id}`, data).then((r) => r.data),
+  patch: (id, data) => api.patch(`/workflows/${id}`, data).then((r) => r.data),
+  delete: (id) => api.delete(`/workflows/${id}`).then((r) => r.data),
+  listGrupos: (includeInactive = false) =>
+    api.get('/workflows/grupos-responsabilidade/list', { params: { includeInactive: includeInactive ? 'true' : undefined } }).then((r) => r.data),
+  createGrupo: (data) => api.post('/workflows/grupos-responsabilidade', data).then((r) => r.data),
+  updateGrupo: (id, data) => api.put(`/workflows/grupos-responsabilidade/${id}`, data).then((r) => r.data),
+  patchGrupo: (id, data) => api.patch(`/workflows/grupos-responsabilidade/${id}`, data).then((r) => r.data),
+  deleteGrupo: (id) => api.delete(`/workflows/grupos-responsabilidade/${id}`).then((r) => r.data),
+};
+
 export const tabulationApi = {
   getActive: () => api.get('/tabulation').then((r) => r.data),
   listProdutos: (includeInactive = false) =>

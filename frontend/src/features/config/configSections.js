@@ -1,6 +1,6 @@
 /**
  * Seções da Central de Configurações
- * VERSION: v1.2.0 | DATE: 2026-07-07
+ * VERSION: v1.3.2 | DATE: 2026-07-14
  */
 export const CONFIG_SECTIONS = [
   {
@@ -18,12 +18,11 @@ export const CONFIG_SECTIONS = [
     icon: 'ti-hierarchy-2',
   },
   {
-    id: 'api',
-    label: 'API Externa',
-    cardTitle: 'API',
-    menuDesc: 'Chaves e endpoints',
-    cardDesc: 'Conecte sistemas externos',
-    icon: 'ti-plug',
+    id: 'grupos-atribuicoes',
+    label: 'Grupos e Atribuições',
+    menuDesc: 'Equipes e regras de atribuição por etapa',
+    cardDesc: 'Defina grupos de responsabilidade e quem recebe cada etapa',
+    icon: 'ti-users-group',
   },
   {
     id: 'automations',
@@ -40,11 +39,12 @@ export const CONFIG_SECTIONS = [
     icon: 'ti-target',
   },
   {
-    id: 'macros',
-    label: 'Macros',
-    menuDesc: 'Respostas e atalhos prontos',
-    cardDesc: 'Crie textos e ações reutilizáveis',
-    icon: 'ti-template',
+    id: 'api',
+    label: 'API Externa',
+    cardTitle: 'API',
+    menuDesc: 'Chaves e endpoints',
+    cardDesc: 'Conecte sistemas externos',
+    icon: 'ti-plug',
   },
   {
     id: 'backup',

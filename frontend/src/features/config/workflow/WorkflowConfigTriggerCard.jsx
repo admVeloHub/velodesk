@@ -14,9 +14,6 @@ export default function WorkflowConfigTriggerCard({ trigger, onEdit }) {
           editar
         </button>
       </div>
-      {trigger.description ? (
-        <p className="wf-config-trigger__desc">{trigger.description}</p>
-      ) : null}
     </>
   );
 }

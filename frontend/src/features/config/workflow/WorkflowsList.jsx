@@ -1,31 +1,50 @@
 /**
- * WorkflowsList v1.0.0 — cards + tabela de workflows (padrão Formulários)
- * VERSION: v1.0.0 | DATE: 2026-07-14
+ * WorkflowsList v2.1.0 — cards + tabela via API + modal grupos
+ * VERSION: v2.1.0 | DATE: 2026-07-14
  */
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { workflowApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
+import { useWorkflowConfig } from '../../../context/WorkflowConfigContext';
 import ConfigAtivoToggle from '../components/ConfigAtivoToggle';
 import { computeWorkflowStats, formatTriggerPath } from './workflowConfigData';
 import WorkflowDeleteConfirmModal from './WorkflowDeleteConfirmModal';
+import GruposResponsabilidadeModal from './GruposResponsabilidadeModal';
 
 function sortWorkflows(list) {
-  return [...(list || [])].sort((a, b) => (a.title || '').localeCompare(b.title || '', 'pt-BR'));
+  return [...(list || [])].sort((a, b) => (a.titulo || '').localeCompare(b.titulo || '', 'pt-BR'));
 }
 
 export default function WorkflowsList({
   id,
-  workflows,
   onEdit,
   onCreate,
   onToggleActive,
   onDelete,
 }) {
   const { showNotification } = useNotifications();
+  const { reload: reloadRuntime, grupos } = useWorkflowConfig();
+  const [workflows, setWorkflows] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
+  const [gruposModalOpen, setGruposModalOpen] = useState(false);
 
-  const sortedWorkflows = useMemo(() => sortWorkflows(workflows), [workflows]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await workflowApi.listAll(true);
+      setWorkflows(sortWorkflows(data || []));
+    } catch {
+      showNotification('Erro ao carregar workflows.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [showNotification]);
+
+  useEffect(() => { load(); }, [load]);
+
   const stats = useMemo(() => computeWorkflowStats(workflows), [workflows]);
 
   const handleToggleActive = async (workflowId, nextActive) => {
@@ -33,6 +52,7 @@ export default function WorkflowsList({
     try {
       await onToggleActive?.(workflowId, nextActive);
       showNotification(nextActive ? 'Workflow ativado.' : 'Workflow desativado.', 'success');
+      await load();
     } catch {
       showNotification('Erro ao atualizar status do workflow.', 'error');
     } finally {
@@ -44,9 +64,10 @@ export default function WorkflowsList({
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await onDelete?.(deleteTarget.id);
+      await onDelete?.(deleteTarget._id);
       showNotification('Workflow excluído.', 'success');
       setDeleteTarget(null);
+      await load();
     } catch {
       showNotification('Erro ao excluir workflow.', 'error');
     } finally {
@@ -59,55 +80,41 @@ export default function WorkflowsList({
       <div className="forms-stats-row">
         <div className="stat-card stat-card--static">
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-hierarchy-2" /></span>
-          <div className="stat-info">
-            <h3>{stats.total}</h3>
-            <p>Workflows cadastrados</p>
-          </div>
+          <div className="stat-info"><h3>{stats.total}</h3><p>Workflows cadastrados</p></div>
         </div>
         <div className="stat-card stat-card--static">
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-circle-check" /></span>
-          <div className="stat-info">
-            <h3>{stats.ativos}</h3>
-            <p>Ativos no desk</p>
-          </div>
+          <div className="stat-info"><h3>{stats.ativos}</h3><p>Ativos no desk</p></div>
         </div>
         <div className="stat-card stat-card--static">
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-list-details" /></span>
-          <div className="stat-info">
-            <h3>{stats.etapas}</h3>
-            <p>Etapas configuradas</p>
-          </div>
+          <div className="stat-info"><h3>{stats.etapas}</h3><p>Etapas configuradas</p></div>
         </div>
         <div className="stat-card stat-card--static">
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-lock" /></span>
-          <div className="stat-info">
-            <h3>{stats.comAprovacao}</h3>
-            <p>Com etapa de aprovação</p>
-          </div>
+          <div className="stat-info"><h3>{stats.comAprovacao}</h3><p>Com etapa de aprovação</p></div>
         </div>
         <div className="stat-card stat-card--static">
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-forms" /></span>
-          <div className="stat-info">
-            <h3>{stats.tabulacao}</h3>
-            <p>Gatilhos por tabulação</p>
-          </div>
+          <div className="stat-info"><h3>{stats.tabulacao}</h3><p>Gatilhos por tabulação</p></div>
         </div>
+        <button
+          type="button"
+          className="stat-card stat-card--clickable"
+          onClick={() => setGruposModalOpen(true)}
+        >
+          <span className="stat-icon" aria-hidden="true"><i className="ti ti-users-group" /></span>
+          <div className="stat-info"><h3>{grupos?.length || 0}</h3><p>Grupos de responsabilidade</p></div>
+        </button>
         <div className="stat-card stat-card--static">
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-player-pause" /></span>
-          <div className="stat-info">
-            <h3>{stats.inativos}</h3>
-            <p>Workflows inativos</p>
-          </div>
+          <div className="stat-info"><h3>{stats.inativos}</h3><p>Workflows inativos</p></div>
         </div>
       </div>
 
       <div className="config-table-wrap">
         <div className="config-table-head-actions">
-          <button
-            type="button"
-            className="config-action-btn config-action-btn--create config-action-btn--compact"
-            onClick={onCreate}
-          >
+          <button type="button" className="config-action-btn config-action-btn--create config-action-btn--compact" onClick={onCreate}>
             Adicionar Workflow
           </button>
         </div>
@@ -123,7 +130,16 @@ export default function WorkflowsList({
             </tr>
           </thead>
           <tbody>
-            {sortedWorkflows.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={5}>
+                  <div className="config-loading" role="status">
+                    <i className="ti ti-loader-2 config-loading__icon" aria-hidden="true" />
+                    <span>Carregando workflows…</span>
+                  </div>
+                </td>
+              </tr>
+            ) : workflows.length === 0 ? (
               <tr>
                 <td colSpan={5}>
                   <div className="forms-empty-state">
@@ -132,34 +148,20 @@ export default function WorkflowsList({
                 </td>
               </tr>
             ) : (
-              sortedWorkflows.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <strong className="config-table__name">{item.title}</strong>
-                  </td>
-                  <td>{(item.steps || []).length}</td>
-                  <td>{formatTriggerPath(item.trigger)}</td>
+              workflows.map((item) => (
+                <tr key={item._id}>
+                  <td><strong className="config-table__name">{item.titulo}</strong></td>
+                  <td>{(item.passos || []).length}</td>
+                  <td>{formatTriggerPath(item.gatilho)}</td>
                   <td className="config-table__actions">
-                    <button
-                      type="button"
-                      className="config-action-btn config-action-btn--edit"
-                      onClick={() => onEdit?.(item.id)}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      className="config-action-btn config-action-btn--delete"
-                      onClick={() => setDeleteTarget(item)}
-                    >
-                      Excluir
-                    </button>
+                    <button type="button" className="config-action-btn config-action-btn--edit" onClick={() => onEdit?.(item._id)}>Editar</button>
+                    <button type="button" className="config-action-btn config-action-btn--delete" onClick={() => setDeleteTarget(item)}>Excluir</button>
                   </td>
                   <td>
                     <ConfigAtivoToggle
-                      ativo={item.active}
-                      onChange={(nextActive) => handleToggleActive(item.id, nextActive)}
-                      disabled={togglingId === item.id}
+                      ativo={item.ativo}
+                      onChange={(nextActive) => handleToggleActive(item._id, nextActive)}
+                      disabled={togglingId === item._id}
                     />
                   </td>
                 </tr>
@@ -170,11 +172,18 @@ export default function WorkflowsList({
       </div>
 
       <WorkflowDeleteConfirmModal
-        workflow={deleteTarget}
+        workflow={deleteTarget ? { title: deleteTarget.titulo, steps: deleteTarget.passos } : null}
         deleting={deleting}
         onCancel={() => { if (!deleting) setDeleteTarget(null); }}
         onConfirm={confirmDelete}
       />
+
+      {gruposModalOpen ? (
+        <GruposResponsabilidadeModal
+          onClose={() => setGruposModalOpen(false)}
+          onChanged={reloadRuntime}
+        />
+      ) : null}
     </div>
   );
 }

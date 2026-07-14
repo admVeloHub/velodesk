@@ -1,69 +1,86 @@
 /**
- * WorkflowsConfigSection v2.0.0 — lista + editor interno de workflow
- * VERSION: v2.0.0 | DATE: 2026-07-14
+ * WorkflowsConfigSection v3.0.0 — lista + editor via API
+ * VERSION: v3.0.0 | DATE: 2026-07-14
  */
-import React, { useCallback, useMemo, useState } from 'react';
-import { cloneWorkflowConfigList, createEmptyWorkflow } from './workflowConfigData';
+import React, { useCallback, useState } from 'react';
+import { workflowApi } from '../../../api/client';
+import { useWorkflowConfig } from '../../../context/WorkflowConfigContext';
+import { createEmptyWorkflowDocument, createWorkflowSlug } from './workflowConfigData';
 import WorkflowConfigEditor from './WorkflowConfigEditor';
 import WorkflowsList from './WorkflowsList';
 
 export default function WorkflowsConfigSection() {
-  const [workflows, setWorkflows] = useState(() => cloneWorkflowConfigList());
+  const { reload } = useWorkflowConfig();
   const [editingId, setEditingId] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [editingDoc, setEditingDoc] = useState(null);
+  const [loadingDoc, setLoadingDoc] = useState(false);
 
-  const existingIds = useMemo(() => workflows.map((item) => item.id), [workflows]);
+  const loadDoc = useCallback(async (id) => {
+    setLoadingDoc(true);
+    try {
+      const doc = await workflowApi.get(id);
+      setEditingDoc(doc);
+    } finally {
+      setLoadingDoc(false);
+    }
+  }, []);
 
-  const handleEdit = useCallback((workflowId) => {
+  const handleEdit = useCallback(async (workflowId) => {
     setCreating(false);
     setEditingId(workflowId);
-  }, []);
+    await loadDoc(workflowId);
+  }, [loadDoc]);
 
   const handleCreate = useCallback(() => {
     setEditingId(null);
     setCreating(true);
+    setEditingDoc(createEmptyWorkflowDocument());
   }, []);
 
   const handleCloseEditor = useCallback(() => {
     setCreating(false);
     setEditingId(null);
+    setEditingDoc(null);
   }, []);
 
-  const handleSave = useCallback((updatedWorkflow) => {
-    setWorkflows((prev) => {
-      const index = prev.findIndex((item) => item.id === updatedWorkflow.id);
-      if (index >= 0) {
-        return prev.map((item) => (item.id === updatedWorkflow.id ? updatedWorkflow : item));
-      }
-      if (creating) {
-        return [...prev, updatedWorkflow];
-      }
-      return prev;
-    });
-    setCreating(false);
-    setEditingId(null);
-  }, [creating]);
+  const handleSave = useCallback(async (updatedWorkflow) => {
+    if (creating) {
+      const slug = createWorkflowSlug(updatedWorkflow.titulo);
+      await workflowApi.create({ ...updatedWorkflow, slug });
+    } else {
+      await workflowApi.update(editingId, updatedWorkflow);
+    }
+    await reload();
+    handleCloseEditor();
+  }, [creating, editingId, reload, handleCloseEditor]);
 
   const handleToggleActive = useCallback(async (workflowId, nextActive) => {
-    setWorkflows((prev) => prev.map((item) => (
-      item.id === workflowId ? { ...item, active: nextActive } : item
-    )));
-  }, []);
+    await workflowApi.patch(workflowId, { ativo: nextActive });
+    await reload();
+  }, [reload]);
 
   const handleDelete = useCallback(async (workflowId) => {
-    setWorkflows((prev) => prev.filter((item) => item.id !== workflowId));
-  }, []);
+    await workflowApi.delete(workflowId);
+    await reload();
+  }, [reload]);
 
   if (creating || editingId) {
-    const workflow = creating
-      ? createEmptyWorkflow()
-      : workflows.find((item) => item.id === editingId);
+    if (loadingDoc && !editingDoc) {
+      return (
+        <div className="config-section-body">
+          <div className="config-loading" role="status">
+            <i className="ti ti-loader-2 config-loading__icon" aria-hidden="true" />
+            <span>Carregando workflow…</span>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <WorkflowConfigEditor
-        workflow={workflow}
+        workflow={editingDoc}
         isNew={creating}
-        existingIds={existingIds}
         onClose={handleCloseEditor}
         onSave={handleSave}
       />
@@ -73,7 +90,6 @@ export default function WorkflowsConfigSection() {
   return (
     <WorkflowsList
       id="workflowsTab"
-      workflows={workflows}
       onEdit={handleEdit}
       onCreate={handleCreate}
       onToggleActive={handleToggleActive}

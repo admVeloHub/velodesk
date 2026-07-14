@@ -1,9 +1,16 @@
+/**
+ * WorkflowConfigHeader v1.1.0
+ * VERSION: v1.1.0 | DATE: 2026-07-14
+ */
 import React from 'react';
 
 export default function WorkflowConfigHeader({
   title,
   titleEditable = false,
   onTitleChange,
+  description = '',
+  descriptionEditable = false,
+  onDescriptionChange,
   active,
   onToggleActive,
   onHistory,
@@ -33,6 +40,21 @@ export default function WorkflowConfigHeader({
             <span className="wf-config-header__badge wf-config-header__badge--inactive">Inativo</span>
           )}
         </div>
+        {descriptionEditable ? (
+          <label className="wf-config-header__desc-field">
+            <span className="wf-config-header__desc-label">Descrição</span>
+            <textarea
+              rows={2}
+              className="wf-config-header__desc-input"
+              value={description}
+              onChange={(e) => onDescriptionChange?.(e.target.value)}
+              placeholder="Descreva o objetivo deste workflow."
+              aria-label="Descrição do workflow"
+            />
+          </label>
+        ) : description ? (
+          <p className="wf-config-header__desc">{description}</p>
+        ) : null}
       </div>
 
       <div className="wf-config-header__actions">

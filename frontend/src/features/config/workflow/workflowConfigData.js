@@ -1,6 +1,6 @@
 /**
- * workflowConfigData v1.1.0 — dados e helpers do módulo Workflows (Config)
- * VERSION: v1.1.0 | DATE: 2026-07-14
+ * workflowConfigData v2.5.1 — constantes UI + helpers (sem mock)
+ * VERSION: v2.5.1 | DATE: 2026-07-14
  */
 
 export const WORKFLOW_CONFIG_TABS = [
@@ -17,250 +17,243 @@ export const TRIGGER_PATH_FIELDS = [
   { key: 'detalhe', label: 'Detalhe', placeholder: 'Ex.: Dentro dos 7 dias' },
 ];
 
-export const WORKFLOW_CONFIG_LIST = [
-  {
-    id: 'reembolso-7dias',
-    title: 'Reembolso dentro dos 7 dias',
-    active: true,
-    trigger: {
-      type: 'tabulation',
-      path: ['Produto X', 'Solicitação', 'Reembolso', 'Dentro dos 7 dias'],
-      description: 'Este workflow é ativado automaticamente quando o atendente tabula o chamado com este caminho exato na árvore de motivos.',
-    },
-    steps: [
-      {
-        id: 'inicio',
-        title: 'Início — ticket criado',
-        description: 'Atendimento verifica elegibilidade e tabula o chamado.',
-        icon: 'ti-player-play-filled',
-        iconTone: 'start',
-        badges: [
-          { label: 'Grupo: Atendimento', tone: 'neutral' },
-          { label: 'SLA: 15min', tone: 'sla' },
-        ],
-      },
-      {
-        id: 'aprovacao-financeiro',
-        title: 'Aprovação — Financeiro',
-        description: 'Financeiro analisa elegibilidade e aprova ou reprova o estorno.',
-        icon: 'ti-lock',
-        iconTone: 'approval',
-        badges: [
-          { label: 'Grupo: Financeiro', tone: 'neutral' },
-          { label: 'Ação: Aprovar / Reprovar', tone: 'neutral' },
-          { label: 'SLA: 4h', tone: 'sla' },
-        ],
-      },
-      {
-        id: 'processamento-estorno',
-        title: 'Processamento do estorno',
-        description: 'Financeiro processa o estorno no sistema de pagamentos.',
-        icon: 'ti-refresh',
-        iconTone: 'process',
-        badges: [
-          { label: 'Grupo: Financeiro', tone: 'neutral' },
-          { label: 'Ação: Marcar como processado', tone: 'neutral' },
-          { label: 'SLA: 24h', tone: 'sla' },
-        ],
-      },
-      {
-        id: 'retorno-atendente',
-        title: 'Retorno automático ao atendente',
-        description: 'Sistema retorna o ticket ao atendente original com status do estorno.',
-        icon: 'ti-file-description',
-        iconTone: 'auto',
-        badges: [
-          { label: 'Automático — sistema', tone: 'neutral' },
-          { label: 'Notificar: atendente + cliente', tone: 'neutral' },
-        ],
-      },
-      {
-        id: 'comunicacao-cliente',
-        title: 'Comunicação ao cliente',
-        description: 'Mensagem automática ou manual confirmando o estorno ao cliente.',
-        icon: 'ti-message-circle',
-        iconTone: 'comms',
-        badges: [
-          { label: 'Canal original — WhatsApp', tone: 'neutral' },
-          { label: 'Template: reembolso aprovado', tone: 'neutral' },
-          { label: 'SLA: 30min', tone: 'sla' },
-        ],
-      },
-      {
-        id: 'encerramento',
-        title: 'Encerramento do ticket',
-        description: 'Ticket resolvido automaticamente após confirmação do cliente.',
-        icon: 'ti-circle-check-filled',
-        iconTone: 'done',
-        badges: [
-          { label: 'Automático — sistema', tone: 'neutral' },
-          { label: 'CSAT: enviar pesquisa', tone: 'neutral' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'cancelamento',
-    title: 'Cancelamento',
-    active: false,
-    trigger: {
-      type: 'tabulation',
-      path: ['Produto X', 'Solicitação', 'Cancelamento', 'Antes da entrega'],
-      description: 'Ativado quando o atendente tabula o chamado com o caminho de cancelamento.',
-    },
-    steps: [
-      {
-        id: 'inicio',
-        title: 'Início — ticket criado',
-        description: 'Atendimento confirma motivo do cancelamento.',
-        icon: 'ti-player-play-filled',
-        iconTone: 'start',
-        badges: [{ label: 'Grupo: Atendimento', tone: 'neutral' }],
-      },
-      {
-        id: 'analise',
-        title: 'Análise de elegibilidade',
-        description: 'Verificação de prazo e condições contratuais.',
-        icon: 'ti-search',
-        iconTone: 'process',
-        badges: [{ label: 'Grupo: Atendimento', tone: 'neutral' }, { label: 'SLA: 2h', tone: 'sla' }],
-      },
-      {
-        id: 'encerramento',
-        title: 'Encerramento',
-        description: 'Confirmação ao cliente e fechamento do ticket.',
-        icon: 'ti-circle-check-filled',
-        iconTone: 'done',
-        badges: [{ label: 'Automático — sistema', tone: 'neutral' }],
-      },
-    ],
-  },
-  {
-    id: 'troca-produto',
-    title: 'Troca de produto',
-    active: false,
-    trigger: {
-      type: 'tabulation',
-      path: ['Produto Y', 'Solicitação', 'Troca', 'Defeito de fábrica'],
-      description: 'Ativado quando o atendente tabula solicitação de troca.',
-    },
-    steps: [
-      {
-        id: 'inicio',
-        title: 'Início — ticket criado',
-        description: 'Atendimento registra dados do produto e defeito.',
-        icon: 'ti-player-play-filled',
-        iconTone: 'start',
-        badges: [{ label: 'Grupo: Atendimento', tone: 'neutral' }],
-      },
-      {
-        id: 'logistica',
-        title: 'Logística reversa',
-        description: 'Agendamento de coleta e envio do novo produto.',
-        icon: 'ti-truck',
-        iconTone: 'process',
-        badges: [{ label: 'Grupo: Logística', tone: 'neutral' }, { label: 'SLA: 48h', tone: 'sla' }],
-      },
-    ],
-  },
-  {
-    id: 'escalada-n2',
-    title: 'Escalada N2',
-    active: false,
-    trigger: {
-      type: 'tabulation',
-      path: ['Qualquer produto', 'Incidente', 'Escalonar', 'N2'],
-      description: 'Ativado quando o atendente escala o chamado para N2.',
-    },
-    steps: [
-      {
-        id: 'inicio',
-        title: 'Início — ticket criado',
-        description: 'N1 documenta contexto e encaminha para N2.',
-        icon: 'ti-player-play-filled',
-        iconTone: 'start',
-        badges: [{ label: 'Grupo: N1', tone: 'neutral' }],
-      },
-      {
-        id: 'analise-n2',
-        title: 'Análise N2',
-        description: 'Equipe N2 investiga e define solução.',
-        icon: 'ti-arrows-exchange',
-        iconTone: 'approval',
-        badges: [{ label: 'Grupo: N2', tone: 'neutral' }, { label: 'SLA: 4h', tone: 'sla' }],
-      },
-      {
-        id: 'retorno',
-        title: 'Retorno ao atendente',
-        description: 'N2 devolve orientação ao N1 para comunicação ao cliente.',
-        icon: 'ti-file-description',
-        iconTone: 'auto',
-        badges: [{ label: 'Grupo: N1', tone: 'neutral' }],
-      },
-    ],
-  },
+export const CRITERIO_FONTES = [
+  { value: 'tabulacao', label: 'Tabulação' },
+  { value: 'integracao', label: 'Integração (API)' },
+  { value: 'grupo_responsabilidade', label: 'Grupo de responsabilidade' },
 ];
 
-export function getWorkflowConfigById(id, list = WORKFLOW_CONFIG_LIST) {
-  return list.find((wf) => wf.id === id) || list[0] || null;
+export const CRITERIO_CAMPOS = [
+  { value: 'tipoChamado', label: 'Tipo de chamado' },
+  { value: 'produto', label: 'Produto' },
+  { value: 'motivo', label: 'Motivo' },
+  { value: 'detalhe', label: 'Detalhe' },
+  { value: 'responsavel', label: 'Responsável' },
+  { value: 'atribuido', label: 'Atribuído' },
+];
+
+/** Campos obtidos via API externa (informações do cliente / pagamento) */
+export const CRITERIO_CAMPOS_INTEGRACAO = [
+  { value: 'statusPagamento', label: 'Status de pagamento' },
+  { value: 'dataContratacao', label: 'Prazo desde contratação' },
+  { value: 'statusContrato', label: 'Status do contrato' },
+];
+
+/** Opções do gatilho — critério único (tabulação + integração) */
+export const GATILHO_CRITERIO_OPCOES = [
+  { fonte: 'tabulacao', campo: 'tipoChamado', label: 'Tipo de chamado' },
+  { fonte: 'tabulacao', campo: 'produto', label: 'Produto' },
+  { fonte: 'tabulacao', campo: 'motivo', label: 'Motivo' },
+  { fonte: 'tabulacao', campo: 'detalhe', label: 'Detalhe' },
+  { fonte: 'integracao', campo: 'statusPagamento', label: 'Status de pagamento' },
+  { fonte: 'integracao', campo: 'dataContratacao', label: 'Prazo desde contratação' },
+  { fonte: 'integracao', campo: 'statusContrato', label: 'Status do contrato' },
+];
+
+export const STATUS_PAGAMENTO_VALORES = [
+  { value: 'aprovado', label: 'Aprovado' },
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'recusado', label: 'Recusado' },
+  { value: 'cancelado', label: 'Cancelado' },
+  { value: 'estornado', label: 'Estornado' },
+  { value: 'processando', label: 'Processando' },
+];
+
+export const DATA_CONTRATACAO_VALORES = [
+  { value: 'dentro_7_dias', label: 'Dentro de 7 dias' },
+  { value: 'fora_7_dias', label: 'Fora de 7 dias' },
+];
+
+export const STATUS_CONTRATO_VALORES = [
+  { value: 'em_vigencia', label: 'Em vigência' },
+  { value: 'quebra_contratual', label: 'Quebra contratual' },
+  { value: 'quitado', label: 'Quitado' },
+  { value: 'elegivel', label: 'Elegível' },
+  { value: 'inelegivel', label: 'Inelegível' },
+];
+
+export function getIntegracaoValoresForCampo(campo) {
+  switch (campo) {
+    case 'statusPagamento':
+      return STATUS_PAGAMENTO_VALORES;
+    case 'dataContratacao':
+      return DATA_CONTRATACAO_VALORES;
+    case 'statusContrato':
+      return STATUS_CONTRATO_VALORES;
+    default:
+      return [];
+  }
 }
+
+export function criterioOptionKey(fonte, campo) {
+  return `${fonte || 'tabulacao'}:${campo || ''}`;
+}
+
+export function parseCriterioOptionKey(key) {
+  const [fonte, ...rest] = String(key || '').split(':');
+  return { fonte: fonte || 'tabulacao', campo: rest.join(':') };
+}
+
+export function findGatilhoCriterioLabel(fonte, campo) {
+  const match = GATILHO_CRITERIO_OPCOES.find((o) => o.fonte === fonte && o.campo === campo);
+  if (match) return match.label;
+  const tab = CRITERIO_CAMPOS.find((c) => c.value === campo);
+  if (tab) return tab.label;
+  const integ = CRITERIO_CAMPOS_INTEGRACAO.find((c) => c.value === campo);
+  return integ?.label || campo;
+}
+
+/** Produto/motivo definidos em outros critérios do gatilho (cascata tabulação) */
+export function resolveGatilhoCascadeContext(criterios = []) {
+  const list = criterios || [];
+  const produtoRow = list.find((c) => c.fonte === 'tabulacao' && c.campo === 'produto' && c.valor);
+  const motivoRow = list.find((c) => c.fonte === 'tabulacao' && c.campo === 'motivo' && c.valor);
+  return {
+    produto: String(produtoRow?.valor || '').trim(),
+    motivo: String(motivoRow?.valor || '').trim(),
+  };
+}
+
+export function formatCriterioValorLabel(fonte, campo, valor) {
+  if (!valor) return '*';
+  if (fonte === 'integracao') {
+    const options = getIntegracaoValoresForCampo(campo);
+    return options.find((o) => o.value === valor)?.label || valor;
+  }
+  return valor;
+}
+
+export const CRITERIO_OPERADORES = [
+  { value: 'equals', label: 'Igual a' },
+  { value: 'contains', label: 'Contém' },
+  { value: 'not_empty', label: 'Não vazio' },
+  { value: 'in', label: 'Está em (CSV)' },
+];
+
+export const ATRIBUICAO_TIPOS = [
+  { value: 'grupo', label: 'Grupo de responsabilidade' },
+  { value: 'colaborador', label: 'Colaborador' },
+  { value: 'responsavel_ticket', label: 'Responsável do ticket' },
+  { value: 'sistema', label: 'Sistema (automático)' },
+];
+
+export const ACAO_TIPOS = [
+  { value: 'manual', label: 'Manual' },
+  { value: 'aprovacao', label: 'Aprovação' },
+  { value: 'automatica', label: 'Automática' },
+];
+
+export const ROTA_VARIAVEIS = [
+  { value: 'approve', label: 'Aprovar' },
+  { value: 'reject', label: 'Reprovar' },
+  { value: 'request_info', label: 'Pedir informação' },
+  { value: 'concluir', label: 'Concluir' },
+];
 
 export function getWorkflowConfigTab(id) {
   return WORKFLOW_CONFIG_TABS.find((tab) => tab.id === id) || WORKFLOW_CONFIG_TABS[0];
 }
 
-export function cloneWorkflowConfigList(list = WORKFLOW_CONFIG_LIST) {
-  return (list || []).map((wf) => ({
-    ...wf,
-    trigger: wf.trigger ? { ...wf.trigger, path: [...(wf.trigger.path || [])] } : null,
-    steps: (wf.steps || []).map((step) => ({
-      ...step,
-      badges: (step.badges || []).map((badge) => ({ ...badge })),
-    })),
-  }));
+export function formatTriggerPath(gatilho) {
+  const criterios = gatilho?.criterios || [];
+  if (!criterios.length) return '—';
+  return criterios
+    .map((c) => {
+      const label = findGatilhoCriterioLabel(c.fonte, c.campo);
+      if (c.operador === 'not_empty') return `${label} ≠∅`;
+      const val = formatCriterioValorLabel(c.fonte, c.campo, c.valor);
+      const op = c.operador === 'contains' ? ' ∋ ' : ' = ';
+      return `${label}${op}${val}`;
+    })
+    .join(' · ');
 }
 
-export function formatTriggerPath(trigger) {
-  return (trigger?.path || []).filter(Boolean).join(' → ') || '—';
-}
-
-export function stepHasApproval(step) {
-  return (step?.badges || []).some((badge) => String(badge.label || '').toLowerCase().includes('aprovar'));
+export function stepHasApprovalFromPasso(passo) {
+  return passo?.acao?.tipo === 'aprovacao';
 }
 
 export function computeWorkflowStats(workflows) {
   const list = workflows || [];
   return {
     total: list.length,
-    ativos: list.filter((wf) => wf.active !== false).length,
-    inativos: list.filter((wf) => wf.active === false).length,
-    etapas: list.reduce((sum, wf) => sum + (wf.steps?.length || 0), 0),
-    comAprovacao: list.filter((wf) => (wf.steps || []).some(stepHasApproval)).length,
-    tabulacao: list.filter((wf) => wf.trigger?.type === 'tabulation').length,
+    ativos: list.filter((wf) => wf.ativo !== false).length,
+    inativos: list.filter((wf) => wf.ativo === false).length,
+    etapas: list.reduce((sum, wf) => sum + (wf.passos?.length || 0), 0),
+    comAprovacao: list.filter((wf) => (wf.passos || []).some((p) => stepHasApprovalFromPasso(p.passo))).length,
+    tabulacao: list.filter((wf) => wf.gatilho?.tipo === 'tabulacao').length,
   };
 }
 
-export function createEmptyWorkflow() {
-  const suffix = Date.now();
+export function generatePassoEnvelopeId() {
+  const ts = Math.floor(Date.now() / 1000).toString(16).padStart(8, '0');
+  let rand = '';
+  while (rand.length < 16) {
+    rand += Math.floor(Math.random() * 16).toString(16);
+  }
+  return ts + rand;
+}
+
+export function sortPassosEnvelopes(passos = []) {
+  return [...passos].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+}
+
+export function normalizePassosOrdem(passos = []) {
+  return sortPassosEnvelopes(passos).map((envelope, index) => ({
+    ...envelope,
+    ordem: index,
+  }));
+}
+
+export function getPassoEnvelopeKey(envelope, index = 0) {
+  if (envelope?._id) return String(envelope._id);
+  return `step-${index}`;
+}
+
+export function findPassoEnvelopeIndex(passos = [], envelope) {
+  if (!envelope) return -1;
+  if (envelope._id) {
+    const byId = passos.findIndex((item) => String(item._id) === String(envelope._id));
+    if (byId >= 0) return byId;
+  }
+  return passos.indexOf(envelope);
+}
+
+export function createEmptyGatilhoCriterio() {
+  return { fonte: 'tabulacao', campo: '', operador: 'equals', valor: '' };
+}
+
+export function createEmptyPassoEnvelope(ordem = 0) {
   return {
-    id: `workflow-${suffix}`,
-    title: 'Novo workflow',
-    active: false,
-    trigger: {
-      type: 'tabulation',
-      path: ['', '', '', ''],
-      description: 'Defina o caminho de tabulação que ativa este workflow.',
+    _id: generatePassoEnvelopeId(),
+    ordem,
+    passo: {
+      nome: 'Nova etapa',
+      descricao: '',
+      icone: 'ti-circle',
+      slaHoras: null,
+      criterios: [],
+      atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' },
+      acao: { tipo: 'manual', rotas: [] },
     },
-    steps: [
-      {
-        id: `inicio-${suffix}`,
-        title: 'Início — ticket criado',
-        description: 'Primeira etapa do fluxo.',
-        icon: 'ti-player-play-filled',
-        iconTone: 'start',
-        badges: [{ label: 'Grupo: Atendimento', tone: 'neutral' }],
-      },
+  };
+}
+
+export function createEmptyWorkflowDocument() {
+  return {
+    slug: '',
+    titulo: 'Novo workflow',
+    descricao: '',
+    ordem: 0,
+    ativo: false,
+    gatilho: {
+      tipo: 'tabulacao',
+      descricao: '',
+      criterios: [],
+    },
+    passos: [
+      createEmptyPassoEnvelope(0),
     ],
+    passoInicialId: null,
   };
 }
 
@@ -272,4 +265,49 @@ export function createWorkflowSlug(title) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48) || `workflow-${Date.now()}`;
+}
+
+export function criteriosToTriggerPath(criterios = []) {
+  const map = Object.fromEntries(criterios.map((c) => [c.campo, c.valor]));
+  return {
+    type: 'tabulation',
+    path: [
+      map.produto || '',
+      map.tipoChamado || map.tipo || '',
+      map.motivo || '',
+      map.detalhe || '',
+    ],
+    description: '',
+    criterios,
+  };
+}
+
+export function triggerPathToCriterios(trigger) {
+  if (trigger?.criterios?.length) return trigger.criterios;
+  const path = trigger?.path || [];
+  return [
+    { fonte: 'tabulacao', campo: 'produto', operador: 'contains', valor: path[0] || '' },
+    { fonte: 'tabulacao', campo: 'tipoChamado', operador: 'equals', valor: path[1] || '' },
+    { fonte: 'tabulacao', campo: 'motivo', operador: 'contains', valor: path[2] || '' },
+    { fonte: 'tabulacao', campo: 'detalhe', operador: 'contains', valor: path[3] || '' },
+  ];
+}
+
+export function passosToDisplaySteps(passos = []) {
+  return normalizePassosOrdem(passos).map((envelope, index) => {
+      const cfg = envelope.passo || {};
+      const badges = [];
+      if (cfg.atribuicao?.grupoSlug) badges.push({ label: `Grupo: ${cfg.atribuicao.grupoSlug}`, tone: 'neutral' });
+      if (cfg.slaHoras) badges.push({ label: `SLA: ${cfg.slaHoras}h`, tone: 'sla' });
+      if (cfg.acao?.tipo === 'aprovacao') badges.push({ label: 'Ação: Aprovar / Reprovar', tone: 'neutral' });
+      return {
+        id: getPassoEnvelopeKey(envelope, index),
+        title: cfg.nome,
+        description: cfg.descricao,
+        icon: cfg.icone || 'ti-circle',
+        iconTone: cfg.acao?.tipo === 'aprovacao' ? 'approval' : 'start',
+        badges,
+        envelope,
+      };
+    });
 }

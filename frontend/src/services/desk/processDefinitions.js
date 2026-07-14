@@ -3,7 +3,9 @@
  * VERSION: v1.1.0 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team
  */
 import { getDetalhes, getMotivos } from '../tabulationConfig';
-import { WORKFLOW_TEMPLATES, getWorkflowTeamLabel } from './workflowDefinitions';
+import { getWorkflowTeamLabel } from './workflowDefinitions';
+import { getRuntimeWorkflows } from './workflowRuntimeStore';
+import { evaluateGatilhoCriterios, normalizeWorkflowDef } from './workflowEngine';
 
 function optionKey(motivo, detalhe) {
   return `${motivo}::${detalhe || motivo}`;
@@ -98,7 +100,7 @@ const PROCESS_INFO_BY_KEY = {
     ],
     comunicacaoCliente: 'Informe que a solicitação foi registrada e encaminhada ao financeiro. Prazo de retorno: até 5 dias úteis para aparecer na fatura ou extrato, conforme operadora do cartão.',
     workflowEtapas: [
-      'Abertura N1 → Elegibilidade N1 → Aprovação Financeiro → Estorno processado → Retorno ao cliente',
+      'Elegibilidade N1 → Aprovação Financeiro → Estorno processado → Retorno ao cliente',
     ],
     restricoes: [
       'Não confirmar estorno antes da aprovação financeira.',
@@ -185,16 +187,15 @@ const PROCESS_INFO_BY_KEY = {
 };
 
 function findWorkflowForFields(produto, motivo, detalhe) {
-  return WORKFLOW_TEMPLATES.find((template) => {
-    const produtoOk = template.match.produtoIncludes?.some(
-      (needle) => String(produto || '').toLowerCase().includes(String(needle).toLowerCase()),
-    );
-    const motivoHaystack = `${motivo} ${detalhe}`.toLowerCase();
-    const motivoOk = template.match.motivoIncludes?.some(
-      (needle) => motivoHaystack.includes(String(needle).toLowerCase()),
-    );
-    return produtoOk && motivoOk;
-  });
+  const fields = {
+    produto: produto || '',
+    motivo: motivo || '',
+    detalhe: detalhe || '',
+    tipoChamado: 'Solicitação',
+    tipo: 'Solicitação',
+  };
+  const def = getRuntimeWorkflows().find((w) => evaluateGatilhoCriterios(w.gatilho?.criterios || [], fields));
+  return def ? normalizeWorkflowDef(def) : null;
 }
 
 function buildGenericProcessInfo(produto, option) {

@@ -8,6 +8,7 @@ import { ticketMatchesAgentResponsavel } from './responsavelSegmentation';
 import { lookupClient, getAgentName } from '../clientDb';
 import {
   advanceWorkflowStep,
+  advanceWorkflowByDecision,
   buildEscalonarWorkflowTemplate,
   buildWorkflowAdvanceMessage,
   createWorkflowState,
@@ -15,7 +16,8 @@ import {
   getWorkflowTeamLabel,
   getWorkflowTemplateById,
   resolveWorkflowForTicket,
-} from './workflowDefinitions';
+  resolveAtribuidoForStep,
+} from './workflowEngine';
 
 export function escapeHtml(str) {
   return String(str || '')
@@ -279,14 +281,16 @@ export function getTicketOperationAreaLabel(ticket) {
 }
 
 export function isTicketInWorkflow(ticket) {
-  return Boolean(ticket?.lateralForm?.workflow?.templateId);
+  const wf = ticket?.lateralForm?.workflow;
+  return Boolean(wf?.templateId || wf?.definicaoSlug);
 }
 
 export function getWorkflowTemplateForTicket(ticket) {
   const wf = ticket?.lateralForm?.workflow;
-  if (!wf?.templateId) return null;
-  return getWorkflowTemplateById(wf.templateId)
-    || (wf.templateId.startsWith('escalonar-') ? buildEscalonarWorkflowTemplate(wf.templateId.replace('escalonar-', '')) : null);
+  const templateKey = wf?.templateId || wf?.definicaoSlug;
+  if (!templateKey) return null;
+  return getWorkflowTemplateById(templateKey)
+    || (String(templateKey).startsWith('escalonar-') ? buildEscalonarWorkflowTemplate(String(templateKey).replace('escalonar-', '')) : null);
 }
 
 function formatDurationMs(ms) {
@@ -369,9 +373,13 @@ export function buildWorkflowSystemMessage(template, escalonar) {
   return `Workflow **${template.title}** iniciado automaticamente com base na classificação do ticket.`;
 }
 
+function getWorkflowInstanceKey(workflow) {
+  return workflow?.templateId || workflow?.definicaoSlug || '';
+}
+
 export function maybeActivateWorkflowForTicket(ticket, rightFields, escalonar, author) {
   const lf = ticket.lateralForm || {};
-  if (lf.workflow?.templateId) {
+  if (getWorkflowInstanceKey(lf.workflow)) {
     return { activated: false, workflow: lf.workflow, template: getWorkflowTemplateForTicket(ticket) };
   }
 
@@ -387,7 +395,9 @@ export function maybeActivateWorkflowForTicket(ticket, rightFields, escalonar, a
     by: author || getAgentName() || 'sistema',
     trigger: escalonar ? 'escalonar' : 'tabulation',
   });
-  return { activated: true, workflow, template };
+  const activeStep = template.steps.find((s) => s.id === workflow.currentStepId);
+  const atribuido = resolveAtribuidoForStep(activeStep);
+  return { activated: true, workflow, template, atribuido };
 }
 
 function pushWorkflowSystemMessage(ticket, text) {
@@ -414,19 +424,23 @@ export function syncTicketWorkflowOnCommit(ticket, rightFields, escalonar, statu
   let activated = false;
   let advanced = false;
 
-  if (!workflow?.templateId) {
+  if (!getWorkflowInstanceKey(workflow)) {
     const activation = maybeActivateWorkflowForTicket(ticket, rightFields, escalonar, author);
     if (activation.activated && activation.workflow && activation.template) {
       workflow = activation.workflow;
       template = activation.template;
       activated = true;
+      if (activation.atribuido) {
+        ticket.lateralForm = { ...lf, atribuido: activation.atribuido };
+      }
     }
   }
 
-  if (workflow?.templateId && !template) {
-    template = getWorkflowTemplateById(workflow.templateId)
-      || (workflow.templateId.startsWith('escalonar-')
-        ? buildEscalonarWorkflowTemplate(workflow.templateId.replace('escalonar-', ''))
+  if (getWorkflowInstanceKey(workflow) && !template) {
+    const key = getWorkflowInstanceKey(workflow);
+    template = getWorkflowTemplateById(key)
+      || (String(key).startsWith('escalonar-')
+        ? buildEscalonarWorkflowTemplate(String(key).replace('escalonar-', ''))
         : null);
   }
 
@@ -435,6 +449,11 @@ export function syncTicketWorkflowOnCommit(ticket, rightFields, escalonar, statu
     if (auto.advanced) {
       workflow = auto.workflow;
       advanced = true;
+      const nextStep = template.steps.find((s) => s.id === auto.nextStepId);
+      if (nextStep) {
+        const atribuido = resolveAtribuidoForStep(nextStep);
+        if (atribuido) ticket.lateralForm = { ...(ticket.lateralForm || lf), atribuido };
+      }
       const prevId = auto.previousStepId;
       const nextId = auto.nextStepId;
       if (prevId) {
@@ -457,6 +476,43 @@ export function syncTicketWorkflowOnCommit(ticket, rightFields, escalonar, statu
   return { activated, advanced, workflow, template };
 }
 
+export function advanceTicketWorkflowByDecision(ticket, variavel, author) {
+  const lf = ticket?.lateralForm || {};
+  const workflow = lf.workflow;
+  const template = getWorkflowTemplateForTicket(ticket);
+  if (!workflow || !template || workflow.status === 'completed') {
+    return { advanced: false, completed: false };
+  }
+
+  const result = advanceWorkflowByDecision(workflow, template, variavel, {
+    by: author || getAgentName() || 'sistema',
+    trigger: `decision-${variavel}`,
+  });
+
+  if (!result.advanced) return { advanced: false, completed: false };
+
+  ticket.lateralForm = { ...lf, workflow: result.workflow };
+  if (result.statusTicket) ticket.status = result.statusTicket;
+  if (result.nextStep) {
+    const atribuido = resolveAtribuidoForStep(result.nextStep);
+    if (atribuido) ticket.lateralForm.atribuido = atribuido;
+  }
+
+  if (variavel === 'approve') {
+    pushWorkflowSystemMessage(
+      ticket,
+      buildWorkflowAdvanceMessage(template, result.previousStepId, result.nextStepId, author),
+    );
+  }
+
+  return {
+    advanced: true,
+    completed: result.completed,
+    workflow: result.workflow,
+    template,
+  };
+}
+
 export function advanceTicketWorkflow(ticket, author) {
   const lf = ticket?.lateralForm || {};
   const workflow = lf.workflow;
@@ -473,6 +529,11 @@ export function advanceTicketWorkflow(ticket, author) {
   if (!result.advanced) return { advanced: false, completed: false };
 
   ticket.lateralForm = { ...lf, workflow: result.workflow };
+  const nextStep = template.steps.find((s) => s.id === result.nextStepId);
+  if (nextStep) {
+    const atribuido = resolveAtribuidoForStep(nextStep);
+    if (atribuido) ticket.lateralForm.atribuido = atribuido;
+  }
   pushWorkflowSystemMessage(
     ticket,
     buildWorkflowAdvanceMessage(template, result.previousStepId, result.nextStepId, author),

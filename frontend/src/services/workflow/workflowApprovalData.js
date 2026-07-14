@@ -1,16 +1,38 @@
 /**
- * workflowApprovalData v1.1.0 — fila e detalhe do console de decisão
+ * workflowApprovalData v1.2.0 — fila e detalhe do console de decisão
  */
 import { getAllCockpitTickets } from '../kanbanStorage';
-import { getSlaClass, getWorkflowProgress, isTicketInWorkflow, getTicketProtocolLabel } from '../desk/utils';
+import { getSlaClass, getWorkflowProgress, isTicketInWorkflow, getTicketProtocolLabel, getAgentName } from '../desk/utils';
 import { resolveApprovalHeader, ticketAwaitingDecision } from '../desk/workflowDefinitions';
-import {
-  findDemoApprovalEntry,
-  getDemoApprovalEntries,
-  shouldUseApprovalDemoFallback,
-} from './workflowApprovalDemoStore';
+import { getRuntimeGrupos } from '../desk/workflowRuntimeStore';
 
 const QUEUE_LABEL = 'Aguardando aprovação';
+
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function agentCanDecideTicket(ticket) {
+  const atribuido = String(ticket?.lateralForm?.atribuido || '').trim();
+  const agent = normalizeText(getAgentName());
+  if (!atribuido || !agent) return true;
+
+  if (atribuido.startsWith('grupo:')) {
+    const slug = atribuido.slice(6);
+    const grupo = getRuntimeGrupos().find((g) => g.slug === slug);
+    if (!grupo) return false;
+    if (!grupo.membros?.length) return true;
+    return grupo.membros.some((m) => {
+      const val = normalizeText(m.valor);
+      if (m.tipo === 'colaborador') return val === agent || agent.includes(val);
+      if (m.tipo === 'email') return val === agent || agent.includes(val);
+      if (m.tipo === 'perfil_desk') return m.valor === 'agent' || m.valor === 'supervisor';
+      return false;
+    });
+  }
+
+  return normalizeText(atribuido) === agent || atribuido.toLowerCase().includes(agent);
+}
 
 function formatRelativeTime(iso) {
   if (!iso) return '';
@@ -243,6 +265,7 @@ function buildDetailView(ticket, progress) {
     metaLine: `Ticket #${protocol} · ${ticket.clientName || ticket.solicitante || 'Cliente'} · aberto por ${openedBy} em ${formatDateTime(openedAt)}`,
     responsibleAgent: openedBy,
     actions: header.actions,
+    actionLabels: Object.fromEntries((header.rotas || []).map((r) => [r.variavel, r.rotulo]).filter(([k]) => k)),
     ...detail,
   };
 }
@@ -253,17 +276,11 @@ function collectPendingEntries() {
   getAllCockpitTickets().forEach((entry) => {
     const { ticket } = entry;
     if (!isTicketInWorkflow(ticket)) return;
+    if (!agentCanDecideTicket(ticket)) return;
     const progress = getWorkflowProgress(ticket);
     if (!ticketAwaitingDecision(ticket, progress)) return;
     pending.push({ entry, progress, queueItem: buildQueueItem(entry) });
   });
-
-  if (shouldUseApprovalDemoFallback(pending.length)) {
-    getDemoApprovalEntries().forEach((entry) => {
-      const progress = getWorkflowProgress(entry.ticket);
-      pending.push({ entry, progress, queueItem: buildQueueItem(entry) });
-    });
-  }
 
   return pending;
 }
@@ -314,7 +331,6 @@ export function computeWorkflowApprovalQueue() {
 export function getWorkflowApprovalDetail(ticketId) {
   const id = String(ticketId);
   let match = getAllCockpitTickets().find(({ ticket }) => String(ticket.id) === id);
-  if (!match) match = findDemoApprovalEntry(id);
   if (!match) return null;
   const progress = getWorkflowProgress(match.ticket);
   if (!ticketAwaitingDecision(match.ticket, progress)) return null;
@@ -324,6 +340,5 @@ export function getWorkflowApprovalDetail(ticketId) {
 export function findTicketEntryById(ticketId) {
   const id = String(ticketId);
   return getAllCockpitTickets().find(({ ticket }) => String(ticket.id) === id)
-    || findDemoApprovalEntry(id)
     || null;
 }

@@ -22,6 +22,7 @@ import { TicketsProvider } from '../context/TicketsContext';
 
 import { ProfileProvider } from '../context/ProfileContext';
 import { TabulationProvider } from '../context/TabulationContext';
+import { WorkflowConfigProvider } from '../context/WorkflowConfigContext';
 
 import ProtectedRoute from '../routes/ProtectedRoute';
 
@@ -133,7 +134,9 @@ function AppProviders({ children }) {
           null,
 
           React.createElement(ProfileProvider, null,
-            React.createElement(TabulationProvider, null, children)
+            React.createElement(TabulationProvider, null,
+              React.createElement(WorkflowConfigProvider, null, children)
+            )
           )
 
         )

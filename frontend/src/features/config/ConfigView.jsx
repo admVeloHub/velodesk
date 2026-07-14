@@ -1,12 +1,13 @@
 /**
  * Central de Configurações — layout V2
- * VERSION: v3.4.0 | DATE: 2026-07-14
+ * VERSION: v3.5.1 | DATE: 2026-07-14
  */
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useProfile } from '../../context/ProfileContext';
 import { CONFIG_SECTIONS, getConfigSection } from './configSections';
 import TabulationFormsSection from './components/TabulationFormsSection';
+import GruposAtribuicoesSection from './grupos/GruposAtribuicoesSection';
 import WorkflowsConfigSection from './workflow/WorkflowsConfigSection';
 
 export default function ConfigView() {
@@ -45,7 +46,6 @@ export default function ConfigView() {
                 </span>
                 <span className="config-menu-text">
                   <span className="config-menu-label">{item.label}</span>
-                  <span className="config-menu-desc">{item.menuDesc}</span>
                 </span>
               </button>
             ))}
@@ -75,7 +75,6 @@ export default function ConfigView() {
                       <i className={'ti ' + item.icon} />
                     </span>
                     <strong>{item.cardTitle || item.label}</strong>
-                    <span>{item.cardDesc}</span>
                   </button>
                 ))}
               </div>
@@ -86,7 +85,6 @@ export default function ConfigView() {
                 <span className="config-content-eyebrow">Central de configurações</span>
                 <div className="config-content-title-row">
                   <h3>{active?.label}</h3>
-                  <p>{active?.menuDesc}</p>
                 </div>
               </header>
 
@@ -94,6 +92,8 @@ export default function ConfigView() {
                 <TabulationFormsSection />
               ) : section === 'workflows' ? (
                 <WorkflowsConfigSection />
+              ) : section === 'grupos-atribuicoes' ? (
+                <GruposAtribuicoesSection />
               ) : (
                 <p className="config-placeholder-msg">
                   Editor de {active?.label?.toLowerCase()} — em desenvolvimento.

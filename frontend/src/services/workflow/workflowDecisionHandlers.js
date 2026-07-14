@@ -4,17 +4,13 @@
 import { updateTicketInKanban, getAllCockpitTickets } from '../kanbanStorage';
 import {
   advanceTicketWorkflow,
+  advanceTicketWorkflowByDecision,
   getAgentName,
   getTicketProtocolLabel,
   getWorkflowProgress,
   getWorkflowTemplateForTicket,
 } from '../desk/utils';
 import { buildWorkflowAdvanceMessage, ticketAwaitingDecision } from '../desk/workflowDefinitions';
-import {
-  isDemoApprovalTicket,
-  removeDemoApprovalTicket,
-  updateDemoApprovalTicket,
-} from './workflowApprovalDemoStore';
 import { createWorkflowInfoRequest } from './workflowInfoNotifications';
 
 function pushSystemMessage(ticket, text) {
@@ -33,30 +29,9 @@ function pushSystemMessage(ticket, text) {
 
 function applyApprove(ticket) {
   const author = getAgentName() || 'Operador';
-  const lf = ticket.lateralForm || {};
-  const wf = lf.workflow;
-  const history = [...(wf?.stepHistory || [])];
-  const activeIdx = history.findIndex((h) => h.status === 'active');
-  if (activeIdx >= 0) {
-    history[activeIdx] = {
-      ...history[activeIdx],
-      decision: 'approved',
-      trigger: 'decision-approve',
-    };
-    ticket.lateralForm = { ...lf, workflow: { ...wf, stepHistory: history } };
-  }
-
-  const result = advanceTicketWorkflow(ticket, author);
-  if (result.advanced) {
-    pushSystemMessage(
-      ticket,
-      `Decisão **aprovada** por ${author}. ${buildWorkflowAdvanceMessage(
-        result.template,
-        wf?.currentStepId,
-        result.workflow?.currentStepId,
-        author,
-      ).replace(/^Etapa|Workflow/, 'Workflow')}`,
-    );
+  const result = advanceTicketWorkflowByDecision(ticket, 'approve', author);
+  if (!result.advanced) {
+    advanceTicketWorkflow(ticket, author);
   }
   return ticket;
 }
@@ -107,7 +82,9 @@ function applyReject(ticket, reason = '') {
       rejectionReason: note,
     },
   };
-  ticket.status = 'pendente';
+  const rejectRota = progress?.activeStep?.acao?.rotas?.find((r) => r.variavel === 'reject')
+    || progress?.activeStep?.decision?.rotas?.find((r) => r.variavel === 'reject');
+  ticket.status = rejectRota?.statusTicket || 'pendente';
 
   if (!ticket.internalNotes) ticket.internalNotes = [];
   ticket.internalNotes.push({
@@ -268,43 +245,14 @@ function applyRequestInfo(ticket, message = '') {
   return ticket;
 }
 
-function finalizeDemoTicket(ticketId, ticket) {
-  const progress = getWorkflowProgress(ticket);
-  if (!ticketAwaitingDecision(ticket, progress)) {
-    removeDemoApprovalTicket(ticketId);
-  } else {
-    updateDemoApprovalTicket(ticketId, ticket);
-  }
-}
-
 export async function approveWorkflowDecision(ticketId) {
-  if (isDemoApprovalTicket(ticketId)) {
-    const ticket = updateDemoApprovalTicket(ticketId, applyApprove);
-    if (ticket) finalizeDemoTicket(ticketId, ticket);
-    return ticket;
-  }
-
   return updateTicketInKanban(ticketId, (ticket) => applyApprove(ticket));
 }
 
 export async function rejectWorkflowDecision(ticketId, reason = '') {
-  if (isDemoApprovalTicket(ticketId)) {
-    const ticket = updateDemoApprovalTicket(ticketId, (t) => applyReject(t, reason));
-    if (ticket) finalizeDemoTicket(ticketId, ticket);
-    return ticket;
-  }
-
   return updateTicketInKanban(ticketId, (ticket) => applyReject(ticket, reason));
 }
 
 export async function requestWorkflowInfo(ticketId, message = '') {
-  if (isDemoApprovalTicket(ticketId)) {
-    const ticket = updateDemoApprovalTicket(ticketId, (t) => applyRequestInfo(t, message));
-    if (ticket) {
-      await syncInfoRequestToKanbanTickets(ticket);
-    }
-    return ticket;
-  }
-
   return updateTicketInKanban(ticketId, (ticket) => applyRequestInfo(ticket, message));
 }

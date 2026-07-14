@@ -75,6 +75,7 @@ export default function WorkflowApprovalDetail({
 
         <WorkflowApprovalActions
           actions={detail.actions}
+          actionLabels={detail.actionLabels}
           busy={busy}
           infoPanelOpen={infoPanelOpen}
           onApprove={onApprove}
