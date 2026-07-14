@@ -1,4 +1,4 @@
-/** env v1.14.0 — Gmail Workspace outbound + inbound Pub/Sub */
+/** env v1.16.0 — snapshot horário gestão (GESTAO_SNAPSHOT_INTERVAL_MS) */
 import fs from 'fs';
 import path from 'path';
 
@@ -90,7 +90,31 @@ export const env = {
     || process.env.VECTOR_STORE_PATH
     || ''
   ).trim(),
+  openaiPopVectorStoreId: (
+    process.env.OPENAI_POP_VECTOR_STORE_ID
+    || process.env.OPENAI_VECTOR_STORE_ID
+    || process.env.VECTOR_STORE_PATH
+    || ''
+  ).trim(),
+  openaiPublicVectorStoreId: (process.env.OPENAI_PUBLIC_VECTOR_STORE_ID || '').trim(),
+  openaiAuditVectorStoreId: (process.env.OPENAI_AUDIT_VECTOR_STORE_ID || '').trim(),
   openaiModel: (process.env.OPENAI_MODEL || 'gpt-4.1-mini').trim(),
+  agentsEnabled: process.env.AGENTS_ENABLED === 'true',
+  agentsAutonomyEnabled: process.env.AGENTS_AUTONOMY_ENABLED === 'true',
+  agentAuditThresholdAuto: parseInt(process.env.AGENT_AUDIT_THRESHOLD_AUTO || '85', 10),
+  agentAuditThresholdDesk: parseInt(process.env.AGENT_AUDIT_THRESHOLD_DESK || '70', 10),
+  agentRevisionMaxAttempts: parseInt(process.env.AGENT_REVISION_MAX_ATTEMPTS || '2', 10),
+  gestaoSnapshotIntervalMs: parseInt(process.env.GESTAO_SNAPSHOT_INTERVAL_MS || '3600000', 10),
+  gestaoChamadosIntervalMs: parseInt(process.env.GESTAO_CHAMADOS_INTERVAL_MS || '300000', 10),
+  gestaoSpikeThreshold: parseInt(process.env.GESTAO_SPIKE_THRESHOLD || '10', 10),
+  gestaoSpikeWindowMin: parseInt(process.env.GESTAO_SPIKE_WINDOW_MIN || '30', 10),
+  gestaoStuckNovoMinutes: parseInt(process.env.GESTAO_STUCK_NOVO_MINUTES || '120', 10),
+  gestaoStuckActiveHours: parseInt(process.env.GESTAO_STUCK_ACTIVE_HOURS || '4', 10),
+  gestaoAlertEmails: (process.env.GESTAO_ALERT_EMAILS || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean),
+  gestaoAlertWhatsapp: (process.env.GESTAO_ALERT_WHATSAPP || '').trim(),
   ticketSequenceFloor: (process.env.TICKET_SEQUENCE_FLOOR || '100177678').trim(),
   assignmentRouterEnabled: process.env.ASSIGNMENT_ROUTER_ENABLED === 'true',
   assignmentRouterStrategy: (process.env.ASSIGNMENT_ROUTER_STRATEGY || 'least_loaded').trim(),

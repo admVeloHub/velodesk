@@ -1,6 +1,6 @@
 /**
  * Painel 360° — roteamento por perfil (Agente / Gestão / Workflow)
- * VERSION: v2.4.0 | DATE: 2026-07-13 | AUTHOR: VeloHub Development Team
+ * VERSION: v2.4.1 | DATE: 2026-07-14 | AUTHOR: VeloHub Development Team
  */
 import React, { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';

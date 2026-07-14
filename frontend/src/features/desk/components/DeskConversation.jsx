@@ -1,10 +1,22 @@
 /**
- * DeskConversation v1.3.2 — exibe erro de sugestão IA na barra
- * VERSION: v1.3.2 | DATE: 2026-07-10
+ * DeskConversation v1.5.2 — normaliza auditScore numérico para badge
+ * VERSION: v1.5.2 | DATE: 2026-07-13
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
 import { sanitizeComposeHtml } from '../../../services/desk/composeRichEditor';
+
+const AUDIT_MIN_DISPLAY = 70;
+const AUDIT_HIGH_GREEN = 90;
+
+function normalizeAuditScore(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
 
 function MessageBubbleText({ text }) {
   const raw = String(text || '');
@@ -38,6 +50,8 @@ export default function DeskConversation({
   iaShowBar = false,
   iaHasSuggestion = false,
   iaError = '',
+  iaAuditScore = null,
+  onRequestRevision,
 }) {
   const [iaVisible, setIaVisible] = useState(true);
   const lastIaReplyRef = useRef('');
@@ -60,6 +74,12 @@ export default function DeskConversation({
       : iaReply;
 
   const canUseReply = iaHasSuggestion && !iaReplyLoading && Boolean(iaReply) && !iaError;
+  const showFooter = !iaError;
+  const auditScoreValue = normalizeAuditScore(iaAuditScore);
+  const hasAuditScore = auditScoreValue !== null;
+  const showCompliance = showFooter && iaHasSuggestion && !iaReplyLoading
+    && hasAuditScore && auditScoreValue >= AUDIT_MIN_DISPLAY;
+  const complianceTone = hasAuditScore && auditScoreValue >= AUDIT_HIGH_GREEN ? 'high' : 'mid';
 
   const handleUseIaReply = () => {
     if (!canUseReply) return;
@@ -105,23 +125,51 @@ export default function DeskConversation({
       )}
       {iaVisible && iaShowBar && (
         <div className={'ia-suggestion-bar' + (iaReplyLoading ? ' ia-suggestion-bar--loading' : '') + (iaError ? ' ia-suggestion-bar--error' : '')} id="iaSuggestionBar">
-          <span className="ia-suggestion-bar__label">IA</span>
-          <span className="ia-suggestion-bar__text" id="iaReplyText">{displayText}</span>
-          <div className="ia-suggestion-bar__actions">
-            {!iaError ? (
-            <>
-            <button
-              type="button"
-              className="ia-suggestion-bar__btn"
-              disabled={!canUseReply}
-              onClick={handleUseIaReply}
-            >
-              Usar resposta
-            </button>
-            <button type="button" className="ia-suggestion-bar__btn ia-suggestion-bar__btn--dismiss" onClick={() => setIaVisible(false)}>Não usar</button>
-            </>
-            ) : null}
+          <div className="ia-suggestion-bar__content">
+            <span className="ia-suggestion-bar__text" id="iaReplyText">{displayText}</span>
           </div>
+          {showFooter && (
+            <>
+              <div className="ia-suggestion-bar__divider" role="separator" aria-hidden="true" />
+              <div className="ia-suggestion-bar__footer">
+                {showCompliance && (
+                  <span
+                    className={'ia-suggestion-bar__compliance container-secondary ia-suggestion-bar__compliance--' + complianceTone}
+                    title="Conformidade da auditoria"
+                  >
+                    {auditScoreValue}%
+                  </span>
+                )}
+                <div className="ia-suggestion-bar__actions">
+                  <button
+                    type="button"
+                    className="ia-suggestion-bar__btn ia-suggestion-bar__btn--use container-secondary"
+                    disabled={!canUseReply}
+                    onClick={handleUseIaReply}
+                  >
+                    Usar resposta
+                  </button>
+                  {onRequestRevision && (
+                    <button
+                      type="button"
+                      className="ia-suggestion-bar__btn ia-suggestion-bar__btn--revise container-secondary"
+                      disabled={iaReplyLoading || !iaHasSuggestion}
+                      onClick={onRequestRevision}
+                    >
+                      Revisar
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="ia-suggestion-bar__btn ia-suggestion-bar__btn--dismiss container-secondary"
+                    onClick={() => setIaVisible(false)}
+                  >
+                    Não usar
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

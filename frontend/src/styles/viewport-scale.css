@@ -1,16 +1,18 @@
 /**
- * viewport-scale v1.0.4 — escala proporcional; notebooks sobrescrevem via velodesk-crm.css
- * VERSION: v1.0.4 | DATE: 2026-07-07
+ * viewport-scale v1.0.5 — escala ~75% no Desk (equivale ao zoom 75% do navegador)
+ * VERSION: v1.0.5 | DATE: 2026-07-14
  *
- * Objetivo: manter o mesmo aspecto visual do layout de referência (~1680×945)
- * em telas menores, reduzindo tudo na mesma proporção (scale=1 = design intacto).
- *
+ * Referência 2560×1440 → em 1920×1080 o scale ≈ 0,75.
  * Não altera #velodeskDeskV2Root (position fixed). Scale só no .page interno.
  */
 :root {
-    --velo-ui-ref-w: 1520;
-    --velo-ui-ref-h: 860;
-    --velo-ui-scale: clamp(0.62, min(1, 100vw / 1520, 100vh / 860), 1);
+    --velo-ui-ref-w: 2560;
+    --velo-ui-ref-h: 1440;
+    --velo-ui-scale: clamp(0.68, min(1, 100vw / 2560, 100vh / 1440), 1);
+}
+
+body.desk-v2-mode {
+    --velo-ui-scale: clamp(0.68, min(1, 100vw / 2560, 100vh / 1440), 1);
 }
 
 body.desk-v2-mode #velodeskDeskV2Root > .page.active {
@@ -19,4 +21,16 @@ body.desk-v2-mode #velodeskDeskV2Root > .page.active {
     width: calc(100% / var(--velo-ui-scale));
     height: calc(100% / var(--velo-ui-scale));
     max-height: calc(100% / var(--velo-ui-scale));
+}
+
+@media (max-width: 1480px), (max-height: 860px) {
+    body.desk-v2-mode {
+        --velo-ui-scale: clamp(0.65, min(1, 100vw / 2000, 100vh / 1120), 0.82);
+    }
+}
+
+@media (max-width: 1280px) {
+    body.desk-v2-mode {
+        --velo-ui-scale: clamp(0.62, min(1, 100vw / 1840, 100vh / 1030), 0.78);
+    }
 }

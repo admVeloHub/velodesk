@@ -1,6 +1,6 @@
 /**
- * useWorkspace360 v1.0.0 — hook do Painel 360° (dados reais)
- * VERSION: v1.0.0 | DATE: 2026-07-06
+ * useWorkspace360 v1.0.1 — hook do Painel 360° (dados reais)
+ * VERSION: v1.0.1 | DATE: 2026-07-14
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useProfile } from '../context/ProfileContext';
@@ -18,7 +18,9 @@ export function useWorkspace360(options = {}) {
     setLoading(true);
     setError(null);
     try {
-      const params = profileId === 'supervisor' ? (reportParams || {}) : undefined;
+      const params = profileId === 'gestao' || profileId === 'supervisor'
+        ? (reportParams || {})
+        : undefined;
       const payload = await fetchWorkspace360(params);
       setData(payload);
       return payload;

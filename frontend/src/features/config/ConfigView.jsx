@@ -1,6 +1,6 @@
 /**
  * Central de Configurações — layout V2
- * VERSION: v3.3.0 | DATE: 2026-07-07
+ * VERSION: v3.4.0 | DATE: 2026-07-14
  */
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
@@ -82,15 +82,13 @@ export default function ConfigView() {
             </>
           ) : (
             <>
-              {section !== 'workflows' ? (
-                <header className="config-content-header">
-                  <span className="config-content-eyebrow">Central de configurações</span>
-                  <div className="config-content-title-row">
-                    <h3>{active?.label}</h3>
-                    <p>{active?.menuDesc}</p>
-                  </div>
-                </header>
-              ) : null}
+              <header className="config-content-header">
+                <span className="config-content-eyebrow">Central de configurações</span>
+                <div className="config-content-title-row">
+                  <h3>{active?.label}</h3>
+                  <p>{active?.menuDesc}</p>
+                </div>
+              </header>
 
               {section === 'forms' ? (
                 <TabulationFormsSection />

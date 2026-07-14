@@ -1,4 +1,4 @@
-/** ticketAi.routes v1.0.1 — status de configuração + sugestão IA */
+/** ticketAi.routes v1.0.2 — agentsEnabled + auditComplete no status/suggest */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { env } from '../config/env';
@@ -18,6 +18,7 @@ router.get('/status', authMiddleware, (_req: Request, res: Response) => {
     configured: status.configured,
     missing: status.missing,
     model: env.openaiModel,
+    agentsEnabled: env.agentsEnabled,
     source: 'ticket_ai_status',
   });
 });
@@ -54,6 +55,12 @@ router.post('/suggest', authMiddleware, async (req: Request, res: Response) => {
     respostaSugerida: aiResult.respostaSugerida,
     tabulacao: aiResult.tabulacao,
     tabulacaoDisplay: aiResult.tabulacaoDisplay,
+    auditScore: aiResult.auditScore,
+    auditAprovado: aiResult.auditAprovado,
+    auditDecisao: aiResult.auditDecisao,
+    auditComplete: aiResult.auditComplete ?? false,
+    confidence: aiResult.confidence,
+    revisoesRealizadas: aiResult.revisoesRealizadas,
     aiProvider: 'OpenAI',
     model: aiResult.model,
     source: 'ticket_ai_suggest',

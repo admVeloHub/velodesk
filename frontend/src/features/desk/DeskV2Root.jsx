@@ -47,6 +47,7 @@ import { useTabulation } from '../../context/TabulationContext';
 import { createSpellContext, loadSpellEngine, scanText } from '../../services/spellcheck/spellEngine';
 import { htmlToPlainText } from '../../services/desk/composeRichEditor';
 import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
+import DeskAiRevisionModal from './components/DeskAiRevisionModal';
 
 function applyRightFieldsToTicket(t, rightFields, escalonar) {
   const prevLf = t.lateralForm || {};
@@ -124,6 +125,8 @@ export default function DeskV2Root() {
   const [rightFields, setRightFields] = useState({});
   const [escalonar, setEscalonar] = useState(null);
   const [waChatOpen, setWaChatOpen] = useState(false);
+  const [aiRevisionOpen, setAiRevisionOpen] = useState(false);
+  const [aiRevisionSubmitting, setAiRevisionSubmitting] = useState(false);
   const [composeSpellErrors, setComposeSpellErrors] = useState([]);
   const [spellIgnoredWords, setSpellIgnoredWords] = useState(() => new Set());
   const [queueStatuses, setQueueStatuses] = useState(() => getAllQueueStatuses());
@@ -754,6 +757,25 @@ export default function DeskV2Root() {
     }
   }, [workflowComposeLocked, composeMode]);
 
+  const handleOpenAiRevision = useCallback(() => {
+    setAiRevisionOpen(true);
+  }, []);
+
+  const handleAiRevisionSubmit = useCallback(async (inputOperador) => {
+    setAiRevisionSubmitting(true);
+    try {
+      const result = await ticketAi.requestRevision(inputOperador);
+      if (result.success) {
+        showNotification('Sugestão revisada pela IA.', 'success');
+      } else if (result.error) {
+        showNotification(result.error, 'warning');
+      }
+      return result;
+    } finally {
+      setAiRevisionSubmitting(false);
+    }
+  }, [ticketAi, showNotification]);
+
   return (
     <div className="app-shell" id="deskAppShell">
       <DeskQueuePanel
@@ -870,6 +892,9 @@ export default function DeskV2Root() {
                         iaWaitingMessage={ticketAi.waitingMessage}
                         iaShowBar={ticketAi.showIaBar}
                         iaHasSuggestion={ticketAi.hasSuggestion}
+                        iaError={ticketAi.error}
+                        iaAuditScore={ticketAi.auditScore}
+                        onRequestRevision={handleOpenAiRevision}
                       />
                       <DeskComposePanel
                         ticketId={ticket.id}
@@ -928,8 +953,17 @@ export default function DeskV2Root() {
           iaHasSuggestion={ticketAi.hasSuggestion}
           iaHasTabulationSuggestion={ticketAi.hasTabulationSuggestion}
           iaShowSection={ticketAi.showIaBar || Boolean(ticketAi.waitingReason)}
+          iaAuditScore={ticketAi.auditScore}
         />
       )}
+
+      <DeskAiRevisionModal
+        open={aiRevisionOpen}
+        auditScore={ticketAi.auditScore}
+        submitting={aiRevisionSubmitting}
+        onClose={() => setAiRevisionOpen(false)}
+        onSubmit={handleAiRevisionSubmit}
+      />
     </div>
   );
 }

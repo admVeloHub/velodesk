@@ -1,10 +1,11 @@
 /**
  * Painel 360° — Gestão
- * VERSION: v2.3.0 | DATE: 2026-07-13
+ * VERSION: v3.2.1 | DATE: 2026-07-14
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { computeSupervisorData } from '../../services/workspace/deskData';
+import { buildSupervisor360View, mapEntryToRow } from '../../services/workspace/deskData';
+import { useWorkspace360 } from '../../hooks/useWorkspace360';
 import { useNotifications } from '../../context/NotificationContext';
 import { useTickets } from '../../context/TicketsContext';
 import Workspace360SupervisorKpis from './components/ws360/Workspace360SupervisorKpis';
@@ -19,10 +20,27 @@ export default function GestaoPanel() {
   const navigate = useNavigate();
   const { showNotification } = useNotifications();
   const { openTicket, refreshTickets } = useTickets();
+  const { data, loading, error, refresh } = useWorkspace360();
   const [escalatedListOpen, setEscalatedListOpen] = useState(false);
   const [redistributeOpen, setRedistributeOpen] = useState(false);
   const [escalateOpen, setEscalateOpen] = useState(false);
-  const d = computeSupervisorData();
+
+  const view = useMemo(() => (data ? buildSupervisor360View(data) : null), [data]);
+
+  const escalatedListGroups = useMemo(() => {
+    if (!view?.escalated?.groups) return [];
+    return view.escalated.groups.map((group) => ({
+      ...group,
+      tickets: (group.entries ?? []).map((entry) => {
+        const responsavel = entry.ticket?.responsibleAgent || entry.ticket?.lateralForm?.responsavel || '';
+        const row = mapEntryToRow(entry, 'urgent');
+        return {
+          ...row,
+          meta: responsavel ? `${row.meta ? `${row.meta} · ` : ''}Agente: ${responsavel}` : row.meta,
+        };
+      }),
+    }));
+  }, [view]);
 
   const handleOpenEscalatedTicket = useCallback((ticketId) => {
     if (typeof window.openTicket === 'function') {
@@ -33,27 +51,53 @@ export default function GestaoPanel() {
     navigate('/tickets?desk=v2');
   }, [navigate, openTicket]);
 
-  const handleRedistributeComplete = useCallback(async ({ count, targetAgent, sources }) => {
+  const handleRedistributeComplete = useCallback(async (outcome) => {
     await refreshTickets();
-    const sourceLabel = sources.join(', ');
+    await refresh();
+    if (outcome.sources?.length) {
+      const sourceLabel = outcome.sources.join(', ');
+      showNotification(
+        `${outcome.count} ticket${outcome.count === 1 ? '' : 's'} redistribuído${outcome.count === 1 ? '' : 's'} de ${sourceLabel} para ${outcome.targetAgent}.`,
+        'success',
+      );
+      return;
+    }
+    const fromLabel = outcome.previousAgent && outcome.previousAgent !== 'Sem responsável'
+      ? ` de ${outcome.previousAgent}`
+      : '';
     showNotification(
-      `${count} ticket${count === 1 ? '' : 's'} redistribuído${count === 1 ? '' : 's'} de ${sourceLabel} para ${targetAgent}.`,
+      `Ticket #${outcome.ticketId} redistribuído${fromLabel} para ${outcome.targetAgent}.`,
       'success',
     );
-  }, [refreshTickets, showNotification]);
+  }, [refreshTickets, refresh, showNotification]);
 
   const handleEscalateComplete = useCallback(async ({ ticketId, label }) => {
     await refreshTickets();
+    await refresh();
     showNotification(`Ticket #${ticketId} escalonado para ${label}.`, 'success');
-  }, [refreshTickets, showNotification]);
+  }, [refreshTickets, refresh, showNotification]);
+
+  if (loading && !view) {
+    return <div className="ws-super-desk"><p className="ws360-loading">Carregando painel…</p></div>;
+  }
+
+  if (error && !view) {
+    return (
+      <div className="ws-super-desk">
+        <p className="ws360-error" role="alert">Não foi possível carregar o Painel 360°.</p>
+      </div>
+    );
+  }
+
+  if (!view) return null;
+
+  const d = view.kpis;
 
   return (
     <div className={'ws-super-desk' + (d.warRoom ? ' ws-super-desk--war-room' : '')} id="wsGestaoDesk">
-      <div className="ws-hero ws-hero--mgmt">
+      <div className="ws-hero ws-hero--supervisor">
         <div>
-          <span className="ws-eyebrow">Gestão</span>
-          <h3>Visão executiva da operação</h3>
-          <p>SLA, performance da equipe, escalonamentos e alertas em tempo real.</p>
+          <h3>Performance da equipe</h3>
         </div>
         <div className="ws-hero-actions">
           <button
@@ -69,9 +113,6 @@ export default function GestaoPanel() {
           <button type="button" className="btn-secondary" onClick={() => navigate('/tickets?desk=v2')}>
             Abrir fila
           </button>
-          <button type="button" className="btn-primary" onClick={() => navigate('/dashboard')}>
-            <i className="fas fa-chart-line" /> Dashboard
-          </button>
         </div>
       </div>
 
@@ -79,6 +120,8 @@ export default function GestaoPanel() {
 
       {escalatedListOpen ? (
         <Workspace360EscalatedCasesList
+          groups={escalatedListGroups}
+          slaCriticalCount={view.escalated?.slaCriticalCount ?? 0}
           onBack={() => setEscalatedListOpen(false)}
           onOpenTicket={handleOpenEscalatedTicket}
         />
@@ -86,10 +129,12 @@ export default function GestaoPanel() {
         <>
           <div className="ws-grid-2">
             <Workspace360EscalatedCases
+              escalated={view.escalated}
+              channelVision={view.channelVision}
               onViewAll={() => setEscalatedListOpen(true)}
               onDismiss={() => showNotification('Alerta de escalonamento registrado.', 'info')}
             />
-            <Workspace360OperationalLeaderboard />
+            <Workspace360OperationalLeaderboard entries={view.leaderboard} />
           </div>
           <Workspace360SupervisorReports />
         </>

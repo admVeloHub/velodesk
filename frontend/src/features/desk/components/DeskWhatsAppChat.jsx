@@ -130,7 +130,7 @@ export default function DeskWhatsAppChat({
           <div className={'wa-ia-card' + (iaReplyLoading ? ' wa-ia-card--loading' : '') + (iaError ? ' wa-ia-card--error' : '')} id="iaSuggestionBar">
             <div className="wa-ia-card__head">
               <i className="ti ti-sparkles" aria-hidden="true" />
-              <span className="wa-ia-card__label">SUGESTÃO IA</span>
+              <span className="wa-ia-card__label">SUGESTÃO</span>
             </div>
             <p className="wa-ia-card__text" id="iaReplyText">{displayText}</p>
             <div className="wa-ia-card__actions">

@@ -1,0 +1,233 @@
+/**
+ * agents.routes v1.1.0 — snapshots horários do Agente 3
+ * VERSION: v1.1.0 | DATE: 2026-07-14
+ */
+import { Router, Request, Response } from 'express';
+import { authMiddleware } from '../middleware/auth';
+import { supervisorMiddleware } from '../middleware/supervisor';
+import { env } from '../config/env';
+import { getAgentsStatus, isAgentsConfigured } from '../services/agents/openaiAgent.util';
+import { runAgentPipeline, runRevisarSugestao } from '../services/agents/agentOrchestrator.service';
+import { validateAuditoria } from '../services/agents/auditoriaAgent.service';
+import {
+  createAutonomyRule,
+  deleteAutonomyRule,
+  listAutonomyRules,
+  updateAutonomyRule,
+} from '../services/agents/autonomyRules.service';
+import {
+  executeGestaoHandoff,
+  listGestaoAlerts,
+  markGestaoAlertRead,
+} from '../services/agents/gestaoChamadosHandoff.service';
+import { runGestaoChamadosCycle } from '../services/agents/gestaoChamadosAgent.service';
+import {
+  getLatestGestaoSnapshot,
+  listGestaoSnapshots,
+} from '../services/agents/gestaoSnapshot.service';
+import {
+  exportAgentFeedbackCsv,
+  listAgentFeedback,
+} from '../services/agents/agentFeedback.service';
+import { validateTicketAiInput } from '../services/openaiTicketSuggest.service';
+import type { RevisaoOrigem, TicketAiTabulationResult } from '../services/agents/agentTypes';
+
+const router = Router();
+
+router.get('/status', authMiddleware, (_req: Request, res: Response) => {
+  const status = getAgentsStatus();
+  return res.json({
+    success: true,
+    ...status,
+    model: env.openaiModel,
+    thresholds: {
+      auto: env.agentAuditThresholdAuto,
+      desk: env.agentAuditThresholdDesk,
+      maxRevisions: env.agentRevisionMaxAttempts,
+    },
+    source: 'agents_status',
+  });
+});
+
+router.post('/pipeline', authMiddleware, async (req: Request, res: Response) => {
+  const parsed = validateTicketAiInput(req.body);
+  if (!parsed.ok) {
+    return res.status(400).json({ success: false, error: parsed.error });
+  }
+  if (!isAgentsConfigured()) {
+    return res.status(503).json({ success: false, error: 'Agentes não configurados no servidor.' });
+  }
+
+  const pipelineModo = req.body?.pipelineModo === 'auto_envio' ? 'auto_envio' : 'desk';
+  const result = await runAgentPipeline({ ...parsed.data, pipelineModo });
+
+  if (!result.success) {
+    return res.status(500).json({ success: false, error: result.error });
+  }
+
+  return res.json({
+    ...result,
+    success: true,
+    aiProvider: 'OpenAI',
+    source: 'agents_pipeline',
+  });
+});
+
+router.post('/revisar-sugestao', authMiddleware, async (req: Request, res: Response) => {
+  const parsed = validateTicketAiInput(req.body);
+  if (!parsed.ok) {
+    return res.status(400).json({ success: false, error: parsed.error });
+  }
+
+  const body = req.body as Record<string, unknown>;
+  const respostaAtual = String(body.respostaAtual || '').trim();
+  const tabulacaoAtual = body.tabulacaoAtual as TicketAiTabulationResult | undefined;
+  const origemRevisao = body.origemRevisao === 'solicitada_operador'
+    ? 'solicitada_operador' as RevisaoOrigem
+    : 'automatica_baixo_compliance' as RevisaoOrigem;
+
+  if (!respostaAtual || !tabulacaoAtual) {
+    return res.status(400).json({ success: false, error: 'respostaAtual e tabulacaoAtual são obrigatórios' });
+  }
+
+  const result = await runRevisarSugestao({
+    input: parsed.data,
+    respostaAtual,
+    tabulacaoAtual,
+    auditScore: typeof body.auditScore === 'number' ? body.auditScore : undefined,
+    origemRevisao,
+    inputOperador: String(body.inputOperador || '').trim() || undefined,
+    violacoes: Array.isArray(body.violacoes) ? body.violacoes.map(String) : undefined,
+    recomendacoes: Array.isArray(body.recomendacoes) ? body.recomendacoes.map(String) : undefined,
+  });
+
+  if (!result.success) {
+    return res.status(500).json({ success: false, error: result.error });
+  }
+
+  return res.json({ ...result, success: true, source: 'agents_revisar_sugestao' });
+});
+
+router.post('/auditoria', authMiddleware, supervisorMiddleware, async (req: Request, res: Response) => {
+  const body = req.body as Record<string, unknown>;
+  const modo = body.modo === 'pos_humano' ? 'pos_humano' : 'desk_sugestao';
+
+  const result = await validateAuditoria({
+    modo,
+    protocolo: String(body.protocolo || ''),
+    canal: String(body.canal || ''),
+    respostaSugerida: String(body.respostaSugerida || body.mensagemOperador || ''),
+    tabulacao: (body.tabulacao as TicketAiTabulationResult) || {
+      tipo: '', produto: '', motivo: '', detalhe: '',
+    },
+    mensagemOperador: String(body.mensagemOperador || ''),
+    ultimaMensagemCliente: String(body.ultimaMensagemCliente || ''),
+    messages: Array.isArray(body.messages) ? body.messages : undefined,
+  });
+
+  if (!result.success) {
+    return res.status(500).json({ success: false, error: result.error });
+  }
+
+  return res.json({ ...result, success: true, source: 'agents_auditoria' });
+});
+
+router.get('/autonomy-rules', authMiddleware, supervisorMiddleware, async (_req, res) => {
+  const rules = await listAutonomyRules();
+  return res.json({ success: true, rules, source: 'agents_autonomy_rules' });
+});
+
+router.post('/autonomy-rules', authMiddleware, supervisorMiddleware, async (req, res) => {
+  const rule = await createAutonomyRule(req.body);
+  return res.status(201).json({ success: true, rule, source: 'agents_autonomy_rules' });
+});
+
+router.put('/autonomy-rules/:id', authMiddleware, supervisorMiddleware, async (req, res) => {
+  const rule = await updateAutonomyRule(req.params.id, req.body);
+  if (!rule) return res.status(404).json({ success: false, error: 'Regra não encontrada' });
+  return res.json({ success: true, rule });
+});
+
+router.delete('/autonomy-rules/:id', authMiddleware, supervisorMiddleware, async (req, res) => {
+  const rule = await deleteAutonomyRule(req.params.id);
+  if (!rule) return res.status(404).json({ success: false, error: 'Regra não encontrada' });
+  return res.json({ success: true, deleted: true });
+});
+
+router.get('/feedback', authMiddleware, supervisorMiddleware, async (req, res) => {
+  const limit = parseInt(String(req.query.limit || '50'), 10);
+  const skip = parseInt(String(req.query.skip || '0'), 10);
+  const items = await listAgentFeedback(limit, skip);
+  return res.json({ success: true, items, source: 'agents_feedback' });
+});
+
+router.get('/feedback/export', authMiddleware, supervisorMiddleware, async (_req, res) => {
+  const csv = await exportAgentFeedbackCsv();
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="agent_feedback.csv"');
+  return res.send(csv);
+});
+
+router.get('/gestao/snapshots/latest', authMiddleware, supervisorMiddleware, async (_req, res) => {
+  const snapshot = await getLatestGestaoSnapshot();
+  if (!snapshot) {
+    return res.status(404).json({ success: false, error: 'Nenhum snapshot horário disponível' });
+  }
+  return res.json({ success: true, snapshot, source: 'agents_gestao_snapshot_latest' });
+});
+
+router.get('/gestao/snapshots', authMiddleware, supervisorMiddleware, async (req, res) => {
+  const limit = parseInt(String(req.query.limit || '24'), 10);
+  const snapshots = await listGestaoSnapshots(limit);
+  return res.json({ success: true, snapshots, source: 'agents_gestao_snapshots' });
+});
+
+router.get('/gestao/alerts', authMiddleware, supervisorMiddleware, async (req, res) => {
+  const limit = parseInt(String(req.query.limit || '50'), 10);
+  const onlyUnread = req.query.unread === 'true';
+  const alerts = await listGestaoAlerts(limit, onlyUnread);
+  return res.json({ success: true, alerts, source: 'agents_gestao_alerts' });
+});
+
+router.patch('/gestao/alerts/:id/read', authMiddleware, supervisorMiddleware, async (req, res) => {
+  const alert = await markGestaoAlertRead(req.params.id);
+  if (!alert) return res.status(404).json({ success: false, error: 'Alerta não encontrado' });
+  return res.json({ success: true, alert });
+});
+
+router.post('/gestao/handoff', authMiddleware, supervisorMiddleware, async (req, res) => {
+  const body = req.body as Record<string, unknown>;
+  const ticketId = String(body.ticketId || '').trim();
+  const protocolo = String(body.protocolo || '').trim();
+  if (!ticketId || !protocolo) {
+    return res.status(400).json({ success: false, error: 'ticketId e protocolo obrigatórios' });
+  }
+
+  const result = await executeGestaoHandoff({
+    ticketId,
+    protocolo,
+    nivelCriticidade: (body.nivelCriticidade as 'critica' | 'alta' | 'media' | 'baixa') || 'alta',
+    palavrasCriticas: Array.isArray(body.palavrasCriticas) ? body.palavrasCriticas.map(String) : [],
+    categoriaAtendimento: String(body.categoriaAtendimento || ''),
+    origem: String(body.origem || 'manual_supervisor'),
+    auditScore: typeof body.auditScore === 'number' ? body.auditScore : undefined,
+    produto: String(body.produto || ''),
+    motivo: String(body.motivo || ''),
+  });
+
+  if (!result.success) {
+    return res.status(500).json({ success: false, error: result.error });
+  }
+
+  return res.json({ ...result, success: true, source: 'agents_gestao_handoff' });
+});
+
+router.post('/gestao/run', authMiddleware, supervisorMiddleware, async (_req, res) => {
+  const result = await runGestaoChamadosCycle();
+  if (!result.success) {
+    return res.status(500).json({ success: false, error: result.error });
+  }
+  return res.json({ ...result, success: true, source: 'agents_gestao_run' });
+});
+
+export default router;

@@ -1,4 +1,4 @@
-/** chamado.mapper v1.8.5 — novos sem responsavel visíveis para todos os agentes */
+/** chamado.mapper v1.8.6 — filtro tickets ativos para snapshot gestão */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -269,8 +269,33 @@ const STATUS_VARIANTS: Record<string, string[]> = {
   pendente: ['pendente'],
   resolvido: ['resolvido'],
   cancelado: ['cancelado'],
+  fechado: ['fechado'],
   'em-espera': ['em-espera', 'em espera', 'em-andamento', 'em andamento'],
 };
+
+/** Status terminais — excluídos do snapshot horário do Agente 3 */
+export const GESTAO_TERMINAL_STATUSES = ['resolvido', 'cancelado', 'fechado'] as const;
+
+export function gestaoTerminalStatusVariants(): string[] {
+  return [...new Set(
+    GESTAO_TERMINAL_STATUSES.flatMap((status) => STATUS_VARIANTS[status] ?? [status]),
+  )];
+}
+
+/** Tickets com último status diferente de resolvido/cancelado/fechado */
+export function activeTicketsStatusFilter(): Record<string, unknown> {
+  const terminalVariants = gestaoTerminalStatusVariants();
+  return {
+    $expr: {
+      $not: {
+        $in: [
+          { $ifNull: [{ $arrayElemAt: ['$registro.status', -1] }, 'novo'] },
+          terminalVariants,
+        ],
+      },
+    },
+  };
+}
 
 const STATUS_BY_BOX_NAME = Object.fromEntries(
   Object.entries(BOX_NAME_BY_STATUS).map(([status, name]) => [name, status])

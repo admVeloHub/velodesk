@@ -1,4 +1,4 @@
-/** workflowTestSeed v1.0.0 â€” tickets fictÃ­cios para testar workflow visual no Desk (dev) */
+/** workflowTestSeed v1.0.1 — tickets fictícios para testar workflow visual no Desk (dev) */
 import mongoose from 'mongoose';
 import { ChamadoN1, IChamadoN1, IRegistro } from '../models/ChamadoN1';
 import { getClienteModel } from '../models/Cliente';
@@ -76,14 +76,14 @@ const PRODUTO_X_TABULACAO = {
       detalhes: [
         { detalhe: 'Dentro de 7 dias', ordem: 0, ativo: true },
         { detalhe: 'Fora do prazo', ordem: 1, ativo: true },
-        { detalhe: 'Em anÃ¡lise', ordem: 2, ativo: true },
+        { detalhe: 'Em análise', ordem: 2, ativo: true },
       ],
     },
     {
-      motivo: 'CobranÃ§a indevida',
+      motivo: 'Cobrança indevida',
       ordem: 1,
       ativo: true,
-      detalhes: [{ detalhe: 'Em anÃ¡lise', ordem: 0, ativo: true }],
+      detalhes: [{ detalhe: 'Em análise', ordem: 0, ativo: true }],
     },
   ],
   updatedBy: 'workflow-test-seed',
@@ -112,7 +112,7 @@ function buildWorkflowState(stepActiveHoursAgo = 3) {
   const startedAt = hoursAgo(stepActiveHoursAgo + 1).toISOString();
   const activeAt = hoursAgo(stepActiveHoursAgo).toISOString();
   const systemMessage =
-    'Workflow **REEMBOLSO DENTRO DOS 7 DIAS** iniciado automaticamente com base na classificaÃ§Ã£o do ticket.';
+    'Workflow **REEMBOLSO DENTRO DOS 7 DIAS** iniciado automaticamente com base na classificação do ticket.';
 
   return {
     templateId: 'reembolso-7dias',
@@ -138,7 +138,7 @@ function buildApprovalMeta(overrides: Record<string, unknown> = {}) {
   return {
     valor: 249.9,
     pedido: '#PED-2026-98732',
-    formaPagamento: 'CartÃ£o Â· final 4521',
+    formaPagamento: 'Cartão · final 4521',
     dataCompra: hoursAgo(4 * 24).toISOString(),
     diasDesdeCompra: 4,
     canal: 'WhatsApp',
@@ -163,7 +163,7 @@ function buildWorkflowAgentRegistro(options: {
     anexosAnotacaoInterna: [],
     alteracoes: [
       {
-        tipoChamado: 'SolicitaÃ§Ã£o',
+        tipoChamado: 'Solicitação',
         produto: options.tabulacao?.produto ?? 'Produto X',
         motivo: options.tabulacao?.motivo ?? 'Reembolso',
         detalhe: options.tabulacao?.detalhe ?? 'Dentro de 7 dias',
@@ -216,10 +216,13 @@ async function ensureProdutoXTabulation() {
   await Produto.create(PRODUTO_X_TABULACAO);
 }
 
-async function createTestTicket(doc: Partial<IChamadoN1>) {
+async function upsertTestTicket(doc: Partial<IChamadoN1>): Promise<{ created: boolean; protocolo: string }> {
   const protocolo = String(doc.chamadoProtocolo ?? '').trim();
-  const exists = await ChamadoN1.findOne({ chamadoProtocolo: protocolo });
-  if (exists) return { created: false, protocolo };
+  const exists = await ChamadoN1.findOne({ chamadoProtocolo: protocolo }).select('_id').lean();
+  if (exists) {
+    await ChamadoN1.updateOne({ chamadoProtocolo: protocolo }, { $set: doc });
+    return { created: false, protocolo };
+  }
 
   await ChamadoN1.create(doc);
   return { created: true, protocolo };
@@ -259,7 +262,7 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
       ],
       registro: [
         buildClienteMessage(
-          'OlÃ¡, comprei o Produto X na semana passada e gostaria de solicitar o reembolso integral. A compra foi feita hÃ¡ 5 dias e ainda estÃ¡ dentro do prazo de 7 dias.',
+          'Olá, comprei o Produto X na semana passada e gostaria de solicitar o reembolso integral. A compra foi feita há 5 dias e ainda está dentro do prazo de 7 dias.',
           helena.nome,
           1
         ),
@@ -267,7 +270,7 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
     },
     {
       chamadoProtocolo: `${WORKFLOW_TEST_PROTOCOL_PREFIX}002`,
-      chamadoTitulo: '[TESTE] Disputa de cobranÃ§a no cartÃ£o',
+      chamadoTitulo: '[TESTE] Disputa de cobrança no cartão',
       cliente: [
         {
           clienteCpf: ricardo.cpf,
@@ -286,7 +289,7 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
       ],
       registro: [
         buildClienteMessage(
-          'Fui cobrado duas vezes no cartÃ£o de crÃ©dito referente Ã  assinatura do mÃªs. Preciso que o financeiro analise e estorne a cobranÃ§a duplicada.',
+          'Fui cobrado duas vezes no cartão de crédito referente à assinatura do mês. Preciso que o financeiro analise e estorne a cobrança duplicada.',
           ricardo.nome,
           2,
         ),
@@ -294,7 +297,7 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
     },
     {
       chamadoProtocolo: `${WORKFLOW_TEST_PROTOCOL_PREFIX}003`,
-      chamadoTitulo: '[TESTE] Workflow ativo â€” aguardando financeiro',
+      chamadoTitulo: '[TESTE] Workflow ativo — aguardando financeiro',
       cliente: [
         {
           clienteCpf: camila.cpf,
@@ -303,17 +306,17 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
       ],
       tabulacao: [
         {
-          tipoChamado: 'SolicitaÃ§Ã£o',
+          tipoChamado: 'Solicitação',
           produto: 'Produto X',
-        motivo: 'Reembolso',
-        detalhe: 'Dentro de 7 dias',
+          motivo: 'Reembolso',
+          detalhe: 'Dentro de 7 dias',
           responsavel: 'admin@velodesk.local',
           atribuido: '',
         },
       ],
       registro: [
         buildClienteMessage(
-          'Bom dia! Solicito reembolso do Produto X. A compra foi realizada hÃ¡ 4 dias.',
+          'Bom dia! Solicito reembolso do Produto X. A compra foi realizada há 4 dias.',
           camila.nome,
           5,
         ),
@@ -323,14 +326,14 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
           autor: 'Admin Velodesk',
           mensagemPublica: '',
           anexosMensagemPublica: [],
-          anotacaoInterna: 'ClassificaÃ§Ã£o aplicada â€” workflow de reembolso iniciado.',
+          anotacaoInterna: 'Classificação aplicada — workflow de reembolso iniciado.',
           anexosAnotacaoInterna: [],
           alteracoes: [
             {
-              tipoChamado: 'SolicitaÃ§Ã£o',
+              tipoChamado: 'Solicitação',
               produto: 'Produto X',
-        motivo: 'Reembolso',
-        detalhe: 'Dentro de 7 dias',
+              motivo: 'Reembolso',
+              detalhe: 'Dentro de 7 dias',
             },
           ],
           metadados: {
@@ -343,10 +346,10 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
     },
     {
       chamadoProtocolo: `${WORKFLOW_TEST_PROTOCOL_PREFIX}007`,
-      chamadoTitulo: '[TESTE] AprovaÃ§Ã£o reembolso â€” Maria Oliveira',
+      chamadoTitulo: '[TESTE] Aprovação reembolso — Maria Oliveira',
       cliente: [{ clienteCpf: maria.cpf, clienteId: clientRefs.get(maria.cpf) ?? null }],
       tabulacao: [{
-        tipoChamado: 'SolicitaÃ§Ã£o',
+        tipoChamado: 'Solicitação',
         produto: 'Produto X',
         motivo: 'Reembolso',
         detalhe: 'Dentro de 7 dias',
@@ -355,13 +358,13 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
       }],
       registro: [
         buildClienteMessage(
-          'Comprei o Produto X hÃ¡ 4 dias e quero solicitar o reembolso integral conforme a polÃ­tica de 7 dias.',
+          'Comprei o Produto X há 4 dias e quero solicitar o reembolso integral conforme a política de 7 dias.',
           maria.nome,
           6,
         ),
         buildWorkflowAgentRegistro({
           agentName: 'Ana Silva (Atendimento)',
-          note: 'Atendimento confirmou elegibilidade e encaminhou para aprovaÃ§Ã£o.',
+          note: 'Atendimento confirmou elegibilidade e encaminhou para aprovação.',
           stepActiveHoursAgo: 1.33,
           approval: buildApprovalMeta({ valor: 249.9, canal: 'WhatsApp' }),
         }),
@@ -369,10 +372,10 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
     },
     {
       chamadoProtocolo: `${WORKFLOW_TEST_PROTOCOL_PREFIX}008`,
-      chamadoTitulo: '[TESTE] AprovaÃ§Ã£o reembolso â€” Roberto Alves',
+      chamadoTitulo: '[TESTE] Aprovação reembolso — Roberto Alves',
       cliente: [{ clienteCpf: roberto.cpf, clienteId: clientRefs.get(roberto.cpf) ?? null }],
       tabulacao: [{
-        tipoChamado: 'SolicitaÃ§Ã£o',
+        tipoChamado: 'Solicitação',
         produto: 'duplicidade',
         motivo: 'Estorno',
         detalhe: 'Em análise',
@@ -381,28 +384,28 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
       }],
       registro: [
         buildClienteMessage(
-          'Preciso do reembolso do Produto X. Compra realizada por e-mail hÃ¡ 5 dias.',
+          'Preciso do reembolso do Produto X. Compra realizada por e-mail há 5 dias.',
           roberto.nome,
           8,
         ),
         buildWorkflowAgentRegistro({
           agentName: 'Ana Silva (Atendimento)',
-          note: 'Cliente elegÃ­vel â€” encaminhado ao financeiro.',
+          note: 'Cliente elegível — encaminhado ao financeiro.',
           stepActiveHoursAgo: 2.75,
           approval: buildApprovalMeta({
             valor: 89.9,
             canal: 'E-mail',
-            formaPagamento: 'CartÃ£o Â· final 4521',
+            formaPagamento: 'Cartão · final 4521',
           }),
         }),
       ],
     },
     {
       chamadoProtocolo: `${WORKFLOW_TEST_PROTOCOL_PREFIX}009`,
-      chamadoTitulo: '[TESTE] AprovaÃ§Ã£o reembolso â€” Fernanda Lima (SLA crÃ­tico)',
+      chamadoTitulo: '[TESTE] Aprovação reembolso — Fernanda Lima (SLA crítico)',
       cliente: [{ clienteCpf: fernanda.cpf, clienteId: clientRefs.get(fernanda.cpf) ?? null }],
       tabulacao: [{
-        tipoChamado: 'SolicitaÃ§Ã£o',
+        tipoChamado: 'Solicitação',
         produto: 'Produto Y',
         motivo: 'Reembolso',
         detalhe: 'Dentro de 7 dias',
@@ -411,13 +414,13 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
       }],
       registro: [
         buildClienteMessage(
-          'Liguei para solicitar reembolso do Produto X. A compra foi hÃ¡ 3 dias e preciso de urgÃªncia.',
+          'Liguei para solicitar reembolso do Produto X. A compra foi há 3 dias e preciso de urgência.',
           fernanda.nome,
           10,
         ),
         buildWorkflowAgentRegistro({
           agentName: 'Ana Silva (Atendimento)',
-          note: 'Urgente â€” SLA financeiro prestes a vencer.',
+          note: 'Urgente — SLA financeiro prestes a vencer.',
           stepActiveHoursAgo: 3.83,
           approval: buildApprovalMeta({
             valor: 599,
@@ -429,7 +432,7 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
     },
     {
       chamadoProtocolo: `${WORKFLOW_TEST_PROTOCOL_PREFIX}004`,
-      chamadoTitulo: '[TESTE] LentidÃ£o na internet fibra',
+      chamadoTitulo: '[TESTE] Lentidão na internet fibra',
       cliente: [
         {
           clienteCpf: gustavo.cpf,
@@ -448,7 +451,7 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
       ],
       registro: [
         buildClienteMessage(
-          'Minha internet fibra estÃ¡ muito lenta desde ontem Ã  noite. Velocidade caiu de 500 Mbps para menos de 50 Mbps.',
+          'Minha internet fibra está muito lenta desde ontem à noite. Velocidade caiu de 500 Mbps para menos de 50 Mbps.',
           gustavo.nome,
           0.5,
         ),
@@ -475,7 +478,7 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
       ],
       registro: [
         buildClienteMessage(
-          'Quero cancelar meu pacote de TV. NÃ£o uso mais os canais premium e preciso encaminhar para o time responsÃ¡vel.',
+          'Quero cancelar meu pacote de TV. Não uso mais os canais premium e preciso encaminhar para o time responsável.',
           patricia.nome,
           3,
         ),
@@ -483,7 +486,7 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
     },
     {
       chamadoProtocolo: `${WORKFLOW_TEST_PROTOCOL_PREFIX}006`,
-      chamadoTitulo: '[TESTE] DÃºvida sobre valor da fatura',
+      chamadoTitulo: '[TESTE] Dúvida sobre valor da fatura',
       cliente: [
         {
           clienteCpf: bruno.cpf,
@@ -502,7 +505,7 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
       ],
       registro: [
         buildClienteMessage(
-          'Recebi a fatura deste mÃªs e o valor veio diferente do combinado. Podem me explicar os itens cobrados?',
+          'Recebi a fatura deste mês e o valor veio diferente do combinado. Podem me explicar os itens cobrados?',
           bruno.nome,
           4,
         ),
@@ -514,7 +517,7 @@ export async function seedWorkflowTestTickets(): Promise<{ created: number; skip
   let skipped = 0;
 
   for (const ticket of tickets) {
-    const result = await createTestTicket(ticket);
+    const result = await upsertTestTicket(ticket);
     if (result.created) created += 1;
     else skipped += 1;
   }

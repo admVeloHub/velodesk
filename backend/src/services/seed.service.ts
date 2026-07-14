@@ -69,7 +69,7 @@ async function seedWorkflowTestData() {
   if (created > 0) {
     console.log(`Seed: ${created} ticket(s) de teste de workflow criado(s) (WF-TEST-*)`);
   } else if (skipped > 0) {
-    console.log(`Seed: ${skipped} ticket(s) de teste de workflow já existente(s)`);
+    console.log(`Seed: ${skipped} ticket(s) de teste de workflow sincronizado(s) (WF-TEST-*)`);
   }
 }
 

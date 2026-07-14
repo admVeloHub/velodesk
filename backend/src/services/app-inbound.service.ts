@@ -1,9 +1,10 @@
-/** app-inbound.service v1.0.0 — notificação pós-insert MongoDB pelo app integrado */
+/** app-inbound.service v1.1.0 — pipeline agentes paralelos pós-notify */
 import mongoose from 'mongoose';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { applyAssignmentToChamado } from './assignmentRouter.service';
 import { allocateNextProtocolo } from './protocolo.service';
+import { runInboundAgentPipeline } from './agents/inboundAgentPipeline.service';
 
 export interface AppNotifyPayload {
   chamadoId?: string;
@@ -79,6 +80,10 @@ export async function processAppNotify(payload: AppNotifyPayload): Promise<AppNo
 
   await applyAssignmentToChamado(chamado, { source: 'app-integrado' });
   await chamado.save();
+
+  void runInboundAgentPipeline(chamado, { source: 'app-integrado' }).catch((err: Error) => {
+    console.warn('[app-inbound] pipeline agentes fail-soft:', err.message);
+  });
 
   return {
     action: 'processed',

@@ -1,6 +1,6 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.0.0 | DATE: 2026-07-08
+ * VERSION: v3.0.1 | DATE: 2026-07-14
  */
 import { getKanbanColumns, saveKanbanColumns, getAllCockpitTickets } from '../kanbanStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
@@ -23,6 +23,22 @@ export function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/** Corrige texto UTF-8 lido como Latin-1 (ex.: AprovaÃ§Ã£o → Aprovação). */
+export function repairUtf8Mojibake(text) {
+  const value = String(text ?? '');
+  if (!value || !/[ÃÂâ€]/.test(value)) return value;
+  try {
+    const bytes = new Uint8Array(value.length);
+    for (let i = 0; i < value.length; i += 1) {
+      bytes[i] = value.charCodeAt(i) & 0xff;
+    }
+    const decoded = new TextDecoder('utf-8').decode(bytes);
+    return decoded.includes('\uFFFD') ? value : decoded;
+  } catch {
+    return value;
+  }
 }
 
 export function getInitials(name) {
@@ -94,7 +110,8 @@ export function formatTicketDate(iso) {
 }
 
 export function getTicketTitle(ticket) {
-  return ticket?.title || ticket?.description || 'Sem assunto';
+  const raw = ticket?.title || ticket?.description || 'Sem assunto';
+  return repairUtf8Mojibake(raw);
 }
 
 export function statusMeta(queueId) {
@@ -111,8 +128,8 @@ export function buildTags(ticket) {
   const tags = [];
   const lf = ticket.lateralForm || {};
   if (isTicketInWorkflow(ticket)) tags.push('Workflow');
-  if (lf.produto) tags.push(lf.produto.replace(/Internet\s+/i, '').trim() || lf.produto);
-  if (lf.motivo) tags.push(lf.motivo);
+  if (lf.produto) tags.push(repairUtf8Mojibake(lf.produto.replace(/Internet\s+/i, '').trim() || lf.produto));
+  if (lf.motivo) tags.push(repairUtf8Mojibake(lf.motivo));
   if (!tags.length && ticket.priority) tags.push(ticket.priority);
   return tags.slice(0, 4);
 }

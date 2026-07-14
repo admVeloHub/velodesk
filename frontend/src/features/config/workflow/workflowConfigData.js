@@ -1,5 +1,6 @@
 /**
- * workflowConfigData v1.0.0 — mock visual do editor de workflows (Gestão)
+ * workflowConfigData v1.1.0 — dados e helpers do módulo Workflows (Config)
+ * VERSION: v1.1.0 | DATE: 2026-07-14
  */
 
 export const WORKFLOW_CONFIG_TABS = [
@@ -200,10 +201,75 @@ export const WORKFLOW_CONFIG_LIST = [
   },
 ];
 
-export function getWorkflowConfigById(id) {
-  return WORKFLOW_CONFIG_LIST.find((wf) => wf.id === id) || WORKFLOW_CONFIG_LIST[0];
+export function getWorkflowConfigById(id, list = WORKFLOW_CONFIG_LIST) {
+  return list.find((wf) => wf.id === id) || list[0] || null;
 }
 
 export function getWorkflowConfigTab(id) {
   return WORKFLOW_CONFIG_TABS.find((tab) => tab.id === id) || WORKFLOW_CONFIG_TABS[0];
+}
+
+export function cloneWorkflowConfigList(list = WORKFLOW_CONFIG_LIST) {
+  return (list || []).map((wf) => ({
+    ...wf,
+    trigger: wf.trigger ? { ...wf.trigger, path: [...(wf.trigger.path || [])] } : null,
+    steps: (wf.steps || []).map((step) => ({
+      ...step,
+      badges: (step.badges || []).map((badge) => ({ ...badge })),
+    })),
+  }));
+}
+
+export function formatTriggerPath(trigger) {
+  return (trigger?.path || []).filter(Boolean).join(' → ') || '—';
+}
+
+export function stepHasApproval(step) {
+  return (step?.badges || []).some((badge) => String(badge.label || '').toLowerCase().includes('aprovar'));
+}
+
+export function computeWorkflowStats(workflows) {
+  const list = workflows || [];
+  return {
+    total: list.length,
+    ativos: list.filter((wf) => wf.active !== false).length,
+    inativos: list.filter((wf) => wf.active === false).length,
+    etapas: list.reduce((sum, wf) => sum + (wf.steps?.length || 0), 0),
+    comAprovacao: list.filter((wf) => (wf.steps || []).some(stepHasApproval)).length,
+    tabulacao: list.filter((wf) => wf.trigger?.type === 'tabulation').length,
+  };
+}
+
+export function createEmptyWorkflow() {
+  const suffix = Date.now();
+  return {
+    id: `workflow-${suffix}`,
+    title: 'Novo workflow',
+    active: false,
+    trigger: {
+      type: 'tabulation',
+      path: ['', '', '', ''],
+      description: 'Defina o caminho de tabulação que ativa este workflow.',
+    },
+    steps: [
+      {
+        id: `inicio-${suffix}`,
+        title: 'Início — ticket criado',
+        description: 'Primeira etapa do fluxo.',
+        icon: 'ti-player-play-filled',
+        iconTone: 'start',
+        badges: [{ label: 'Grupo: Atendimento', tone: 'neutral' }],
+      },
+    ],
+  };
+}
+
+export function createWorkflowSlug(title) {
+  return String(title || 'workflow')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || `workflow-${Date.now()}`;
 }

@@ -1,9 +1,10 @@
 /**
- * ticketAdapter v1.4.4 — preserva clienteId do ticket da API
- * VERSION: v1.4.4 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.4.5 — repara mojibake UTF-8 em títulos e mensagens
+ * VERSION: v1.4.5 | DATE: 2026-07-14 | AUTHOR: VeloHub Development Team
  */
 import { getAgentName } from '../../services/clientDb';
 import { DEFAULT_TIPO } from '../../services/tabulationConfig';
+import { repairUtf8Mojibake } from '../../services/desk/utils';
 
 const MEUS_CHAMADOS_BOX_MAP = {
   'meus-novos': 'novos',
@@ -31,7 +32,7 @@ function normalizeMessage(msg) {
   );
   return {
     ...msg,
-    text: msg.text || msg.message || '',
+    text: repairUtf8Mojibake(msg.text || msg.message || ''),
     timestamp: msg.timestamp || msg.time || msg.createdAt || new Date().toISOString(),
     origin: msg.origin || (msg.sender === 'them' ? 'cliente' : 'agente'),
     fromClient: isClient,
@@ -52,13 +53,16 @@ export function apiTicketToCockpit(ticket) {
   const id = ticket._id || ticket.id;
   const lf = ticket.lateralForm || {};
   const clienteId = ticket.clienteId || lf.clienteId;
+  const title = repairUtf8Mojibake(
+    ticket.title || ticket.chamadoTitulo || ticket.chamadoProtocolo || 'Sem título',
+  );
   return {
     ...ticket,
     id,
     _id: id,
     clienteId,
-    title: ticket.title || ticket.chamadoTitulo || ticket.chamadoProtocolo || 'Sem título',
-    chamadoTitulo: ticket.chamadoTitulo || ticket.title,
+    title,
+    chamadoTitulo: repairUtf8Mojibake(ticket.chamadoTitulo || ticket.title || title),
     status: ticket.status || 'novo',
     messages: (ticket.messages || []).map(normalizeMessage),
     internalNotes: (ticket.internalNotes || []).map(normalizeMessage),

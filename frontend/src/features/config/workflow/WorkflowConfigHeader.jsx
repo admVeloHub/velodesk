@@ -2,6 +2,8 @@ import React from 'react';
 
 export default function WorkflowConfigHeader({
   title,
+  titleEditable = false,
+  onTitleChange,
   active,
   onToggleActive,
   onHistory,
@@ -13,7 +15,18 @@ export default function WorkflowConfigHeader({
       <div className="wf-config-header__main">
         <span className="wf-config-header__eyebrow">Workflows</span>
         <div className="wf-config-header__title-row">
-          <h2>{title}</h2>
+          {titleEditable ? (
+            <input
+              type="text"
+              className="wf-config-header__title-input"
+              value={title}
+              onChange={(event) => onTitleChange?.(event.target.value)}
+              aria-label="Nome do workflow"
+              placeholder="Nome do workflow"
+            />
+          ) : (
+            <h2>{title}</h2>
+          )}
           {active ? (
             <span className="wf-config-header__badge">Ativo</span>
           ) : (

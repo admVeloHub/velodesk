@@ -1,11 +1,13 @@
 /**
- * openaiTicketSuggest.service v1.0.4 — saudação com primeiro nome do cliente
- * VERSION: v1.0.4 | DATE: 2026-07-10
+ * openaiTicketSuggest.service v1.1.0 — delegação ao orquestrador de agentes
+ * VERSION: v1.1.0 | DATE: 2026-07-13
  */
 import OpenAI from 'openai';
 import { env } from '../config/env';
 import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from './tabulation.service';
 import { getTicketSuggestPersona } from './ticketSuggestPersona';
+import { runAgentPipeline } from './agents/agentOrchestrator.service';
+import { getAgentsStatus, isAgentsConfigured } from './agents/openaiAgent.util';
 
 const MAX_MESSAGES = 50;
 const MAX_MESSAGE_CHARS = 8_000;
@@ -60,6 +62,12 @@ export interface TicketAiSuggestResult {
   tabulacaoDisplay?: string;
   model?: string;
   error?: string;
+  auditScore?: number;
+  auditAprovado?: boolean;
+  auditDecisao?: string;
+  confidence?: string;
+  revisoesRealizadas?: number;
+  auditComplete?: boolean;
 }
 
 const JSON_SCHEMA = {
@@ -83,6 +91,10 @@ const JSON_SCHEMA = {
 } as const;
 
 export function getOpenAiTicketSuggestStatus(): { configured: boolean; missing: string[] } {
+  if (env.agentsEnabled) {
+    const agents = getAgentsStatus();
+    return { configured: agents.configured, missing: agents.missing };
+  }
   const missing: string[] = [];
   if (!env.openaiApiKey?.trim()) missing.push('OPENAI_API_KEY');
   if (!env.openaiVectorStoreId?.trim()) missing.push('OPENAI_VECTOR_STORE_ID');
@@ -90,6 +102,7 @@ export function getOpenAiTicketSuggestStatus(): { configured: boolean; missing: 
 }
 
 export function isOpenAiTicketSuggestConfigured(): boolean {
+  if (env.agentsEnabled) return isAgentsConfigured();
   return getOpenAiTicketSuggestStatus().configured;
 }
 
@@ -333,6 +346,30 @@ export async function generateTicketAiSuggest(
 ): Promise<TicketAiSuggestResult> {
   if (!isOpenAiTicketSuggestConfigured()) {
     return { success: false, error: 'Serviço OpenAI não configurado' };
+  }
+
+  if (env.agentsEnabled) {
+    console.log('[ticket-ai-suggest] delegando ao orquestrador (desk) para', userId || 'anonimo');
+    const pipeline = await runAgentPipeline({ ...params, pipelineModo: 'desk' });
+    if (!pipeline.success) {
+      return { success: false, error: pipeline.error || 'Falha no pipeline de agentes' };
+    }
+    if (typeof pipeline.auditScore !== 'number' || !pipeline.auditComplete) {
+      return { success: false, error: 'Auditoria não concluída — sugestão bloqueada' };
+    }
+    return {
+      success: true,
+      respostaSugerida: pipeline.respostaSugerida,
+      tabulacao: pipeline.tabulacao,
+      tabulacaoDisplay: pipeline.tabulacaoDisplay,
+      model: pipeline.model,
+      auditScore: pipeline.auditScore,
+      auditAprovado: pipeline.auditAprovado,
+      auditDecisao: pipeline.auditDecisao,
+      auditComplete: true,
+      confidence: pipeline.confidence,
+      revisoesRealizadas: pipeline.revisoesRealizadas,
+    };
   }
 
   try {

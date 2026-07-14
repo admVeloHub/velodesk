@@ -1,6 +1,6 @@
 /**
- * DeskRightPanel v1.4.0 — sugestão IA tabulação via OpenAI + POPs
- * VERSION: v1.4.0 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
+ * DeskRightPanel v1.4.1 — responsável pela sessão (sem campo manual no painel)
+ * VERSION: v1.4.1 | DATE: 2026-07-14 | AUTHOR: VeloHub Development Team
  */
 import React, { useEffect, useState } from 'react';
 import { DEFAULT_TIPO, hasApplyableTabulation, parseTabulationDisplay } from '../../../services/tabulationConfig';
@@ -12,8 +12,8 @@ import ProcessosPopover from './ProcessosPopover';
 import { ESCALONAR_OPTIONS } from '../../../services/desk/constants';
 import { isTicketInWorkflow } from '../../../services/desk/utils';
 
-const CANAL_OPTIONS = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
-const TIPO_OPTIONS = ['Reclamação', 'Solicitação', 'Dúvida', 'Informação'];
+const CANAL_OPTIONS_FALLBACK = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
+const TIPO_OPTIONS_FALLBACK = ['Reclamação', 'Solicitação', 'Dúvida', 'Informação'];
 
 function SelectField({ id, label, fieldKey, value, options, readonly, onFieldChange, showPlaceholder = false, optionItems = null }) {
   return (
@@ -57,9 +57,10 @@ export default function DeskRightPanel({
   iaHasSuggestion = false,
   iaHasTabulationSuggestion = false,
   iaShowSection = false,
+  iaAuditScore = null,
 }) {
-  const { loading, getMotivos, getDetalhes, getProdutoNames } = useTabulation();
-  const { agentOptions, currentAgentValue, loading: agentsLoading } = useDeskAgents();
+  const { loading, getMotivos, getDetalhes, getProdutoNames, getTipoChamadoOptions, getCanalContatoOptions } = useTabulation();
+  const { currentAgentValue } = useDeskAgents();
   const [processosOpen, setProcessosOpen] = useState(false);
 
   useEffect(() => {
@@ -67,9 +68,8 @@ export default function DeskRightPanel({
     onFieldChange('responsavel', currentAgentValue);
   }, [currentAgentValue, rightFields.responsavel, onFieldChange]);
 
-  const responsavelOptions = agentOptions.length
-    ? agentOptions
-    : (currentAgentValue ? [currentAgentValue] : []);
+  const tipoOptions = getTipoChamadoOptions();
+  const canalOptions = getCanalContatoOptions();
 
   const thermo = client?.termometro ?? 38;
   const thermoLabel = client?.termometroLabel || (thermo >= 55 ? 'Crítico' : thermo >= 45 ? 'Atenção' : 'Estável');
@@ -120,24 +120,12 @@ export default function DeskRightPanel({
           {loading && (
             <p className="rp-field-hint">Carregando opções de tabulação…</p>
           )}
-          {agentsLoading && (
-            <p className="rp-field-hint">Carregando agentes…</p>
-          )}
-          <SelectField
-            id="selResponsavel"
-            label="Responsável"
-            fieldKey="responsavel"
-            value={rightFields.responsavel || currentAgentValue}
-            options={responsavelOptions}
-            showPlaceholder
-            onFieldChange={onFieldChange}
-          />
           <SelectField
             id="selCanal"
             label="Canal"
             fieldKey="canal"
             value={rightFields.canal}
-            options={CANAL_OPTIONS}
+            options={canalOptions.length ? canalOptions : CANAL_OPTIONS_FALLBACK}
             onFieldChange={onFieldChange}
           />
           <SelectField
@@ -145,7 +133,7 @@ export default function DeskRightPanel({
             label="Tipo"
             fieldKey="tipo"
             value={rightFields.tipo || DEFAULT_TIPO}
-            options={TIPO_OPTIONS}
+            options={tipoOptions.length ? tipoOptions : TIPO_OPTIONS_FALLBACK}
             onFieldChange={onFieldChange}
           />
           <SelectField
@@ -195,7 +183,12 @@ export default function DeskRightPanel({
         {iaShowSection && (
           <section className="rp-section">
             <div className={'ia-tabulation' + (iaTabulationLoading ? ' ia-tabulation--loading' : '')}>
-              <div className="ia-tabulation__label">SUGESTÃO IA</div>
+              <div className="ia-tabulation__label">
+                SUGESTÃO
+                {typeof iaAuditScore === 'number' && iaHasSuggestion && !iaTabulationLoading && (
+                  <span className="ia-tabulation__compliance"> · Conformidade {iaAuditScore}%</span>
+                )}
+              </div>
               <div className="ia-tabulation__text" id="iaTabulationText">{tabulationText}</div>
               <div className="ia-tabulation__actions">
                 <button

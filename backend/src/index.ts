@@ -1,4 +1,4 @@
-/** index v1.7.0 — fallback MongoDB em memória no dev local */
+/** index v1.8.0 — agentes paralelos + job gestão chamados + fallback MongoDB em memória no dev local */
 import express from 'express';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import cors from 'cors';
@@ -17,10 +17,23 @@ import tabulationRoutes from './routes/tabulation.routes';
 import spellcheckRoutes from './routes/spellcheck.routes';
 import composeRoutes from './routes/compose.routes';
 import ticketAiRoutes from './routes/ticketAi.routes';
+import agentsRoutes from './routes/agents.routes';
 import inboundRoutes from './routes/inbound.routes';
+import workspace360Routes from './routes/workspace360.routes';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
-import { isOpenAiTicketSuggestConfigured } from './services/openaiTicketSuggest.service';
+import {
+  getOpenAiTicketSuggestStatus,
+  isOpenAiTicketSuggestConfigured,
+} from './services/openaiTicketSuggest.service';
 import { seedDevelopmentData, purgeLegacyDemoData } from './services/seed.service';
+import { getAgentsStatus } from './services/agents/openaiAgent.util';
+import { startGestaoChamadosJob } from './jobs/gestaoChamados.job';
+import { loadEmailTransport } from './services/emailTransport.service';
+import {
+  ensureGmailWatchFresh,
+  setupGmailWatch,
+  startGmailWatchRenewalLoop,
+} from './services/gmail/gmailWatch.service';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const whatsapp = require('./whatsapp/whatsappModule.js');
@@ -43,6 +56,7 @@ app.use('/api/inbound', inboundRoutes);
 app.use('/api/spellcheck', spellcheckRoutes);
 app.use('/api/compose', composeRoutes);
 app.use('/api/ticket-ai', ticketAiRoutes);
+app.use('/api/agents', agentsRoutes);
 
 app.use(
   '/api/',
@@ -100,6 +114,7 @@ app.use('/api', statsRoutes);
 app.use('/api/uploads', uploadsRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/tabulation', tabulationRoutes);
+app.use('/api/workspace360', workspace360Routes);
 
 if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);
@@ -115,6 +130,15 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 let mongoRetryTimer: ReturnType<typeof setInterval> | null = null;
 let devMemoryServer: MongoMemoryServer | null = null;
 let activeMongoUri = env.mongoUri;
+
+async function bootstrapEmailServices(): Promise<void> {
+  await loadEmailTransport();
+  if (env.gmailInboundEnabled) {
+    await setupGmailWatch();
+    startGmailWatchRenewalLoop();
+    void ensureGmailWatchFresh();
+  }
+}
 
 async function tryConnectDatabase(uri?: string): Promise<boolean> {
   if (isAllMongoReady()) return true;
@@ -192,11 +216,24 @@ async function start() {
   app.listen(env.port, '0.0.0.0', () => {
     console.log(`API Velodesk v1.2.0 — http://0.0.0.0:${env.port} (${env.nodeEnv})`);
     void bootstrapDatabase().then(async () => {
+      await bootstrapEmailServices();
       await logLanguageToolStartupStatus();
       if (isOpenAiTicketSuggestConfigured()) {
         console.log('[ticket-ai] OpenAI configurado (sugestão resposta + tabulação).');
       } else {
-        console.warn('[ticket-ai] OpenAI não configurado — defina OPENAI_API_KEY e OPENAI_VECTOR_STORE_ID em backend/.env');
+        const aiStatus = getOpenAiTicketSuggestStatus();
+        console.warn(
+          '[ticket-ai] OpenAI NÃO configurado — sugestão IA retornará 503. Faltam:',
+          aiStatus.missing.join(', ') || '(desconhecido)',
+        );
+      }
+      if (env.agentsEnabled) {
+        const agentsStatus = getAgentsStatus();
+        console.log('[agents] Programa de agentes paralelos ativo.', {
+          configured: agentsStatus.configured,
+          autonomy: env.agentsAutonomyEnabled,
+        });
+        startGestaoChamadosJob();
       }
       if (env.enableWhatsapp) {
         console.log('Inicializando WhatsApp Web...');
@@ -221,4 +258,3 @@ process.on('SIGINT', async () => {
 });
 
 start();
-

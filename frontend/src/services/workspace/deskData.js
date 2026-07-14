@@ -1,6 +1,6 @@
 /**
  * Workspace — dados operacionais do painel 360°
- * VERSION: v2.2.0 | DATE: 2026-07-13
+ * VERSION: v2.2.1 | DATE: 2026-07-14
  */
 import { getAllCockpitTickets } from '../kanbanStorage';
 import { getAgentName } from '../clientDb';
@@ -125,7 +125,7 @@ function buildTags(ticket) {
   return tags.slice(0, 3);
 }
 
-function mapEntryToRow(entry, sectionVariant) {
+export function mapEntryToRow(entry, sectionVariant) {
   const { ticket, queueId } = entry;
   const sla = getSlaClass(ticket);
   const channel = ticket.lateralForm?.canal || ticket.channel || ticket.source || '';
@@ -384,4 +384,128 @@ export function computeWorkflow360View() {
     ],
     sections,
   };
+}
+
+function formatKpiValue(value, emptyLabel = '—') {
+  if (value == null || value === '') return emptyLabel;
+  return String(value);
+}
+
+function buildAgentKpis(kpis) {
+  const resolvedToday = kpis?.resolvedToday ?? 0;
+  const slaAtRisk = kpis?.slaAtRisk ?? 0;
+  const tma = kpis?.tma;
+  return [
+    {
+      id: 'assigned',
+      label: 'Atribuídos a mim',
+      value: formatKpiValue(kpis?.assigned, '0'),
+      hint: 'total',
+      tone: 'neutral',
+      icon: 'ti ti-ticket',
+    },
+    {
+      id: 'resolved',
+      label: 'Resolvidos hoje',
+      value: formatKpiValue(resolvedToday, '0'),
+      hint: resolvedToday > 0 ? `+${resolvedToday} hoje` : 'hoje',
+      tone: 'success',
+      icon: 'ti ti-circle-check',
+    },
+    {
+      id: 'sla',
+      label: 'SLA próximo do limite',
+      value: formatKpiValue(slaAtRisk, '0'),
+      hint: slaAtRisk > 0 ? 'atenção' : null,
+      tone: slaAtRisk > 0 ? 'warn' : 'neutral',
+      icon: 'ti ti-clock-exclamation',
+    },
+    {
+      id: 'csat',
+      label: 'CSAT médio',
+      value: '—',
+      hint: 'Sem dados',
+      tone: 'neutral',
+      icon: 'ti ti-star',
+    },
+    {
+      id: 'tma',
+      label: 'TMA hoje',
+      value: formatKpiValue(tma, '—'),
+      hint: tma ? null : 'Sem dados',
+      tone: tma ? 'success' : 'neutral',
+      icon: 'ti ti-clock',
+    },
+  ];
+}
+
+function buildSupervisorKpis(kpis) {
+  return {
+    slaPct: kpis?.slaPct ?? 0,
+    slaRisk: kpis?.slaRisk ?? 0,
+    online: kpis?.online,
+    tma: formatKpiValue(kpis?.tma, '—'),
+    tme: formatKpiValue(kpis?.tme, '—'),
+    nps: kpis?.nps == null ? '—' : String(kpis.nps),
+    volume: formatKpiValue(kpis?.volume, '0'),
+    warRoom: Boolean(kpis?.warRoom),
+  };
+}
+
+export function buildAgent360View(apiPayload, agentName) {
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? 'Bom dia' : now.getHours() < 18 ? 'Boa tarde' : 'Boa noite';
+  const dateLabel = now.toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const timeLabel = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  const sections = (apiPayload?.sections ?? []).map((section) => ({
+    ...section,
+    tickets: (section.entries ?? []).map((entry) => mapEntryToRow(entry, section.variant)),
+  }));
+
+  return {
+    greeting,
+    agentName: agentName || getAgentName() || 'agente',
+    dateTimeLabel: `${dateLabel.charAt(0).toUpperCase()}${dateLabel.slice(1)} · ${timeLabel}`,
+    alert: apiPayload?.alert ?? null,
+    kpis: buildAgentKpis(apiPayload?.kpis),
+    sections,
+    productionWeek: apiPayload?.productionWeek ?? [],
+  };
+}
+
+export function buildSupervisor360View(apiPayload) {
+  return {
+    kpis: buildSupervisorKpis(apiPayload?.kpis),
+    escalated: apiPayload?.escalated ?? { categories: [], slaCriticalCount: 0, groups: [] },
+    channelVision: apiPayload?.channelVision ?? [],
+    leaderboard: apiPayload?.leaderboard ?? [],
+  };
+}
+
+export const LEADERBOARD_SHIFT_OPTIONS = [
+  { value: 'all', label: 'Turno: Todos' },
+  { value: 'manha', label: 'Turno: Manhã' },
+  { value: 'tarde', label: 'Turno: Tarde' },
+  { value: 'noite', label: 'Turno: Noite' },
+];
+
+export const LEADERBOARD_CHANNEL_OPTIONS = [
+  { value: 'all', label: 'Canal: Todos' },
+  { value: 'whatsapp', label: 'Canal: WhatsApp' },
+  { value: 'email', label: 'Canal: E-mail' },
+  { value: 'telefone', label: 'Canal: Telefone' },
+];
+
+export function filterOperationalLeaderboard(entries, { shift = 'all', channel = 'all' } = {}) {
+  return (entries ?? []).filter((entry) => {
+    if (shift !== 'all' && entry.shift && entry.shift !== shift) return false;
+    if (channel !== 'all' && entry.channel && entry.channel !== channel) return false;
+    return true;
+  });
 }

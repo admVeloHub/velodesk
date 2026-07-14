@@ -1,10 +1,38 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.23.0 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.25.0 | DATE: 2026-07-14 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Agentes paralelos, correções pós-merge Desk/Painel 360 e workflow config
+
+- **Data/Hora**: 2026-07-14
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.25.0
+  - agentes v1.0.0, workspace360 hook v1.0.1, viewport-scale v1.0.5
+  - velodesk-crm v1.7.1, DeskRightPanel v1.4.1, GestaoPanel v3.2.1, AgentPanel v3.0.1
+  - workflowTestSeed v1.0.1, ticketAdapter v1.4.5, desk/utils v3.0.1
+- **Arquivos modificados / incluídos**:
+  - `backend/src/services/agents/` — orquestrador Atendimento, Auditoria e Gestão; feedback e autonomia
+  - `backend/src/routes/agents.routes.ts`, `backend/src/jobs/gestaoChamados.job.ts`
+  - `backend/src/models/AgentFeedback.ts`, `AgentAutonomyRule.ts`, `AgentGestaoAlert.ts`, `AgentGestaoSnapshot.ts`
+  - `backend/src/config/env.ts`, `agentAutonomyRules.default.json`, `docs/AGENTES-PARALELOS.md`
+  - `backend/src/services/workflowTestSeed.service.ts` — corrige UTF-8 mojibake e upsert dos tickets WF-TEST
+  - `frontend/src/hooks/useTicketAiSuggestions.js` — pipeline agentes (auditScore, revisão)
+  - `frontend/src/features/desk/` — layout compacto notebook, responsável por sessão, modal revisão IA
+  - `frontend/velodesk-crm.css`, `frontend/src/styles/viewport-scale.css` — escala ~75% e colunas estreitas
+  - `frontend/src/features/workspace/GestaoPanel.jsx`, `AgentPanel.jsx` — restaura `useWorkspace360` + API
+  - `frontend/src/api/adapters/ticketAdapter.js`, `desk/utils.js` — `repairUtf8Mojibake`
+  - `frontend/src/features/config/workflow/` — editor/lista de workflows na config
+- **Descrição**: Entrega do programa de agentes paralelos IA e correções do merge que revertia layout Desk, Painel 360 (dados mock), campo Responsável manual e textos corrompidos nos seeds de workflow.
+- **Status**: Concluído
+
+---
 
 ### GitHub Push — Cadastro cliente no header, outbound Gmail (formatação e thread)
 

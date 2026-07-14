@@ -1,9 +1,10 @@
-﻿/** email-inbound.service v1.2.1 — roleta em tabulacao.responsavel only */
+﻿/** email-inbound.service v1.3.0 — pipeline agentes paralelos pós-criação */
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { applyAssignmentIfNeeded } from './assignmentRouter.service';
 import { appendMessage, createChamadoFromBody } from './chamado.mapper';
 import { normalizeEmail, resolveClienteRefFromEmail } from './cliente.service';
 import { notifyTicketOpenedAsync } from './emailNotification.service';
+import { runInboundAgentPipeline } from './agents/inboundAgentPipeline.service';
 import type { InboundEmailPayload, InboundEmailProcessResult } from './inbound-email/types';
 
 export const LEGACY_PROTOCOL_PATTERN = /VD-\d{8}-\d{4}/i;
@@ -164,6 +165,11 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
 
   const chamado = await ChamadoN1.create(partial);
   await notifyTicketOpenedAsync(chamado, payload.from.email);
+
+  void runInboundAgentPipeline(chamado, { source: 'email-inbound' }).catch((err: Error) => {
+    console.warn('[email-inbound] pipeline agentes fail-soft:', err.message);
+  });
+
   return {
     action: 'created',
     chamadoProtocolo: chamado.chamadoProtocolo,
