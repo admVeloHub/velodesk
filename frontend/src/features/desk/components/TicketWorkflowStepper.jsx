@@ -20,9 +20,9 @@ export default function TicketWorkflowStepper({ ticket }) {
 
   return (
     <section className="desk-workflow-stepper" aria-label={`Workflow ativo: ${template.title}`}>
-      <p className="desk-workflow-stepper__eyebrow">
+      <p className="desk-workflow-stepper__eyebrow" title={`Workflow ativo: ${template.title}`}>
         <i className="ti ti-arrows-exchange" aria-hidden="true" />
-        WORKFLOW ATIVO · {template.title}
+        {template.title}
       </p>
       <ol className="desk-workflow-stepper__track">
         {stepsWithState.map((step, index) => {
@@ -40,7 +40,7 @@ export default function TicketWorkflowStepper({ ticket }) {
               )}
               <li
                 className={'desk-workflow-stepper__step desk-workflow-stepper__step--' + step.state}
-                title={step.label}
+                title={subtitle ? `${step.label} — ${subtitle}` : step.label}
               >
                 <span className="desk-workflow-stepper__circle">
                   <StepIcon step={step} />

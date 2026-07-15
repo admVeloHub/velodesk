@@ -9,7 +9,7 @@ import { useDeskAgents } from '../../../hooks/useDeskAgents';
 import { DeskStatusCommitButton } from './DeskComposePanel';
 import TicketOperationProgress from './TicketOperationProgress';
 import ProcessosPopover from './ProcessosPopover';
-import { ESCALONAR_OPTIONS } from '../../../services/desk/constants';
+import { AGENT_FORWARD_OPTIONS } from '../../../services/desk/constants';
 import { isTicketInWorkflow } from '../../../services/desk/utils';
 
 const CANAL_OPTIONS_FALLBACK = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
@@ -93,8 +93,10 @@ export default function DeskRightPanel({
     || hasApplyableTabulation(iaTabulation)
     || hasApplyableTabulation(parsedTabulation)
   );
-  const showEscalonar = String(rightFields.tipo || DEFAULT_TIPO).trim() === 'Solicitação';
   const inWorkflow = isTicketInWorkflow(ticket);
+  const canForward = Boolean(
+    rightFields.motivo && detalheOptions.length > 0 && !inWorkflow,
+  );
 
   return (
     <aside className="crm-right-panel" id="crmRightPanel">
@@ -167,13 +169,13 @@ export default function DeskRightPanel({
               onFieldChange={onFieldChange}
             />
           )}
-          {showEscalonar && !inWorkflow ? (
+          {canForward ? (
             <SelectField
               id="selEscalonar"
               label="Encaminhar para"
               fieldKey="escalonar"
               value={escalonar || ''}
-              optionItems={ESCALONAR_OPTIONS}
+              optionItems={AGENT_FORWARD_OPTIONS}
               showPlaceholder
               onFieldChange={(_, value) => onEscalonarChange?.(value)}
             />

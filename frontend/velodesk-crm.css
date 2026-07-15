@@ -86,10 +86,10 @@
     --desk-fs-display: 32px;
     --desk-fs-icon-sm: 17px;
     --desk-fs-icon-md: 22px;
-    --wf-stepper-eyebrow: var(--desk-fs-sm);
-    --wf-stepper-label: var(--desk-fs-md);
-    --wf-stepper-status: var(--desk-fs-sm);
-    --wf-stepper-text-min-h: 42px;
+    --wf-stepper-eyebrow: 10px;
+    --wf-stepper-label: 11px;
+    --wf-stepper-status: 10px;
+    --wf-stepper-text-min-h: 24px;
 }
 
 #velodeskDeskV2Root ::-webkit-scrollbar { width: 4px; }
@@ -878,6 +878,11 @@
     overflow: visible;
 }
 
+#velodeskDeskV2Root .crm-client-profile-bar--with-workflow {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
 #velodeskDeskV2Root .crm-client-profile-bar__history {
     position: absolute;
     right: 16px;
@@ -885,10 +890,89 @@
     z-index: 3;
 }
 
-#velodeskDeskV2Root .crm-client-profile-bar__workflow {
-    border-top: 0.5px solid #E4E6EA;
-    padding: 10px 0 0;
-    margin-top: 8px;
+#velodeskDeskV2Root .crm-client-profile-bar .ticket-client-profile--header-grid--with-workflow {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+        "client"
+        "protocol";
+    padding-right: 0;
+}
+
+#velodeskDeskV2Root .crm-client-profile-bar .ticket-client-profile--header-grid--with-workflow .ticket-client-profile__cell-protocol {
+    padding-right: min(300px, 42%);
+    box-sizing: border-box;
+}
+
+#velodeskDeskV2Root .ticket-client-profile__cell-workflow {
+    position: absolute;
+    top: auto;
+    bottom: 10px;
+    right: 112px;
+    left: auto;
+    z-index: 4;
+    flex-shrink: 0;
+    min-width: 280px;
+    max-width: calc(100% - 128px);
+}
+
+#velodeskDeskV2Root .ticket-client-profile__cell-workflow .desk-workflow-stepper {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-width: 280px;
+    max-width: 100%;
+    margin: 0;
+    padding: 4px 12px;
+    box-sizing: border-box;
+}
+
+#velodeskDeskV2Root .ticket-client-profile__cell-workflow .desk-workflow-stepper__eyebrow {
+    margin: 0;
+    max-width: 118px;
+    flex-shrink: 0;
+    padding-right: 8px;
+    border-right: 0.5px solid rgba(0, 0, 88, 0.12);
+}
+
+#velodeskDeskV2Root .ticket-client-profile__cell-workflow .desk-workflow-stepper__track {
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+}
+
+#velodeskDeskV2Root .ticket-client-profile__cell-workflow .desk-workflow-stepper__step {
+    min-width: 24px;
+    max-width: none;
+    flex: 0 0 auto;
+}
+
+#velodeskDeskV2Root .ticket-client-profile__cell-workflow .desk-workflow-stepper__step--active {
+    max-width: none;
+}
+
+#velodeskDeskV2Root .ticket-client-profile__cell-workflow .desk-workflow-stepper__circle {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 0;
+}
+
+#velodeskDeskV2Root .ticket-client-profile__cell-workflow .desk-workflow-stepper__circle .ti {
+    font-size: 11px;
+}
+
+#velodeskDeskV2Root .ticket-client-profile__cell-workflow .desk-workflow-stepper__connector {
+    flex: 1 1 18px;
+    width: auto;
+    min-width: 10px;
+    max-width: 36px;
+    margin-top: 0;
+}
+
+#velodeskDeskV2Root .ticket-client-profile__cell-workflow .desk-workflow-stepper__text {
+    display: none;
 }
 
 #velodeskDeskV2Root .crm-client-profile-bar .ticket-client-profile {
@@ -3391,9 +3475,9 @@
 
 #velodeskDeskV2Root .rp-section__header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
     margin-bottom: 8px;
 }
 
@@ -3401,6 +3485,7 @@
     margin-bottom: 0;
     flex: 1 1 auto;
     min-width: 0;
+    line-height: 1.25;
 }
 
 #velodeskDeskV2Root .rp-section__label {
@@ -3413,26 +3498,44 @@
 }
 
 #velodeskDeskV2Root .crm-right-panel .ticket-op-progress {
+    position: relative;
     flex-shrink: 0;
-    padding: 3px 8px;
-    gap: 6px;
+    padding: 2px 5px;
+    gap: 0;
+    border-width: 1px;
+    border-radius: 6px;
+    align-self: flex-start;
 }
 
 #velodeskDeskV2Root .crm-right-panel .ticket-op-progress__label {
-    font-size: var(--desk-fs-caption);
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 #velodeskDeskV2Root .crm-right-panel .ticket-op-progress__circle {
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 18px;
 }
 
 #velodeskDeskV2Root .crm-right-panel .ticket-op-progress__circle .ti {
-    font-size: var(--desk-fs-caption);
+    font-size: 10px;
+}
+
+#velodeskDeskV2Root .crm-right-panel .ticket-op-progress__step--active .ticket-op-progress__circle {
+    box-shadow: 0 0 0 2px rgba(21, 162, 55, 0.18);
 }
 
 #velodeskDeskV2Root .crm-right-panel .ticket-op-progress__connector {
-    width: 12px;
+    width: 7px;
+    height: 2px;
+    margin: 0 1px;
 }
 
 #velodeskDeskV2Root .thermo-score {
@@ -3697,40 +3800,46 @@
     background: #F4F6FF;
     border: 0.5px solid #c5cfff;
     border-radius: 7px;
-    padding: 9px 11px;
+    padding: 7px 9px;
 }
 
 #velodeskDeskV2Root .ia-tabulation__label {
-    font-size: var(--desk-fs-caption);
+    font-size: 10px;
     font-weight: 700;
     color: #1634FF;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
 }
 
 #velodeskDeskV2Root .ia-tabulation__text {
-    font-size: var(--desk-fs-sm);
+    font-size: 11px;
     color: #000058;
-    line-height: 1.4;
-    margin-bottom: 8px;
+    line-height: 1.35;
+    margin-bottom: 6px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-height: 96px;
+    overflow-y: auto;
 }
 
 #velodeskDeskV2Root .ia-tabulation__actions {
     display: flex;
-    gap: 8px;
+    flex-direction: column;
+    gap: 6px;
     align-items: stretch;
 }
 
 #velodeskDeskV2Root .ia-tabulation__btn {
-    flex: 1 1 0;
-    min-width: 0;
+    flex: 0 0 auto;
     width: 100%;
-    min-height: 32px;
-    padding: 6px 8px;
+    min-height: 28px;
+    padding: 5px 6px;
     border: none;
     border-radius: var(--rp-radius);
-    font-size: var(--desk-fs-sm);
+    font-size: 11px;
     font-weight: 700;
     line-height: 1.25;
+    white-space: normal;
+    text-align: center;
     cursor: pointer;
     font-family: inherit;
     transition: opacity 0.15s ease, filter 0.15s ease;
@@ -4417,13 +4526,30 @@ body.desk-v2-mode #cockpitFocusContext {
         gap: 6px;
     }
 
+    #velodeskDeskV2Root .crm-right-panel .ticket-op-progress {
+        padding: 2px 4px;
+    }
+
     #velodeskDeskV2Root .ticket-op-progress__circle {
         width: 24px;
         height: 24px;
     }
 
+    #velodeskDeskV2Root .crm-right-panel .ticket-op-progress__circle {
+        width: 16px;
+        height: 16px;
+    }
+
     #velodeskDeskV2Root .ticket-op-progress__circle .ti {
         font-size: 12px;
+    }
+
+    #velodeskDeskV2Root .crm-right-panel .ticket-op-progress__circle .ti {
+        font-size: 9px;
+    }
+
+    #velodeskDeskV2Root .crm-right-panel .ticket-op-progress__connector {
+        width: 6px;
     }
 
     #velodeskDeskV2Root .ia-suggestion-bar {
@@ -4454,18 +4580,34 @@ body.desk-v2-mode #cockpitFocusContext {
     }
 
     #velodeskDeskV2Root .ia-tabulation {
-        padding: 6px 8px;
+        padding: 5px 7px;
+    }
+
+    #velodeskDeskV2Root .ia-tabulation__label {
+        font-size: 10px;
+        margin-bottom: 3px;
     }
 
     #velodeskDeskV2Root .ia-tabulation__text {
-        font-size: 12px;
-        line-height: 1.35;
-        margin-bottom: 6px;
+        font-size: 10px;
+        line-height: 1.3;
+        margin-bottom: 5px;
+        max-height: 72px;
+    }
+
+    #velodeskDeskV2Root .ia-tabulation__actions {
+        flex-direction: column;
+        gap: 5px;
     }
 
     #velodeskDeskV2Root .ia-tabulation__btn {
-        padding: 5px;
-        font-size: 12px;
+        width: 100%;
+        flex: 0 0 auto;
+        min-height: 26px;
+        padding: 4px 6px;
+        font-size: 10px;
+        white-space: normal;
+        text-align: center;
     }
 
     #velodeskDeskV2Root .crm-compose-bottom-bar {
@@ -4484,32 +4626,39 @@ body.desk-v2-mode #cockpitFocusContext {
 
 #velodeskDeskV2Root .desk-workflow-stepper {
     background: #F3F7FC;
-    border: 1px solid rgba(0, 0, 88, 0.12);
-    border-radius: 12px;
-    padding: 12px 16px 14px;
+    border: 0.5px solid rgba(0, 0, 88, 0.12);
+    border-radius: 8px;
+    padding: 4px 8px 5px;
     margin: 0;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__eyebrow {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin: 0 0 12px;
+    gap: 4px;
+    margin: 0 0 4px;
     font-size: var(--wf-stepper-eyebrow);
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.03em;
     color: #1634FF;
     text-transform: uppercase;
+    line-height: 1.2;
+    max-width: 148px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__eyebrow .ti {
-    font-size: var(--desk-fs-icon-sm);
+    font-size: 11px;
+    flex-shrink: 0;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__track {
     display: flex;
     align-items: flex-start;
-    width: 100%;
+    width: auto;
+    max-width: 100%;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -4521,15 +4670,19 @@ body.desk-v2-mode #cockpitFocusContext {
     display: flex;
     flex-direction: column;
     align-items: center;
-    flex: 1 1 0;
-    min-width: 72px;
-    max-width: none;
+    flex: 0 0 auto;
+    min-width: 28px;
+    max-width: 52px;
     text-align: center;
 }
 
+#velodeskDeskV2Root .desk-workflow-stepper__step--active {
+    max-width: 58px;
+}
+
 #velodeskDeskV2Root .desk-workflow-stepper__circle {
-    width: 48px;
-    height: 48px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     box-sizing: border-box;
     display: inline-flex;
@@ -4537,11 +4690,11 @@ body.desk-v2-mode #cockpitFocusContext {
     justify-content: center;
     background: #e2e8f0;
     color: #94a3b8;
-    margin-bottom: 8px;
+    margin-bottom: 3px;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__circle .ti {
-    font-size: var(--desk-fs-icon-md);
+    font-size: 12px;
     line-height: 1;
 }
 
@@ -4552,14 +4705,14 @@ body.desk-v2-mode #cockpitFocusContext {
 
 #velodeskDeskV2Root .desk-workflow-stepper__step--pending .desk-workflow-stepper__circle {
     background: #fff;
-    border: 2.5px solid #cbd5e1;
+    border: 1.5px solid #cbd5e1;
     color: #94a3b8;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__step--active .desk-workflow-stepper__circle {
     background: #1634FF;
     color: #fff;
-    box-shadow: 0 0 0 5px rgba(22, 52, 255, 0.15);
+    box-shadow: 0 0 0 2px rgba(22, 52, 255, 0.15);
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__step--completed .desk-workflow-stepper__label {
@@ -4580,32 +4733,48 @@ body.desk-v2-mode #cockpitFocusContext {
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    min-height: var(--wf-stepper-text-min-h);
+    min-height: auto;
     width: 100%;
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper__step--active .desk-workflow-stepper__text {
+    min-height: var(--wf-stepper-text-min-h);
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__label {
     font-size: var(--wf-stepper-label);
     font-weight: 600;
     color: #000058;
-    line-height: 1.15;
-    padding: 0 4px;
-    max-height: 2.3em;
+    line-height: 1.1;
+    padding: 0 1px;
+    max-height: 1.1em;
     overflow: hidden;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__status {
-    margin-top: 3px;
+    margin-top: 1px;
     font-size: var(--wf-stepper-status);
     font-weight: 500;
     color: #94a3b8;
-    line-height: 1.1;
-    padding: 0 4px;
-    min-height: 16px;
-    white-space: nowrap;
+    line-height: 1.05;
+    padding: 0 1px;
+    min-height: auto;
+    white-space: normal;
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper__step--completed .desk-workflow-stepper__status,
+#velodeskDeskV2Root .desk-workflow-stepper__step--pending .desk-workflow-stepper__status,
+#velodeskDeskV2Root .desk-workflow-stepper__step--completed .desk-workflow-stepper__label,
+#velodeskDeskV2Root .desk-workflow-stepper__step--pending .desk-workflow-stepper__label {
+    display: none;
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper__step--completed .desk-workflow-stepper__text,
+#velodeskDeskV2Root .desk-workflow-stepper__step--pending .desk-workflow-stepper__text {
+    display: none;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__status--sla {
@@ -4657,12 +4826,13 @@ body.desk-v2-mode #cockpitFocusContext {
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__connector {
-    flex: 1 1 20px;
-    min-width: 12px;
-    max-width: none;
-    height: 4px;
-    margin-top: 22px;
-    flex-shrink: 1;
+    flex: 0 0 8px;
+    width: 8px;
+    min-width: 8px;
+    max-width: 8px;
+    height: 2px;
+    margin-top: 12px;
+    flex-shrink: 0;
     border-radius: 999px;
     background: #e2e8f0;
     list-style: none;

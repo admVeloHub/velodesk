@@ -8,6 +8,7 @@ export const WORKFLOW_TEAM_LABELS = {
   n1: 'N1',
   n2: 'N2',
   financeiro: 'Financeiro',
+  produtos: 'Produtos',
   suporte: 'Suporte',
 };
 
@@ -53,6 +54,15 @@ const DECISION_SUPORTE_REVIEW = {
   detailResolver: 'generic',
 };
 
+const DECISION_PRODUTOS_REVIEW = {
+  kind: 'approval',
+  title: 'Análise Produtos',
+  statusLabel: 'Aguardando decisão',
+  queueLabel: 'Aguardando análise',
+  actions: ['approve', 'reject', 'request_info'],
+  detailResolver: 'generic',
+};
+
 const REEMBOLSO_7_DIAS_STEPS = [
   { id: 'abertura', label: 'Abertura', icon: 'ti-inbox', team: 'n1', slaHours: null },
   { id: 'elegibilidade', label: 'Elegibilidade', icon: 'ti-circle-check', team: 'n1', slaHours: 2 },
@@ -78,6 +88,13 @@ const N2_ESCALONAR_STEPS = [
 const SUPORTE_ESCALONAR_STEPS = [
   { id: 'abertura-n1', label: 'Abertura N1', icon: 'ti-inbox', team: 'n1', slaHours: null },
   { id: 'diagnostico-suporte', label: 'Diagnóstico suporte', icon: 'ti-tool', team: 'suporte', slaHours: 4, decision: DECISION_SUPORTE_REVIEW },
+  { id: 'retorno-cliente', label: 'Retorno ao cliente', icon: 'ti-device-desktop', team: 'n1', slaHours: 2 },
+];
+
+const PRODUTOS_ESCALONAR_STEPS = [
+  { id: 'abertura-n1', label: 'Abertura N1', icon: 'ti-inbox', team: 'n1', slaHours: null },
+  { id: 'triagem-n1', label: 'Triagem N1', icon: 'ti-circle-check', team: 'n1', slaHours: 2 },
+  { id: 'analise-produtos', label: 'Análise Produtos', icon: 'ti-package', team: 'produtos', slaHours: 4, decision: DECISION_PRODUTOS_REVIEW },
   { id: 'retorno-cliente', label: 'Retorno ao cliente', icon: 'ti-device-desktop', team: 'n1', slaHours: 2 },
 ];
 
@@ -111,6 +128,11 @@ const ESCALONAR_TEMPLATE_CONFIG = {
     steps: SUPORTE_ESCALONAR_STEPS,
     defaultActiveStepId: 'diagnostico-suporte',
     demoCompletedSteps: ['abertura-n1'],
+  },
+  produtos: {
+    steps: PRODUTOS_ESCALONAR_STEPS,
+    defaultActiveStepId: 'analise-produtos',
+    demoCompletedSteps: ['abertura-n1', 'triagem-n1'],
   },
 };
 

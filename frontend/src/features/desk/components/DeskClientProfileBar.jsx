@@ -6,7 +6,6 @@ import React, { useEffect, useState } from 'react';
 import { getClientContactFields, getClientActiveProducts, getProductTagClass, getTicketProtocolLabel } from '../../../services/desk/utils';
 import ClientTicketHistoryModal from './ClientTicketHistoryModal';
 import TicketWorkflowStepper from './TicketWorkflowStepper';
-import TicketWorkflowActions from './TicketWorkflowActions';
 import { isTicketInWorkflow } from '../../../services/desk/utils';
 
 function resolveProtocolLabel(ticket) {
@@ -60,9 +59,12 @@ export default function DeskClientProfileBar({
   }, [editOpen]);
 
   return (
-    <div className="crm-client-profile-bar">
+    <div className={'crm-client-profile-bar' + (inWorkflow ? ' crm-client-profile-bar--with-workflow' : '')}>
       <section
-        className="ticket-client-profile ticket-client-profile--compact ticket-client-profile--header-grid"
+        className={
+          'ticket-client-profile ticket-client-profile--compact ticket-client-profile--header-grid'
+          + (inWorkflow ? ' ticket-client-profile--header-grid--with-workflow' : '')
+        }
         id="ticketClientProfile"
         aria-label="Perfil do cliente"
       >
@@ -127,6 +129,12 @@ export default function DeskClientProfileBar({
           </span>
         </div>
 
+        {inWorkflow ? (
+          <div className="ticket-client-profile__cell-workflow">
+            <TicketWorkflowStepper ticket={ticket} />
+          </div>
+        ) : null}
+
         <div className="ticket-client-profile__protocol-row ticket-client-profile__cell-protocol">
           <span className="ticket-client-profile__protocol" id="profileProtocol">
             {protocolLabel}
@@ -160,12 +168,6 @@ export default function DeskClientProfileBar({
           <i className="fas fa-history" /> Histórico
         </button>
       </div>
-      {inWorkflow ? (
-        <div className="crm-client-profile-bar__workflow">
-          <TicketWorkflowStepper ticket={ticket} />
-          <TicketWorkflowActions ticket={ticket} />
-        </div>
-      ) : null}
       <ClientTicketHistoryModal
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}

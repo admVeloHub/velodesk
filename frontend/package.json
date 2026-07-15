@@ -10,7 +10,7 @@
   "type": "module",
   "scripts": {
     "predev": "node ../scripts/free-port.cjs 8000",
-    "dev": "vite --host",
+    "dev": "npm run start",
     "prestart": "node ../scripts/free-port.cjs 8000",
     "start": "vite --host",
     "build": "vite build",

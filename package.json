@@ -9,9 +9,10 @@
     "author": "VeloHub Development Team"
   },
   "scripts": {
-    "prestart": "node scripts/free-port.cjs 8000",
-    "start": "npm start --prefix frontend",
-    "dev": "npm start --prefix frontend",
+    "prestart": "node scripts/free-port.cjs 8000 8001",
+    "start": "node scripts/start-dev.cjs",
+    "dev": "npm start",
+    "start:frontend": "npm start --prefix frontend",
     "start:backend": "npm start --prefix backend",
     "stop": "node scripts/free-port.cjs 8000 8001",
     "build": "npm run build --prefix frontend",

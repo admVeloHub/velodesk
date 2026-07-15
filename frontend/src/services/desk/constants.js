@@ -49,8 +49,21 @@ export const CASCADE_ACTIONS = [
 export const ESCALONAR_OPTIONS = [
   { id: 'n2', label: 'N2' },
   { id: 'financeiro', label: 'Financeiro' },
-  { id: 'suporte', label: 'Suporte' }
+  { id: 'produtos', label: 'Produtos' },
+  { id: 'suporte', label: 'Suporte' },
 ];
+
+/** Encaminhamento do Desk Agente — abaixo de Detalhe */
+export const AGENT_FORWARD_OPTIONS = [
+  { id: 'financeiro', label: 'Financeiro' },
+  { id: 'produtos', label: 'Produtos' },
+];
+
+export const AGENT_FORWARD_IDS = new Set(['financeiro', 'produtos']);
+
+export function isAgentForwardEscalonar(id) {
+  return AGENT_FORWARD_IDS.has(id);
+}
 
 export const SLA_LABELS = {
   ok: 'Dentro do prazo',
