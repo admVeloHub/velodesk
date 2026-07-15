@@ -1,19 +1,43 @@
 /**
- * API client v1.7.0 — colaboradoresApi (cadastro Desk via Mongo)
- * VERSION: v1.7.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * API client v1.8.0 — interceptor 401 (sessão expirada / token inválido)
+ * VERSION: v1.8.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
+import { clearDeskAuthSession } from '../utils/backendJwt';
 
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
 });
 
+let handling401 = false;
+
+function isAuthRequest(url = '') {
+  return /\/login\b|\/auth\//.test(String(url));
+}
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('velodesk_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const url = error?.config?.url || '';
+    if (status === 401 && !isAuthRequest(url) && !handling401) {
+      handling401 = true;
+      clearDeskAuthSession();
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.replace('/login?session=expired');
+      }
+      handling401 = false;
+    }
+    return Promise.reject(error);
+  },
+);
 
 export default api;
 

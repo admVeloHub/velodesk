@@ -1,6 +1,6 @@
 /**
- * DeskLoginPage v1.3.0 — login Google + landing Painel 360°
- * VERSION: v1.3.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * DeskLoginPage v1.3.1 — aviso sessão expirada (?session=expired)
+ * VERSION: v1.3.1 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -63,6 +63,13 @@ export default function DeskLoginPage() {
   const buttonRef = useRef(null);
   const initializedRef = useRef(false);
   const clientId = getGoogleClientId();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('session') === 'expired') {
+      setError('Sessão expirada ou inválida. Entre novamente com Google.');
+    }
+  }, [location.search]);
 
   const completeLogin = useCallback(async (data) => {
     if (!data?.token || !data?.user) {

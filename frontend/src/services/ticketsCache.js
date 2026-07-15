@@ -1,8 +1,9 @@
 /**
- * ticketsCache v1.5.1 — novos sem responsavel visíveis ao agente
- * VERSION: v1.5.1 | DATE: 2026-07-03 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.5.2 — só carrega boxes com JWT utilizável
+ * VERSION: v1.5.2 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
+import { isBackendJwtUsable } from '../utils/backendJwt';
 import {
   adaptColumnsFromApi,
   apiTicketToCockpit,
@@ -97,7 +98,8 @@ function filterColumnsForAgent(columns) {
 }
 
 export async function loadKanbanFromApi() {
-  if (!useApi || !localStorage.getItem('velodesk_token')) {
+  const token = localStorage.getItem('velodesk_token');
+  if (!useApi || !isBackendJwtUsable(token)) {
     return columns;
   }
   const drafts = collectDraftTickets(columns);

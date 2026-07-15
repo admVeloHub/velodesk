@@ -1,14 +1,15 @@
 /**
- * AuthContext v1.5.0 — Google SSO + logout + sem admin hardcoded
- * VERSION: v1.5.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * AuthContext v1.6.0 — valida exp do JWT + limpa sessão inválida no boot
+ * VERSION: v1.6.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import { resolveDeskAccessRole } from '../config/deskAccessAllowlist';
 import { isGoogleDeskAuthMode, isGoogleDeskSession } from '../config/deskAuthMode';
-import { DEV_LOCAL_TOKEN, isLocalDevBypass } from '../config/devAuth';
+import { isLocalDevBypass } from '../config/devAuth';
 import { isHubSessionActive, readHubSession } from '../config/hubSession';
 import { setApiMode } from '../services/ticketsCache';
 import { getDeskDisplayName, isLegacyDeskUser } from '../utils/userDisplayName';
+import { clearDeskAuthSession, isBackendJwtUsable } from '../utils/backendJwt';
 
 const AuthContext = createContext(null);
 
@@ -30,25 +31,8 @@ function readStoredColaborador() {
   }
 }
 
-function hasValidBackendJwt(token) {
-  if (!token || token === DEV_LOCAL_TOKEN) return false;
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const userId = String(payload.userId ?? payload.sub ?? '').trim();
-    return /^[a-f0-9]{24}$/i.test(userId);
-  } catch {
-    return false;
-  }
-}
-
 function clearStoredAuthSession() {
-  localStorage.removeItem('velodesk_gate_authorized');
-  localStorage.removeItem('velodesk_user');
-  localStorage.removeItem('velodesk_colaborador');
-  localStorage.removeItem('velodesk_token');
-  localStorage.removeItem('velodesk_auth_mode');
-  localStorage.removeItem('velodesk_profile_locked');
-  localStorage.removeItem('velodeskProfile');
+  clearDeskAuthSession();
 }
 
 function isAllowedGoogleUser(user) {
@@ -70,7 +54,7 @@ function readInitialAuth() {
     }
 
     if (isGoogleDeskSession(user)) {
-      if (!hasValidBackendJwt(token) || !isAllowedGoogleUser(user)) {
+      if (!isBackendJwtUsable(token) || !isAllowedGoogleUser(user)) {
         clearStoredAuthSession();
         return { authStatus: 'pending', user: null, colaborador: null, token: null };
       }
@@ -88,7 +72,12 @@ function readInitialAuth() {
       return { authStatus: 'pending', user: null, colaborador: null, token: null };
     }
 
-    if (isLocalDevBypass() && !hasValidBackendJwt(token)) {
+    if (isLocalDevBypass() && !isBackendJwtUsable(token)) {
+      return { authStatus: 'pending', user: null, colaborador: null, token: null };
+    }
+
+    if (!isLocalDevBypass() && !isBackendJwtUsable(token)) {
+      clearStoredAuthSession();
       return { authStatus: 'pending', user: null, colaborador: null, token: null };
     }
 

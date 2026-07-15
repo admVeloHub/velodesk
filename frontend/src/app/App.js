@@ -1,9 +1,6 @@
 /**
-
  * App raiz — providers + rotas
-
- * VERSION: v2.5.0 | DATE: 2026-07-06 | AUTHOR: VeloHub Development Team
-
+ * VERSION: v2.5.1 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 
 import React, { useEffect } from 'react';
@@ -49,9 +46,7 @@ import WorkflowPage from '../pages/WorkflowPage';
 
 import { initCockpitGlobals } from '../config/cockpitConfig';
 
-import { isLocalDevBypass } from '../config/devAuth';
-
-import { loadKanbanFromApi, setApiMode } from '../services/ticketsCache';
+import { setApiMode } from '../services/ticketsCache';
 
 
 
@@ -154,16 +149,8 @@ function AppProviders({ children }) {
 export default function App() {
 
   useEffect(() => {
-
     initCockpitGlobals();
-
     setApiMode(true);
-
-    if (!isLocalDevBypass()) {
-
-      loadKanbanFromApi().catch(() => {});
-
-    }
   }, []);
 
 

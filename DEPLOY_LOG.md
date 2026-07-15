@@ -1,12 +1,30 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.28.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.29.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
 
-### GitHub Push — Fix 502 prod: API crash por mongodb-memory-server (devDependency)
+### GitHub Push — Fix 401: sessão JWT expirada/inválida redireciona ao login
+
+- **Data/Hora**: 2026-07-15
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.29.0
+  - client.js v1.8.0, AuthContext v1.6.0, backendJwt v1.0.0
+  - App.js v2.5.1, ticketsCache v1.5.2, DeskLoginPage v1.3.1
+- **Arquivos modificados / incluídos**:
+  - `frontend/src/api/client.js` — interceptor 401 limpa sessão e redireciona `/login?session=expired`
+  - `frontend/src/utils/backendJwt.js` — validação local de exp/userId do JWT
+  - `frontend/src/context/AuthContext.js` — não restaura sessão com token expirado
+  - `frontend/src/app/App.js` — remove `loadKanbanFromApi` antes do login
+- **Descrição**: Após queda da API, token antigo no localStorage causava 401 em boxes/workflows/tabulation/colaboradores. Agora força novo login Google.
+- **Status**: Concluído
+
+---
 
 - **Data/Hora**: 2026-07-15
 - **Tipo**: GitHub Push
