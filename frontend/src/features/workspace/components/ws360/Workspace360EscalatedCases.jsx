@@ -3,11 +3,9 @@
  * VERSION: v2.2.0 | DATE: 2026-07-06
  */
 import React, { useState } from 'react';
-import Workspace360ChannelVision from './Workspace360ChannelVision';
 
 export default function Workspace360EscalatedCases({
   escalated,
-  channelVision,
   onViewAll,
   onDismiss,
 }) {
@@ -65,8 +63,6 @@ export default function Workspace360EscalatedCases({
         <i className="ti ti-clock" aria-hidden="true" />
         <span>{slaCriticalCount} casos já passaram do prazo crítico de SLA</span>
       </div>
-
-      <Workspace360ChannelVision channels={channelVision} />
     </section>
   );
 }

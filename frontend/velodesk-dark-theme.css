@@ -236,6 +236,16 @@ body.velodesk-dark .ws-stat-card {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
+body.velodesk-dark .ws360-service-status__tag--active {
+    background: rgba(34, 197, 94, 0.18);
+    color: #86efac;
+}
+
+body.velodesk-dark .ws360-service-status__tag--offline {
+    background: rgba(239, 68, 68, 0.16);
+    color: #fca5a5;
+}
+
 body.velodesk-dark .ws360-super-kpi__value,
 body.velodesk-dark .ws360-super-kpi--primary .ws360-super-kpi__value,
 body.velodesk-dark .ws360-super-kpi--secondary .ws360-super-kpi__value,
