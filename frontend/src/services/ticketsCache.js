@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.5.2 — só carrega boxes com JWT utilizável
- * VERSION: v1.5.2 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.6.0 — cache de boxes/tickets do Desk
+ * VERSION: v1.6.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -97,7 +97,7 @@ function filterColumnsForAgent(columns) {
   }));
 }
 
-export async function loadKanbanFromApi() {
+export async function loadBoxesFromApi() {
   const token = localStorage.getItem('velodesk_token');
   if (!useApi || !isBackendJwtUsable(token)) {
     return columns;
@@ -116,7 +116,7 @@ export async function loadKanbanFromApi() {
   return columns;
 }
 
-export function addCustomKanbanBox(box) {
+export function addCustomBox(box) {
   const cols = ensureDefaultColumns();
   if (cols.some((col) => col.id === box.id)) {
     return cols.find((col) => col.id === box.id);
@@ -155,7 +155,7 @@ export async function updateTicketViaApi(ticketId, updater) {
   if (useApi && apiId && !isDraftTicket(updated)) {
     assertApiReady('atualizar ticket');
     await ticketsApi.update(apiId, cockpitTicketToApi(updated));
-    await loadKanbanFromApi();
+    await loadBoxesFromApi();
     return findInColumns(apiId)?.ticket || updated;
   }
 
@@ -168,7 +168,7 @@ export async function addMessageViaApi(ticketId, payload) {
   if (useApi && !isDraftTicket({ id: apiId })) {
     assertApiReady('enviar mensagem');
     await ticketsApi.addMessage(apiId, payload);
-    await loadKanbanFromApi();
+    await loadBoxesFromApi();
     return findInColumns(apiId)?.ticket;
   }
   return updateTicketViaApi(ticketId, (t) => {
@@ -255,7 +255,7 @@ export async function persistDraftTicket(ticket, messageText) {
   const created = await ticketsApi.create(payload);
   const persisted = apiTicketToCockpit(created);
   removeTicketFromColumns(draftId);
-  await loadKanbanFromApi();
+  await loadBoxesFromApi();
   const entry = findInColumns(persisted.id || persisted._id);
   if (!entry) {
     const cols = ensureDefaultColumns();
@@ -272,7 +272,7 @@ export async function persistDraftTicket(ticket, messageText) {
 export async function createTicketViaApi(payload) {
   assertApiReady('criar ticket');
   const created = await ticketsApi.create(cockpitTicketToApi(buildCreatePayload(payload)));
-  await loadKanbanFromApi();
+  await loadBoxesFromApi();
   return apiTicketToCockpit(created);
 }
 

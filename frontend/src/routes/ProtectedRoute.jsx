@@ -5,14 +5,14 @@
 import React, { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { loadKanbanFromApi } from '../services/ticketsCache';
+import { loadBoxesFromApi } from '../services/ticketsCache';
 
 export default function ProtectedRoute() {
   const { isAuthenticated, authStatus } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
-    if (isAuthenticated) loadKanbanFromApi();
+    if (isAuthenticated) loadBoxesFromApi();
   }, [isAuthenticated]);
 
   if (authStatus !== 'authorized' || !isAuthenticated) {

@@ -13,7 +13,7 @@ const MEUS_CHAMADOS_BOX_MAP = {
   'meus-pendente': 'em-espera',
 };
 
-const DEFAULT_KANBAN_BOXES = [
+const DEFAULT_BOXES = [
   { id: 'novos', name: 'Novos', tickets: [] },
   { id: 'em-andamento', name: 'Em Andamento', tickets: [] },
   { id: 'em-espera', name: 'Pendente', tickets: [] },
@@ -92,7 +92,7 @@ export function adaptColumnsFromApi(columns, options = {}) {
 }
 
 function adaptMeusChamadosColumns(columns) {
-  const merged = DEFAULT_KANBAN_BOXES.map((box) => ({ ...box, tickets: [] }));
+  const merged = DEFAULT_BOXES.map((box) => ({ ...box, tickets: [] }));
 
   (columns || []).forEach((col) => {
     const targetId = MEUS_CHAMADOS_BOX_MAP[col.id];

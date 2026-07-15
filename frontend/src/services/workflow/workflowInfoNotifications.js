@@ -1,7 +1,7 @@
 /**
  * workflowInfoNotifications v1.1.0 — pedidos de informação workflow → agente responsável
  */
-import { findTicketEntry, getAllCockpitTickets } from '../kanbanStorage';
+import { findTicketEntry, getAllCockpitTickets } from '../ticketsStorage';
 import { ticketMatchesAgentResponsavel, readDeskProfileId } from '../desk/responsavelSegmentation';
 import { normalizeProfileId } from '../../config/profiles';
 

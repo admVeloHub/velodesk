@@ -21,14 +21,14 @@ import {
   getWorkflowProgress,
   syncTicketWorkflowOnCommit,
 } from '../../services/desk/utils';
-import { findTicketEntry, updateTicketInKanban, sendTicketRegistroEntry } from '../../services/kanbanStorage';
+import { findTicketEntry, updateTicketInCache, sendTicketRegistroEntry } from '../../services/ticketsStorage';
 import { isDraftTicket, persistDraftTicket } from '../../services/ticketsCache';
 import { lookupClient } from '../../services/clientDb';
 import { clientsApi } from '../../api/client';
 import { persistClienteContact } from '../../api/adapters/clienteAdapter';
 import { useTickets } from '../../context/TicketsContext';
 import { useNotifications } from '../../context/NotificationContext';
-import { getAllQueueStatuses, restoreCustomKanbanBoxes } from '../../services/desk/customQueueBoxes';
+import { getAllQueueStatuses, restoreCustomBoxes } from '../../services/desk/customQueueBoxes';
 import CreateTicketPanel from './components/CreateTicketPanel';
 import DeskQueuePanel from './components/DeskQueuePanel';
 import DeskTicketList from './components/DeskTicketList';
@@ -139,7 +139,7 @@ export default function DeskV2Root() {
 
   const syncTicketViews = useCallback(async () => {
     await refreshTickets();
-    restoreCustomKanbanBoxes();
+    restoreCustomBoxes();
     setQueueStatuses(getAllQueueStatuses());
   }, [refreshTickets]);
 
@@ -203,7 +203,7 @@ export default function DeskV2Root() {
   const sendDisabledBySpell = composeMode === 'public' && composeSpellErrors.length > 0;
 
   useEffect(() => {
-    restoreCustomKanbanBoxes();
+    restoreCustomBoxes();
     setQueueStatuses(getAllQueueStatuses());
   }, []);
 
@@ -504,7 +504,7 @@ export default function DeskV2Root() {
         });
       }
       let workflowActivated = false;
-      await updateTicketInKanban(ticket.id, (t) => {
+      await updateTicketInCache(ticket.id, (t) => {
         applyRightFieldsToTicket(
           t,
           mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
@@ -590,7 +590,7 @@ export default function DeskV2Root() {
 
     (async () => {
       try {
-        await updateTicketInKanban(ticket.id, (t) => {
+        await updateTicketInCache(ticket.id, (t) => {
           if (cancelled) return t;
           applyRightFieldsToTicket(t, fields, escalonar);
           t.lateralForm = {
@@ -656,7 +656,7 @@ export default function DeskV2Root() {
       });
       const clienteId = clienteDoc?._id || clienteDoc?.id || ticket.clienteId || ticket.lateralForm?.clienteId;
 
-      await updateTicketInKanban(ticket.id, (t) => {
+      await updateTicketInCache(ticket.id, (t) => {
         t.clientName = nome;
         t.solicitante = nome;
         t.clientEmail = email;
@@ -745,7 +745,7 @@ export default function DeskV2Root() {
 
     if (ticket && !isDraftTicket(ticket)) {
       try {
-        await updateTicketInKanban(ticket.id, (t) => applyRightFieldsToTicket(t, next, escalonar));
+        await updateTicketInCache(ticket.id, (t) => applyRightFieldsToTicket(t, next, escalonar));
         syncTicketViews();
       } catch {
         showNotification('Tabulação aplicada nos campos, mas não foi possível salvar no ticket.', 'warning');

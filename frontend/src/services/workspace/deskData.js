@@ -2,7 +2,7 @@
  * Workspace — dados operacionais do painel 360°
  * VERSION: v2.2.1 | DATE: 2026-07-14
  */
-import { getAllCockpitTickets } from '../kanbanStorage';
+import { getAllCockpitTickets } from '../ticketsStorage';
 import { getAgentName } from '../clientDb';
 import { getSlaClass, isTicketInWorkflow, getWorkflowProgress } from '../desk/utils';
 import { getWorkflowInfoRequests, resolveDeskTicketIdForInfoRequest } from '../workflow/workflowInfoNotifications';

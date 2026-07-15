@@ -1,7 +1,7 @@
 /**
  * workflowDecisionHandlers v1.1.0 — aprovar / reprovar / pedir informação
  */
-import { updateTicketInKanban, getAllCockpitTickets } from '../kanbanStorage';
+import { updateTicketInCache, getAllCockpitTickets } from '../ticketsStorage';
 import {
   advanceTicketWorkflow,
   advanceTicketWorkflowByDecision,
@@ -177,7 +177,7 @@ function mirrorInfoRequestFromSource(target, source) {
   return target;
 }
 
-async function syncInfoRequestToKanbanTickets(sourceTicket) {
+async function syncInfoRequestToTickets(sourceTicket) {
   const protocol = getTicketProtocolLabel(sourceTicket);
   if (!protocol) return;
 
@@ -187,7 +187,7 @@ async function syncInfoRequestToKanbanTickets(sourceTicket) {
   );
 
   await Promise.all(
-    matches.map(({ ticket }) => updateTicketInKanban(ticket.id, (t) => mirrorInfoRequestFromSource(t, sourceTicket))),
+    matches.map(({ ticket }) => updateTicketInCache(ticket.id, (t) => mirrorInfoRequestFromSource(t, sourceTicket))),
   );
 }
 
@@ -246,13 +246,13 @@ function applyRequestInfo(ticket, message = '') {
 }
 
 export async function approveWorkflowDecision(ticketId) {
-  return updateTicketInKanban(ticketId, (ticket) => applyApprove(ticket));
+  return updateTicketInCache(ticketId, (ticket) => applyApprove(ticket));
 }
 
 export async function rejectWorkflowDecision(ticketId, reason = '') {
-  return updateTicketInKanban(ticketId, (ticket) => applyReject(ticket, reason));
+  return updateTicketInCache(ticketId, (ticket) => applyReject(ticket, reason));
 }
 
 export async function requestWorkflowInfo(ticketId, message = '') {
-  return updateTicketInKanban(ticketId, (ticket) => applyRequestInfo(ticket, message));
+  return updateTicketInCache(ticketId, (ticket) => applyRequestInfo(ticket, message));
 }

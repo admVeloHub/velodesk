@@ -2,7 +2,7 @@
  * Escalonamento de tickets — supervisor
  * VERSION: v1.0.0 | DATE: 2026-06-22
  */
-import { updateTicketInKanban } from '../kanbanStorage';
+import { updateTicketInCache } from '../ticketsStorage';
 import { ESCALONAR_OPTIONS } from '../desk/constants';
 import { formatCpf, normalizeCpf, resolveDeskSearchEntries } from '../desk/utils';
 
@@ -29,7 +29,7 @@ function mapTicketSearchResult({ ticket, queueId }) {
 
 export async function escalateTicket(ticketId, escalonarId) {
   const now = new Date().toISOString();
-  return updateTicketInKanban(ticketId, (ticket) => {
+  return updateTicketInCache(ticketId, (ticket) => {
     const prevLf = ticket.lateralForm || {};
     ticket.lateralForm = {
       ...prevLf,

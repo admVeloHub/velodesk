@@ -1,7 +1,7 @@
 /**
  * workflowApprovalData v1.2.1 — fila e detalhe do console de decisão
  */
-import { getAllCockpitTickets } from '../kanbanStorage';
+import { getAllCockpitTickets } from '../ticketsStorage';
 import { getSlaClass, getWorkflowProgress, isTicketInWorkflow, getTicketProtocolLabel, getAgentName } from '../desk/utils';
 import { resolveApprovalHeader, ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import { getRuntimeGrupos } from '../desk/workflowRuntimeStore';

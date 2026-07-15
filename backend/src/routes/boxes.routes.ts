@@ -72,7 +72,7 @@ router.get('/', authMiddleware, async (req, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[boxes] GET falhou:', message);
-    res.status(500).json({ message: 'Erro ao carregar kanban' });
+    res.status(500).json({ message: 'Erro ao carregar boxes' });
   }
 });
 

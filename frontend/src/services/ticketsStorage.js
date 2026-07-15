@@ -1,11 +1,11 @@
 /**
- * Kanban / tickets — facade API + cache local
- * VERSION: v1.4.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * ticketsStorage v1.0.0 — facade API + cache local de tickets/boxes (Desk)
+ * VERSION: v1.0.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import {
   getCachedColumns,
   setCachedColumns,
-  loadKanbanFromApi,
+  loadBoxesFromApi,
   updateTicketViaApi,
   addMessageViaApi,
   createTicketViaApi,
@@ -16,21 +16,21 @@ import {
 } from './ticketsCache';
 import { apiTicketToCockpit } from '../api/adapters/ticketAdapter';
 
-export async function refreshKanbanFromApi() {
-  return loadKanbanFromApi();
+export async function refreshTicketsFromApi() {
+  return loadBoxesFromApi();
 }
 
-export function getKanbanColumns() {
+export function getTicketColumns() {
   return getCachedColumns();
 }
 
-export function saveKanbanColumns(nextColumns) {
+export function saveTicketColumns(nextColumns) {
   setCachedColumns(nextColumns);
 }
 
 export function findTicketEntry(ticketId) {
   const id = String(ticketId);
-  const cols = getKanbanColumns();
+  const cols = getTicketColumns();
   for (let i = 0; i < cols.length; i++) {
     const box = cols[i];
     const t = (box.tickets || []).find((x) => String(x.id) === id || String(x._id) === id);
@@ -40,7 +40,7 @@ export function findTicketEntry(ticketId) {
 }
 
 export function getAllCockpitTickets() {
-  const cols = getKanbanColumns();
+  const cols = getTicketColumns();
   const list = [];
   cols.forEach((box) => {
     (box.tickets || []).forEach((t) => {
@@ -75,7 +75,7 @@ export function mapTicketQueueId(ticket, boxId) {
   return 'em-andamento';
 }
 
-export async function updateTicketInKanban(ticketId, updater) {
+export async function updateTicketInCache(ticketId, updater) {
   return updateTicketViaApi(ticketId, updater);
 }
 
@@ -107,7 +107,7 @@ export async function addTicketToBox(boxId, ticket) {
     return created ? apiTicketToCockpit(created) : null;
   }
 
-  const cols = getKanbanColumns();
+  const cols = getTicketColumns();
   const box = cols.find((c) => c.id === boxId);
   if (!box) return null;
   if (!box.tickets) box.tickets = [];

@@ -1,12 +1,30 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.29.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.30.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
 
-### GitHub Push — Fix 401: sessão JWT expirada/inválida redireciona ao login
+### GitHub Push — Remoção total do Kanban legado (Desk CRM / boxes)
+
+- **Data/Hora**: 2026-07-15
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.30.0
+  - ticketsStorage v1.0.0, ticketsCache v1.6.0, TicketsContext v1.4.0
+  - TicketsPage v2.2.0, customQueueBoxes, ticketAdapter, boxes.routes
+- **Arquivos modificados / incluídos**:
+  - Removidos `kanbanStorage.js`, `KanbanBoard.jsx`
+  - Novo `ticketsStorage.js` — facade tickets/boxes (`loadBoxesFromApi`, `updateTicketInCache`, etc.)
+  - `TicketsPage` sempre abre Desk CRM (sem fallback kanban)
+  - Renomeação em todo o frontend: sem referências a kanban
+- **Descrição**: Purga definitiva do Kanban morto; Desk usa apenas cache/API de boxes e tickets.
+- **Status**: Concluído
+
+---
 
 - **Data/Hora**: 2026-07-15
 - **Tipo**: GitHub Push
@@ -20,7 +38,7 @@
   - `frontend/src/api/client.js` — interceptor 401 limpa sessão e redireciona `/login?session=expired`
   - `frontend/src/utils/backendJwt.js` — validação local de exp/userId do JWT
   - `frontend/src/context/AuthContext.js` — não restaura sessão com token expirado
-  - `frontend/src/app/App.js` — remove `loadKanbanFromApi` antes do login
+  - `frontend/src/app/App.js` — remove preload de boxes antes do login
 - **Descrição**: Após queda da API, token antigo no localStorage causava 401 em boxes/workflows/tabulation/colaboradores. Agora força novo login Google.
 - **Status**: Concluído
 

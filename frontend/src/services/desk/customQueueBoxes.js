@@ -3,7 +3,7 @@
  * VERSION: v1.0.0 | DATE: 2026-06-19
  */
 import { QUEUE_STATUSES } from './constants';
-import { addCustomKanbanBox } from '../ticketsCache';
+import { addCustomBox } from '../ticketsCache';
 
 const STORAGE_KEY = 'velodeskCustomQueues';
 
@@ -74,7 +74,7 @@ export function createCustomQueueBox({ name, action }) {
   };
 
   saveCustomQueues([...loadCustomQueues(), box]);
-  addCustomKanbanBox({ id: box.id, name: box.name, action: box.action });
+  addCustomBox({ id: box.id, name: box.name, action: box.action });
 
   return box;
 }
@@ -85,8 +85,8 @@ export function getQueueActionLabel(queueId) {
   return null;
 }
 
-export function restoreCustomKanbanBoxes() {
+export function restoreCustomBoxes() {
   loadCustomQueues().forEach((box) => {
-    addCustomKanbanBox({ id: box.id, name: box.name, action: box.action });
+    addCustomBox({ id: box.id, name: box.name, action: box.action });
   });
 }

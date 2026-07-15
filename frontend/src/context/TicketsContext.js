@@ -1,9 +1,9 @@
 /**
- * TicketsContext v1.3.0 — recarrega kanban quando sessão/papel muda
- * VERSION: v1.3.0 | DATE: 2026-07-02 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.4.0 — recarrega boxes/tickets quando sessão/papel muda
+ * VERSION: v1.4.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { findTicketEntry, getKanbanColumns, refreshKanbanFromApi } from '../services/kanbanStorage';
+import { findTicketEntry, getTicketColumns, refreshTicketsFromApi } from '../services/ticketsStorage';
 import { getTicketProtocolLabel } from '../services/desk/utils';
 import { useAuth } from './AuthContext';
 
@@ -33,13 +33,13 @@ export function TicketsProvider({ children }) {
     if (isAuthenticated) {
       setLoading(true);
       try {
-        await refreshKanbanFromApi();
+        await refreshTicketsFromApi();
       } finally {
         setLoading(false);
       }
     }
     setRefreshKey((k) => k + 1);
-    return getKanbanColumns();
+    return getTicketColumns();
   }, [isAuthenticated]);
 
   useEffect(() => {
@@ -113,7 +113,7 @@ export function TicketsProvider({ children }) {
       setActiveTabId,
       refreshTickets,
       selectTicketFromModal,
-      getKanbanColumns,
+      getTicketColumns,
     }}>
       {children}
     </TicketsContext.Provider>

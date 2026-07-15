@@ -3,7 +3,7 @@
  * VERSION: v2.1.0 | DATE: 2026-06-18
  */
 import React, { useState } from 'react';
-import { updateTicketInKanban } from '../../services/kanbanStorage';
+import { updateTicketInCache } from '../../services/ticketsStorage';
 import { useNotifications } from '../../context/NotificationContext';
 import { usersApi } from '../../api/client';
 
@@ -28,7 +28,7 @@ export default function TicketLateralForm({ ticket, onClose }) {
   const save = async () => {
     setSaving(true);
     try {
-      await updateTicketInKanban(ticket.id, (t) => {
+      await updateTicketInCache(ticket.id, (t) => {
         t.lateralForm = { ...t.lateralForm, ...form };
         t.updatedAt = new Date().toISOString();
         return t;

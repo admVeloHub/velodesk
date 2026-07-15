@@ -4,8 +4,8 @@
  */
 import { ticketsApi } from '../../api/client';
 import { apiTicketToCockpit, cockpitTicketToApi } from '../../api/adapters/ticketAdapter';
-import { findTicketEntry, getAllCockpitTickets, updateTicketInKanban } from '../kanbanStorage';
-import { loadKanbanFromApi } from '../ticketsCache';
+import { findTicketEntry, getAllCockpitTickets, updateTicketInCache } from '../ticketsStorage';
+import { loadBoxesFromApi } from '../ticketsCache';
 import { fetchWorkspace360Agents } from './workspace360Api';
 
 let cachedAgents = null;
@@ -159,7 +159,7 @@ async function persistResponsavelUpdate(ticketId, ticketSnapshot, targetAgentNam
 
   const cached = findTicketEntry(ticketId);
   if (cached) {
-    await updateTicketInKanban(ticketId, (ticket) => {
+    await updateTicketInCache(ticketId, (ticket) => {
       ticket.responsibleAgent = targetAgentName;
       ticket.lateralForm = {
         ...(ticket.lateralForm || {}),
@@ -172,7 +172,7 @@ async function persistResponsavelUpdate(ticketId, ticketSnapshot, targetAgentNam
   }
 
   await ticketsApi.update(ticketId, cockpitTicketToApi(payload));
-  await loadKanbanFromApi();
+  await loadBoxesFromApi();
 }
 
 export async function redistributeTicket(ticketId, targetAgentName, ticketSnapshot = null) {

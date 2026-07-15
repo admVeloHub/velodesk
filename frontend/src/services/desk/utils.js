@@ -2,7 +2,7 @@
  * Desk CRM — utilitários de fila e conversa
  * VERSION: v3.0.1 | DATE: 2026-07-14
  */
-import { getKanbanColumns, saveKanbanColumns, getAllCockpitTickets } from '../kanbanStorage';
+import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
 import { ticketMatchesAgentResponsavel } from './responsavelSegmentation';
 import { lookupClient, getAgentName } from '../clientDb';
@@ -646,7 +646,7 @@ export function normalizeTicketForDeskV2(ticket) {
 }
 
 export function migrateAllTicketsForDeskV2() {
-  const columns = getKanbanColumns();
+  const columns = getTicketColumns();
   if (!columns.length) return;
   let changed = false;
   columns.forEach((box) => {
@@ -656,7 +656,7 @@ export function migrateAllTicketsForDeskV2() {
       if (JSON.stringify(t) !== before) changed = true;
     });
   });
-  if (changed) saveKanbanColumns(columns);
+  if (changed) saveTicketColumns(columns);
 }
 
 export function sortTicketEntries(entries, activeSort) {
@@ -1214,7 +1214,7 @@ export function applySendStatus(entry, queueId) {
 
 export function moveTicketToBox(entry, targetBoxId) {
   if (!entry || !targetBoxId) return;
-  const columns = getKanbanColumns();
+  const columns = getTicketColumns();
   const ticket = entry.ticket;
   const ticketId = String(ticket.id);
   columns.forEach((box) => {
@@ -1225,7 +1225,7 @@ export function moveTicketToBox(entry, targetBoxId) {
   if (!target) return;
   if (!target.tickets) target.tickets = [];
   target.tickets.push(ticket);
-  saveKanbanColumns(columns);
+  saveTicketColumns(columns);
   entry.boxId = targetBoxId;
 }
 
