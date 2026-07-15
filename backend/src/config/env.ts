@@ -1,4 +1,4 @@
-/** env v1.17.0 — URI VeloHubCentral para cadastro de colaboradores (leitura) */
+/** env v1.18.0 — colaboradores: MONGO_ENV (VeloHubCentral) em runtime */
 import fs from 'fs';
 import path from 'path';
 
@@ -43,6 +43,31 @@ export const envFile = envFileResult as {
 /** @deprecated use envFile */
 export const envBootstrap = envFile;
 
+export function cleanMongoUri(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .trim()
+    .replace(/(@[^/?]+)\/\?/, '$1?');
+}
+
+/** Cluster Desk (b2c_chamados, b2c_cadastros, desk_config) — MONGO_URI / MONGODB_URI */
+export function getMongoDeskUri(): string {
+  return cleanMongoUri(process.env.MONGODB_URI || process.env.MONGO_URI || '');
+}
+
+/**
+ * VeloHubCentral — console_funcionarios (colaboradores Desk).
+ * Somente MONGO_ENV (secret Cloud Run). Nunca reutilizar MONGO_URI do Desk.
+ */
+export function getMongoHubCentralUri(): string {
+  return cleanMongoUri(process.env.MONGO_ENV || '');
+}
+
+function resolveMongoFuncionariosUri(): string {
+  return getMongoHubCentralUri();
+}
+
 export const env = {
   port: parseInt(process.env.PORT || process.env.VELODESK_BACKEND || '8001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -50,15 +75,8 @@ export const env = {
   mongoDbName: process.env.MONGODB_DB_NAME || 'b2c_chamados',
   mongoCadastrosDbName: process.env.MONGODB_CADASTROS_DB_NAME || 'b2c_cadastros',
   mongoDeskConfigDbName: process.env.MONGODB_DESK_CONFIG_DB_NAME || 'desk_config',
-  /** VeloHubCentral — console_funcionarios.funcionarios_cadastroColaboradores (leitura) */
-  mongoFuncionariosUri: (
-    process.env.MONGODB_FUNCIONARIOS_URI
-    || process.env.MONGO_ENV
-    || ''
-  )
-    .trim()
-    .replace(/^["']|["']$/g, '')
-    .trim(),
+  /** VeloHubCentral — console_funcionarios.funcionarios_cadastroColaboradores (leitura via MONGO_ENV) */
+  mongoFuncionariosUri: resolveMongoFuncionariosUri(),
   mongoFuncionariosDbName: process.env.MONGODB_FUNCIONARIOS_DB_NAME || 'console_funcionarios',
   mongoFuncionariosCollection:
     process.env.MONGODB_FUNCIONARIOS_COLLECTION || 'funcionarios_cadastroColaboradores',

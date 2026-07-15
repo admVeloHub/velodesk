@@ -1,6 +1,6 @@
 #!/bin/sh
-# start-velodesk.sh v1.0.3 — nginx (SPA) + Node API com auto-restart + proxy VeloHub
-# VERSION: v1.0.3 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+# start-velodesk.sh v1.0.4 — repassa MONGO_ENV para API (colaboradores VeloHubCentral)
+# VERSION: v1.0.4 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
 set -e
 
 API_PORT="${API_INTERNAL_PORT:-8081}"
@@ -9,6 +9,9 @@ export BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:${API_PORT}}"
 
 if [ -z "$MONGODB_URI" ] && [ -z "$MONGO_URI" ]; then
   echo "[start-velodesk] ERRO: MONGODB_URI nao definida no servico Cloud Run velodesk"
+fi
+if [ -z "$MONGO_ENV" ]; then
+  echo "[start-velodesk] AVISO: MONGO_ENV nao definida — GET /api/colaboradores retorna 503 (VeloHubCentral / console_funcionarios)"
 fi
 if [ -z "$GOOGLE_CLIENT_ID" ] && [ -z "$VITE_GOOGLE_CLIENT_ID" ]; then
   echo "[start-velodesk] AVISO: GOOGLE_CLIENT_ID nao definida no servico Cloud Run"
@@ -43,6 +46,7 @@ run_api() {
   while true; do
     echo "[start-velodesk] Iniciando API Node na porta ${API_PORT}..."
     PORT="$API_PORT" NODE_ENV="${NODE_ENV:-production}" ENABLE_WHATSAPP="${ENABLE_WHATSAPP:-false}" \
+      MONGO_URI="${MONGO_URI:-}" MONGODB_URI="${MONGODB_URI:-${MONGO_URI:-}}" MONGO_ENV="${MONGO_ENV:-}" \
       node dist/index.js || echo "[start-velodesk] API encerrou inesperadamente (codigo $?)"
     echo "[start-velodesk] Reiniciando API em 2s..."
     sleep 2

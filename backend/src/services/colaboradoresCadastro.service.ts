@@ -1,6 +1,6 @@
 /**
- * colaboradoresCadastro.service v1.0.0 — leitura console_funcionarios.funcionarios_cadastroColaboradores
- * VERSION: v1.0.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * colaboradoresCadastro.service v1.0.1 — leitura console_funcionarios (MONGO_ENV)
+ * VERSION: v1.0.1 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import { env } from '../config/env';
 import { getFuncionariosConnection, isFuncionariosConnected } from '../config/database';
@@ -63,10 +63,13 @@ function getCadastroCollection() {
 export async function listColaboradoresDesk(): Promise<ColaboradorDeskPublico[]> {
   const col = getCadastroCollection();
   const docs = await col
-    .find({
-      desligado: { $ne: true },
-      $or: DESK_ACCESS_OR,
-    })
+    .find(
+      {
+        desligado: { $ne: true },
+        $or: DESK_ACCESS_OR,
+      },
+      { maxTimeMS: 10000 },
+    )
     .project(PUBLIC_PROJECTION)
     .toArray();
 

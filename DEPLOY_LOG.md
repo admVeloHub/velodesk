@@ -1,10 +1,33 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.26.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.27.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Fix colaboradores Desk: MONGO_ENV runtime (VeloHubCentral)
+
+- **Data/Hora**: 2026-07-15
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.27.0
+  - env.ts v1.18.0, database.ts v1.8.2, index.ts v1.9.2
+  - colaboradores.routes v1.0.1, colaboradoresCadastro.service v1.0.1
+  - loadFonteVelodeskEnv.cjs v2.2.2, start-velodesk.sh v1.0.4
+- **Arquivos modificados / incluídos**:
+  - `backend/src/config/env.ts` — `getMongoHubCentralUri()` lê só `MONGO_ENV` em runtime (sem fallback para URI do Desk)
+  - `backend/src/config/database.ts` — conexão `console_funcionarios` via MONGO_ENV; guard contra URI igual ao cluster Desk; `tryConnectFuncionarios()`
+  - `backend/src/routes/colaboradores.routes.ts` — retry de conexão antes de 503 (evita 502 por crash)
+  - `backend/src/index.ts` — health `mongoEnvConfigured`; reconexão MONGO_ENV a cada 15s; log startup
+  - `docker/start-velodesk.sh` — repassa `MONGO_ENV` ao Node; aviso se ausente
+  - `backend/.env.example` — documentação MONGO_ENV
+- **Descrição**: Corrige 502 em `/api/colaboradores` em produção — colaboradores Desk usam cluster VeloHubCentral (`MONGO_ENV`), separado de `MONGO_URI` (desk_dev). Requer secret `MONGO_ENV` no Cloud Run além de `MONGO_URI`.
+- **Status**: Concluído
+
+---
 
 ### GitHub Push — Workflows persistidos, colaboradores Desk, VeloNews e merges dev
 

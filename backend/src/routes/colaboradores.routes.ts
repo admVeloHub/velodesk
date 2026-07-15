@@ -1,10 +1,10 @@
 /**
- * colaboradores.routes v1.0.0 — lista cadastro Desk (console_funcionarios, leitura direta)
- * VERSION: v1.0.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * colaboradores.routes v1.0.1 — lista cadastro Desk (MONGO_ENV → VeloHubCentral)
+ * VERSION: v1.0.1 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
-import { isFuncionariosConnected } from '../config/database';
+import { isFuncionariosConnected, tryConnectFuncionarios } from '../config/database';
 import {
   findColaboradorByEmail,
   listColaboradoresDesk,
@@ -24,9 +24,12 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     }
 
     if (!isFuncionariosConnected()) {
+      await tryConnectFuncionarios();
+    }
+    if (!isFuncionariosConnected()) {
       return res.status(503).json({
         success: false,
-        message: 'Cadastro de colaboradores indisponível (VeloHubCentral / console_funcionarios).',
+        message: 'Cadastro de colaboradores indisponível (configure MONGO_ENV → VeloHubCentral / console_funcionarios).',
         data: [],
       });
     }
@@ -46,9 +49,12 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 router.get('/by-email', authMiddleware, async (req: Request, res: Response) => {
   try {
     if (!isFuncionariosConnected()) {
+      await tryConnectFuncionarios();
+    }
+    if (!isFuncionariosConnected()) {
       return res.status(503).json({
         success: false,
-        message: 'Cadastro de colaboradores indisponível (VeloHubCentral / console_funcionarios).',
+        message: 'Cadastro de colaboradores indisponível (configure MONGO_ENV → VeloHubCentral / console_funcionarios).',
       });
     }
 

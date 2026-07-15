@@ -1,7 +1,7 @@
-/** database v1.8.0 — desk_config VeloDesk + leitura console_funcionarios (VeloHubCentral) */
+/** database v1.8.2 — MONGO_ENV runtime (VeloHubCentral / colaboradores) */
 import path from 'path';
 import mongoose, { Connection } from 'mongoose';
-import { env, envFile } from './env';
+import { env, envFile, getMongoDeskUri, getMongoHubCentralUri } from './env';
 import { MONGO_DRIVER_OPTIONS } from './mongoUri';
 import { maskMongoUri, resolveAtlasSrvUri } from './resolveAtlasUri';
 
@@ -117,10 +117,18 @@ async function connectDeskConfig(uri: string): Promise<void> {
 async function connectFuncionarios(): Promise<void> {
   if (funcionariosConnection?.readyState === 1) return;
 
-  const rawUri = (env.mongoFuncionariosUri || '').trim();
+  const rawUri = getMongoHubCentralUri();
   if (!rawUri) {
     console.warn(
-      '[mongo] MONGODB_FUNCIONARIOS_URI / MONGO_ENV ausente — lista de colaboradores Desk indisponível.',
+      '[mongo] MONGO_ENV ausente — lista de colaboradores Desk indisponível (VeloHubCentral / console_funcionarios).',
+    );
+    return;
+  }
+
+  const deskUri = getMongoDeskUri();
+  if (deskUri && rawUri === deskUri) {
+    console.error(
+      '[mongo] MONGO_ENV igual a MONGO_URI/MONGODB_URI — use clusters distintos (VeloHubCentral vs desk_dev).',
     );
     return;
   }
@@ -137,8 +145,21 @@ async function connectFuncionarios(): Promise<void> {
   });
   await funcionariosConnection.asPromise();
   console.log(
-    `Atlas funcionarios conectado: ${env.mongoFuncionariosDbName} @ ${maskUri(atlasUri)} (${method})`,
+    `Atlas funcionarios conectado: ${env.mongoFuncionariosDbName} @ ${maskUri(atlasUri)} (${method}) [MONGO_ENV]`,
   );
+}
+
+export async function tryConnectFuncionarios(): Promise<boolean> {
+  try {
+    await connectFuncionarios();
+    return isFuncionariosConnected();
+  } catch (err) {
+    console.error(
+      '[mongo] Falha ao conectar console_funcionarios (VeloHubCentral / MONGO_ENV):',
+      (err as Error).message,
+    );
+    return false;
+  }
 }
 
 export async function connectDatabase(uriOverride?: string): Promise<void> {
@@ -161,14 +182,7 @@ export async function connectDatabase(uriOverride?: string): Promise<void> {
 
   await connectCadastros(atlasUri);
   await connectDeskConfig(atlasUri);
-  try {
-    await connectFuncionarios();
-  } catch (err) {
-    console.error(
-      '[mongo] Falha ao conectar console_funcionarios (VeloHubCentral):',
-      (err as Error).message,
-    );
-  }
+  await tryConnectFuncionarios();
 }
 
 export async function disconnectDatabase(): Promise<void> {

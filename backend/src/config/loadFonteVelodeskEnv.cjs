@@ -1,8 +1,8 @@
 /**
  * loadFonteVelodeskEnv.cjs — FONTE DA VERDADE/.env-velodesk + .env + backend/.env
- * VERSION: v2.2.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * VERSION: v2.2.2 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  *
- * .env da FONTE (MONGO_ENV / VeloHubCentral) carrega sem override — não sobrescreve MONGODB_URI do Desk.
+ * VeloHubCentral (colaboradores): MONGO_ENV da FONTE DA VERDADE/.env — fonte da verdade.
  */
 'use strict';
 
@@ -14,23 +14,26 @@ const DEFAULTS = {
   VELODESK_BACKEND: '8001',
 };
 
+function cleanMongoUri(raw) {
+  return String(raw || '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .trim()
+    .replace(/(@[^/?]+)\/\?/, '$1?');
+}
+
 function normalizeMongoEnv() {
   if (!process.env.MONGODB_URI && process.env.MONGO_URI) {
     process.env.MONGODB_URI = process.env.MONGO_URI;
   }
   if (process.env.MONGODB_URI) {
-    process.env.MONGODB_URI = process.env.MONGODB_URI.replace(/(@[^/?]+)\/\?/, '$1?');
+    process.env.MONGODB_URI = cleanMongoUri(process.env.MONGODB_URI);
   }
-  // Cadastro colaboradores (VeloHubCentral) — MONGO_ENV da FONTE DA VERDADE/.env
-  if (!process.env.MONGODB_FUNCIONARIOS_URI && process.env.MONGO_ENV) {
-    process.env.MONGODB_FUNCIONARIOS_URI = String(process.env.MONGO_ENV)
-      .trim()
-      .replace(/^["']|["']$/g, '')
-      .trim();
-  }
-  if (process.env.MONGODB_FUNCIONARIOS_URI) {
-    process.env.MONGODB_FUNCIONARIOS_URI = process.env.MONGODB_FUNCIONARIOS_URI
-      .replace(/(@[^/?]+)\/\?/, '$1?');
+
+  // VeloHubCentral — somente MONGO_ENV (nunca reutilizar MONGO_URI / MONGODB_URI do Desk)
+  const mongoEnv = cleanMongoUri(process.env.MONGO_ENV);
+  if (mongoEnv) {
+    process.env.MONGO_ENV = mongoEnv;
   }
 }
 

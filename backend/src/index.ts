@@ -1,11 +1,22 @@
-/** index v1.9.0 — GET /api/colaboradores (leitura direta console_funcionarios) */
+/** index v1.9.2 — MONGO_ENV runtime + log startup colaboradores */
 import express from 'express';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { env } from './config/env';
-import { connectDatabase, disconnectDatabase, getAtlasConnectionInfo, getMongoStorageLabel, isAllMongoReady, isCadastrosConnected, isDeskConfigConnected, isFuncionariosConnected, isMongoConnected } from './config/database';
+import { env, getMongoHubCentralUri } from './config/env';
+import {
+  connectDatabase,
+  disconnectDatabase,
+  getAtlasConnectionInfo,
+  getMongoStorageLabel,
+  isAllMongoReady,
+  isCadastrosConnected,
+  isDeskConfigConnected,
+  isFuncionariosConnected,
+  isMongoConnected,
+  tryConnectFuncionarios,
+} from './config/database';
 import authRoutes from './routes/auth.routes';
 import ticketsRoutes from './routes/tickets.routes';
 import boxesRoutes from './routes/boxes.routes';
@@ -82,6 +93,7 @@ app.get('/api/health', (_req, res) => {
     deskConfigDbName: env.mongoDeskConfigDbName,
     deskConfigConnected: isDeskConfigConnected(),
     funcionariosDbName: env.mongoFuncionariosDbName,
+    mongoEnvConfigured: Boolean(getMongoHubCentralUri()),
     funcionariosConnected: isFuncionariosConnected(),
     whatsapp: whatsapp.getWhatsAppHealth(),
     languageTool: {
@@ -106,6 +118,7 @@ app.get('/health', (_req, res) => {
     deskConfigDbName: env.mongoDeskConfigDbName,
     deskConfigConnected: isDeskConfigConnected(),
     funcionariosDbName: env.mongoFuncionariosDbName,
+    mongoEnvConfigured: Boolean(getMongoHubCentralUri()),
     funcionariosConnected: isFuncionariosConnected(),
     whatsapp: whatsapp.getWhatsAppHealth(),
     languageTool: {
@@ -195,8 +208,14 @@ function scheduleMongoRetry() {
   if (mongoRetryTimer) return;
   console.log('[startup] Monitoramento MongoDB a cada 15s (reconecta se cair).');
   mongoRetryTimer = setInterval(() => {
-    if (!activeMongoUri?.trim() || isAllMongoReady()) return;
-    void tryConnectDatabase(activeMongoUri);
+    if (!activeMongoUri?.trim()) return;
+    if (!isAllMongoReady()) {
+      void tryConnectDatabase(activeMongoUri);
+      return;
+    }
+    if (!isFuncionariosConnected() && getMongoHubCentralUri()) {
+      void tryConnectFuncionarios();
+    }
   }, 15000);
 }
 
@@ -223,6 +242,14 @@ async function bootstrapDatabase() {
 }
 
 async function start() {
+  const hubUri = getMongoHubCentralUri();
+  console.log(
+    `[env] Desk cluster (MONGO_URI/MONGODB_URI): ${env.mongoUri ? 'configurado' : 'AUSENTE'}`,
+  );
+  console.log(
+    `[env] VeloHubCentral colaboradores (MONGO_ENV): ${hubUri ? 'configurado' : 'AUSENTE — /api/colaboradores retorna 503'}`,
+  );
+
   app.listen(env.port, '0.0.0.0', () => {
     console.log(`API Velodesk v1.2.0 — http://0.0.0.0:${env.port} (${env.nodeEnv})`);
     void bootstrapDatabase().then(async () => {
