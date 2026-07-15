@@ -1,6 +1,5 @@
-/** index v1.9.2 — MONGO_ENV runtime + log startup colaboradores */
+/** index v1.9.3 — import dinâmico mongodb-memory-server (só dev; evita crash prod) */
 import express from 'express';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -151,7 +150,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 let mongoRetryTimer: ReturnType<typeof setInterval> | null = null;
-let devMemoryServer: MongoMemoryServer | null = null;
+let devMemoryServer: { getUri: (dbName?: string) => string } | null = null;
 let activeMongoUri = env.mongoUri;
 
 async function bootstrapEmailServices(): Promise<void> {
@@ -193,6 +192,7 @@ async function tryDevMemoryMongo(): Promise<string | null> {
 
   try {
     if (!devMemoryServer) {
+      const { MongoMemoryServer } = await import('mongodb-memory-server');
       devMemoryServer = await MongoMemoryServer.create();
     }
     const uri = devMemoryServer.getUri('velodesk');

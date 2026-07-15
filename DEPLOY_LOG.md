@@ -1,12 +1,26 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.27.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.28.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
 
-### GitHub Push — Fix colaboradores Desk: MONGO_ENV runtime (VeloHubCentral)
+### GitHub Push — Fix 502 prod: API crash por mongodb-memory-server (devDependency)
+
+- **Data/Hora**: 2026-07-15
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.28.0
+  - index.ts v1.9.3
+- **Arquivos modificados / incluídos**:
+  - `backend/src/index.ts` — import dinâmico de `mongodb-memory-server` só em dev (Docker prod faz `npm prune --omit=dev`)
+- **Descrição**: Cloud Run logs: `Cannot find module 'mongodb-memory-server'` — Node não subia, nginx retornava 502 em todas as rotas `/api/*`. Corrigido com dynamic import condicional.
+- **Status**: Concluído
+
+---
 
 - **Data/Hora**: 2026-07-15
 - **Tipo**: GitHub Push
