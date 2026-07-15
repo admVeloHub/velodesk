@@ -1,11 +1,11 @@
 /**
- * GruposResponsabilidadePanel v1.1.0 — CRUD grupos + agentes Desk para workflows
- * VERSION: v1.1.0 | DATE: 2026-07-14
+ * GruposResponsabilidadePanel v1.2.0 — CRUD Grupos de Atuação (pool VeloHub)
+ * VERSION: v1.2.0 | DATE: 2026-07-15
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { workflowApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
-import { useDeskAgents } from '../../../hooks/useDeskAgents';
+import { useDeskColaboradores } from '../../../hooks/useDeskColaboradores';
 import ConfigAtivoToggle from '../components/ConfigAtivoToggle';
 import GrupoAgentesEditor from './GrupoAgentesEditor';
 import {
@@ -35,7 +35,7 @@ function emptyDraft(ordem = 0) {
 
 export default function GruposResponsabilidadePanel({ onChanged, showStats = true }) {
   const { showNotification } = useNotifications();
-  const { agents, loading: agentsLoading } = useDeskAgents();
+  const { agents, loading: agentsLoading, error: agentsError } = useDeskColaboradores();
   const [grupos, setGrupos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -87,7 +87,7 @@ export default function GruposResponsabilidadePanel({ onChanged, showStats = tru
       return;
     }
     if (!countAgentesNoGrupo(draft.membros)) {
-      showNotification('Adicione ao menos um agente ou perfil ao grupo para limitar atuações nos workflows.', 'error');
+      showNotification('Adicione ao menos um agente ou visão ao grupo para limitar atuações nos workflows.', 'error');
       return;
     }
     const slug = String(draft.slug || slugify(nome)).trim();
@@ -124,7 +124,7 @@ export default function GruposResponsabilidadePanel({ onChanged, showStats = tru
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Excluir este grupo de responsabilidade?')) return;
+    if (!window.confirm('Excluir este grupo de atuação?')) return;
     setSaving(true);
     try {
       await workflowApi.deleteGrupo(id);
@@ -145,7 +145,7 @@ export default function GruposResponsabilidadePanel({ onChanged, showStats = tru
         <div className="forms-stats-row">
           <div className="stat-card stat-card--static">
             <span className="stat-icon"><i className="ti ti-users-group" aria-hidden="true" /></span>
-            <div className="stat-info"><h3>{stats.total}</h3><p>Grupos cadastrados</p></div>
+            <div className="stat-info"><h3>{stats.total}</h3><p>Grupos de atuação</p></div>
           </div>
           <div className="stat-card stat-card--static">
             <span className="stat-icon"><i className="ti ti-circle-check" aria-hidden="true" /></span>
@@ -153,8 +153,15 @@ export default function GruposResponsabilidadePanel({ onChanged, showStats = tru
           </div>
           <div className="stat-card stat-card--static">
             <span className="stat-icon"><i className="ti ti-user-check" aria-hidden="true" /></span>
-            <div className="stat-info"><h3>{stats.agentes}</h3><p>Agentes vinculados</p></div>
+            <div className="stat-info"><h3>{stats.agentes}</h3><p>Vínculos no total</p></div>
           </div>
+        </div>
+      ) : null}
+
+      {agentsError ? (
+        <div className="lista-agentes-panel__error" role="alert">
+          <p>Pool de agentes indisponível. Não é possível montar membros até a lista carregar.</p>
+          <p className="lista-agentes-panel__error-detail">{agentsError}</p>
         </div>
       ) : null}
 
@@ -162,7 +169,7 @@ export default function GruposResponsabilidadePanel({ onChanged, showStats = tru
         <div className="wf-grupos-list">
           <div className="config-table-head-actions">
             <button type="button" className="config-action-btn config-action-btn--create config-action-btn--compact" onClick={resetDraft}>
-              Novo grupo
+              Novo grupo de atuação
             </button>
           </div>
 
@@ -173,7 +180,7 @@ export default function GruposResponsabilidadePanel({ onChanged, showStats = tru
             </div>
           ) : grupos.length === 0 ? (
             <div className="forms-empty-state">
-              <p className="forms-empty-text">Nenhum grupo cadastrado. Crie o primeiro ao lado.</p>
+              <p className="forms-empty-text">Nenhum grupo de atuação cadastrado. Crie o primeiro ao lado.</p>
             </div>
           ) : (
             <table className="config-table">
@@ -181,7 +188,7 @@ export default function GruposResponsabilidadePanel({ onChanged, showStats = tru
                 <tr>
                   <th>Grupo</th>
                   <th>Slug</th>
-                  <th>Agentes</th>
+                  <th>Membros</th>
                   <th>Status</th>
                   <th />
                 </tr>
@@ -211,7 +218,7 @@ export default function GruposResponsabilidadePanel({ onChanged, showStats = tru
         </div>
 
         <div className="wf-grupos-form">
-          <h3>{editingId ? 'Editar grupo' : 'Novo grupo'}</h3>
+          <h3>{editingId ? 'Editar grupo de atuação' : 'Novo grupo de atuação'}</h3>
           <label className="wf-step-editor__field">
             <span>Nome</span>
             <input

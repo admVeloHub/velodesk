@@ -1,6 +1,6 @@
 /**
- * agentTypes v1.0.0 — contratos dos agentes paralelos VeloDesk
- * VERSION: v1.0.0 | DATE: 2026-07-13
+ * agentTypes v1.1.0 — tabulação sugerida pelo Agente de Auditoria
+ * VERSION: v1.1.0 | DATE: 2026-07-15
  */
 
 export type TicketAiContextSource = 'public' | 'internal';
@@ -94,6 +94,8 @@ export interface AuditoriaInput {
   palavrasCriticasPrecheck?: string[];
 }
 
+export type TabulacaoFonte = 'auditoria' | 'atendimento';
+
 export interface AuditoriaResult {
   success: boolean;
   aprovado?: boolean;
@@ -109,6 +111,8 @@ export interface AuditoriaResult {
   violacoes?: string[];
   recomendacoes?: string[];
   criteriosAvaliados?: CriterioAvaliado[];
+  tabulacaoSugerida?: TicketAiTabulationResult;
+  tabulacaoDisplay?: string;
   model?: string;
   error?: string;
 }
@@ -122,6 +126,7 @@ export interface PipelineResult {
   respostaSugerida?: string;
   tabulacao?: TicketAiTabulationResult;
   tabulacaoDisplay?: string;
+  tabulacaoFonte?: TabulacaoFonte;
   confidence?: ConfidenceLevel;
   auditScore?: number;
   auditAprovado?: boolean;

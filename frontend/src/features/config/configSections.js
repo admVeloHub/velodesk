@@ -1,6 +1,6 @@
 /**
  * Seções da Central de Configurações
- * VERSION: v1.3.2 | DATE: 2026-07-14
+ * VERSION: v1.3.3 | DATE: 2026-07-15
  */
 export const CONFIG_SECTIONS = [
   {
@@ -20,8 +20,8 @@ export const CONFIG_SECTIONS = [
   {
     id: 'grupos-atribuicoes',
     label: 'Grupos e Atribuições',
-    menuDesc: 'Equipes e regras de atribuição por etapa',
-    cardDesc: 'Defina grupos de responsabilidade e quem recebe cada etapa',
+    menuDesc: 'Lista de agentes e grupos de atuação',
+    cardDesc: 'Pool Desk e grupos de atuação para as etapas',
     icon: 'ti-users-group',
   },
   {

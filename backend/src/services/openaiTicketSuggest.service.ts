@@ -68,6 +68,7 @@ export interface TicketAiSuggestResult {
   confidence?: string;
   revisoesRealizadas?: number;
   auditComplete?: boolean;
+  tabulacaoFonte?: 'auditoria' | 'atendimento';
 }
 
 const JSON_SCHEMA = {
@@ -362,6 +363,7 @@ export async function generateTicketAiSuggest(
       respostaSugerida: pipeline.respostaSugerida,
       tabulacao: pipeline.tabulacao,
       tabulacaoDisplay: pipeline.tabulacaoDisplay,
+      tabulacaoFonte: pipeline.tabulacaoFonte,
       model: pipeline.model,
       auditScore: pipeline.auditScore,
       auditAprovado: pipeline.auditAprovado,

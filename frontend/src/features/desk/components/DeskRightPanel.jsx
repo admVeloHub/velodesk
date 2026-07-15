@@ -1,6 +1,6 @@
 /**
- * DeskRightPanel v1.4.1 — responsável pela sessão (sem campo manual no painel)
- * VERSION: v1.4.1 | DATE: 2026-07-14 | AUTHOR: VeloHub Development Team
+ * DeskRightPanel v1.4.2 — tabulação sugerida pelo Agente de Auditoria
+ * VERSION: v1.4.2 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import React, { useEffect, useState } from 'react';
 import { DEFAULT_TIPO, hasApplyableTabulation, parseTabulationDisplay } from '../../../services/tabulationConfig';
@@ -52,6 +52,7 @@ export default function DeskRightPanel({
   sendDisabled = false,
   iaTabulationDisplay = '',
   iaTabulation = null,
+  iaTabulationFonte = 'atendimento',
   iaTabulationLoading = false,
   iaWaitingMessage = '',
   iaHasSuggestion = false,
@@ -187,6 +188,9 @@ export default function DeskRightPanel({
             <div className={'ia-tabulation' + (iaTabulationLoading ? ' ia-tabulation--loading' : '')}>
               <div className="ia-tabulation__label">
                 SUGESTÃO
+                {iaTabulationFonte === 'auditoria' && iaHasTabulationSuggestion && !iaTabulationLoading && (
+                  <span className="ia-tabulation__fonte"> · Tabulação (Auditoria)</span>
+                )}
                 {typeof iaAuditScore === 'number' && iaHasSuggestion && !iaTabulationLoading && (
                   <span className="ia-tabulation__compliance"> · Conformidade {iaAuditScore}%</span>
                 )}

@@ -1,11 +1,11 @@
-/** index v1.8.1 — bloqueio de rotas locais de noticiário (VeloHub exclusivo) */
+/** index v1.9.0 — GET /api/colaboradores (leitura direta console_funcionarios) */
 import express from 'express';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { env } from './config/env';
-import { connectDatabase, disconnectDatabase, getAtlasConnectionInfo, getMongoStorageLabel, isAllMongoReady, isCadastrosConnected, isDeskConfigConnected, isMongoConnected } from './config/database';
+import { connectDatabase, disconnectDatabase, getAtlasConnectionInfo, getMongoStorageLabel, isAllMongoReady, isCadastrosConnected, isDeskConfigConnected, isFuncionariosConnected, isMongoConnected } from './config/database';
 import authRoutes from './routes/auth.routes';
 import ticketsRoutes from './routes/tickets.routes';
 import boxesRoutes from './routes/boxes.routes';
@@ -21,6 +21,7 @@ import ticketAiRoutes from './routes/ticketAi.routes';
 import agentsRoutes from './routes/agents.routes';
 import inboundRoutes from './routes/inbound.routes';
 import workspace360Routes from './routes/workspace360.routes';
+import colaboradoresRoutes from './routes/colaboradores.routes';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
 import {
@@ -80,6 +81,8 @@ app.get('/api/health', (_req, res) => {
     cadastrosConnected: isCadastrosConnected(),
     deskConfigDbName: env.mongoDeskConfigDbName,
     deskConfigConnected: isDeskConfigConnected(),
+    funcionariosDbName: env.mongoFuncionariosDbName,
+    funcionariosConnected: isFuncionariosConnected(),
     whatsapp: whatsapp.getWhatsAppHealth(),
     languageTool: {
       configured: isLanguageToolConfigured(),
@@ -102,6 +105,8 @@ app.get('/health', (_req, res) => {
     cadastrosConnected: isCadastrosConnected(),
     deskConfigDbName: env.mongoDeskConfigDbName,
     deskConfigConnected: isDeskConfigConnected(),
+    funcionariosDbName: env.mongoFuncionariosDbName,
+    funcionariosConnected: isFuncionariosConnected(),
     whatsapp: whatsapp.getWhatsAppHealth(),
     languageTool: {
       configured: isLanguageToolConfigured(),
@@ -113,6 +118,7 @@ app.use('/api', authRoutes);
 app.use('/api/tickets', ticketsRoutes);
 app.use('/api/boxes', boxesRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/colaboradores', colaboradoresRoutes);
 app.use('/api', statsRoutes);
 app.use('/api/uploads', uploadsRoutes);
 app.use('/api/clients', clientsRoutes);

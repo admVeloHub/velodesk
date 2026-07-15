@@ -1,4 +1,4 @@
-/** ticketAi.routes v1.0.2 — agentsEnabled + auditComplete no status/suggest */
+/** ticketAi.routes v1.0.3 — tabulacaoFonte da auditoria */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { env } from '../config/env';
@@ -55,6 +55,7 @@ router.post('/suggest', authMiddleware, async (req: Request, res: Response) => {
     respostaSugerida: aiResult.respostaSugerida,
     tabulacao: aiResult.tabulacao,
     tabulacaoDisplay: aiResult.tabulacaoDisplay,
+    tabulacaoFonte: aiResult.tabulacaoFonte || 'atendimento',
     auditScore: aiResult.auditScore,
     auditAprovado: aiResult.auditAprovado,
     auditDecisao: aiResult.auditDecisao,

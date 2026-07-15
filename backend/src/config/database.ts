@@ -1,4 +1,4 @@
-/** database v1.7.3 — desk_config VeloDesk; VeloNews fica no VeloHubCentral */
+/** database v1.8.0 — desk_config VeloDesk + leitura console_funcionarios (VeloHubCentral) */
 import path from 'path';
 import mongoose, { Connection } from 'mongoose';
 import { env, envFile } from './env';
@@ -7,11 +7,12 @@ import { maskMongoUri, resolveAtlasSrvUri } from './resolveAtlasUri';
 
 /**
  * Conexões deste serviço (cluster VeloDesk): b2c_chamados, b2c_cadastros, desk_config.
- * VeloNews NÃO usa estes bancos — conteúdo e ciência ficam no VeloHubCentral
- * (console_conteudo.Velonews, console_conteudo.velonews_acknowledgments) via API VeloHub.
+ * Cadastro colaboradores: cluster VeloHubCentral → console_funcionarios (somente leitura).
+ * VeloNews continua via API VeloHub (console_conteudo).
  */
 let cadastrosConnection: Connection | null = null;
 let deskConfigConnection: Connection | null = null;
+let funcionariosConnection: Connection | null = null;
 
 export function isMongoConnected(): boolean {
   return mongoose.connection.readyState === 1;
@@ -23,6 +24,10 @@ export function isCadastrosConnected(): boolean {
 
 export function isDeskConfigConnected(): boolean {
   return deskConfigConnection?.readyState === 1;
+}
+
+export function isFuncionariosConnected(): boolean {
+  return funcionariosConnection?.readyState === 1;
 }
 
 export function getCadastrosConnection(): Connection {
@@ -37,6 +42,13 @@ export function getDeskConfigConnection(): Connection {
     throw new Error('Conexão desk_config indisponível');
   }
   return deskConfigConnection;
+}
+
+export function getFuncionariosConnection(): Connection {
+  if (!funcionariosConnection || funcionariosConnection.readyState !== 1) {
+    throw new Error('Conexão console_funcionarios (VeloHubCentral) indisponível');
+  }
+  return funcionariosConnection;
 }
 
 export function getMongoStorageLabel(): 'atlas' {
@@ -102,6 +114,33 @@ async function connectDeskConfig(uri: string): Promise<void> {
   console.log(`Atlas desk_config conectado: ${env.mongoDeskConfigDbName}`);
 }
 
+async function connectFuncionarios(): Promise<void> {
+  if (funcionariosConnection?.readyState === 1) return;
+
+  const rawUri = (env.mongoFuncionariosUri || '').trim();
+  if (!rawUri) {
+    console.warn(
+      '[mongo] MONGODB_FUNCIONARIOS_URI / MONGO_ENV ausente — lista de colaboradores Desk indisponível.',
+    );
+    return;
+  }
+
+  if (funcionariosConnection) {
+    await resetConnection(funcionariosConnection);
+    funcionariosConnection = null;
+  }
+
+  const { uri: atlasUri, method } = await resolveAtlasSrvUri(rawUri);
+  funcionariosConnection = mongoose.createConnection(atlasUri, {
+    dbName: env.mongoFuncionariosDbName,
+    ...MONGO_DRIVER_OPTIONS,
+  });
+  await funcionariosConnection.asPromise();
+  console.log(
+    `Atlas funcionarios conectado: ${env.mongoFuncionariosDbName} @ ${maskUri(atlasUri)} (${method})`,
+  );
+}
+
 export async function connectDatabase(uriOverride?: string): Promise<void> {
   const mongoUri = (uriOverride || env.mongoUri || '').trim();
   if (!mongoUri) {
@@ -122,9 +161,21 @@ export async function connectDatabase(uriOverride?: string): Promise<void> {
 
   await connectCadastros(atlasUri);
   await connectDeskConfig(atlasUri);
+  try {
+    await connectFuncionarios();
+  } catch (err) {
+    console.error(
+      '[mongo] Falha ao conectar console_funcionarios (VeloHubCentral):',
+      (err as Error).message,
+    );
+  }
 }
 
 export async function disconnectDatabase(): Promise<void> {
+  if (funcionariosConnection) {
+    await funcionariosConnection.close();
+    funcionariosConnection = null;
+  }
   if (deskConfigConnection) {
     await deskConfigConnection.close();
     deskConfigConnection = null;

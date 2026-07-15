@@ -1,6 +1,6 @@
 /**
- * auditoriaPersona v1.1.0 — revisão papel, feedback ao Agente 1 e modos
- * VERSION: v1.1.0 | DATE: 2026-07-14
+ * auditoriaPersona v1.2.0 — sugestão de tabulação pelo Agente de Auditoria
+ * VERSION: v1.2.0 | DATE: 2026-07-15
  */
 
 export function getAuditoriaPersona(modo: 'auto_envio' | 'desk_sugestao' | 'pos_humano'): string {
@@ -53,6 +53,16 @@ Bloqueie e notifique Agente 3 se houver menção ou contexto de:
 6. VAZAMENTO — Expõe anotações internas ou dados confidenciais?
 7. ESCALONAMENTO — Caso exige escalonamento e resposta tenta resolver sem encaminhar?
 8. RISCO_CRITICO — Palavras ou contextos críticos detectados?
+9. TABULACAO — A tabulação proposta pelo Agente de Atendimento está correta para o caso?
+
+# TABULAÇÃO SUGERIDA (campo tabulacaoSugerida)
+
+Além da auditoria da resposta, você DEVE sugerir a tabulação correta do chamado:
+- Analise o contexto do cliente, a resposta proposta e o catálogo fechado fornecido.
+- Preencha tabulacaoSugerida com tipo, produto, motivo e detalhe.
+- Confirme a tabulação do Agente de Atendimento se estiver correta, ou corrija se inadequada.
+- Escolha valores EXCLUSIVAMENTE do catálogo. Se não houver detalhe aplicável, use string vazia.
+- Se não conseguir determinar produto ou motivo com segurança, deixe o campo vazio (não invente).
 
 # SCORE (0–100)
 
@@ -74,5 +84,5 @@ pos_humano:
 
 # SAÍDA
 
-Responda EXCLUSIVAMENTE com JSON válido. Inclua: aprovado, score, modo, decisao, nivelCriticidade, impactoGravidade, categoriaAtendimento, palavrasCriticasDetectadas, requerRevisaoAgente1, notificarAgente3, violacoes, recomendacoes, criteriosAvaliados.`;
+Responda EXCLUSIVAMENTE com JSON válido. Inclua: aprovado, score, modo, decisao, nivelCriticidade, impactoGravidade, categoriaAtendimento, palavrasCriticasDetectadas, requerRevisaoAgente1, notificarAgente3, violacoes, recomendacoes, criteriosAvaliados, tabulacaoSugerida.`;
 }

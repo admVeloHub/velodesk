@@ -1,9 +1,9 @@
 /**
- * agentTabulation.util v1.0.0 — catálogo e validação de tabulação para agentes
- * VERSION: v1.0.0 | DATE: 2026-07-13
+ * agentTabulation.util v1.1.0 — tabulação sugerida pelo Agente de Auditoria
+ * VERSION: v1.1.0 | DATE: 2026-07-15
  */
 import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from '../tabulation.service';
-import type { TicketAiMessageInput, TicketAiTabulationResult } from './agentTypes';
+import type { TicketAiMessageInput, TicketAiTabulationResult, AuditoriaInput } from './agentTypes';
 import { resolveClientFirstName, trimStr } from './openaiAgent.util';
 
 const VALID_TIPOS = new Set(['Reclamação', 'Solicitação', 'Dúvida', 'Informação']);
@@ -107,6 +107,70 @@ export function buildAtendimentoUserBlock(
   return parts.join('\n');
 }
 
+export function buildAuditoriaUserBlock(
+  params: AuditoriaInput,
+  tabulationCatalog: string,
+): string {
+  const parts: string[] = [
+    `## Modo\n${params.modo}`,
+    '',
+    '## Chamado',
+    `Protocolo: ${params.protocolo || 'não informado'}`,
+    `Canal: ${params.canal || 'não informado'}`,
+    `Status: ${params.status || 'não informado'}`,
+  ];
+
+  if (params.contextSource === 'public' && params.messages?.length) {
+    parts.push('', '## Contexto original do cliente', '', formatMessagesBlock(params.messages));
+  }
+  if (params.contextSource === 'internal' && params.internalNote) {
+    parts.push('', '## Contexto original (anotação interna)', '', params.internalNote);
+  }
+  if (params.ultimaMensagemCliente) {
+    parts.push('', '## Última mensagem do cliente', '', params.ultimaMensagemCliente);
+  }
+
+  parts.push(
+    '',
+    '## Resposta proposta pelo Agente de Atendimento',
+    params.respostaSugerida,
+    '',
+    '## Tabulação proposta pelo Agente de Atendimento',
+    `tipo: ${params.tabulacao.tipo} | produto: ${params.tabulacao.produto} | motivo: ${params.tabulacao.motivo} | detalhe: ${params.tabulacao.detalhe}`,
+    '',
+    `## Confiança do Atendimento: ${params.confidence || 'não informada'}`,
+  );
+
+  if (params.mensagemOperador) {
+    parts.push('', '## Resposta enviada pelo operador humano', '', params.mensagemOperador);
+  }
+
+  if (params.palavrasCriticasPrecheck?.length) {
+    parts.push(
+      '',
+      '## Palavras críticas detectadas pelo sistema (pré-verificação)',
+      params.palavrasCriticasPrecheck.join(', '),
+    );
+  }
+
+  parts.push(
+    '',
+    '## Catálogo de tabulação (lista fechada)',
+    '',
+    tabulationCatalog,
+    '',
+    '## Tipos permitidos',
+    '',
+    'Reclamação, Solicitação, Dúvida, Informação',
+    '',
+    '## Tarefa',
+    '',
+    'Audite a resposta e sugira a tabulação correta em tabulacaoSugerida (tipo, produto, motivo, detalhe) com base no contexto, na resposta e no catálogo. Confirme ou corrija a tabulação do Agente de Atendimento.',
+  );
+
+  return parts.join('\n');
+}
+
 export function validateTabulationResult(
   raw: { tipo?: string; produto?: string; motivo?: string; detalhe?: string },
   config: TabulationActiveDto,
@@ -196,10 +260,21 @@ export const AUDITORIA_JSON_SCHEMA = {
         required: ['criterio', 'conforme', 'observacao'],
       },
     },
+    tabulacaoSugerida: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        tipo: { type: 'string' },
+        produto: { type: 'string' },
+        motivo: { type: 'string' },
+        detalhe: { type: 'string' },
+      },
+      required: ['tipo', 'produto', 'motivo', 'detalhe'],
+    },
   },
   required: [
     'aprovado', 'score', 'modo', 'decisao', 'nivelCriticidade', 'impactoGravidade',
     'categoriaAtendimento', 'palavrasCriticasDetectadas', 'requerRevisaoAgente1',
-    'notificarAgente3', 'violacoes', 'recomendacoes', 'criteriosAvaliados',
+    'notificarAgente3', 'violacoes', 'recomendacoes', 'criteriosAvaliados', 'tabulacaoSugerida',
   ],
 } as const;

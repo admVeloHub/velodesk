@@ -1,4 +1,4 @@
-/* Velodesk CRM v1.7.1 ? restaura tokens de layout/flex ap?s merge v1.7.0 */
+/* Velodesk CRM v1.7.2 — badge tabulação Auditoria no painel direito */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -2330,6 +2330,11 @@
 #velodeskDeskV2Root .ia-tabulation__compliance {
     font-weight: 600;
     color: #1634FF;
+}
+
+#velodeskDeskV2Root .ia-tabulation__fonte {
+    font-weight: 600;
+    color: #000058;
 }
 
 #velodeskDeskV2Root .desk-ai-revision-modal {

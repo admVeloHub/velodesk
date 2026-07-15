@@ -1,6 +1,6 @@
 /**
- * API client v1.6.1 — clientsApi getByEmail
- * VERSION: v1.6.1 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team
+ * API client v1.7.0 — colaboradoresApi (cadastro Desk via Mongo)
+ * VERSION: v1.7.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 
@@ -66,6 +66,18 @@ export const workspace360Api = {
 
 export const usersApi = {
   list: () => api.get('/users').then((r) => r.data),
+};
+
+export const colaboradoresApi = {
+  listDesk: () =>
+    api.get('/colaboradores', { params: { acesso: 'Desk' } }).then((r) => {
+      const payload = r.data;
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.data)) return payload.data;
+      return [];
+    }),
+  byEmail: (email) =>
+    api.get('/colaboradores/by-email', { params: { email } }).then((r) => r.data?.data || r.data),
 };
 
 export const workflowApi = {

@@ -1,6 +1,6 @@
 /**
- * GrupoAgentesEditor v1.0.0 — seleção de agentes Desk para grupos de responsabilidade
- * VERSION: v1.0.0 | DATE: 2026-07-14
+ * GrupoAgentesEditor v1.1.0 — seleção de agentes do pool VeloHub para grupos de atuação
+ * VERSION: v1.1.0 | DATE: 2026-07-15
  */
 import React, { useMemo, useState } from 'react';
 import {
@@ -9,6 +9,7 @@ import {
   getPerfilMembros,
   PERFIL_DESK_OPCOES,
   resolveAgentLabel,
+  resolvePerfilDeskLabel,
 } from './gruposAtribData';
 
 export default function GrupoAgentesEditor({
@@ -34,7 +35,9 @@ export default function GrupoAgentesEditor({
     if (!term) return agents;
     return agents.filter(
       (a) => a.label.toLowerCase().includes(term)
-        || String(a.email || '').toLowerCase().includes(term),
+        || String(a.email || '').toLowerCase().includes(term)
+        || String(a.visionLabel || '').toLowerCase().includes(term)
+        || String(a.atuacaoLabel || '').toLowerCase().includes(term),
     );
   }, [agents, search]);
 
@@ -64,13 +67,13 @@ export default function GrupoAgentesEditor({
   return (
     <section className="grupo-agentes-editor">
       <div className="grupo-agentes-editor__head">
-        <h4>Agentes do grupo</h4>
+        <h4>Membros do grupo</h4>
         <span className="grupo-agentes-editor__count">
           {selectedColaboradores.size + selectedPerfis.size} selecionado(s)
         </span>
       </div>
       <p className="grupos-atrib__hint">
-        Somente agentes listados aqui poderão atuar nas etapas de workflow atribuídas a este grupo.
+        Selecione colaboradores da Lista de Agentes (acessos.Desk). Somente eles poderão atuar nas etapas atribuídas a este grupo.
       </p>
 
       {(selectedColaboradores.size > 0 || selectedPerfis.size > 0) ? (
@@ -90,7 +93,7 @@ export default function GrupoAgentesEditor({
             </span>
           ))}
           {Array.from(selectedPerfis).map((valor) => {
-            const label = PERFIL_DESK_OPCOES.find((o) => o.value === valor)?.label || valor;
+            const label = resolvePerfilDeskLabel(valor);
             return (
               <span key={`perfil-${valor}`} className="grupo-agentes-editor__chip grupo-agentes-editor__chip--perfil">
                 <i className="ti ti-shield" aria-hidden="true" />
@@ -114,7 +117,7 @@ export default function GrupoAgentesEditor({
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar agente por nome ou e-mail…"
+          placeholder="Buscar agente por nome, e-mail ou atuação…"
           aria-label="Buscar agente"
         />
       </label>
@@ -124,7 +127,9 @@ export default function GrupoAgentesEditor({
           <p className="grupo-agentes-editor__empty">Carregando agentes…</p>
         ) : filteredAgents.length === 0 ? (
           <p className="grupo-agentes-editor__empty">
-            {agents.length === 0 ? 'Nenhum agente cadastrado no Desk.' : 'Nenhum agente encontrado.'}
+            {agents.length === 0
+              ? 'Nenhum colaborador com acessos.Desk encontrado no cadastro.'
+              : 'Nenhum agente encontrado.'}
           </p>
         ) : (
           <ul className="grupo-agentes-editor__list">
@@ -143,9 +148,11 @@ export default function GrupoAgentesEditor({
                     </span>
                     <span className="grupo-agentes-editor__meta">
                       <strong>{agent.label}</strong>
-                      <small>{agent.email}</small>
+                      <small>{agent.email || agent.atuacaoLabel}</small>
                     </span>
-                    <span className="grupo-agentes-editor__role">{agent.role || 'agent'}</span>
+                    <span className="grupo-agentes-editor__role">
+                      {agent.visionLabel || agent.role || 'agent'}
+                    </span>
                   </label>
                 </li>
               );
@@ -155,7 +162,7 @@ export default function GrupoAgentesEditor({
       </div>
 
       <div className="grupo-agentes-editor__perfis">
-        <span className="grupo-agentes-editor__perfis-label">Acesso amplo por perfil</span>
+        <span className="grupo-agentes-editor__perfis-label">Acesso amplo por visão Desk</span>
         <div className="grupo-agentes-editor__perfis-options">
           {PERFIL_DESK_OPCOES.map((opt) => (
             <label key={opt.value} className="grupo-agentes-editor__perfil-option">

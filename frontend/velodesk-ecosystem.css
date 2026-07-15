@@ -6501,7 +6501,7 @@ body.desk-v2-mode #aiChatbotModal {
     }
 }
 
-/* Workflow config — editores de critérios, passos e grupos v1.0.0 */
+/* Workflow config — editores de critérios, passos e grupos v1.1.0 */
 .wf-criteria-editor__list {
     list-style: none;
     margin: 0;
@@ -6920,6 +6920,183 @@ body.desk-v2-mode #aiChatbotModal {
     .wf-criteria-editor__row,
     .wf-step-editor__grid,
     .wf-grupos-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Grupos e Atribuições — hub + lista de agentes v1.0.0 */
+.grupos-atrib-hub__lead {
+    margin: 0 0 16px;
+    font-size: 14px;
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+.grupos-atrib-hub__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.grupos-atrib-hub__card {
+    appearance: none;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px 18px;
+    text-align: left;
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    font: inherit;
+    color: inherit;
+    box-shadow: 0 2px 8px rgba(0, 0, 88, 0.04);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.grupos-atrib-hub__card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(22, 52, 255, 0.25);
+    box-shadow: 0 8px 24px rgba(0, 0, 88, 0.08);
+}
+
+.grupos-atrib-hub__card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #eef2ff;
+    color: #1634FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+
+.grupos-atrib-hub__card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.grupos-atrib-hub__card-body strong {
+    font-size: 0.95rem;
+    color: #111827;
+}
+
+.grupos-atrib-hub__card-body span {
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.45;
+}
+
+.grupos-atrib-hub__card-chevron {
+    color: #9ca3af;
+    font-size: 1.1rem;
+}
+
+.grupos-atrib-hub__nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.grupos-atrib-hub__panel-title {
+    margin: 0;
+    font-size: 1rem;
+    color: #111827;
+}
+
+.lista-agentes-panel__toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.lista-agentes-panel__search {
+    flex: 1;
+    min-width: 220px;
+}
+
+.lista-agentes-panel__search input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font: inherit;
+}
+
+.lista-agentes-panel__table-wrap {
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.lista-agentes-panel__table td strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.lista-agentes-panel__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.lista-agentes-panel__badge--warn {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.lista-agentes-panel__vision {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #eef2ff;
+    color: #1634FF;
+}
+
+.lista-agentes-panel__vision--gestao {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.lista-agentes-panel__error {
+    margin-bottom: 14px;
+    padding: 14px 16px;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    border-radius: 10px;
+}
+
+.lista-agentes-panel__error p {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: #991b1b;
+}
+
+.lista-agentes-panel__error-detail {
+    font-size: 12px !important;
+    color: #b91c1c !important;
+    opacity: 0.9;
+}
+
+@media (max-width: 900px) {
+    .grupos-atrib-hub__grid {
         grid-template-columns: 1fr;
     }
 }

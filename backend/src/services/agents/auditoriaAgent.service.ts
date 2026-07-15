@@ -1,17 +1,24 @@
 /**
- * auditoriaAgent.service v1.0.0 — Agente de Auditoria e Compliance
- * VERSION: v1.0.0 | DATE: 2026-07-13
+ * auditoriaAgent.service v1.1.0 — tabulação sugerida pelo Agente de Auditoria
+ * VERSION: v1.1.0 | DATE: 2026-07-15
  */
 import { env } from '../../config/env';
 import type {
   AuditDecisao,
-  AuditModo,
   AuditoriaInput,
   AuditoriaResult,
   NivelCriticidade,
+  TicketAiTabulationResult,
 } from './agentTypes';
 import { getAuditoriaPersona } from './personas/auditoriaPersona';
-import { AUDITORIA_JSON_SCHEMA, formatMessagesBlock } from './agentTabulation.util';
+import {
+  AUDITORIA_JSON_SCHEMA,
+  buildAuditoriaUserBlock,
+  buildTabulationCatalog,
+  buildTabulationDisplay,
+  loadTabulationConfig,
+  validateTabulationResult,
+} from './agentTabulation.util';
 import {
   createOpenAiClient,
   extractOutputText,
@@ -37,63 +44,24 @@ interface AuditoriaParsed {
   violacoes?: string[];
   recomendacoes?: string[];
   criteriosAvaliados?: Array<{ criterio: string; conforme: boolean; observacao?: string }>;
+  tabulacaoSugerida?: { tipo?: string; produto?: string; motivo?: string; detalhe?: string };
 }
 
-function buildAuditoriaUserBlock(params: AuditoriaInput): string {
-  const parts: string[] = [
-    `## Modo\n${params.modo}`,
-    '',
-    '## Chamado',
-    `Protocolo: ${params.protocolo || 'não informado'}`,
-    `Canal: ${params.canal || 'não informado'}`,
-    `Status: ${params.status || 'não informado'}`,
-  ];
-
-  if (params.contextSource === 'public' && params.messages?.length) {
-    parts.push('', '## Contexto original do cliente', '', formatMessagesBlock(params.messages));
-  }
-  if (params.contextSource === 'internal' && params.internalNote) {
-    parts.push('', '## Contexto original (anotação interna)', '', params.internalNote);
-  }
-  if (params.ultimaMensagemCliente) {
-    parts.push('', '## Última mensagem do cliente', '', params.ultimaMensagemCliente);
-  }
-
-  parts.push(
-    '',
-    '## Resposta proposta pelo Agente de Atendimento',
-    params.respostaSugerida,
-    '',
-    '## Tabulação proposta',
-    `tipo: ${params.tabulacao.tipo} | produto: ${params.tabulacao.produto} | motivo: ${params.tabulacao.motivo} | detalhe: ${params.tabulacao.detalhe}`,
-    '',
-    `## Confiança do Atendimento: ${params.confidence || 'não informada'}`,
-  );
-
-  if (params.mensagemOperador) {
-    parts.push('', '## Resposta enviada pelo operador humano', '', params.mensagemOperador);
-  }
-
-  if (params.palavrasCriticasPrecheck?.length) {
-    parts.push(
-      '',
-      '## Palavras críticas detectadas pelo sistema (pré-verificação)',
-      params.palavrasCriticasPrecheck.join(', '),
-    );
-  }
-
-  const threshold = params.modo === 'auto_envio'
-    ? env.agentAuditThresholdAuto
-    : env.agentAuditThresholdDesk;
-  parts.push('', `## Threshold do modo: ${threshold}%`);
-
-  return parts.join('\n');
+function resolveTabulacaoSugerida(
+  raw: AuditoriaParsed['tabulacaoSugerida'],
+  config: Awaited<ReturnType<typeof loadTabulationConfig>>,
+): TicketAiTabulationResult | undefined {
+  if (!raw) return undefined;
+  const validated = validateTabulationResult(raw, config);
+  if (!validated.tipo && !validated.produto && !validated.motivo) return undefined;
+  return validated;
 }
 
 function applyPostAuditRules(
   parsed: AuditoriaParsed,
   params: AuditoriaInput,
   precheckKeywords: string[],
+  tabulacaoSugerida?: TicketAiTabulationResult,
 ): AuditoriaResult {
   const modo = params.modo;
   const threshold = modo === 'auto_envio'
@@ -113,6 +81,8 @@ function applyPostAuditRules(
   let requerRevisaoAgente1 = Boolean(parsed.requerRevisaoAgente1);
   let aprovado = Boolean(parsed.aprovado);
 
+  const tabTipo = tabulacaoSugerida?.tipo || params.tabulacao.tipo;
+
   if (hasCritical) {
     decisao = 'bloquear_critico';
     nivelCriticidade = nivelCriticidade === 'nenhuma' ? 'alta' : nivelCriticidade;
@@ -127,7 +97,7 @@ function applyPostAuditRules(
     requerRevisaoAgente1 = true;
     aprovado = false;
   } else if (modo === 'auto_envio') {
-    const categoria = trimStr(parsed.categoriaAtendimento || params.tabulacao.tipo, 64);
+    const categoria = trimStr(parsed.categoriaAtendimento || tabTipo, 64);
     const impacto = parsed.impactoGravidade || 'medio';
     if (categoria === 'Reclamação' || impacto === 'alto') {
       decisao = 'encaminhar_humano';
@@ -149,13 +119,15 @@ function applyPostAuditRules(
     decisao,
     nivelCriticidade,
     impactoGravidade: parsed.impactoGravidade || 'medio',
-    categoriaAtendimento: parsed.categoriaAtendimento || params.tabulacao.tipo,
+    categoriaAtendimento: parsed.categoriaAtendimento || tabTipo,
     palavrasCriticasDetectadas: allKeywords,
     requerRevisaoAgente1,
     notificarAgente3,
     violacoes: parsed.violacoes || [],
     recomendacoes: parsed.recomendacoes || [],
     criteriosAvaliados: parsed.criteriosAvaliados || [],
+    tabulacaoSugerida,
+    tabulacaoDisplay: tabulacaoSugerida ? buildTabulationDisplay(tabulacaoSugerida) : undefined,
   };
 }
 
@@ -178,10 +150,12 @@ export async function validateAuditoria(params: AuditoriaInput): Promise<Auditor
   );
 
   try {
-    const userBlock = buildAuditoriaUserBlock({
-      ...params,
-      palavrasCriticasPrecheck: precheckKeywords,
-    });
+    const config = await loadTabulationConfig();
+    const tabulationCatalog = buildTabulationCatalog(config);
+    const userBlock = buildAuditoriaUserBlock(
+      { ...params, palavrasCriticasPrecheck: precheckKeywords },
+      tabulationCatalog,
+    );
 
     const openai = createOpenAiClient();
     const vectorIds = getAuditoriaVectorStoreIds();
@@ -213,7 +187,8 @@ export async function validateAuditoria(params: AuditoriaInput): Promise<Auditor
       return { success: false, error: 'Resposta de auditoria inválida' };
     }
 
-    const result = applyPostAuditRules(parsed, params, precheckKeywords);
+    const tabulacaoSugerida = resolveTabulacaoSugerida(parsed.tabulacaoSugerida, config);
+    const result = applyPostAuditRules(parsed, params, precheckKeywords, tabulacaoSugerida);
     return { ...result, model: response.model || env.openaiModel };
   } catch (err) {
     console.error('[agent-auditoria]', err);

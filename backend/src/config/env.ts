@@ -1,4 +1,4 @@
-/** env v1.16.0 — snapshot horário gestão (GESTAO_SNAPSHOT_INTERVAL_MS) */
+/** env v1.17.0 — URI VeloHubCentral para cadastro de colaboradores (leitura) */
 import fs from 'fs';
 import path from 'path';
 
@@ -50,6 +50,18 @@ export const env = {
   mongoDbName: process.env.MONGODB_DB_NAME || 'b2c_chamados',
   mongoCadastrosDbName: process.env.MONGODB_CADASTROS_DB_NAME || 'b2c_cadastros',
   mongoDeskConfigDbName: process.env.MONGODB_DESK_CONFIG_DB_NAME || 'desk_config',
+  /** VeloHubCentral — console_funcionarios.funcionarios_cadastroColaboradores (leitura) */
+  mongoFuncionariosUri: (
+    process.env.MONGODB_FUNCIONARIOS_URI
+    || process.env.MONGO_ENV
+    || ''
+  )
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .trim(),
+  mongoFuncionariosDbName: process.env.MONGODB_FUNCIONARIOS_DB_NAME || 'console_funcionarios',
+  mongoFuncionariosCollection:
+    process.env.MONGODB_FUNCIONARIOS_COLLECTION || 'funcionarios_cadastroColaboradores',
   jwtSecret: process.env.JWT_SECRET || 'velodesk-dev-secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   enableWhatsapp: process.env.ENABLE_WHATSAPP !== 'false',

@@ -1,6 +1,6 @@
 /**
- * useTicketAiSuggestions v1.3.0 — anti-loop, exibição pós-auditoria
- * VERSION: v1.3.0 | DATE: 2026-07-13
+ * useTicketAiSuggestions v1.4.0 — tabulação sugerida pelo Agente de Auditoria
+ * VERSION: v1.4.0 | DATE: 2026-07-15
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ticketAiApi, agentsApi } from '../api/client';
@@ -31,6 +31,7 @@ function applySuggestionResult(setters, result) {
   setters.setRespostaSugerida(result.respostaSugerida || '');
   setters.setTabulacao(result.tabulacao || null);
   setters.setTabulacaoDisplay(result.tabulacaoDisplay || '');
+  setters.setTabulacaoFonte(result.tabulacaoFonte || 'atendimento');
   setters.setAuditScore(result.auditScore ?? null);
   setters.setAuditAprovado(result.auditAprovado ?? null);
   setters.setAuditComplete(Boolean(result.auditComplete));
@@ -176,6 +177,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
   const [respostaSugerida, setRespostaSugerida] = useState('');
   const [tabulacao, setTabulacao] = useState(null);
   const [tabulacaoDisplay, setTabulacaoDisplay] = useState('');
+  const [tabulacaoFonte, setTabulacaoFonte] = useState('atendimento');
   const [auditScore, setAuditScore] = useState(null);
   const [auditAprovado, setAuditAprovado] = useState(null);
   const [auditComplete, setAuditComplete] = useState(false);
@@ -294,6 +296,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
         setRespostaSugerida,
         setTabulacao,
         setTabulacaoDisplay,
+        setTabulacaoFonte,
         setAuditScore,
         setAuditAprovado,
         setAuditComplete,
@@ -316,6 +319,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     setRespostaSugerida('');
     setTabulacao(null);
     setTabulacaoDisplay('');
+    setTabulacaoFonte('atendimento');
     setAuditScore(null);
     setAuditAprovado(null);
     setAuditComplete(false);
@@ -338,6 +342,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
         respostaSugerida: data.respostaSugerida || '',
         tabulacao: data.tabulacao || null,
         tabulacaoDisplay: data.tabulacaoDisplay || '',
+        tabulacaoFonte: data.tabulacaoFonte || 'atendimento',
         auditScore: parseAuditScore(data.auditScore),
         auditAprovado: typeof data.auditAprovado === 'boolean' ? data.auditAprovado : null,
         auditComplete: auditDone,
@@ -350,6 +355,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
         setRespostaSugerida('');
         setTabulacao(null);
         setTabulacaoDisplay('');
+        setTabulacaoFonte('atendimento');
         setAuditScore(null);
         setAuditAprovado(null);
         setAuditComplete(false);
@@ -361,6 +367,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
         setRespostaSugerida,
         setTabulacao,
         setTabulacaoDisplay,
+        setTabulacaoFonte,
         setAuditScore,
         setAuditAprovado,
         setAuditComplete,
@@ -369,6 +376,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       logTicketAi('info', 'Sugestão recebida com sucesso.', {
         respostaChars: result.respostaSugerida.length,
         tabulacao: result.tabulacaoDisplay,
+        tabulacaoFonte: result.tabulacaoFonte,
         auditScore: result.auditScore,
         auditComplete: result.auditComplete,
         model: data?.model,
@@ -392,6 +400,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       setRespostaSugerida('');
       setTabulacao(null);
       setTabulacaoDisplay('');
+      setTabulacaoFonte('atendimento');
       setAuditScore(null);
       setAuditAprovado(null);
       setAuditComplete(false);
@@ -428,6 +437,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       setRespostaSugerida('');
       setTabulacao(null);
       setTabulacaoDisplay('');
+      setTabulacaoFonte('atendimento');
       setAuditScore(null);
       setAuditAprovado(null);
       setAuditComplete(false);
@@ -451,6 +461,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       setRespostaSugerida('');
       setTabulacao(null);
       setTabulacaoDisplay('');
+      setTabulacaoFonte('atendimento');
       setAuditScore(null);
       setAuditAprovado(null);
       setAuditComplete(false);
@@ -536,6 +547,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
         respostaSugerida: data.respostaSugerida || '',
         tabulacao: data.tabulacao || null,
         tabulacaoDisplay: data.tabulacaoDisplay || '',
+        tabulacaoFonte: data.tabulacaoFonte || 'atendimento',
         auditScore: parseAuditScore(data.auditScore),
         auditAprovado: typeof data.auditAprovado === 'boolean' ? data.auditAprovado : null,
         auditComplete: isAuditComplete(data, agentsEnabledRef.current),
@@ -546,6 +558,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
         setRespostaSugerida,
         setTabulacao,
         setTabulacaoDisplay,
+        setTabulacaoFonte,
         setAuditScore,
         setAuditAprovado,
         setAuditComplete,
@@ -577,6 +590,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     respostaSugerida,
     tabulacao,
     tabulacaoDisplay,
+    tabulacaoFonte,
     auditScore,
     auditAprovado,
     waitingReason,
@@ -586,6 +600,11 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     serviceConfigured,
     hasSuggestion: Boolean(
       respostaSugerida
+      && !error
+      && (!agentsEnabled || auditComplete)
+    ),
+    hasTabulationSuggestion: Boolean(
+      (tabulacao || tabulacaoDisplay)
       && !error
       && (!agentsEnabled || auditComplete)
     ),

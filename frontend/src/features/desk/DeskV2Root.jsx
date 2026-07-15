@@ -965,6 +965,7 @@ export default function DeskV2Root() {
           sendDisabled={sendDisabledBySpell}
           iaTabulationDisplay={ticketAi.tabulacaoDisplay}
           iaTabulation={ticketAi.tabulacao}
+          iaTabulationFonte={ticketAi.tabulacaoFonte}
           iaTabulationLoading={ticketAi.loading}
           iaWaitingMessage={ticketAi.waitingMessage}
           iaHasSuggestion={ticketAi.hasSuggestion}

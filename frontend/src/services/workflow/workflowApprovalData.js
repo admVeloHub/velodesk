@@ -1,5 +1,5 @@
 /**
- * workflowApprovalData v1.2.0 — fila e detalhe do console de decisão
+ * workflowApprovalData v1.2.1 — fila e detalhe do console de decisão
  */
 import { getAllCockpitTickets } from '../kanbanStorage';
 import { getSlaClass, getWorkflowProgress, isTicketInWorkflow, getTicketProtocolLabel, getAgentName } from '../desk/utils';
@@ -10,6 +10,11 @@ const QUEUE_LABEL = 'Aguardando aprovação';
 
 function normalizeText(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function isPerfilDeskAmplo(valor) {
+  const v = String(valor || '').trim();
+  return v === 'agent' || v === 'gestao' || v === 'supervisor';
 }
 
 function agentCanDecideTicket(ticket) {
@@ -26,7 +31,7 @@ function agentCanDecideTicket(ticket) {
       const val = normalizeText(m.valor);
       if (m.tipo === 'colaborador') return val === agent || agent.includes(val);
       if (m.tipo === 'email') return val === agent || agent.includes(val);
-      if (m.tipo === 'perfil_desk') return m.valor === 'agent' || m.valor === 'supervisor';
+      if (m.tipo === 'perfil_desk') return isPerfilDeskAmplo(m.valor);
       return false;
     });
   }

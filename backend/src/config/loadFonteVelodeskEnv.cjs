@@ -1,6 +1,8 @@
 /**
- * loadFonteVelodeskEnv.cjs — FONTE DA VERDADE/.env-velodesk + backend/.env (override local)
- * VERSION: v2.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * loadFonteVelodeskEnv.cjs — FONTE DA VERDADE/.env-velodesk + .env + backend/.env
+ * VERSION: v2.2.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ *
+ * .env da FONTE (MONGO_ENV / VeloHubCentral) carrega sem override — não sobrescreve MONGODB_URI do Desk.
  */
 'use strict';
 
@@ -18,6 +20,17 @@ function normalizeMongoEnv() {
   }
   if (process.env.MONGODB_URI) {
     process.env.MONGODB_URI = process.env.MONGODB_URI.replace(/(@[^/?]+)\/\?/, '$1?');
+  }
+  // Cadastro colaboradores (VeloHubCentral) — MONGO_ENV da FONTE DA VERDADE/.env
+  if (!process.env.MONGODB_FUNCIONARIOS_URI && process.env.MONGO_ENV) {
+    process.env.MONGODB_FUNCIONARIOS_URI = String(process.env.MONGO_ENV)
+      .trim()
+      .replace(/^["']|["']$/g, '')
+      .trim();
+  }
+  if (process.env.MONGODB_FUNCIONARIOS_URI) {
+    process.env.MONGODB_FUNCIONARIOS_URI = process.env.MONGODB_FUNCIONARIOS_URI
+      .replace(/(@[^/?]+)\/\?/, '$1?');
   }
 }
 
@@ -48,16 +61,16 @@ function loadDotenvFile(envPath, override = false) {
     require('dotenv').config({ path: envPath, override });
     return true;
   } catch (err) {
-    console.warn(`loadFonteVelodeskEnv v2.1.0: falha ao carregar ${envPath}:`, err.message);
+    console.warn(`loadFonteVelodeskEnv v2.2.0: falha ao carregar ${envPath}:`, err.message);
     return false;
   }
 }
 
-function findFonteVelodeskEnv(startDir) {
+function findFonteDir(startDir) {
   let d = path.resolve(startDir);
   for (let i = 0; i < 16; i++) {
-    const envPath = path.join(d, 'FONTE DA VERDADE', '.env-velodesk');
-    if (fs.existsSync(envPath)) return envPath;
+    const fonteDir = path.join(d, 'FONTE DA VERDADE');
+    if (fs.existsSync(fonteDir)) return fonteDir;
     const parent = path.dirname(d);
     if (parent === d) break;
     d = parent;
@@ -68,21 +81,30 @@ function findFonteVelodeskEnv(startDir) {
 function loadFrom(startDir) {
   const backendDir = path.resolve(startDir);
   const backendEnvPath = path.join(backendDir, '.env');
-  const fonteEnvPath = findFonteVelodeskEnv(backendDir);
+  const fonteDir = findFonteDir(backendDir);
+  const fonteEnvPath = fonteDir ? path.join(fonteDir, '.env-velodesk') : null;
+  const fonteHubEnvPath = fonteDir ? path.join(fonteDir, '.env') : null;
 
   let source = 'defaults';
   let envPath = null;
   let loaded = false;
 
-  if (fonteEnvPath && loadDotenvFile(fonteEnvPath, false)) {
+  // VeloHubCentral (MONGO_ENV) primeiro, sem override
+  if (fonteHubEnvPath && loadDotenvFile(fonteHubEnvPath, false)) {
+    envPath = fonteHubEnvPath;
+    source = 'fonte-da-verdade-env';
+    loaded = true;
+  }
+
+  if (fonteEnvPath && loadDotenvFile(fonteEnvPath, true)) {
     envPath = fonteEnvPath;
-    source = 'fonte-da-verdade';
+    source = loaded ? 'fonte-da-verdade+velodesk' : 'fonte-da-verdade';
     loaded = true;
   }
 
   if (loadDotenvFile(backendEnvPath, true)) {
     envPath = backendEnvPath;
-    source = loaded ? 'fonte-da-verdade+backend-dotenv' : 'backend-dotenv';
+    source = loaded ? `${source}+backend-dotenv` : 'backend-dotenv';
     loaded = true;
   }
 
@@ -95,7 +117,7 @@ function loadFrom(startDir) {
   }
 
   applyDefaults();
-  return { envPath, loaded, source, fonteEnvPath, backendEnvPath };
+  return { envPath, loaded, source, fonteEnvPath, fonteHubEnvPath, backendEnvPath };
 }
 
 module.exports = { loadFrom };

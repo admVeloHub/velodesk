@@ -1,6 +1,6 @@
 /**
- * agentOrchestrator.service v1.0.1 — auditComplete + sem persist desk
- * VERSION: v1.0.1 | DATE: 2026-07-13
+ * agentOrchestrator.service v1.0.2 — tabulação sugerida pelo Agente de Auditoria no Desk
+ * VERSION: v1.0.2 | DATE: 2026-07-15
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -11,15 +11,38 @@ import type {
   AtendimentoInput,
   AtendimentoResult,
   AuditModo,
+  AuditoriaResult,
   PipelineInput,
   PipelineResult,
   RevisaoOrigem,
+  TabulacaoFonte,
+  TicketAiTabulationResult,
 } from './agentTypes';
+import { buildTabulationDisplay } from './agentTabulation.util';
 import { composeAtendimento, reviseAtendimento } from './atendimentoAgent.service';
 import { validateAuditoria } from './auditoriaAgent.service';
 import { saveAgentFeedback } from './agentFeedback.service';
 import { evaluateAutonomy } from './autonomyRules.service';
 import { executeGestaoHandoff } from './gestaoChamadosHandoff.service';
+
+function resolveDeskTabulacao(
+  audit: AuditoriaResult,
+  fallbackTab: TicketAiTabulationResult,
+  fallbackDisplay?: string,
+): { tabulacao: TicketAiTabulationResult; tabulacaoDisplay: string; tabulacaoFonte: TabulacaoFonte } {
+  if (audit.tabulacaoSugerida) {
+    return {
+      tabulacao: audit.tabulacaoSugerida,
+      tabulacaoDisplay: audit.tabulacaoDisplay || buildTabulationDisplay(audit.tabulacaoSugerida),
+      tabulacaoFonte: 'auditoria',
+    };
+  }
+  return {
+    tabulacao: fallbackTab,
+    tabulacaoDisplay: fallbackDisplay || buildTabulationDisplay(fallbackTab),
+    tabulacaoFonte: 'atendimento',
+  };
+}
 
 function auditModoFromPipeline(modo: PipelineInput['pipelineModo']): AuditModo {
   return modo === 'desk' ? 'desk_sugestao' : 'auto_envio';
@@ -174,6 +197,7 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
   }
 
   if (audit.notificarAgente3 && input.ticketId && input.protocolo) {
+    const tabHandoff = resolveDeskTabulacao(audit, tabulacaoAtual, atendimento.tabulacaoDisplay);
     await executeGestaoHandoff({
       ticketId: input.ticketId,
       protocolo: input.protocolo,
@@ -182,16 +206,19 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
       categoriaAtendimento: audit.categoriaAtendimento,
       origem: 'agente_auditoria',
       auditScore: audit.score,
-      produto: tabulacaoAtual.produto,
-      motivo: tabulacaoAtual.motivo,
+      produto: tabHandoff.tabulacao.produto,
+      motivo: tabHandoff.tabulacao.motivo,
     });
   }
+
+  const deskTab = resolveDeskTabulacao(audit, tabulacaoAtual, atendimento.tabulacaoDisplay);
 
   const pipelineResult: PipelineResult = {
     success: true,
     respostaSugerida: respostaAtual,
-    tabulacao: tabulacaoAtual,
-    tabulacaoDisplay: atendimento.tabulacaoDisplay,
+    tabulacao: deskTab.tabulacao,
+    tabulacaoDisplay: deskTab.tabulacaoDisplay,
+    tabulacaoFonte: deskTab.tabulacaoFonte,
     confidence: atendimento.confidence,
     auditScore: audit.score,
     auditAprovado: audit.aprovado,
@@ -296,11 +323,14 @@ export async function runRevisarSugestao(params: {
     tabulacao: revised.tabulacao,
   });
 
+  const deskTab = resolveDeskTabulacao(audit, revised.tabulacao, revised.tabulacaoDisplay);
+
   return {
     success: true,
     respostaSugerida: revised.respostaSugerida,
-    tabulacao: revised.tabulacao,
-    tabulacaoDisplay: revised.tabulacaoDisplay,
+    tabulacao: deskTab.tabulacao,
+    tabulacaoDisplay: deskTab.tabulacaoDisplay,
+    tabulacaoFonte: deskTab.tabulacaoFonte,
     confidence: revised.confidence,
     auditScore: audit.score,
     auditAprovado: audit.aprovado,
