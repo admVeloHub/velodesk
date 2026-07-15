@@ -1,6 +1,6 @@
 /**
- * workflowEngine v1.5.0 — motor de workflow a partir de definições persistidas
- * VERSION: v1.5.0 | DATE: 2026-07-14
+ * workflowEngine v1.5.1 — label Produtos em WORKFLOW_TEAM_LABELS
+ * VERSION: v1.5.1 | DATE: 2026-07-15
  */
 import { getRuntimeGrupos, getRuntimeWorkflows } from './workflowRuntimeStore';
 
@@ -8,6 +8,7 @@ export const WORKFLOW_TEAM_LABELS = {
   n1: 'N1',
   n2: 'N2',
   financeiro: 'Financeiro',
+  produtos: 'Produtos',
   suporte: 'Suporte',
 };
 

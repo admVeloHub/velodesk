@@ -223,7 +223,7 @@ export function buildIaTabulation(ticket, fields) {
 }
 
 export function getEscalonarLabel(id) {
-  const map = { n2: 'N2', financeiro: 'Financeiro', suporte: 'Suporte' };
+  const map = { n2: 'N2', financeiro: 'Financeiro', produtos: 'Produtos', suporte: 'Suporte' };
   return map[id] || 'Selecionar escalonamento';
 }
 
@@ -237,6 +237,9 @@ function resolveWorkflowArea(escalonar, group, lastWorkflow) {
   if (escalonar === 'n2' || lastWorkflow === 'n2' || group.includes('n2')) return 'N2';
   if (escalonar === 'financeiro' || lastWorkflow === 'financeiro' || group.includes('financeiro')) {
     return 'Financeiro';
+  }
+  if (escalonar === 'produtos' || lastWorkflow === 'produtos' || group.includes('produtos')) {
+    return 'Produtos';
   }
   if (escalonar === 'suporte' || lastWorkflow === 'suporte' || group.includes('suporte')) {
     return 'Suporte';
@@ -350,6 +353,7 @@ export function getWorkflowProgress(ticket) {
   }
 
   const externalTeamActive = activeStep && !['n1', 'agent'].includes(activeStep.team);
+  const agentRetainsTicket = Boolean(ticket?.lateralForm?.agentRetainsTicket);
 
   return {
     workflow,
@@ -362,7 +366,7 @@ export function getWorkflowProgress(ticket) {
     slaTotalHours,
     externalTeamActive,
     awaitingTeamLabel: externalTeamActive ? getWorkflowTeamLabel(activeStep.team) : null,
-    composeLocked: Boolean(externalTeamActive),
+    composeLocked: Boolean(externalTeamActive && !agentRetainsTicket),
   };
 }
 
@@ -782,40 +786,14 @@ function isWorkflowInfoNoteText(text) {
   return /^\[Workflow\].*Pedido de informação/i.test(String(text || '').trim());
 }
 
-function buildWorkflowInfoThreadEntries(ticket, mapped) {
-  const entries = [];
-  const existingTexts = new Set(mapped.map((m) => String(m.text || '').trim()));
-
-  const wf = ticket?.lateralForm?.workflow;
-  if (wf?.infoRequestedAt && wf?.infoRequestNote) {
-    const author = wf.infoRequestedBy || 'Operador Workflow';
-    const progress = getWorkflowProgress(ticket);
-    const stepLabel = progress?.activeStep?.label || 'Aprovação';
-    const text = `[Workflow] Pedido de informação — ${author} (${stepLabel}): ${wf.infoRequestNote}`;
-    if (!existingTexts.has(text)) {
-      entries.push({
-        type: 'system',
-        text,
-        meta: 'Pedido de info · Workflow',
-        timestamp: wf.infoRequestedAt,
-      });
-      existingTexts.add(text);
-    }
-  }
-
-  getWorkflowInfoRequestsForTicket(ticket).forEach((req) => {
-    const text = `[Workflow] Pedido de informação — ${req.requestedBy} (${req.stepLabel}): ${req.message}`;
-    if (existingTexts.has(text)) return;
-    entries.push({
-      type: 'system',
-      text,
-      meta: 'Pedido de info · Workflow',
-      timestamp: req.createdAt,
-    });
-    existingTexts.add(text);
-  });
-
-  return entries;
+export function shouldHideWorkflowSystemThreadMessage(text) {
+  const value = String(text || '').trim();
+  if (!value) return false;
+  if (isWorkflowInfoNoteText(value)) return true;
+  if (/^Workflow\s+\*\*/i.test(value)) return true;
+  if (/^Etapa\s+\*\*/i.test(value)) return true;
+  if (/^Decisão\s+\*\*aprovada\*\*/i.test(value)) return true;
+  return false;
 }
 
 function mapAgentInternalNote(note, ticket) {
@@ -843,21 +821,14 @@ function mapAgentInternalNote(note, ticket) {
 export function buildRegistroThread(ticket) {
   if (!ticket) return [];
 
-  const wf = ticket?.lateralForm?.workflow;
-  const workflowSystem = wf?.systemMessage
-    ? [{
-      type: 'system',
-      text: wf.systemMessage,
-      meta: 'Sistema',
-      timestamp: wf.startedAt || ticket.createdAt,
-    }]
-    : [];
-
   const raw = (ticket.messages || [])
     .filter((m) => {
       if (!m || m.type === 'internal') return false;
-      if (m.type === 'system') return Boolean(String(m.text || m.message || '').trim());
       const text = String(m.text || m.message || '').trim();
+      if (m.type === 'system') {
+        if (shouldHideWorkflowSystemThreadMessage(text)) return false;
+        return Boolean(text);
+      }
       return Boolean(text);
     })
     .map((m) => {
@@ -906,15 +877,10 @@ export function buildRegistroThread(ticket) {
     };
   });
 
-  const infoEntries = buildWorkflowInfoThreadEntries(ticket, mapped);
-  const combined = [...mapped, ...infoEntries].sort(
+  const combined = mapped.sort(
     (a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0),
   );
 
-  const hasSystem = combined.some((m) => m.type === 'system');
-  if (!hasSystem && workflowSystem.length) {
-    return [...workflowSystem, ...combined];
-  }
   return combined;
 }
 

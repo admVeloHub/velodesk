@@ -3,4 +3,4 @@
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force | Out-Null
 $env:Path = "C:\Program Files\nodejs;" + $env:Path
 & node "$PSScriptRoot\scripts\free-port.cjs" 8000 8001
-Write-Host "Pronto. Rode npm start ou .\run-dev.ps1"
+Write-Host "Pronto. Rode .\start.cmd, npm.cmd start ou .\run-dev.ps1"

@@ -1,6 +1,6 @@
 /**
- * workflowDefinitions v2.1.0 — reexporta workflowEngine (definições persistidas)
- * VERSION: v2.1.0 | DATE: 2026-07-14
+ * workflowDefinitions v2.1.1 — reexporta workflowEngine (definições persistidas)
+ * VERSION: v2.1.1 | DATE: 2026-07-15
  */
 import {
   WORKFLOW_TEAM_LABELS,
@@ -48,10 +48,10 @@ export {
   resolveAtribuidoForStep,
 };
 
-/** @deprecated use getRuntimeWorkflows — mantido para compatibilidade */
-export const WORKFLOW_TEMPLATES = [];
-
 export function getDecisionStepsForTemplate(template) {
   if (!template?.steps) return [];
   return template.steps.filter(stepRequiresDecision);
 }
+
+/** @deprecated use getRuntimeWorkflows — mantido para compatibilidade */
+export const WORKFLOW_TEMPLATES = [];

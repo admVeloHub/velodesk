@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
 import { sanitizeComposeHtml } from '../../../services/desk/composeRichEditor';
+import { shouldHideWorkflowSystemThreadMessage } from '../../../services/desk/utils';
 
 const AUDIT_MIN_DISPLAY = 70;
 const AUDIT_HIGH_GREEN = 90;
@@ -97,11 +98,13 @@ export default function DeskConversation({
       ) : (
         thread.map((msg, i) => {
           if (msg.type === 'system') {
-            const isWorkflowInfo = /Pedido de informação/i.test(String(msg.text || ''));
+            if (shouldHideWorkflowSystemThreadMessage(msg.text)) {
+              return null;
+            }
             return (
               <div key={i} className="msg-row msg-row--system">
                 <div className="msg-body msg-body--system">
-                  <div className={'msg-bubble msg-bubble--system' + (isWorkflowInfo ? ' msg-bubble--workflow-info' : '')}>
+                  <div className="msg-bubble msg-bubble--system">
                     <MessageBubbleText text={msg.text} />
                   </div>
                   {msg.meta ? <div className="msg-meta">{msg.meta}</div> : null}

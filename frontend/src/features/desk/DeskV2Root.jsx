@@ -3,6 +3,7 @@
  * VERSION: v3.6.0 | DATE: 2026-07-03
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { isAgentForwardEscalonar } from '../../services/desk/constants';
 import {
   filterTickets,
   resolveDeskSearchEntries,
@@ -41,7 +42,6 @@ import DeskComposePanel from './components/DeskComposePanel';
 import DeskInternalNotesPanel from './components/DeskInternalNotesPanel';
 import DeskConsultasPanel from './components/DeskConsultasPanel';
 import DeskRightPanel from './components/DeskRightPanel';
-import TicketWorkflowBanner from './components/TicketWorkflowBanner';
 import { applyCascadeFieldChange, applyTabulationSuggestion, buildDefaultRightFields, getMotivos, hasApplyableTabulation, mergeRightFieldsWithDefaults, parseTabulationDisplay, validateTabulationForSendStatus } from '../../services/tabulationConfig';
 import { useTabulation } from '../../context/TabulationContext';
 import { createSpellContext, loadSpellEngine, scanText } from '../../services/spellcheck/spellEngine';
@@ -70,6 +70,9 @@ function applyRightFieldsToTicket(t, rightFields, escalonar) {
     nextLf.wasEscalated = true;
     nextLf.lastWorkflow = escalonar;
     nextLf.retornoN1 = false;
+    if (isAgentForwardEscalonar(escalonar)) {
+      nextLf.agentRetainsTicket = true;
+    }
   } else if (prevLf.wasEscalated) {
     nextLf.retornoN1 = true;
   }
@@ -564,9 +567,15 @@ export default function DeskV2Root() {
     }
 
     const fields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
-    const isSolicitacao = String(fields.tipo || '').trim() === 'Solicitação';
-    if (!isSolicitacao && !escalonar) return undefined;
-    if (!fields.produto && !escalonar) return undefined;
+    const isAgentForward = isAgentForwardEscalonar(escalonar);
+
+    if (isAgentForward) {
+      if (!fields.produto || !fields.motivo || !fields.detalhe) return undefined;
+    } else {
+      const isSolicitacao = String(fields.tipo || '').trim() === 'Solicitação';
+      if (!isSolicitacao && !escalonar) return undefined;
+      if (!fields.produto && !escalonar) return undefined;
+    }
 
     const { activated, workflow, template } = maybeActivateWorkflowForTicket(
       ticket,
@@ -584,12 +593,21 @@ export default function DeskV2Root() {
         await updateTicketInKanban(ticket.id, (t) => {
           if (cancelled) return t;
           applyRightFieldsToTicket(t, fields, escalonar);
-          t.lateralForm = { ...(t.lateralForm || {}), workflow };
+          t.lateralForm = {
+            ...(t.lateralForm || {}),
+            workflow,
+            ...(isAgentForward ? { agentRetainsTicket: true } : {}),
+          };
           injectWorkflowSystemMessage(t, template, escalonar);
           return t;
         });
         if (!cancelled) {
-          showNotification('Workflow ativado para este ticket.', 'success');
+          showNotification(
+            isAgentForward
+              ? 'Solicitação encaminhada para análise. Ticket permanece com você.'
+              : 'Workflow ativado para este ticket.',
+            'success',
+          );
           syncTicketViews();
         }
       } catch {
@@ -882,7 +900,6 @@ export default function DeskV2Root() {
                   {mainTab === 'conversa' ? (
                     <>
                       <TicketWorkflowInfoRequestCallout ticket={ticket} />
-                      <TicketWorkflowBanner ticket={ticket} />
                       <DeskConversation
                         ticket={ticket}
                         messages={convMsgs}
