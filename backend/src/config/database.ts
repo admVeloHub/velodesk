@@ -1,10 +1,15 @@
-/** database v1.7.0 — reconexão cadastros/desk_config + não derruba processo */
+/** database v1.7.3 — desk_config VeloDesk; VeloNews fica no VeloHubCentral */
 import path from 'path';
 import mongoose, { Connection } from 'mongoose';
 import { env, envFile } from './env';
 import { MONGO_DRIVER_OPTIONS } from './mongoUri';
 import { maskMongoUri, resolveAtlasSrvUri } from './resolveAtlasUri';
 
+/**
+ * Conexões deste serviço (cluster VeloDesk): b2c_chamados, b2c_cadastros, desk_config.
+ * VeloNews NÃO usa estes bancos — conteúdo e ciência ficam no VeloHubCentral
+ * (console_conteudo.Velonews, console_conteudo.velonews_acknowledgments) via API VeloHub.
+ */
 let cadastrosConnection: Connection | null = null;
 let deskConfigConnection: Connection | null = null;
 

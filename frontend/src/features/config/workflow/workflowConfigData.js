@@ -1,6 +1,6 @@
 /**
- * workflowConfigData v2.5.1 — constantes UI + helpers (sem mock)
- * VERSION: v2.5.1 | DATE: 2026-07-14
+ * workflowConfigData v2.5.2 — gatilho sem descricao
+ * VERSION: v2.5.2 | DATE: 2026-07-15
  */
 
 export const WORKFLOW_CONFIG_TABS = [
@@ -218,6 +218,13 @@ export function findPassoEnvelopeIndex(passos = [], envelope) {
   return passos.indexOf(envelope);
 }
 
+export function normalizeGatilho(gatilho) {
+  return {
+    tipo: gatilho?.tipo || 'tabulacao',
+    criterios: Array.isArray(gatilho?.criterios) ? gatilho.criterios : [],
+  };
+}
+
 export function createEmptyGatilhoCriterio() {
   return { fonte: 'tabulacao', campo: '', operador: 'equals', valor: '' };
 }
@@ -247,7 +254,6 @@ export function createEmptyWorkflowDocument() {
     ativo: false,
     gatilho: {
       tipo: 'tabulacao',
-      descricao: '',
       criterios: [],
     },
     passos: [

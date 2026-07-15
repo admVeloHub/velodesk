@@ -1,4 +1,4 @@
-/** WorkflowDefinicao v1.1.0 — desk_config.workflow_definicoes */
+/** WorkflowDefinicao v1.2.0 — gatilho sem descricao (campo removido) */
 import { Schema, Document, Model, Types } from 'mongoose';
 import { getDeskConfigConnection } from '../config/database';
 
@@ -45,7 +45,6 @@ export interface IWorkflowPassoEnvelope {
 
 export interface IWorkflowGatilho {
   tipo: string;
-  descricao: string;
   criterios: IWorkflowCriterio[];
 }
 
@@ -126,7 +125,6 @@ const WorkflowDefinicaoSchema = new Schema<IWorkflowDefinicao>(
     ativo: { type: Boolean, default: true },
     gatilho: {
       tipo: { type: String, default: 'tabulacao' },
-      descricao: { type: String, default: '' },
       criterios: { type: [CriterioSchema], default: [] },
     },
     passos: { type: [PassoEnvelopeSchema], default: [] },

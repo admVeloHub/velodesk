@@ -1,4 +1,4 @@
-/** index v1.8.0 — agentes paralelos + job gestão chamados + fallback MongoDB em memória no dev local */
+/** index v1.8.1 — bloqueio de rotas locais de noticiário (VeloHub exclusivo) */
 import express from 'express';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import cors from 'cors';
@@ -21,6 +21,7 @@ import ticketAiRoutes from './routes/ticketAi.routes';
 import agentsRoutes from './routes/agents.routes';
 import inboundRoutes from './routes/inbound.routes';
 import workspace360Routes from './routes/workspace360.routes';
+import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
 import {
   getOpenAiTicketSuggestStatus,
@@ -52,6 +53,7 @@ app.use(
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(blockNoticiarioRoutes);
 
 app.use('/api/inbound', inboundRoutes);
 app.use('/api/spellcheck', spellcheckRoutes);

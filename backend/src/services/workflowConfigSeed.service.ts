@@ -52,7 +52,6 @@ export async function seedWorkflowConfig(): Promise<void> {
       ativo: true,
       gatilho: {
         tipo: 'tabulacao',
-        descricao: 'Ativado quando tabulação indica solicitação de reembolso.',
         criterios: [
           { fonte: 'tabulacao', campo: 'tipoChamado', operador: 'equals', valor: 'Solicitação' },
           { fonte: 'tabulacao', campo: 'produto', operador: 'contains', valor: 'produto x' },
@@ -166,7 +165,7 @@ export async function seedWorkflowConfig(): Promise<void> {
       descricao: 'Fluxo de encaminhamento',
       ordem: 10,
       ativo: true,
-      gatilho: { tipo: 'tabulacao', descricao: 'Ativado via encaminhamento no Desk.', criterios: [] },
+      gatilho: { tipo: 'tabulacao', criterios: [] },
       passos: seed.passos,
       updatedBy: 'seed',
     });

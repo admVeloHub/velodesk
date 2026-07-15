@@ -1,11 +1,23 @@
 /**
- * veloNewsApi v1.0.1 — cliente VeloNews (API VeloHub)
- * VERSION: v1.0.1 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * veloNewsApi v1.0.5 — VeloNews via API VeloHub (VeloHubCentral / console_conteudo)
+ * VERSION: v1.0.5 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ *
+ * Endpoints /velo-news/* → proxy /velohub-api → API VeloHub
+ * Persistência: console_conteudo.Velonews + velonews_acknowledgments (VeloHubCentral)
  */
-import { requireVelohubApiBaseUrl } from '../config/velohubApiConfig';
+import { requireVelohubApiBaseUrl, VELOHUB_API_PROXY_PREFIX } from '../config/velohubApiConfig';
+
+function assertVelohubProxyBase(base) {
+  if (base !== VELOHUB_API_PROXY_PREFIX || String(base).startsWith('/api')) {
+    throw new Error(
+      'VeloNews deve usar exclusivamente o proxy VeloHub (/velohub-api), não /api do VeloDesk.',
+    );
+  }
+}
 
 async function veloNewsRequest(path, options = {}) {
   const base = requireVelohubApiBaseUrl();
+  assertVelohubProxyBase(base);
   const res = await fetch(`${base}${path}`, {
     headers: {
       Accept: 'application/json',

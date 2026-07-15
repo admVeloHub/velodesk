@@ -1,6 +1,6 @@
 /**
- * WorkflowConfigEditor v2.5.0 — editor API + gatilho inline + etapas funcionais
- * VERSION: v2.5.0 | DATE: 2026-07-14
+ * WorkflowConfigEditor v2.5.1 — gatilho sem descricao
+ * VERSION: v2.5.1 | DATE: 2026-07-15
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNotifications } from '../../../context/NotificationContext';
@@ -12,6 +12,7 @@ import WorkflowCriteriaEditor from './WorkflowCriteriaEditor';
 import {
   createEmptyGatilhoCriterio,
   createEmptyPassoEnvelope,
+  normalizeGatilho,
   normalizePassosOrdem,
 } from './workflowConfigData';
 
@@ -39,11 +40,7 @@ export default function WorkflowConfigEditor({
   const [expandStepId, setExpandStepId] = useState(null);
 
   useEffect(() => {
-    const doc = cloneDoc(initialWorkflow);
-    if (doc && !String(doc.descricao || '').trim() && String(doc.gatilho?.descricao || '').trim()) {
-      doc.descricao = doc.gatilho.descricao;
-    }
-    setDraft(doc);
+    setDraft(cloneDoc(initialWorkflow));
     setActiveTab('steps');
     setExpandStepId(null);
   }, [initialWorkflow]);
@@ -52,7 +49,6 @@ export default function WorkflowConfigEditor({
     setDraft((prev) => ({
       ...prev,
       gatilho: {
-        ...(prev.gatilho || {}),
         tipo: 'tabulacao',
         criterios,
       },
@@ -79,6 +75,7 @@ export default function WorkflowConfigEditor({
       await onSave?.({
         ...draft,
         titulo,
+        gatilho: normalizeGatilho(draft.gatilho),
         passos: normalizePassosOrdem(draft.passos || []),
       });
       showNotification(isNew ? 'Workflow criado.' : 'Workflow salvo.', 'success');

@@ -1,8 +1,9 @@
-/** workflowDefinicao.service v1.1.0 */
+/** workflowDefinicao.service v1.2.0 — gatilho normalizado sem descricao */
 import { Types } from 'mongoose';
 import {
   getWorkflowDefinicaoModel,
   IWorkflowDefinicao,
+  IWorkflowGatilho,
   IWorkflowPassoEnvelope,
 } from '../models/WorkflowDefinicao';
 import { evaluateGatilhoCriterios, buildTabulationFieldsFromTicket } from './workflowMatcher.service';
@@ -36,6 +37,13 @@ function normalizePassoInicialId(
     if (found?._id) return found._id as Types.ObjectId;
   }
   return (sorted[0]?._id as Types.ObjectId) || null;
+}
+
+function normalizeGatilho(gatilho?: Partial<IWorkflowGatilho> | null): IWorkflowGatilho {
+  return {
+    tipo: String(gatilho?.tipo || 'tabulacao'),
+    criterios: Array.isArray(gatilho?.criterios) ? gatilho.criterios : [],
+  };
 }
 
 export async function listWorkflows(includeInactive = false): Promise<IWorkflowDefinicao[]> {
@@ -80,7 +88,7 @@ export async function createWorkflow(
     descricao: String(payload.descricao || '').trim(),
     ordem: payload.ordem ?? 0,
     ativo: payload.ativo !== false,
-    gatilho: payload.gatilho || { tipo: 'tabulacao', descricao: '', criterios: [] },
+    gatilho: normalizeGatilho(payload.gatilho),
     passos,
     passoInicialId,
     updatedBy,
@@ -106,7 +114,7 @@ export async function replaceWorkflow(
       descricao: String(payload.descricao || '').trim(),
       ordem: payload.ordem ?? 0,
       ativo: payload.ativo !== false,
-      gatilho: payload.gatilho || { tipo: 'tabulacao', descricao: '', criterios: [] },
+      gatilho: normalizeGatilho(payload.gatilho),
       passos,
       passoInicialId,
       updatedBy,
