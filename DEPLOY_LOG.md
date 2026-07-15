@@ -1,10 +1,31 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.25.0 | DATE: 2026-07-14 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.26.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Workflows persistidos, colaboradores Desk, VeloNews e merges dev
+
+- **Data/Hora**: 2026-07-15
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.26.0
+  - WorkflowDefinicao v1.2.0, workflowEngine v1.5.1, workflowConfigData v2.5.2
+  - colaboradores.routes v1.0.0, database v1.8.0, blockNoticiarioRoutes v1.0.3
+  - veloNewsApi v1.0.5, velohubApiConfig v1.3.3, useDeskColaboradores v1.0.0
+  - WorkflowConfigEditor v2.5.1, WorkflowConfigStepsTimeline v2.1.2
+- **Arquivos modificados / incluídos**:
+  - `backend/` — API `/api/workflows`, `/api/grupos-responsabilidade`, `/api/colaboradores` (leitura `console_funcionarios` VeloHubCentral); models e seeds; bloqueio rotas noticiário; `gatilho` sem `descricao`
+  - `frontend/` — Config workflows/grupos/lista agentes; runtime `workflowEngine`; VeloNews só via `/velohub-api`; auditoria IA com `tabulacaoFonte`; CSS etapas workflow
+  - Merge remoto: Painel 360 status serviços, workflow Produtos, monorepo `npm start`
+- **Descrição**: Consolida workflows persistidos no MongoDB com editor Config completo, colaboradores Desk via cadastro VeloHubCentral, isolamento VeloNews na API VeloHub e integração dos merges remotos (360, Produtos, CSS cockpit).
+- **Status**: Concluído
+
+---
 
 ### GitHub Push — Agentes paralelos, correções pós-merge Desk/Painel 360 e workflow config
 
