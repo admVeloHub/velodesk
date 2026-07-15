@@ -302,6 +302,110 @@ export function computeSupervisorData() {
   };
 }
 
+const FINANCEIRO_KW = ['financeiro', 'cobrança', 'cobranca', 'fatura', 'inadimplência', 'inadimplencia'];
+const ESTORNO_KW = ['estorno', 'procon', 'devolução', 'devolucao'];
+
+function classifyEscalationCategory(ticket) {
+  const text = `${ticket?.title || ''} ${ticket?.description || ''} ${ticket?.lateralForm?.motivo || ''}`.toLowerCase();
+  if (ESTORNO_KW.some((kw) => text.includes(kw))) return 'estorno';
+  if (FINANCEIRO_KW.some((kw) => text.includes(kw))) return 'financeiro';
+  return null;
+}
+
+/** Fallback local do Painel 360° Gestão quando a API não responde */
+export function computeSupervisor360View() {
+  const entries = getAllCockpitTickets().filter((entry) => entry.queueId !== 'resolvidos');
+  let slaRisk = 0;
+  let slaCriticalCount = 0;
+
+  entries.forEach(({ ticket }) => {
+    const sla = getSlaClass(ticket);
+    if (sla === 'critical' || sla === 'warning') slaRisk += 1;
+    if (sla === 'critical') slaCriticalCount += 1;
+  });
+
+  const categories = [
+    { id: 'financeiro', label: 'Financeiro', count: 0, accent: 'orange' },
+    { id: 'estorno', label: 'Estorno', count: 0, accent: 'navy' },
+  ];
+  const groupedEntries = { financeiro: [], estorno: [] };
+
+  entries.forEach((entry) => {
+    const categoryId = classifyEscalationCategory(entry.ticket);
+    if (!categoryId) return;
+    const category = categories.find((item) => item.id === categoryId);
+    if (category) category.count += 1;
+    if (groupedEntries[categoryId].length < 20) {
+      groupedEntries[categoryId].push({
+        ticket: entry.ticket,
+        queueId: entry.queueId,
+        sla: getSlaClass(entry.ticket),
+      });
+    }
+  });
+
+  const channelVision = ['whatsapp', 'email', 'telefone'].map((id) => {
+    const inChannel = entries.filter(({ ticket }) => {
+      const channel = String(ticket.channel || ticket.lateralForm?.canal || '').toLowerCase();
+      if (id === 'whatsapp') return channel.includes('whats');
+      if (id === 'email') return channel.includes('mail') || channel.includes('e-mail');
+      return channel.includes('telefone') || channel.includes('phone');
+    });
+    const total = inChannel.length;
+    const ok = inChannel.filter(({ ticket }) => getSlaClass(ticket) === 'ok').length;
+    return {
+      id,
+      label: id.charAt(0).toUpperCase() + id.slice(1),
+      tickets: total,
+      sla: total ? Math.round((ok / total) * 100) : 0,
+      highVolume: false,
+    };
+  });
+
+  const agentStats = new Map();
+  entries.forEach(({ ticket }) => {
+    const agent = String(ticket.responsibleAgent || ticket.lateralForm?.responsavel || 'Sem responsável').trim();
+    if (!agentStats.has(agent)) agentStats.set(agent, { tickets: 0 });
+    agentStats.get(agent).tickets += 1;
+  });
+
+  const leaderboard = [...agentStats.entries()]
+    .sort((a, b) => b[1].tickets - a[1].tickets)
+    .slice(0, 8)
+    .map(([agent, stats], index) => ({
+      rank: index + 1,
+      agent,
+      tickets: stats.tickets,
+      slaPct: 90,
+      tma: '—',
+      shift: 'all',
+      channel: 'all',
+    }));
+
+  return buildSupervisor360View({
+    kpis: {
+      slaPct: entries.length ? Math.max(0, 100 - Math.round((slaRisk / entries.length) * 100)) : 100,
+      slaRisk,
+      online: null,
+      tma: '—',
+      tme: '—',
+      nps: null,
+      volume: String(entries.length),
+      warRoom: slaCriticalCount >= 3,
+    },
+    escalated: {
+      categories,
+      slaCriticalCount,
+      groups: categories.map((category) => ({
+        ...category,
+        entries: groupedEntries[category.id] || [],
+      })),
+    },
+    channelVision,
+    leaderboard,
+  });
+}
+
 export function computeManagementStats() {
   const entries = getAllCockpitTickets();
   const resolved = entries.filter((e) => e.queueId === 'resolvidos').length;

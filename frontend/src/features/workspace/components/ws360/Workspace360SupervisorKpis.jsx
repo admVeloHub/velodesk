@@ -4,7 +4,7 @@
  */
 import React from 'react';
 
-export default function Workspace360SupervisorKpis({ kpis }) {
+export default function Workspace360SupervisorKpis({ kpis, statusSlot = null }) {
   const primary = [
     { value: `${kpis.slaPct ?? 0}%`, label: 'SLA cumprido' },
     { value: String(kpis.slaRisk ?? 0), label: 'Em risco de SLA' },
@@ -19,7 +19,7 @@ export default function Workspace360SupervisorKpis({ kpis }) {
   ];
 
   return (
-    <div className="ws360-super-kpis">
+    <div className={'ws360-super-kpis' + (statusSlot ? ' ws360-super-kpis--with-status' : '')}>
       {primary.map((item) => (
         <div key={item.label} className="ws360-super-kpi ws360-super-kpi--primary">
           <strong className="ws360-super-kpi__value">{item.value}</strong>
@@ -35,6 +35,7 @@ export default function Workspace360SupervisorKpis({ kpis }) {
           </div>
         </div>
       ))}
+      {statusSlot}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { getWorkflowProgress } from '../../services/desk/utils';
 import { ticketAwaitingDecision } from '../../services/desk/workflowDefinitions';
 import Workspace360Kpis from './components/ws360/Workspace360Kpis';
 import Workspace360TicketSection from './components/ws360/Workspace360TicketSection';
+import Workspace360ServiceStatus from './components/ws360/Workspace360ServiceStatus';
 
 export default function WorkflowPanel() {
   const navigate = useNavigate();
@@ -49,17 +50,38 @@ export default function WorkflowPanel() {
         </div>
       </div>
 
-      <Workspace360Kpis kpis={view.kpis} />
+      <Workspace360Kpis
+        kpis={view.kpis}
+        ariaLabel="Indicadores de workflow"
+        title="Indicadores"
+        gridAppend={<Workspace360ServiceStatus className="ws360-service-status--workflow" tagsOnly />}
+      />
 
-      <div className="ws360-sections-row ws360-sections-row--bottom">
-        {view.sections.map((section) => (
-          <Workspace360TicketSection
-            key={section.id}
-            section={section}
-            onOpenTicket={handleOpenTicket}
-            onSeeAll={handleSeeAll}
-          />
-        ))}
+      <div className="ws360-sections-row ws360-sections-row--bottom ws360-sections-row--workflow-grid">
+        <div className="ws360-sections-row__stack ws360-sections-row__stack--lead">
+          {view.sections
+            .filter((section) => section.id === 'workflow-active')
+            .map((section) => (
+              <Workspace360TicketSection
+                key={section.id}
+                section={section}
+                onOpenTicket={handleOpenTicket}
+                onSeeAll={handleSeeAll}
+              />
+            ))}
+        </div>
+        <div className="ws360-sections-row__stack ws360-sections-row__stack--trail">
+          {view.sections
+            .filter((section) => section.id === 'workflow-external')
+            .map((section) => (
+              <Workspace360TicketSection
+                key={section.id}
+                section={section}
+                onOpenTicket={handleOpenTicket}
+                onSeeAll={handleSeeAll}
+              />
+            ))}
+        </div>
       </div>
     </div>
   );

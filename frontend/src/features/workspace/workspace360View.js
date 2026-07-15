@@ -6,5 +6,6 @@ export {
   buildAgent360View,
   buildSupervisor360View,
   computeAgent360View,
+  computeSupervisor360View,
   mapEntryToRow,
 } from '../../services/workspace/deskData';

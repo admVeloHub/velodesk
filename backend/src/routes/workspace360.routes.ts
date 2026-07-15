@@ -1,7 +1,8 @@
-/** workspace360.routes v1.0.0 — Painel 360° sobre chamados_n1 */
+/** workspace360.routes v1.1.0 — Painel 360° com suporte a profile=gestao|agent */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { isMongoConnected } from '../config/database';
+import { env } from '../config/env';
 import { User } from '../models/User';
 import {
   buildAgent360Payload,
@@ -21,6 +22,13 @@ function parseQuery(req: { query: Record<string, unknown> }): Workspace360Query 
   };
 }
 
+function wantsSupervisorPayload(req: { query: Record<string, unknown> }, role: string): boolean {
+  const profile = String(req.query.profile ?? '').trim().toLowerCase();
+  if (profile === 'gestao' || profile === 'supervisor') return true;
+  if (profile === 'agent') return false;
+  return role === 'supervisor';
+}
+
 router.get('/', authMiddleware, async (req, res: Response) => {
   if (!isMongoConnected()) {
     return res.status(503).json({ message: 'Banco de chamados indisponível' });
@@ -29,14 +37,18 @@ router.get('/', authMiddleware, async (req, res: Response) => {
   try {
     const role = String(req.user?.role ?? '').trim().toLowerCase();
     const query = parseQuery(req);
+    const supervisorView = wantsSupervisorPayload(req, role);
 
-    if (query.report && role === 'supervisor') {
+    if (query.report && supervisorView) {
       const report = await buildReportPayload(req.user!, query);
       if (!report) return res.status(404).json({ message: 'Relatório não encontrado' });
       return res.json({ report });
     }
 
-    if (role === 'supervisor') {
+    if (supervisorView) {
+      if (role !== 'supervisor' && env.nodeEnv === 'production') {
+        return res.status(403).json({ message: 'Perfil Gestão requer permissão de supervisor.' });
+      }
       const payload = await buildSupervisor360Payload(req.user!, query);
       return res.json(payload);
     }

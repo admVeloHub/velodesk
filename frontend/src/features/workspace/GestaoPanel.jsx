@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { buildSupervisor360View, mapEntryToRow } from '../../services/workspace/deskData';
+import { buildSupervisor360View, computeSupervisor360View, mapEntryToRow } from '../../services/workspace/deskData';
 import { useWorkspace360 } from '../../hooks/useWorkspace360';
 import { useNotifications } from '../../context/NotificationContext';
 import { useTickets } from '../../context/TicketsContext';
@@ -13,6 +13,7 @@ import Workspace360EscalatedCases from './components/ws360/Workspace360Escalated
 import Workspace360EscalatedCasesList from './components/ws360/Workspace360EscalatedCasesList';
 import Workspace360OperationalLeaderboard from './components/ws360/Workspace360OperationalLeaderboard';
 import Workspace360SupervisorReports from './components/ws360/Workspace360SupervisorReports';
+import Workspace360ServiceStatus from './components/ws360/Workspace360ServiceStatus';
 import Workspace360RedistributeModal from './components/ws360/Workspace360RedistributeModal';
 import Workspace360EscalateModal from './components/ws360/Workspace360EscalateModal';
 
@@ -25,7 +26,11 @@ export default function GestaoPanel() {
   const [redistributeOpen, setRedistributeOpen] = useState(false);
   const [escalateOpen, setEscalateOpen] = useState(false);
 
-  const view = useMemo(() => (data ? buildSupervisor360View(data) : null), [data]);
+  const view = useMemo(() => {
+    if (data) return buildSupervisor360View(data);
+    if (!loading) return computeSupervisor360View();
+    return null;
+  }, [data, loading]);
 
   const escalatedListGroups = useMemo(() => {
     if (!view?.escalated?.groups) return [];
@@ -81,20 +86,17 @@ export default function GestaoPanel() {
     return <div className="ws-super-desk"><p className="ws360-loading">Carregando painel…</p></div>;
   }
 
-  if (error && !view) {
-    return (
-      <div className="ws-super-desk">
-        <p className="ws360-error" role="alert">Não foi possível carregar o Painel 360°.</p>
-      </div>
-    );
-  }
-
   if (!view) return null;
 
   const d = view.kpis;
 
   return (
     <div className={'ws-super-desk' + (d.warRoom ? ' ws-super-desk--war-room' : '')} id="wsGestaoDesk">
+      {error ? (
+        <p className="ws360-error ws360-error--inline" role="status">
+          API indisponível — exibindo dados locais da fila.
+        </p>
+      ) : null}
       <div className="ws-hero ws-hero--supervisor">
         <div>
           <h3>Performance da equipe</h3>
@@ -116,7 +118,15 @@ export default function GestaoPanel() {
         </div>
       </div>
 
-      <Workspace360SupervisorKpis kpis={d} />
+      <Workspace360SupervisorKpis
+        kpis={d}
+        statusSlot={(
+          <Workspace360ServiceStatus
+            className="ws360-service-status--gestao-in-kpis"
+            tagsOnly
+          />
+        )}
+      />
 
       {escalatedListOpen ? (
         <Workspace360EscalatedCasesList
@@ -130,7 +140,6 @@ export default function GestaoPanel() {
           <div className="ws-grid-2">
             <Workspace360EscalatedCases
               escalated={view.escalated}
-              channelVision={view.channelVision}
               onViewAll={() => setEscalatedListOpen(true)}
               onDismiss={() => showNotification('Alerta de escalonamento registrado.', 'info')}
             />
