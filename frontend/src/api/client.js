@@ -1,9 +1,10 @@
 /**
  * API client v1.8.0 — interceptor 401 (sessão expirada / token inválido)
- * VERSION: v1.8.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.8.0 | DATE: 2026-07-17 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
+import { isPublicAuthApiPath } from '../utils/authSession';
 
 const api = axios.create({
   baseURL: '/api',
@@ -11,10 +12,6 @@ const api = axios.create({
 });
 
 let handling401 = false;
-
-function isAuthRequest(url = '') {
-  return /\/login\b|\/auth\//.test(String(url));
-}
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('velodesk_token');
@@ -26,8 +23,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error?.response?.status;
-    const url = error?.config?.url || '';
-    if (status === 401 && !isAuthRequest(url) && !handling401) {
+    const requestUrl = String(error?.config?.url || '');
+    if (status === 401 && !isPublicAuthApiPath(requestUrl) && !handling401) {
       handling401 = true;
       clearDeskAuthSession();
       if (!window.location.pathname.startsWith('/login')) {

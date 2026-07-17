@@ -5,6 +5,7 @@
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
 import { ticketMatchesAgentResponsavel } from './responsavelSegmentation';
+import { QUEUE_STATUSES, isAgentForwardEscalonar } from './constants';
 import { lookupClient, getAgentName } from '../clientDb';
 import {
   advanceWorkflowStep,
@@ -13,6 +14,7 @@ import {
   buildWorkflowAdvanceMessage,
   createWorkflowState,
   evaluateWorkflowAutoAdvance,
+  findEscalonarTargetStepIndex,
   getWorkflowTeamLabel,
   getWorkflowTemplateById,
   resolveWorkflowForTicket,
@@ -329,7 +331,7 @@ export function getWorkflowProgress(ticket) {
       .map((h) => h.stepId),
   );
 
-  const stepsWithState = template.steps.map((step, index) => {
+  let stepsWithState = template.steps.map((step, index) => {
     let state = 'pending';
     if (completedIds.has(step.id)) state = 'completed';
     else if (step.id === currentStepId) state = 'active';
@@ -344,6 +346,25 @@ export function getWorkflowProgress(ticket) {
     };
   });
 
+  const escalonarId = ticket?.lateralForm?.escalonar;
+  const agentRetainsTicket = Boolean(ticket?.lateralForm?.agentRetainsTicket);
+  let forwardTargetStepIndex = -1;
+  let forwardTargetStepId = null;
+
+  if (agentRetainsTicket && isAgentForwardEscalonar(escalonarId)) {
+    forwardTargetStepIndex = findEscalonarTargetStepIndex(template, escalonarId);
+    if (forwardTargetStepIndex > activeStepIndex) {
+      const targetStep = template.steps[forwardTargetStepIndex];
+      forwardTargetStepId = targetStep?.id || null;
+      stepsWithState = stepsWithState.map((step, index) => {
+        if (index === forwardTargetStepIndex && step.state === 'pending') {
+          return { ...step, state: 'signaled' };
+        }
+        return step;
+      });
+    }
+  }
+
   let slaRemainingMs = null;
   let slaTotalHours = null;
   if (activeStep?.slaHours) {
@@ -356,7 +377,6 @@ export function getWorkflowProgress(ticket) {
   }
 
   const externalTeamActive = activeStep && !['n1', 'agent'].includes(activeStep.team);
-  const agentRetainsTicket = Boolean(ticket?.lateralForm?.agentRetainsTicket);
 
   return {
     workflow,
@@ -364,6 +384,8 @@ export function getWorkflowProgress(ticket) {
     activeStepIndex,
     activeStep,
     stepsWithState,
+    forwardTargetStepIndex,
+    forwardTargetStepId,
     slaRemainingMs,
     slaRemainingLabel: slaRemainingMs != null ? formatDurationMs(slaRemainingMs) : null,
     slaTotalHours,
@@ -710,8 +732,15 @@ export function countByQueue(queueId) {
   return getAllCockpitTickets().filter((e) => e.queueId === queueId && ticketMatchesAgentResponsavel(e.ticket)).length;
 }
 
+/** Fila com tickets visíveis — prioriza Novos (maior volume no Atlas). */
+export function pickDefaultQueueId(preferred = 'novos') {
+  if (countByQueue(preferred) > 0) return preferred;
+  const match = QUEUE_STATUSES.find((queue) => countByQueue(queue.id) > 0);
+  return match?.id || preferred;
+}
+
 export function pickDefaultTicket(activeQueue) {
-  const list = filterTickets(activeQueue || 'em-andamento', '', 'data');
+  const list = filterTickets(activeQueue || 'novos', '', 'data');
   if (list.length) return list[0].ticket.id;
   const all = getAllCockpitTickets();
   return all[0]?.ticket?.id ?? null;

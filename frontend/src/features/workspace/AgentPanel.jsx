@@ -12,7 +12,6 @@ import Workspace360Kpis from './components/ws360/Workspace360Kpis';
 import Workspace360DualTicketSection from './components/ws360/Workspace360DualTicketSection';
 import Workspace360TicketSection from './components/ws360/Workspace360TicketSection';
 import Workspace360ProductionChart from './components/ws360/Workspace360ProductionChart';
-import Workspace360ServiceStatus from './components/ws360/Workspace360ServiceStatus';
 
 export default function AgentPanel() {
   const navigate = useNavigate();
@@ -54,10 +53,7 @@ export default function AgentPanel() {
           API indisponível — exibindo dados locais da fila.
         </p>
       ) : null}
-      <Workspace360Kpis
-        kpis={view.kpis}
-        gridAppend={<Workspace360ServiceStatus className="ws360-service-status--agent-kpi" tagsOnly />}
-      />
+      <Workspace360Kpis kpis={view.kpis} />
       <Workspace360DualTicketSection
         leftSection={actionNow}
         rightSection={clientReplied}

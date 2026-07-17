@@ -1,5 +1,5 @@
 /**
- * Painel 360° — roteamento por perfil (Agente / Gestão / Workflow)
+ * Painel 360° — roteamento por perfil (Agente / Gestão / Workflow / Especiais)
  * VERSION: v2.4.1 | DATE: 2026-07-14 | AUTHOR: VeloHub Development Team
  */
 import React, { useMemo } from 'react';
@@ -11,10 +11,12 @@ import Workspace360Header from './components/ws360/Workspace360Header';
 import AgentPanel from './AgentPanel';
 import GestaoPanel from './GestaoPanel';
 import WorkflowPanel from './WorkflowPanel';
+import EspeciaisPanel from './EspeciaisPanel';
 
 function resolveWorkspacePanel(profileId) {
   if (profileId === 'gestao') return GestaoPanel;
   if (profileId === 'workflow') return WorkflowPanel;
+  if (profileId === 'especiais') return EspeciaisPanel;
   return AgentPanel;
 }
 

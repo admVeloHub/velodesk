@@ -1225,3 +1225,234 @@ body.velodesk-dark .ia-processos-drawer__tag {
     background: rgba(22, 52, 255, 0.16);
     color: #93c5fd;
 }
+
+body.velodesk-dark .produtos-forward-popover__backdrop {
+    background: rgba(0, 0, 0, 0.45);
+}
+
+body.velodesk-dark .produtos-forward-popover__panel {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
+}
+
+body.velodesk-dark .produtos-forward-popover__title {
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .produtos-forward-popover__close:hover {
+    background: var(--velo-dark-surface-hover);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .produtos-forward-popover__body .prod-solic-form__actions {
+    background: var(--velo-dark-surface);
+}
+
+/* Perfil Especiais */
+body.velodesk-dark .especiais-page__title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .especiais-page__back,
+body.velodesk-dark .especiais-channel-card,
+body.velodesk-dark .especiais-channel-shell {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .especiais-channel-card__label {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .especiais-channel-card__desc,
+body.velodesk-dark .especiais-page__subtitle,
+body.velodesk-dark .especiais-channel-shell__placeholder {
+    color: var(--velo-dark-text-muted);
+}
+
+/* Reclame Aqui */
+body.velodesk-dark .ra-page-wrap {
+    background: var(--velo-dark-bg);
+}
+
+body.velodesk-dark .ra-panel__back,
+body.velodesk-dark .ra-toolbar__search,
+body.velodesk-dark .ra-toolbar__btn,
+body.velodesk-dark .ra-chip,
+body.velodesk-dark .ra-kpi,
+body.velodesk-dark .ra-table-wrap,
+body.velodesk-dark .ra-kanban__col,
+body.velodesk-dark .ra-kanban__card,
+body.velodesk-dark .ra-calendar,
+body.velodesk-dark .ra-reports__chart,
+body.velodesk-dark .ra-panel__pagination button {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ra-page-header__title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ra-table th {
+    background: var(--velo-dark-surface-inset);
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ra-table__row td {
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .ra-kpi__value {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ra-kpi__label,
+body.velodesk-dark .ra-toolbar__group-label,
+body.velodesk-dark .ra-table__assunto,
+body.velodesk-dark .ra-panel__footer {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ra-registro__card,
+body.velodesk-dark .ra-registro__side-card,
+body.velodesk-dark .ra-registro__footer {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .ra-registro__card-title,
+body.velodesk-dark .ra-registro__side-title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ra-registro__input,
+body.velodesk-dark .ra-registro__select,
+body.velodesk-dark .ra-registro__textarea {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ra-registro__input--readonly {
+    background: var(--velo-dark-surface-inset);
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ra-registro__field label,
+body.velodesk-dark .ra-registro__side-label,
+body.velodesk-dark .ra-registro__char-count,
+body.velodesk-dark .ra-registro__prazo-text,
+body.velodesk-dark .ra-registro__footer-summary {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ra-registro__toggle-btn {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ra-registro__toggle-btn.is-active {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: #22c55e;
+    color: #86efac;
+}
+
+body.velodesk-dark .ra-registro__side-card--whatsapp {
+    background: rgba(34, 197, 94, 0.08);
+    border-color: rgba(34, 197, 94, 0.25);
+}
+
+body.velodesk-dark .ra-registro__moderacao {
+    background: rgba(234, 179, 8, 0.08);
+    border-color: rgba(234, 179, 8, 0.25);
+}
+
+body.velodesk-dark .ra-registro__moderacao-content h3,
+body.velodesk-dark .ra-registro__moderacao-content p {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ra-registro__moderacao-btn {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .ra-registro__btn--ghost {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
+    color: var(--velo-dark-text);
+}
+
+/* Solicitações Produtos */
+body.velodesk-dark .prod-solic-page-wrap {
+    background: var(--velo-dark-bg);
+}
+
+body.velodesk-dark .prod-solic-tabs,
+body.velodesk-dark .prod-solic-main__card,
+body.velodesk-dark .prod-solic-track {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .prod-solic-tabs__btn {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .prod-solic-tabs__btn.is-active {
+    color: #93c5fd;
+}
+
+body.velodesk-dark .prod-solic-stats__card,
+body.velodesk-dark .prod-solic-form__box,
+body.velodesk-dark .prod-solic-track__item {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .prod-solic-stats__value,
+body.velodesk-dark .prod-solic-track__title,
+body.velodesk-dark .prod-solic-track__item-title {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .prod-solic-stats__label,
+body.velodesk-dark .prod-solic-stats__updated,
+body.velodesk-dark .prod-solic-track__item-date,
+body.velodesk-dark .prod-solic-track__status,
+body.velodesk-dark .prod-solic-track__empty {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .prod-solic-form__label,
+body.velodesk-dark .prod-solic-form__check {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .prod-solic-form__input,
+body.velodesk-dark .prod-solic-form__textarea,
+body.velodesk-dark .prod-solic-track__input {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .prod-solic-track__item-subtitle {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .prod-solic-attachments__chip {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .prod-solic-attachments__chip-remove {
+    color: var(--velo-dark-text-muted);
+}

@@ -50,6 +50,29 @@ function registroMetadados(reg: IRegistro): Record<string, unknown> {
   return {};
 }
 
+function readReclameAquiFromBody(body: Record<string, unknown>): Record<string, unknown> | null {
+  const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
+  const ra = lf.reclameAqui;
+  if (ra && typeof ra === 'object' && !Array.isArray(ra)) {
+    return ra as Record<string, unknown>;
+  }
+  return null;
+}
+
+function findReclameAquiFromChamado(chamado: IChamadoN1): Record<string, unknown> | null {
+  for (const reg of chamado.registro ?? []) {
+    const meta = registroMetadados(reg);
+    if (String(meta.source ?? '').toLowerCase() === 'reclame-aqui') {
+      const nested = meta.reclameAqui;
+      if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+        return nested as Record<string, unknown>;
+      }
+      return meta;
+    }
+  }
+  return null;
+}
+
 function findLatestWorkflowFromRegistro(chamado: IChamadoN1): Record<string, unknown> | null {
   if (chamado.workflow?.active && chamado.workflow.workflowId) {
     return null;
@@ -83,6 +106,7 @@ export function resolveRegistroOrigin(reg: IRegistro): RegistroOrigin {
 
   const meta = registroMetadados(reg);
   if (String(meta.source ?? '').toLowerCase() === 'email-inbound') return 'cliente';
+  if (String(meta.source ?? '').toLowerCase() === 'reclame-aqui') return 'cliente';
 
   const legacy = legacyAlteracoesObject(reg);
   if (legacy) {
@@ -389,22 +413,68 @@ export async function createChamadoFromBody(
   const cliente = await resolveClienteRefFromBody(body);
 
   const clientName = String(body.clientName ?? '').trim();
-  const registro: IRegistro = {
-    data: new Date(),
-    origin: 'agente',
-    autor: resolveRegistroAutor('agente', {
-      authUser,
-      authorHint: String(body.author ?? '').trim(),
-      clientName,
-    }),
-    mensagemPublica: internal ? '' : text,
-    anexosMensagemPublica: internal ? [] : attachments,
-    anotacaoInterna: internal ? text : '',
-    anexosAnotacaoInterna: internal ? attachments : [],
-    alteracoes: [],
-    metadados: {},
-    status,
-  };
+  const raData = readReclameAquiFromBody(body);
+  const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
+  const workflowMeta = lf.workflow;
+
+  let registro: IRegistro[];
+
+  if (raData) {
+    const complaintText = String(raData.descricao ?? text ?? '').trim();
+    const raMetadados: Record<string, unknown> = {
+      source: 'reclame-aqui',
+      reclameAqui: raData,
+    };
+    const clienteRegistro: IRegistro = {
+      data: new Date(),
+      origin: 'cliente',
+      autor: clientName || String(raData.consumidor ?? '').trim() || 'Consumidor',
+      mensagemPublica: internal ? '' : complaintText,
+      anexosMensagemPublica: internal ? [] : attachments,
+      anotacaoInterna: '',
+      anexosAnotacaoInterna: [],
+      alteracoes: [],
+      metadados: raMetadados,
+      status,
+    };
+    registro = [clienteRegistro];
+
+    if (workflowMeta && typeof workflowMeta === 'object' && !Array.isArray(workflowMeta)) {
+      registro.push({
+        data: new Date(),
+        origin: 'agente',
+        autor: resolveRegistroAutor('agente', {
+          authUser,
+          authorHint: String(body.author ?? '').trim(),
+          clientName,
+        }),
+        mensagemPublica: '',
+        anexosMensagemPublica: [],
+        anotacaoInterna: '',
+        anexosAnotacaoInterna: [],
+        alteracoes: buildAlteracoesItem({ workflow: workflowMeta }),
+        metadados: { workflow: workflowMeta },
+        status,
+      });
+    }
+  } else {
+    registro = [{
+      data: new Date(),
+      origin: 'agente',
+      autor: resolveRegistroAutor('agente', {
+        authUser,
+        authorHint: String(body.author ?? '').trim(),
+        clientName,
+      }),
+      mensagemPublica: internal ? '' : text,
+      anexosMensagemPublica: internal ? [] : attachments,
+      anotacaoInterna: internal ? text : '',
+      anexosAnotacaoInterna: internal ? attachments : [],
+      alteracoes: [],
+      metadados: {},
+      status,
+    }];
+  }
 
   await assertTabulacaoForStatus(tab, status);
 
@@ -413,7 +483,7 @@ export async function createChamadoFromBody(
     chamadoTitulo: titulo,
     cliente,
     tabulacao: [tab],
-    registro: [registro],
+    registro,
   };
 }
 
@@ -701,6 +771,7 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
     lateralWorkflow = persistedWorkflow ?? undefined;
   }
   const persistedApproval = findLatestApprovalFromRegistro(chamado);
+  const reclameAqui = findReclameAquiFromChamado(chamado);
 
   return {
     _id: chamado._id.toString(),
@@ -710,8 +781,8 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
     description: tab?.detalhe,
     status,
     priority: 'media',
-    channel: 'digital',
-    source: 'velodesk',
+    channel: reclameAqui ? 'reclame-aqui' : 'digital',
+    source: reclameAqui ? 'reclame-aqui' : 'velodesk',
     boxId,
     clientName,
     clientCPF: clientCpf,
@@ -729,6 +800,8 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
       clienteEmail: cadastro?.clienteEmail?.lista ?? [],
       clienteTelefone: cadastro?.clienteTelefone?.lista ?? [],
       cpf: clientCpf,
+      canal: reclameAqui ? 'Reclame Aqui' : undefined,
+      reclameAqui: reclameAqui ?? undefined,
       workflow: lateralWorkflow,
       approval: persistedApproval ?? undefined,
     },

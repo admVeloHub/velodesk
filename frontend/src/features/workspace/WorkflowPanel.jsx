@@ -11,7 +11,6 @@ import { ticketAwaitingDecision } from '../../services/desk/workflowDefinitions'
 import { workflowNotificacoesApi } from '../../api/client';
 import Workspace360Kpis from './components/ws360/Workspace360Kpis';
 import Workspace360TicketSection from './components/ws360/Workspace360TicketSection';
-import Workspace360ServiceStatus from './components/ws360/Workspace360ServiceStatus';
 
 export default function WorkflowPanel() {
   const navigate = useNavigate();
@@ -67,7 +66,6 @@ export default function WorkflowPanel() {
         kpis={view.kpis}
         ariaLabel="Indicadores de workflow"
         title="Indicadores"
-        gridAppend={<Workspace360ServiceStatus className="ws360-service-status--workflow" tagsOnly />}
       />
 
       <div className="ws360-sections-row ws360-sections-row--bottom ws360-sections-row--workflow-grid">

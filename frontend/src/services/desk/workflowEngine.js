@@ -266,6 +266,16 @@ export function getWorkflowTeamLabel(teamId) {
   return WORKFLOW_TEAM_LABELS[teamId] || teamId || 'Operação';
 }
 
+export function findEscalonarTargetStepIndex(template, escalonarId) {
+  const target = String(escalonarId || '').trim().toLowerCase();
+  if (!target || !template?.steps?.length) return -1;
+  return template.steps.findIndex((step) => {
+    const team = String(step.team || '').toLowerCase();
+    const grupo = String(step.atribuicao?.grupoSlug || '').toLowerCase();
+    return team === target || grupo === target;
+  });
+}
+
 function findStepIndex(template, stepId) {
   return template.steps.findIndex((s) => s.id === stepId);
 }
@@ -388,6 +398,10 @@ export function getWorkflowStepSubtitle(step, progress) {
   if (!step) return '';
   if (step.state === 'completed') return 'concluído';
   if (step.state === 'pending') return 'aguardando';
+  if (step.state === 'signaled') {
+    const teamLabel = step.teamLabel || getWorkflowTeamLabel(step.team);
+    return teamLabel ? `aguardando ${teamLabel}` : 'encaminhado';
+  }
   if (step.state === 'active') {
     if (step.id === progress?.activeStep?.id && progress?.slaRemainingLabel) {
       return `${progress.slaRemainingLabel} restantes`;

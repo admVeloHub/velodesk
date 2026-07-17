@@ -953,6 +953,10 @@
     max-width: none;
 }
 
+#velodeskDeskV2Root .ticket-client-profile__cell-workflow .desk-workflow-stepper__step--signaled {
+    max-width: none;
+}
+
 #velodeskDeskV2Root .ticket-client-profile__cell-workflow .desk-workflow-stepper__circle {
     width: 24px;
     height: 24px;
@@ -4163,6 +4167,179 @@
     color: #272A30;
 }
 
+/* Produtos forward popover — drawer à esquerda do painel direito */
+.produtos-forward-popover {
+    position: relative;
+    z-index: 8200;
+}
+
+.produtos-forward-popover__backdrop {
+    z-index: 8199;
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: rgba(15, 23, 42, 0.28);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.produtos-forward-popover__backdrop.is-visible {
+    opacity: 1;
+}
+
+.produtos-forward-popover__panel {
+    z-index: 8200;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #eef1f6;
+    border: 0.5px solid #c5cfff;
+    border-right: none;
+    border-radius: 12px 0 0 12px;
+    box-shadow: -8px 0 32px rgba(0, 0, 88, 0.16);
+    padding: 0;
+    transform: translateX(16px);
+    opacity: 0;
+    transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.produtos-forward-popover__panel.is-visible {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.produtos-forward-popover__close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #9ca3af;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+.produtos-forward-popover__workspace {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.produtos-forward-popover__workspace .prod-solic-page--embed {
+    flex: 1;
+    min-height: 0;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.produtos-forward-popover__workspace .prod-solic-tabs {
+    flex-shrink: 0;
+    margin-bottom: 0;
+    padding-top: 0.35rem;
+    padding-right: 2.5rem;
+}
+
+.produtos-forward-popover__workspace .prod-solic-layout {
+    flex: 1;
+    min-height: 0;
+    padding: 0.75rem 0.85rem 0.85rem;
+    overflow: hidden;
+    align-items: stretch;
+}
+
+.produtos-forward-popover__workspace .prod-solic-main {
+    min-height: 0;
+    overflow: auto;
+}
+
+.produtos-forward-popover__workspace .prod-solic-main__card {
+    min-height: min-content;
+}
+
+.produtos-forward-popover__workspace .prod-solic-track {
+    min-height: 0;
+    max-height: none;
+    height: auto;
+    overflow: hidden;
+}
+
+.produtos-forward-popover__workspace .prod-solic-track__list {
+    min-height: 0;
+}
+
+.produtos-forward-popover__header {
+    padding-right: 32px;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+}
+
+.produtos-forward-popover__close:hover {
+    background: #F3F7FC;
+    color: #000058;
+}
+
+.produtos-forward-popover__eyebrow {
+    display: block;
+    font-family: Anton, sans-serif;
+    font-size: var(--desk-fs-caption);
+    letter-spacing: 0.04em;
+    color: #1634FF;
+    margin-bottom: 2px;
+}
+
+.produtos-forward-popover__title {
+    margin: 0;
+    font-family: Anton, sans-serif;
+    font-size: 1.125rem;
+    font-weight: 400;
+    color: #000058;
+    line-height: 1.2;
+}
+
+.produtos-forward-popover__panel .prod-solic-tabs {
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+.produtos-forward-popover__body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    padding-top: 4px;
+}
+
+.produtos-forward-popover__workspace .prod-solic-form__actions {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding-top: 8px;
+    margin-top: 8px;
+    z-index: 1;
+}
+
+.produtos-forward-popover__body .prod-solic-form__actions {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding-top: 8px;
+    margin-top: 8px;
+}
+
 #velodeskDeskV2Root .crm-right-panel__footer {
     padding: 10px 14px 14px;
     display: flex;
@@ -4700,6 +4877,10 @@ body.desk-v2-mode #cockpitFocusContext {
     max-width: 58px;
 }
 
+#velodeskDeskV2Root .desk-workflow-stepper__step--signaled {
+    max-width: 58px;
+}
+
 #velodeskDeskV2Root .desk-workflow-stepper__circle {
     width: 28px;
     height: 28px;
@@ -4735,11 +4916,22 @@ body.desk-v2-mode #cockpitFocusContext {
     box-shadow: 0 0 0 2px rgba(22, 52, 255, 0.15);
 }
 
+#velodeskDeskV2Root .desk-workflow-stepper__step--signaled .desk-workflow-stepper__circle {
+    background: #1634FF;
+    color: #fff;
+    box-shadow: 0 0 0 2px rgba(22, 52, 255, 0.15);
+}
+
 #velodeskDeskV2Root .desk-workflow-stepper__step--completed .desk-workflow-stepper__label {
     color: #15A237;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__step--active .desk-workflow-stepper__label {
+    color: #1634FF;
+    font-weight: 700;
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper__step--signaled .desk-workflow-stepper__label {
     color: #1634FF;
     font-weight: 700;
 }
@@ -4758,6 +4950,10 @@ body.desk-v2-mode #cockpitFocusContext {
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__step--active .desk-workflow-stepper__text {
+    min-height: var(--wf-stepper-text-min-h);
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper__step--signaled .desk-workflow-stepper__text {
     min-height: var(--wf-stepper-text-min-h);
 }
 
@@ -4800,6 +4996,11 @@ body.desk-v2-mode #cockpitFocusContext {
 #velodeskDeskV2Root .desk-workflow-stepper__status--sla {
     font-weight: 700;
     color: #b45309;
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper__status--signaled {
+    font-weight: 600;
+    color: #1634FF;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__sla {
@@ -4860,6 +5061,10 @@ body.desk-v2-mode #cockpitFocusContext {
 
 #velodeskDeskV2Root .desk-workflow-stepper__connector.is-completed {
     background: #15A237;
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper__connector.is-signaled {
+    background: linear-gradient(90deg, #1634FF 0%, #1634FF 50%, #e2e8f0 50%, #e2e8f0 100%);
 }
 
 #velodeskDeskV2Root .desk-workflow-banner {

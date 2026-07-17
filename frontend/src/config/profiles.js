@@ -1,6 +1,6 @@
 /**
- * Perfis operacionais — Agente / Gestão / Workflow
- * VERSION: v1.4.0 | DATE: 2026-07-13 | AUTHOR: VeloHub Development Team
+ * Perfis operacionais — Agente / Gestão / Workflow / Especiais
+ * VERSION: v1.5.0 | DATE: 2026-07-16 | AUTHOR: VeloHub Development Team
  */
 export const PROFILES = {
   agent: {
@@ -30,6 +30,22 @@ export const PROFILES = {
     nav: ['workspace', 'workflow-inbox', 'dashboard'],
     defaultPage: 'workflow-inbox',
   },
+  especiais: {
+    id: 'especiais',
+    label: 'Especiais',
+    icon: 'fa-star',
+    color: '#7C3AED',
+    desc: 'Canais especiais — Reclame Aqui, Procon, Consumidor.Gov, Bacen e Processos',
+    nav: [
+      'workspace',
+      'especiais-reclame-aqui',
+      'especiais-procon',
+      'especiais-consumidor-gov',
+      'especiais-bacen',
+      'especiais-processos',
+    ],
+    defaultPage: 'workspace',
+  },
 };
 
 export const NAV_ITEMS = [
@@ -38,6 +54,41 @@ export const NAV_ITEMS = [
   { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: 'ti-dashboard', tooltip: 'Dashboard' },
   { id: 'reports', path: '/reports', label: 'Relatórios', icon: 'ti-chart-bar', tooltip: 'Relatórios' },
   { id: 'tickets', path: '/tickets', label: 'Tickets', icon: 'ti-ticket', tooltip: 'Tickets' },
+  {
+    id: 'especiais-reclame-aqui',
+    path: '/especiais/reclame-aqui',
+    label: 'Reclame Aqui',
+    icon: 'ti-messages',
+    tooltip: 'Reclame Aqui',
+  },
+  {
+    id: 'especiais-procon',
+    path: '/especiais/procon',
+    label: 'Procon',
+    icon: 'ti-building-community',
+    tooltip: 'Procon',
+  },
+  {
+    id: 'especiais-consumidor-gov',
+    path: '/especiais/consumidor-gov',
+    label: 'Consumidor.Gov',
+    icon: 'ti-world',
+    tooltip: 'Consumidor.Gov',
+  },
+  {
+    id: 'especiais-bacen',
+    path: '/especiais/bacen',
+    label: 'Bacen',
+    icon: 'ti-building-bank',
+    tooltip: 'Bacen',
+  },
+  {
+    id: 'especiais-processos',
+    path: '/especiais/processos',
+    label: 'Processos',
+    icon: 'ti-briefcase',
+    tooltip: 'Processos',
+  },
   { id: 'chat', path: '/chat', label: 'Mensagens', icon: 'ti-message-2', tooltip: 'Mensagens', badge: true },
   { id: 'config', path: '/config', label: 'Configurações', icon: 'ti-settings', tooltip: 'Configurações' },
   { id: 'client-portal', path: '/client-portal', label: 'Portal Cliente', icon: 'ti-external-link', tooltip: 'Portal do Cliente' },
@@ -64,6 +115,7 @@ export function getProfileDefaultPath(profileId = 'agent') {
   const pageId = profile.defaultPage || 'workspace';
   if (pageId === 'tickets') return '/tickets?desk=v2';
   if (pageId === 'workflow-inbox') return '/workflow';
+  if (pageId === 'alteracoes-cadastrais') return '/alteracoes-cadastrais';
   if (pageId === 'analytics-ia') return '/analytics-ia';
   return `/${pageId}`;
 }

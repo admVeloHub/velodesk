@@ -69,10 +69,25 @@ app.use('/api/compose', composeRoutes);
 app.use('/api/ticket-ai', ticketAiRoutes);
 app.use('/api/agents', agentsRoutes);
 
-app.use(
-  '/api/',
-  rateLimit({ windowMs: 15 * 60 * 1000, max: 200 })
-);
+app.use('/api', authRoutes);
+
+const apiRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: env.nodeEnv === 'development' ? 2000 : 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    const path = req.path || '';
+    return path === '/health'
+      || path === '/api/health'
+      || path === '/login'
+      || path === '/api/login'
+      || path.startsWith('/auth/')
+      || path.startsWith('/api/auth/');
+  },
+});
+
+app.use('/api/', apiRateLimiter);
 
 app.get('/api/health', (_req, res) => {
   const allReady = isAllMongoReady();
@@ -123,7 +138,6 @@ app.get('/health', (_req, res) => {
   });
 });
 
-app.use('/api', authRoutes);
 app.use('/api/tickets', ticketsRoutes);
 app.use('/api/boxes', boxesRoutes);
 app.use('/api/users', usersRoutes);

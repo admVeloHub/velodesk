@@ -10,7 +10,7 @@ function buildQueryParams(profileId, reportParams) {
   if (profileId === 'gestao') {
     return { profile: 'gestao', ...(reportParams || {}) };
   }
-  if (profileId === 'agent') {
+  if (profileId === 'agent' || profileId === 'especiais') {
     return { profile: 'agent' };
   }
   return reportParams || undefined;

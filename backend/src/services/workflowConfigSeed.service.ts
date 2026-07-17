@@ -39,6 +39,14 @@ export async function seedWorkflowConfig(): Promise<void> {
       DEFAULT_GRUPOS.map((g) => ({ ...g, updatedBy: 'seed' })),
     );
     console.log(`Seed: ${DEFAULT_GRUPOS.length} grupo(s) de responsabilidade criados`);
+  } else {
+    for (const grupo of DEFAULT_GRUPOS) {
+      const exists = await Grupo.findOne({ slug: grupo.slug }).select('_id').lean();
+      if (!exists) {
+        await Grupo.create({ ...grupo, updatedBy: 'seed' });
+        console.log(`Seed: grupo ${grupo.slug} criado`);
+      }
+    }
   }
 
   const Workflow = getWorkflowDefinicaoModel();
@@ -119,6 +127,35 @@ export async function seedWorkflowConfig(): Promise<void> {
     console.log('Seed: workflow reembolso-7dias criado');
   }
 
+  const raTratativaExists = await Workflow.findOne({ slug: 'reclame-aqui-tratativa' }).select('_id').lean();
+  if (!raTratativaExists) {
+    const doc = await Workflow.create({
+      slug: 'reclame-aqui-tratativa',
+      titulo: 'TRATATIVA RECLAME AQUI',
+      descricao: 'Fluxo de tratativa de reclamações publicadas no Reclame Aqui',
+      ordem: 5,
+      ativo: true,
+      gatilho: {
+        tipo: 'tabulacao',
+        criterios: [
+          { fonte: 'tabulacao', campo: 'canal', operador: 'equals', valor: 'Reclame Aqui' },
+        ],
+      },
+      passos: [
+        { ordem: 0, passo: { nome: 'Triagem N1', descricao: 'N1 analisa a reclamação RA.', icone: 'ti-circle-check', slaHoras: 4, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
+        { ordem: 1, passo: { nome: 'Resposta pública RA', descricao: 'Publicar resposta no Reclame Aqui.', icone: 'ti-message-circle', slaHoras: 48, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
+        { ordem: 2, passo: { nome: 'Aguardando avaliação', descricao: 'Aguardar avaliação do consumidor.', icone: 'ti-star', slaHoras: 72, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
+      ],
+      updatedBy: 'seed',
+    });
+    const first = doc.passos?.[0];
+    if (first?._id) {
+      doc.passoInicialId = first._id;
+      await doc.save();
+    }
+    console.log('Seed: workflow reclame-aqui-tratativa criado');
+  }
+
   const escalonarSeeds = [
     {
       slug: 'escalonar-financeiro',
@@ -128,6 +165,15 @@ export async function seedWorkflowConfig(): Promise<void> {
         { ordem: 1, passo: { nome: 'Aprovação financeiro', descricao: '', slaHoras: 4, atribuicao: { tipo: 'grupo', grupoSlug: 'financeiro', colaborador: '' }, acao: { tipo: 'aprovacao', rotas: [{ variavel: 'approve', rotulo: 'Aprovar', proximoPassoId: null, statusTicket: 'em-andamento' }, { variavel: 'reject', rotulo: 'Reprovar', proximoPassoId: null, statusTicket: 'pendente' }, { variavel: 'request_info', rotulo: 'Pedir informação', proximoPassoId: null, statusTicket: 'pendente' }] } } },
         { ordem: 2, passo: { nome: 'Estorno processado', descricao: '', slaHoras: 8, atribuicao: { tipo: 'grupo', grupoSlug: 'financeiro', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
         { ordem: 3, passo: { nome: 'Retorno ao cliente', descricao: '', slaHoras: 2, atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
+      ],
+    },
+    {
+      slug: 'escalonar-produtos',
+      titulo: 'ENCAMINHAMENTO PRODUTOS',
+      passos: [
+        { ordem: 0, passo: { nome: 'Triagem N1', descricao: 'N1 prepara encaminhamento para produtos.', icone: 'ti-circle-check', slaHoras: 2, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
+        { ordem: 1, passo: { nome: 'Análise produtos', descricao: '', icone: 'ti-package', slaHoras: 4, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'produtos', colaborador: '' }, acao: { tipo: 'aprovacao', rotas: [{ variavel: 'approve', rotulo: 'Aprovar', proximoPassoId: null, statusTicket: 'em-andamento' }, { variavel: 'reject', rotulo: 'Reprovar', proximoPassoId: null, statusTicket: 'pendente' }, { variavel: 'request_info', rotulo: 'Pedir informação', proximoPassoId: null, statusTicket: 'pendente' }] } } },
+        { ordem: 2, passo: { nome: 'Retorno ao cliente', descricao: '', icone: 'ti-device-desktop', slaHoras: 2, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
       ],
     },
     {
@@ -169,7 +215,7 @@ export async function seedWorkflowConfig(): Promise<void> {
     console.log(`Seed: workflow ${seed.slug} criado`);
   }
 
-  const repairSlugs = ['reembolso-7dias', 'escalonar-financeiro', 'escalonar-n2', 'escalonar-suporte'];
+  const repairSlugs = ['reembolso-7dias', 'reclame-aqui-tratativa', 'escalonar-financeiro', 'escalonar-produtos', 'escalonar-n2', 'escalonar-suporte'];
   for (const slug of repairSlugs) {
     const doc = await Workflow.findOne({ slug });
     if (doc) await repairWorkflowPassos(doc);

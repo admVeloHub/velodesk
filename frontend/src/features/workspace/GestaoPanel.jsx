@@ -13,7 +13,6 @@ import Workspace360EscalatedCases from './components/ws360/Workspace360Escalated
 import Workspace360EscalatedCasesList from './components/ws360/Workspace360EscalatedCasesList';
 import Workspace360OperationalLeaderboard from './components/ws360/Workspace360OperationalLeaderboard';
 import Workspace360SupervisorReports from './components/ws360/Workspace360SupervisorReports';
-import Workspace360ServiceStatus from './components/ws360/Workspace360ServiceStatus';
 import Workspace360RedistributeModal from './components/ws360/Workspace360RedistributeModal';
 import Workspace360EscalateModal from './components/ws360/Workspace360EscalateModal';
 
@@ -118,15 +117,7 @@ export default function GestaoPanel() {
         </div>
       </div>
 
-      <Workspace360SupervisorKpis
-        kpis={d}
-        statusSlot={(
-          <Workspace360ServiceStatus
-            className="ws360-service-status--gestao-in-kpis"
-            tagsOnly
-          />
-        )}
-      />
+      <Workspace360SupervisorKpis kpis={d} />
 
       {escalatedListOpen ? (
         <Workspace360EscalatedCasesList

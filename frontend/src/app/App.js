@@ -43,6 +43,10 @@ import ReportsPage from '../pages/ReportsPage';
 
 import ClientPortalPage from '../pages/ClientPortalPage';
 import WorkflowPage from '../pages/WorkflowPage';
+import AlteracoesCadastraisPage from '../pages/AlteracoesCadastraisPage';
+import EspeciaisSelectPage from '../features/especiais/EspeciaisSelectPage';
+import EspeciaisChannelPage from '../features/especiais/EspeciaisChannelPage';
+import ReclameAquiChannelPage from '../features/especiais/ReclameAquiChannelPage';
 
 import { initCockpitGlobals } from '../config/cockpitConfig';
 
@@ -79,6 +83,14 @@ function AppRoutes() {
             { path: 'reports', element: React.createElement(ReportsPage) },
 
             { path: 'tickets', element: React.createElement(TicketsPage) },
+
+            { path: 'alteracoes-cadastrais', element: React.createElement(AlteracoesCadastraisPage) },
+
+            { path: 'especiais', element: React.createElement(EspeciaisSelectPage) },
+
+            { path: 'especiais/reclame-aqui/*', element: React.createElement(ReclameAquiChannelPage) },
+
+            { path: 'especiais/:channelId', element: React.createElement(EspeciaisChannelPage) },
 
             { path: 'chat', element: React.createElement(ChatPage) },
 
