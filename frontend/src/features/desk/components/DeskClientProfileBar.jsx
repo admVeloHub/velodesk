@@ -1,12 +1,11 @@
 /**
- * DeskClientProfileBar v1.4.1 — termômetro à esquerda de status/histórico
- * VERSION: v1.4.1 | DATE: 2026-07-03
+ * DeskClientProfileBar v1.5.0 — Avançar Workflow ao lado do stepper
+ * VERSION: v1.5.0 | DATE: 2026-07-16
  */
 import React, { useEffect, useState } from 'react';
-import { getClientContactFields, getClientActiveProducts, getProductTagClass, getTicketProtocolLabel } from '../../../services/desk/utils';
+import { getClientContactFields, getClientActiveProducts, getProductTagClass, getTicketProtocolLabel, isTicketInWorkflow } from '../../../services/desk/utils';
 import ClientTicketHistoryModal from './ClientTicketHistoryModal';
 import TicketWorkflowStepper from './TicketWorkflowStepper';
-import { isTicketInWorkflow } from '../../../services/desk/utils';
 
 function resolveProtocolLabel(ticket) {
   const protocol = getTicketProtocolLabel(ticket);
@@ -20,6 +19,9 @@ export default function DeskClientProfileBar({
   client,
   onSaveContact,
   onSelectTicket,
+  onAdvanceWorkflow,
+  advancingWorkflow = false,
+  canAdvanceWorkflow = false,
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -132,6 +134,16 @@ export default function DeskClientProfileBar({
         {inWorkflow ? (
           <div className="ticket-client-profile__cell-workflow">
             <TicketWorkflowStepper ticket={ticket} />
+            {canAdvanceWorkflow ? (
+              <button
+                type="button"
+                className="btn-primary btn-sm desk-workflow-advance-btn"
+                onClick={onAdvanceWorkflow}
+                disabled={advancingWorkflow}
+              >
+                {advancingWorkflow ? 'Avançando…' : 'Avançar Workflow'}
+              </button>
+            ) : null}
           </div>
         ) : null}
 

@@ -60,6 +60,8 @@ export const ticketsApi = {
   delete: (id) => api.delete(`/tickets/${id}`).then((r) => r.data),
   addMessage: (id, data) =>
     api.post(`/tickets/${id}/messages`, data).then((r) => r.data),
+  advanceWorkflow: (id, body = {}) =>
+    api.post(`/tickets/${id}/workflow/advance`, body).then((r) => r.data),
 };
 
 export const uploadsApi = {
@@ -119,6 +121,12 @@ export const workflowApi = {
   updateGrupo: (id, data) => api.put(`/workflows/grupos-responsabilidade/${id}`, data).then((r) => r.data),
   patchGrupo: (id, data) => api.patch(`/workflows/grupos-responsabilidade/${id}`, data).then((r) => r.data),
   deleteGrupo: (id) => api.delete(`/workflows/grupos-responsabilidade/${id}`).then((r) => r.data),
+};
+
+export const workflowNotificacoesApi = {
+  list: () => api.get('/workflow-notificacoes').then((r) => r.data),
+  markRead: (id) => api.patch(`/workflow-notificacoes/${id}/read`).then((r) => r.data),
+  internalHooks: () => api.get('/workflow-notificacoes/internal-hooks').then((r) => r.data),
 };
 
 export const tabulationApi = {

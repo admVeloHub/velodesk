@@ -1,4 +1,4 @@
-﻿/** email-inbound.service v1.3.0 — pipeline agentes paralelos pós-criação */
+﻿/** email-inbound.service v1.4.0 — ticket sem CPF/cliente + thread e-mail preservada */
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { applyAssignmentIfNeeded } from './assignmentRouter.service';
 import { appendMessage, createChamadoFromBody } from './chamado.mapper';
@@ -124,6 +124,7 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
   const clienteRef = await resolveClienteRefFromEmail(payload.from.email, payload.from.name);
   const subject = payload.subject.trim() || 'Atendimento por e-mail';
   const displayName = payload.from.name || payload.from.email.split('@')[0];
+  const inboundRootId = normalizeMessageId(payload.messageId);
 
   const ticketBody: Record<string, unknown> = {
     title: subject,
@@ -153,6 +154,7 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
     partial.registro[0].metadados = {
       ...(partial.registro[0].metadados ?? {}),
       ...emailMeta,
+      emailThreadRootId: inboundRootId,
     };
     partial.registro[0].alteracoes = partial.registro[0].alteracoes ?? [];
   }

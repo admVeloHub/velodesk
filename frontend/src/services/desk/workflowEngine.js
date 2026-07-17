@@ -1,8 +1,20 @@
 /**
- * workflowEngine v1.5.1 — label Produtos em WORKFLOW_TEAM_LABELS
- * VERSION: v1.5.1 | DATE: 2026-07-15
+ * workflowEngine v1.6.0 — ícones por acao.tipo; step index; sem criterios por passo
+ * VERSION: v1.6.0 | DATE: 2026-07-16
  */
 import { getRuntimeGrupos, getRuntimeWorkflows } from './workflowRuntimeStore';
+
+function resolveStepIcon(acaoTipo) {
+  switch (acaoTipo) {
+    case 'aprovacao':
+      return 'ti-circle-check';
+    case 'automatica':
+      return 'ti-bolt';
+    case 'manual':
+    default:
+      return 'ti-hand-click';
+  }
+}
 
 export const WORKFLOW_TEAM_LABELS = {
   n1: 'N1',
@@ -146,13 +158,12 @@ export function normalizeWorkflowDef(definicao) {
     return {
       id: stepId,
       label: cfg.nome || 'Etapa',
-      icon: cfg.icone || 'ti-circle',
+      icon: resolveStepIcon(cfg.acao?.tipo),
       team: getTeamFromAtribuicao(cfg.atribuicao),
       slaHours: cfg.slaHoras ?? null,
       description: cfg.descricao || '',
       atribuicao: cfg.atribuicao,
       acao: cfg.acao,
-      criterios: cfg.criterios || [],
       passoEnvelope: envelope,
       decision: buildDecisionFromPasso(cfg, definicao.slug),
     };
@@ -243,6 +254,7 @@ export function createWorkflowState(template, options = {}) {
     definicaoId: template.definicaoId,
     title: template.title,
     currentStepId: activeStepId,
+    step: findStepIndex(template, activeStepId) >= 0 ? findStepIndex(template, activeStepId) : 0,
     startedAt: now,
     stepHistory,
     status: 'active',
@@ -367,32 +379,8 @@ export function advanceWorkflowStep(workflow, template, options = {}) {
   };
 }
 
-function isExternalTeamStep(step) {
-  return step?.team && !['n1', 'agent'].includes(step.team);
-}
-
-export function evaluateWorkflowAutoAdvance(workflow, template, { statusId } = {}) {
-  if (!workflow || !template || workflow.status === 'completed') {
-    return { workflow, advanced: false };
-  }
-
-  const currentStepId = workflow.currentStepId || template.defaultActiveStepId;
-  const currentStep = template.steps.find((s) => s.id === currentStepId);
-  if (!currentStep) return { workflow, advanced: false };
-
-  const normalizedStatus = String(statusId || '').toLowerCase();
-
-  if (isExternalTeamStep(currentStep)) {
-    if (normalizedStatus === 'pendente' || normalizedStatus === 'resolvido' || normalizedStatus === 'resolvidos') {
-      return advanceWorkflowStep(workflow, template, { trigger: 'status' });
-    }
-    return { workflow, advanced: false };
-  }
-
-  if (normalizedStatus === 'resolvido' || normalizedStatus === 'resolvidos') {
-    return advanceWorkflowStep(workflow, template, { trigger: 'status' });
-  }
-
+/** Avanço automático por status desativado — avanço só via botão explícito */
+export function evaluateWorkflowAutoAdvance(workflow, template) {
   return { workflow, advanced: false };
 }
 

@@ -1,6 +1,6 @@
 /**
- * atuacaoVision v1.0.0 — mapeia atuacao.funcao → visão Desk (agente | supervisão)
- * VERSION: v1.0.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * atuacaoVision v1.1.0 — hasAtendimentoFuncao para permissões Desk
+ * VERSION: v1.1.0 | DATE: 2026-07-16
  */
 
 export const DESK_VISION = {
@@ -70,4 +70,9 @@ export function formatAtuacaoLabels(atuacao) {
     })
     .filter(Boolean);
   return labels.length ? labels.join(', ') : '—';
+}
+
+/** Função atendimento → mensagem pública + tabulação editável */
+export function hasAtendimentoFuncao(atuacao) {
+  return extractFuncoes(atuacao).includes('atendimento');
 }

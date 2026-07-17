@@ -1,4 +1,4 @@
-/** WorkflowDefinicao v1.2.0 — gatilho sem descricao (campo removido) */
+/** WorkflowDefinicao v1.4.0 — acao.automatica (webhook/IA/CTA); atribuicao.sistema legado */
 import { Schema, Document, Model, Types } from 'mongoose';
 import { getDeskConfigConnection } from '../config/database';
 
@@ -10,10 +10,28 @@ export interface IWorkflowCriterio {
   valor: string;
 }
 
+export interface IWorkflowAutomaticaConfig {
+  modo: 'acao_sistema' | 'resposta_cliente' | 'call_to_action';
+  webhookTipo?: 'interno' | 'externo';
+  webhookUrl?: string;
+  webhookHookId?: string;
+  webhookMetodo?: 'POST' | 'GET';
+  webhookHeaders?: Record<string, string>;
+  promptContexto?: string;
+  ctaTitulo?: string;
+  ctaMensagem?: string;
+  ctaAlvo?: 'responsavel' | 'atribuido' | 'grupo';
+  ctaGrupoSlug?: string;
+}
+
+/** @deprecated legado — preferir acao.automatica */
+export type IWorkflowSistemaConfig = IWorkflowAutomaticaConfig;
+
 export interface IWorkflowAtribuicao {
   tipo: 'grupo' | 'colaborador' | 'responsavel_ticket' | 'sistema';
   grupoSlug: string;
   colaborador: string;
+  sistema?: IWorkflowSistemaConfig;
 }
 
 export interface IWorkflowRota {
@@ -27,13 +45,12 @@ export interface IWorkflowRota {
 export interface IWorkflowPassoConfig {
   nome: string;
   descricao: string;
-  icone: string;
   slaHoras: number | null;
-  criterios: IWorkflowCriterio[];
   atribuicao: IWorkflowAtribuicao;
   acao: {
     tipo: 'manual' | 'aprovacao' | 'automatica';
     rotas: IWorkflowRota[];
+    automatica?: IWorkflowAutomaticaConfig;
   };
 }
 
@@ -73,11 +90,29 @@ const CriterioSchema = new Schema<IWorkflowCriterio>(
   { _id: true },
 );
 
+const AutomaticaConfigSchema = new Schema<IWorkflowAutomaticaConfig>(
+  {
+    modo: { type: String, enum: ['acao_sistema', 'resposta_cliente', 'call_to_action'], required: true },
+    webhookTipo: { type: String, enum: ['interno', 'externo'], default: 'externo' },
+    webhookUrl: { type: String, default: '' },
+    webhookHookId: { type: String, default: '' },
+    webhookMetodo: { type: String, enum: ['POST', 'GET'], default: 'POST' },
+    webhookHeaders: { type: Schema.Types.Mixed, default: {} },
+    promptContexto: { type: String, default: '' },
+    ctaTitulo: { type: String, default: '' },
+    ctaMensagem: { type: String, default: '' },
+    ctaAlvo: { type: String, enum: ['responsavel', 'atribuido', 'grupo'], default: 'responsavel' },
+    ctaGrupoSlug: { type: String, default: '' },
+  },
+  { _id: false },
+);
+
 const AtribuicaoSchema = new Schema<IWorkflowAtribuicao>(
   {
     tipo: { type: String, required: true, enum: ['grupo', 'colaborador', 'responsavel_ticket', 'sistema'] },
     grupoSlug: { type: String, default: '' },
     colaborador: { type: String, default: '' },
+    sistema: { type: AutomaticaConfigSchema, default: undefined },
   },
   { _id: false },
 );
@@ -96,13 +131,12 @@ const PassoConfigSchema = new Schema<IWorkflowPassoConfig>(
   {
     nome: { type: String, required: true },
     descricao: { type: String, default: '' },
-    icone: { type: String, default: 'ti-circle' },
     slaHoras: { type: Number, default: null },
-    criterios: { type: [CriterioSchema], default: [] },
-    atribuicao: { type: AtribuicaoSchema, default: () => ({ tipo: 'sistema', grupoSlug: '', colaborador: '' }) },
+    atribuicao: { type: AtribuicaoSchema, default: () => ({ tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }) },
     acao: {
       tipo: { type: String, enum: ['manual', 'aprovacao', 'automatica'], default: 'manual' },
       rotas: { type: [RotaSchema], default: [] },
+      automatica: { type: AutomaticaConfigSchema, default: undefined },
     },
   },
   { _id: false },

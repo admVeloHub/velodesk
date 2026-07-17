@@ -1,4 +1,4 @@
-/** index v1.9.3 — import dinâmico mongodb-memory-server (só dev; evita crash prod) */
+/** index v1.9.5 — bootstrap Gmail inbound após desk_config pronto */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -32,6 +32,7 @@ import agentsRoutes from './routes/agents.routes';
 import inboundRoutes from './routes/inbound.routes';
 import workspace360Routes from './routes/workspace360.routes';
 import colaboradoresRoutes from './routes/colaboradores.routes';
+import workflowNotificacoesRoutes from './routes/workflowNotificacoes.routes';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
 import {
@@ -41,12 +42,8 @@ import {
 import { seedDevelopmentData, purgeAllMockTickets } from './services/seed.service';
 import { getAgentsStatus } from './services/agents/openaiAgent.util';
 import { startGestaoChamadosJob } from './jobs/gestaoChamados.job';
-import { loadEmailTransport } from './services/emailTransport.service';
-import {
-  ensureGmailWatchFresh,
-  setupGmailWatch,
-  startGmailWatchRenewalLoop,
-} from './services/gmail/gmailWatch.service';
+import { bootstrapEmailServices } from './services/emailBootstrap.service';
+import { startChamadoProtocoloWatcher } from './services/chamadoProtocoloWatcher.service';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const whatsapp = require('./whatsapp/whatsappModule.js');
@@ -136,6 +133,7 @@ app.use('/api/uploads', uploadsRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/tabulation', tabulationRoutes);
 app.use('/api/workflows', workflowsRoutes);
+app.use('/api/workflow-notificacoes', workflowNotificacoesRoutes);
 app.use('/api/workspace360', workspace360Routes);
 
 if (env.enableWhatsapp) {
@@ -153,15 +151,6 @@ let mongoRetryTimer: ReturnType<typeof setInterval> | null = null;
 let devMemoryServer: { getUri: (dbName?: string) => string } | null = null;
 let activeMongoUri = env.mongoUri;
 
-async function bootstrapEmailServices(): Promise<void> {
-  await loadEmailTransport();
-  if (env.gmailInboundEnabled) {
-    await setupGmailWatch();
-    startGmailWatchRenewalLoop();
-    void ensureGmailWatchFresh();
-  }
-}
-
 async function tryConnectDatabase(uri?: string): Promise<boolean> {
   if (isAllMongoReady()) return true;
 
@@ -173,6 +162,7 @@ async function tryConnectDatabase(uri?: string): Promise<boolean> {
     activeMongoUri = targetUri;
     await purgeAllMockTickets();
     await seedDevelopmentData();
+    await startChamadoProtocoloWatcher();
     console.log('[startup] MongoDB conectado (chamados + cadastros + desk_config).');
     return true;
   } catch (err) {
@@ -210,7 +200,9 @@ function scheduleMongoRetry() {
   mongoRetryTimer = setInterval(() => {
     if (!activeMongoUri?.trim()) return;
     if (!isAllMongoReady()) {
-      void tryConnectDatabase(activeMongoUri);
+      void tryConnectDatabase(activeMongoUri).then((ok) => {
+        if (ok) void bootstrapEmailServices();
+      });
       return;
     }
     if (!isFuncionariosConnected() && getMongoHubCentralUri()) {

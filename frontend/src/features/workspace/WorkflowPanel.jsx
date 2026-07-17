@@ -1,13 +1,14 @@
 /**
- * Painel 360° — Workflow
- * VERSION: v1.1.0 | DATE: 2026-07-13
+ * Painel 360° — Workflow (+ CTA persistidos)
+ * VERSION: v1.2.0 | DATE: 2026-07-16
  */
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { computeWorkflow360View } from '../../services/workspace/deskData';
 import { findTicketEntryById } from '../../services/workflow/workflowApprovalData';
 import { getWorkflowProgress } from '../../services/desk/utils';
 import { ticketAwaitingDecision } from '../../services/desk/workflowDefinitions';
+import { workflowNotificacoesApi } from '../../api/client';
 import Workspace360Kpis from './components/ws360/Workspace360Kpis';
 import Workspace360TicketSection from './components/ws360/Workspace360TicketSection';
 import Workspace360ServiceStatus from './components/ws360/Workspace360ServiceStatus';
@@ -15,6 +16,13 @@ import Workspace360ServiceStatus from './components/ws360/Workspace360ServiceSta
 export default function WorkflowPanel() {
   const navigate = useNavigate();
   const view = useMemo(() => computeWorkflow360View(), []);
+  const [ctaPending, setCtaPending] = useState([]);
+
+  useEffect(() => {
+    workflowNotificacoesApi.list()
+      .then((data) => setCtaPending((data?.notificacoes || []).filter((n) => !n.lida)))
+      .catch(() => setCtaPending([]));
+  }, []);
 
   const handleOpenTicket = useCallback((ticketId) => {
     const entry = findTicketEntryById(ticketId);
@@ -39,6 +47,11 @@ export default function WorkflowPanel() {
           <span className="ws-eyebrow">Workflow</span>
           <h3>Fluxos operacionais entre times</h3>
           <p>Acompanhe etapas, SLAs e encaminhamentos ativos em todos os tickets.</p>
+          {ctaPending.length ? (
+            <p className="ws-workflow-cta-hint">
+              {ctaPending.length} call to action pendente{ctaPending.length > 1 ? 's' : ''} para você.
+            </p>
+          ) : null}
         </div>
         <div className="ws-hero-actions">
           <button type="button" className="btn-primary" onClick={() => navigate('/workflow')}>

@@ -1,6 +1,6 @@
 /**
- * workflowConfigData v2.5.2 — gatilho sem descricao
- * VERSION: v2.5.2 | DATE: 2026-07-15
+ * workflowConfigData v2.6.0 — SISTEMA_MODOS, resolveStepIcon, passo sem icone/criterios
+ * VERSION: v2.6.0 | DATE: 2026-07-16
  */
 
 export const WORKFLOW_CONFIG_TABS = [
@@ -130,12 +130,52 @@ export const CRITERIO_OPERADORES = [
   { value: 'in', label: 'Está em (CSV)' },
 ];
 
+export const SISTEMA_MODOS = [
+  { value: 'acao_sistema', label: 'Ação de sistema' },
+  { value: 'resposta_cliente', label: 'Resposta ao cliente' },
+  { value: 'call_to_action', label: 'Call to action' },
+];
+
+export const WEBHOOK_TIPOS = [
+  { value: 'interno', label: 'Interno (catálogo VeloDesk)' },
+  { value: 'externo', label: 'Externo (URL)' },
+];
+
+export const CTA_ALVOS = [
+  { value: 'responsavel', label: 'Responsável do ticket' },
+  { value: 'atribuido', label: 'Atribuído atual' },
+  { value: 'grupo', label: 'Grupo de responsabilidade' },
+];
+
+export function resolveStepIcon(acaoTipo) {
+  switch (acaoTipo) {
+    case 'aprovacao':
+      return 'ti-circle-check';
+    case 'automatica':
+      return 'ti-bolt';
+    case 'manual':
+    default:
+      return 'ti-hand-click';
+  }
+}
+
 export const ATRIBUICAO_TIPOS = [
   { value: 'grupo', label: 'Grupo de responsabilidade' },
   { value: 'colaborador', label: 'Colaborador' },
   { value: 'responsavel_ticket', label: 'Responsável do ticket' },
-  { value: 'sistema', label: 'Sistema (automático)' },
 ];
+
+export const ATRIBUICAO_SISTEMA = { value: 'sistema', label: 'Sistema (automático)' };
+
+/** Preferência acao.automatica; fallback legado atribuicao.sistema */
+export function resolveAutomaticaConfig(passo) {
+  if (!passo) return null;
+  const isAutomatica = passo.acao?.tipo === 'automatica' || passo.atribuicao?.tipo === 'sistema';
+  if (!isAutomatica) return null;
+  if (passo.acao?.automatica?.modo) return passo.acao.automatica;
+  if (passo.atribuicao?.sistema?.modo) return passo.atribuicao.sistema;
+  return null;
+}
 
 export const ACAO_TIPOS = [
   { value: 'manual', label: 'Manual' },
@@ -236,9 +276,7 @@ export function createEmptyPassoEnvelope(ordem = 0) {
     passo: {
       nome: 'Nova etapa',
       descricao: '',
-      icone: 'ti-circle',
       slaHoras: null,
-      criterios: [],
       atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' },
       acao: { tipo: 'manual', rotas: [] },
     },
@@ -310,7 +348,7 @@ export function passosToDisplaySteps(passos = []) {
         id: getPassoEnvelopeKey(envelope, index),
         title: cfg.nome,
         description: cfg.descricao,
-        icon: cfg.icone || 'ti-circle',
+        icon: resolveStepIcon(cfg.acao?.tipo),
         iconTone: cfg.acao?.tipo === 'aprovacao' ? 'approval' : 'start',
         badges,
         envelope,

@@ -1,6 +1,6 @@
 /**
- * AgentGestaoSnapshot v1.0.0 — inventário horário de tickets ativos para Agente 3
- * VERSION: v1.0.0 | DATE: 2026-07-14
+ * AgentGestaoSnapshot v1.0.1 — protocolo com fallback no schema
+ * VERSION: v1.0.1 | DATE: 2026-07-16
  */
 import mongoose, { Schema, Document } from 'mongoose';
 
@@ -35,7 +35,7 @@ export interface IAgentGestaoSnapshot extends Document {
 const GestaoTicketSnapshotEntrySchema = new Schema<IGestaoTicketSnapshotEntry>(
   {
     ticketId: { type: String, required: true },
-    protocolo: { type: String, required: true },
+    protocolo: { type: String, required: true, default: 'sem-protocolo' },
     status: { type: String, required: true },
     titulo: { type: String, default: '' },
     produto: { type: String, default: '' },

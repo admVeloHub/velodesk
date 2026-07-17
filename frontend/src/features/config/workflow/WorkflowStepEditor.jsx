@@ -1,11 +1,25 @@
 /**
- * WorkflowStepEditor v1.0.0 — formulário de passos[n].passo
- * VERSION: v1.0.0 | DATE: 2026-07-14
+ * WorkflowStepEditor v1.2.1 — ação automática → atribuição sistema
+ * VERSION: v1.2.1 | DATE: 2026-07-16
  */
-import React from 'react';
-import WorkflowCriteriaEditor from './WorkflowCriteriaEditor';
+import React, { useEffect, useMemo, useState } from 'react';
 import WorkflowRoutesEditor from './WorkflowRoutesEditor';
-import { ACAO_TIPOS, ATRIBUICAO_TIPOS } from './workflowConfigData';
+import {
+  ACAO_TIPOS,
+  ATRIBUICAO_SISTEMA,
+  ATRIBUICAO_TIPOS,
+  CTA_ALVOS,
+  resolveAutomaticaConfig,
+  SISTEMA_MODOS,
+  WEBHOOK_TIPOS,
+} from './workflowConfigData';
+import api from '../../../api/client';
+import { useDeskColaboradores } from '../../../hooks/useDeskColaboradores';
+
+const DEFAULT_INTERNAL_HOOKS = [
+  { id: 'gestao.alert', label: 'Alerta gestão (stub)' },
+  { id: 'integracao.stub', label: 'Integração stub' },
+];
 
 export default function WorkflowStepEditor({
   envelope,
@@ -16,6 +30,42 @@ export default function WorkflowStepEditor({
   canRemove = true,
 }) {
   const cfg = envelope?.passo || {};
+  const [internalHooks, setInternalHooks] = useState(DEFAULT_INTERNAL_HOOKS);
+  const { colaboradores, loading: colaboradoresLoading, error: colaboradoresError } = useDeskColaboradores();
+
+  const colaboradoresValidos = useMemo(
+    () => colaboradores.filter((c) => !c.desligado),
+    [colaboradores],
+  );
+
+  const colaboradorSelecionado = String(cfg.atribuicao?.colaborador || '').trim();
+  const colaboradorNaLista = useMemo(
+    () => colaboradoresValidos.find(
+      (c) => c.value === colaboradorSelecionado
+        || c.email === colaboradorSelecionado
+        || c.colaboradorNome === colaboradorSelecionado,
+    ),
+    [colaboradoresValidos, colaboradorSelecionado],
+  );
+  const colaboradorSelectValue = colaboradorNaLista?.value || colaboradorSelecionado;
+
+  const formatColaboradorLabel = (c) => {
+    const nome = c.colaboradorNome || c.label || c.value;
+    if (c.email && c.email !== nome) return `${nome} (${c.email})`;
+    return nome;
+  };
+
+  useEffect(() => {
+    api.get('/workflow-notificacoes/internal-hooks')
+      .then((r) => {
+        if (Array.isArray(r.data?.hooks) && r.data.hooks.length) {
+          setInternalHooks(r.data.hooks);
+        }
+      })
+      .catch(() => {
+        setInternalHooks(DEFAULT_INTERNAL_HOOKS);
+      });
+  }, []);
 
   const patchPasso = (patch) => {
     onChange?.({
@@ -32,6 +82,56 @@ export default function WorkflowStepEditor({
     patchPasso({ acao: { ...(cfg.acao || {}), ...patch } });
   };
 
+  const patchAutomatica = (patch) => {
+    const current = resolveAutomaticaConfig(cfg) || { modo: 'acao_sistema' };
+    patchAcao({ automatica: { ...current, ...patch } });
+  };
+
+  const acaoTipo = cfg.acao?.tipo || 'manual';
+  const isAutomatica = acaoTipo === 'automatica';
+  const automatica = resolveAutomaticaConfig(cfg) || {};
+
+  const handleAcaoTipoChange = (tipo) => {
+    const nextAcao = {
+      ...(cfg.acao || {}),
+      tipo,
+      rotas: tipo === 'aprovacao'
+        ? (cfg.acao?.rotas?.length ? cfg.acao.rotas : [
+          { variavel: 'approve', rotulo: 'Aprovar', proximoPassoId: null, statusTicket: 'em-andamento' },
+          { variavel: 'reject', rotulo: 'Reprovar', proximoPassoId: null, statusTicket: 'pendente' },
+          { variavel: 'request_info', rotulo: 'Pedir informação', proximoPassoId: null, statusTicket: 'pendente' },
+        ])
+        : [],
+    };
+
+    if (tipo === 'automatica') {
+      nextAcao.automatica = resolveAutomaticaConfig(cfg) || {
+        modo: 'acao_sistema',
+        webhookTipo: 'externo',
+        webhookMetodo: 'POST',
+      };
+      patchPasso({
+        acao: nextAcao,
+        atribuicao: { tipo: 'sistema' },
+      });
+      return;
+    }
+
+    nextAcao.automatica = undefined;
+    const nextAtribuicao = cfg.atribuicao?.tipo === 'sistema'
+      ? { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }
+      : (cfg.atribuicao || { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' });
+    patchPasso({ acao: nextAcao, atribuicao: nextAtribuicao });
+  };
+
+  const atribuicaoTipo = isAutomatica ? 'sistema' : (cfg.atribuicao?.tipo || 'grupo');
+
+  useEffect(() => {
+    if (isAutomatica && cfg.atribuicao?.tipo !== 'sistema') {
+      patchAtribuicao({ tipo: 'sistema' });
+    }
+  }, [isAutomatica, cfg.atribuicao?.tipo]);
+
   return (
     <div className="wf-step-editor">
       <div className="wf-step-editor__grid">
@@ -41,15 +141,6 @@ export default function WorkflowStepEditor({
             type="text"
             value={cfg.nome || ''}
             onChange={(e) => patchPasso({ nome: e.target.value })}
-          />
-        </label>
-        <label className="wf-step-editor__field">
-          <span>Ícone (Tabler)</span>
-          <input
-            type="text"
-            value={cfg.icone || 'ti-circle'}
-            onChange={(e) => patchPasso({ icone: e.target.value })}
-            placeholder="ti-circle-check"
           />
         </label>
         <label className="wf-step-editor__field">
@@ -75,13 +166,152 @@ export default function WorkflowStepEditor({
       </label>
 
       <section className="wf-step-editor__section">
-        <h4>Critérios de validação</h4>
-        <WorkflowCriteriaEditor
-          criterios={cfg.criterios || []}
-          grupos={grupos}
-          onChange={(next) => patchPasso({ criterios: next })}
-          compact
-        />
+        <h4>Ação</h4>
+        <label className="wf-step-editor__field">
+          <span>Tipo de ação</span>
+          <select
+            value={acaoTipo}
+            onChange={(e) => handleAcaoTipoChange(e.target.value)}
+          >
+            {ACAO_TIPOS.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </label>
+
+        {isAutomatica ? (
+          <div className="wf-step-editor__sistema">
+            <label className="wf-step-editor__field wf-step-editor__field--full">
+              <span>Modo automático</span>
+              <select
+                value={automatica.modo || 'acao_sistema'}
+                onChange={(e) => patchAutomatica({ modo: e.target.value })}
+              >
+                {SISTEMA_MODOS.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </label>
+
+            {automatica.modo === 'acao_sistema' ? (
+              <>
+                <label className="wf-step-editor__field">
+                  <span>Tipo de webhook</span>
+                  <select
+                    value={automatica.webhookTipo || 'externo'}
+                    onChange={(e) => patchAutomatica({ webhookTipo: e.target.value })}
+                  >
+                    {WEBHOOK_TIPOS.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </label>
+                {automatica.webhookTipo === 'interno' ? (
+                  <label className="wf-step-editor__field">
+                    <span>Hook interno</span>
+                    <select
+                      value={automatica.webhookHookId || ''}
+                      onChange={(e) => patchAutomatica({ webhookHookId: e.target.value })}
+                    >
+                      <option value="">Selecione…</option>
+                      {internalHooks.map((h) => (
+                        <option key={h.id} value={h.id}>{h.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <>
+                    <label className="wf-step-editor__field">
+                      <span>URL</span>
+                      <input
+                        type="url"
+                        value={automatica.webhookUrl || ''}
+                        onChange={(e) => patchAutomatica({ webhookUrl: e.target.value })}
+                        placeholder="https://..."
+                      />
+                    </label>
+                    <label className="wf-step-editor__field">
+                      <span>Método</span>
+                      <select
+                        value={automatica.webhookMetodo || 'POST'}
+                        onChange={(e) => patchAutomatica({ webhookMetodo: e.target.value })}
+                      >
+                        <option value="POST">POST</option>
+                        <option value="GET">GET</option>
+                      </select>
+                    </label>
+                  </>
+                )}
+              </>
+            ) : null}
+
+            {automatica.modo === 'resposta_cliente' ? (
+              <label className="wf-step-editor__field wf-step-editor__field--full">
+                <span>Contexto para o prompt</span>
+                <textarea
+                  rows={3}
+                  value={automatica.promptContexto || ''}
+                  onChange={(e) => patchAutomatica({ promptContexto: e.target.value })}
+                  placeholder="Instruções adicionais para o Agente de Atendimento nesta etapa…"
+                />
+              </label>
+            ) : null}
+
+            {automatica.modo === 'call_to_action' ? (
+              <>
+                <label className="wf-step-editor__field wf-step-editor__field--full">
+                  <span>Título da notificação</span>
+                  <input
+                    type="text"
+                    value={automatica.ctaTitulo || ''}
+                    onChange={(e) => patchAutomatica({ ctaTitulo: e.target.value })}
+                  />
+                </label>
+                <label className="wf-step-editor__field wf-step-editor__field--full">
+                  <span>Mensagem</span>
+                  <textarea
+                    rows={2}
+                    value={automatica.ctaMensagem || ''}
+                    onChange={(e) => patchAutomatica({ ctaMensagem: e.target.value })}
+                  />
+                </label>
+                <label className="wf-step-editor__field">
+                  <span>Alvo</span>
+                  <select
+                    value={automatica.ctaAlvo || 'responsavel'}
+                    onChange={(e) => patchAutomatica({ ctaAlvo: e.target.value })}
+                  >
+                    {CTA_ALVOS.map((a) => (
+                      <option key={a.value} value={a.value}>{a.label}</option>
+                    ))}
+                  </select>
+                </label>
+                {automatica.ctaAlvo === 'grupo' ? (
+                  <label className="wf-step-editor__field">
+                    <span>Grupo CTA</span>
+                    <select
+                      value={automatica.ctaGrupoSlug || ''}
+                      onChange={(e) => patchAutomatica({ ctaGrupoSlug: e.target.value })}
+                    >
+                      <option value="">Selecione…</option>
+                      {grupos.map((g) => (
+                        <option key={g._id || g.slug} value={g.slug}>{g.nome || g.slug}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
+        {acaoTipo === 'aprovacao' ? (
+          <WorkflowRoutesEditor
+            rotas={cfg.acao?.rotas || []}
+            passos={passos}
+            onChange={(next) => patchAcao({ rotas: next })}
+          />
+        ) : null}
       </section>
 
       <section className="wf-step-editor__section">
@@ -89,16 +319,20 @@ export default function WorkflowStepEditor({
         <div className="wf-step-editor__grid">
           <label className="wf-step-editor__field">
             <span>Tipo</span>
-            <select
-              value={cfg.atribuicao?.tipo || 'grupo'}
-              onChange={(e) => patchAtribuicao({ tipo: e.target.value })}
-            >
-              {ATRIBUICAO_TIPOS.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
+            {isAutomatica ? (
+              <input type="text" value={ATRIBUICAO_SISTEMA.label} readOnly disabled />
+            ) : (
+              <select
+                value={atribuicaoTipo}
+                onChange={(e) => patchAtribuicao({ tipo: e.target.value })}
+              >
+                {ATRIBUICAO_TIPOS.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            )}
           </label>
-          {cfg.atribuicao?.tipo === 'grupo' ? (
+          {!isAutomatica && atribuicaoTipo === 'grupo' ? (
             <label className="wf-step-editor__field">
               <span>Grupo</span>
               <select
@@ -112,47 +346,37 @@ export default function WorkflowStepEditor({
               </select>
             </label>
           ) : null}
-          {cfg.atribuicao?.tipo === 'colaborador' ? (
+          {!isAutomatica && atribuicaoTipo === 'colaborador' ? (
             <label className="wf-step-editor__field">
               <span>Colaborador</span>
-              <input
-                type="text"
-                value={cfg.atribuicao?.colaborador || ''}
+              <select
+                value={colaboradorSelectValue}
                 onChange={(e) => patchAtribuicao({ colaborador: e.target.value })}
-              />
+                disabled={colaboradoresLoading}
+              >
+                <option value="">
+                  {colaboradoresLoading ? 'Carregando colaboradores…' : 'Selecione…'}
+                </option>
+                {colaboradorSelecionado && !colaboradorNaLista ? (
+                  <option value={colaboradorSelecionado}>
+                    {colaboradorSelecionado} (fora da lista atual)
+                  </option>
+                ) : null}
+                {colaboradoresValidos.map((c) => (
+                  <option key={c.id || c.email || c.value} value={c.value}>
+                    {formatColaboradorLabel(c)}
+                    {c.afastado ? ' — afastado' : ''}
+                  </option>
+                ))}
+              </select>
+              {colaboradoresError ? (
+                <span className="grupos-atrib__hint">
+                  Não foi possível carregar a lista de colaboradores.
+                </span>
+              ) : null}
             </label>
           ) : null}
         </div>
-      </section>
-
-      <section className="wf-step-editor__section">
-        <h4>Ação</h4>
-        <label className="wf-step-editor__field">
-          <span>Tipo de ação</span>
-          <select
-            value={cfg.acao?.tipo || 'manual'}
-            onChange={(e) => patchAcao({
-              tipo: e.target.value,
-              rotas: e.target.value === 'aprovacao' ? (cfg.acao?.rotas?.length ? cfg.acao.rotas : [
-                { variavel: 'approve', rotulo: 'Aprovar', proximoPassoId: null, statusTicket: 'em-andamento' },
-                { variavel: 'reject', rotulo: 'Reprovar', proximoPassoId: null, statusTicket: 'pendente' },
-                { variavel: 'request_info', rotulo: 'Pedir informação', proximoPassoId: null, statusTicket: 'pendente' },
-              ]) : [],
-            })}
-          >
-            {ACAO_TIPOS.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
-        </label>
-
-        {cfg.acao?.tipo === 'aprovacao' ? (
-          <WorkflowRoutesEditor
-            rotas={cfg.acao?.rotas || []}
-            passos={passos}
-            onChange={(next) => patchAcao({ rotas: next })}
-          />
-        ) : null}
       </section>
 
       {canRemove ? (

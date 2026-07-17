@@ -24,10 +24,12 @@ import {
 import { findTicketEntry, updateTicketInCache, sendTicketRegistroEntry } from '../../services/ticketsStorage';
 import { isDraftTicket, persistDraftTicket } from '../../services/ticketsCache';
 import { lookupClient } from '../../services/clientDb';
-import { clientsApi } from '../../api/client';
+import { clientsApi, colaboradoresApi, ticketsApi } from '../../api/client';
 import { persistClienteContact } from '../../api/adapters/clienteAdapter';
 import { useTickets } from '../../context/TicketsContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { useAuth } from '../../context/AuthContext';
+import { hasAtendimentoFuncao } from '../../services/desk/atuacaoVision';
 import { getAllQueueStatuses, restoreCustomBoxes } from '../../services/desk/customQueueBoxes';
 import CreateTicketPanel from './components/CreateTicketPanel';
 import DeskQueuePanel from './components/DeskQueuePanel';
@@ -48,6 +50,7 @@ import { createSpellContext, loadSpellEngine, scanText } from '../../services/sp
 import { htmlToPlainText } from '../../services/desk/composeRichEditor';
 import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
 import DeskAiRevisionModal from './components/DeskAiRevisionModal';
+import { resolveAutomaticaConfig } from '../config/workflow/workflowConfigData';
 
 function applyRightFieldsToTicket(t, rightFields, escalonar) {
   const prevLf = t.lateralForm || {};
@@ -111,6 +114,7 @@ export default function DeskV2Root() {
     setActiveTabId,
   } = useTickets();
   const { showNotification } = useNotifications();
+  const { user } = useAuth();
   const { config } = useTabulation();
 
   const [activeQueue, setActiveQueue] = useState('em-andamento');
@@ -136,6 +140,29 @@ export default function DeskV2Root() {
   const suppressAutoSelectRef = useRef(false);
   const tabSessionsRef = useRef({});
   const prevActiveTabIdRef = useRef(null);
+  const [colaboradorAtuacao, setColaboradorAtuacao] = useState([]);
+  const [workflowDecision, setWorkflowDecision] = useState(null);
+  const [advancingWorkflow, setAdvancingWorkflow] = useState(false);
+
+  useEffect(() => {
+    if (!user?.email) {
+      setColaboradorAtuacao([]);
+      return undefined;
+    }
+    let cancelled = false;
+    colaboradoresApi.byEmail(user.email)
+      .then((data) => {
+        if (!cancelled) setColaboradorAtuacao(data?.atuacao || []);
+      })
+      .catch(() => {
+        if (!cancelled) setColaboradorAtuacao([]);
+      });
+    return () => { cancelled = true; };
+  }, [user?.email]);
+
+  useEffect(() => {
+    setWorkflowDecision(null);
+  }, [activeTabId]);
 
   const syncTicketViews = useCallback(async () => {
     await refreshTickets();
@@ -767,7 +794,49 @@ export default function DeskV2Root() {
   ]);
 
   const workflowProgress = ticket ? getWorkflowProgress(ticket) : null;
-  const workflowComposeLocked = Boolean(workflowProgress?.composeLocked);
+  const isAtendimentoAgent = hasAtendimentoFuncao(colaboradorAtuacao);
+  const workflowComposeLocked = Boolean(workflowProgress?.composeLocked) || !isAtendimentoAgent;
+  const tabulationReadonly = !isAtendimentoAgent;
+
+  const canAdvanceWorkflow = (() => {
+    if (!workflowProgress || workflowProgress.workflow?.status === 'completed') return false;
+    const step = workflowProgress.activeStep;
+    if (!step) return false;
+    if (step.acao?.tipo === 'automatica' || step.atribuicao?.tipo === 'sistema') {
+      const modo = resolveAutomaticaConfig(step)?.modo;
+      return modo === 'call_to_action';
+    }
+    if (step.acao?.tipo === 'aprovacao') {
+      return Boolean(workflowDecision);
+    }
+    return true;
+  })();
+
+  const handleAdvanceWorkflow = useCallback(async () => {
+    if (!ticket || isDraftTicket(ticket) || advancingWorkflow) return;
+    setAdvancingWorkflow(true);
+    try {
+      const body = workflowDecision ? { pendingDecision: workflowDecision } : {};
+      const updated = await ticketsApi.advanceWorkflow(ticket.id || ticket._id, body);
+      await updateTicketInCache(ticket.id, () => normalizeTicketForDeskV2(updated));
+      setWorkflowDecision(null);
+      await syncTicketViews();
+      showNotification('Workflow avançado.', 'success');
+    } catch (err) {
+      showNotification(
+        err?.response?.data?.message || 'Não foi possível avançar o workflow.',
+        'warning',
+      );
+    } finally {
+      setAdvancingWorkflow(false);
+    }
+  }, [
+    advancingWorkflow,
+    showNotification,
+    syncTicketViews,
+    ticket,
+    workflowDecision,
+  ]);
 
   useEffect(() => {
     if (workflowComposeLocked && composeMode === 'public') {
@@ -845,6 +914,9 @@ export default function DeskV2Root() {
               client={client}
               onSaveContact={handleSaveContact}
               onSelectTicket={selectTicket}
+              onAdvanceWorkflow={handleAdvanceWorkflow}
+              advancingWorkflow={advancingWorkflow}
+              canAdvanceWorkflow={canAdvanceWorkflow}
             />
             <nav className="tabs-top" aria-label="Navegação do ticket">
               <button
@@ -972,6 +1044,10 @@ export default function DeskV2Root() {
           iaHasTabulationSuggestion={ticketAi.hasTabulationSuggestion}
           iaShowSection={ticketAi.showIaBar || Boolean(ticketAi.waitingReason)}
           iaAuditScore={ticketAi.auditScore}
+          tabulationReadonly={tabulationReadonly}
+          workflowProgress={workflowProgress}
+          workflowDecision={workflowDecision}
+          onWorkflowDecisionChange={setWorkflowDecision}
         />
       )}
 

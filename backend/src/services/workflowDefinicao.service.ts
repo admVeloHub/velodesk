@@ -1,4 +1,5 @@
-/** workflowDefinicao.service v1.2.0 — gatilho normalizado sem descricao */
+/** workflowDefinicao.service v1.4.0 — migra acao.automatica e remove legado */
+import { migratePassoAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import {
   getWorkflowDefinicaoModel,
@@ -19,11 +20,20 @@ function sortPassos(passos: IWorkflowPassoEnvelope[] = []): IWorkflowPassoEnvelo
   return [...passos].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
 }
 
+function sanitizePassoConfig(passo: IWorkflowPassoEnvelope['passo']): IWorkflowPassoEnvelope['passo'] {
+  const raw = { ...(passo || {}) } as Record<string, unknown>;
+  delete raw.icone;
+  delete raw.criterios;
+  migratePassoAutomaticaConfig(raw);
+  return raw as unknown as IWorkflowPassoEnvelope['passo'];
+}
+
 function ensurePassoIds(passos: IWorkflowPassoEnvelope[] = []): IWorkflowPassoEnvelope[] {
   return sortPassos(passos).map((envelope, index) => ({
     ...envelope,
     ordem: index,
     _id: envelope._id ? new Types.ObjectId(String(envelope._id)) : new Types.ObjectId(),
+    passo: sanitizePassoConfig(envelope.passo),
   }));
 }
 

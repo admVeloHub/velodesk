@@ -1,9 +1,10 @@
-/** app-inbound.service v1.1.0 — pipeline agentes paralelos pós-notify */
+/** app-inbound.service v1.2.0 — protocolo oficial + pipeline agentes pós-notify */
 import mongoose from 'mongoose';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { applyAssignmentToChamado } from './assignmentRouter.service';
-import { allocateNextProtocolo } from './protocolo.service';
+import { assignProtocolIfNeeded } from './chamadoProtocoloAssign.service';
+import { hasOfficialProtocolo } from './protocoloUtils';
 import { runInboundAgentPipeline } from './agents/inboundAgentPipeline.service';
 
 export interface AppNotifyPayload {
@@ -62,7 +63,7 @@ export async function processAppNotify(payload: AppNotifyPayload): Promise<AppNo
 
   ensureTabulacao(chamado);
 
-  const hadProtocolo = Boolean(String(chamado.chamadoProtocolo ?? '').trim());
+  const hadProtocolo = hasOfficialProtocolo(chamado.chamadoProtocolo);
   const hadResponsavel = Boolean(readResponsavel(chamado));
 
   if (hadProtocolo && hadResponsavel) {
@@ -75,7 +76,10 @@ export async function processAppNotify(payload: AppNotifyPayload): Promise<AppNo
   }
 
   if (!hadProtocolo) {
-    chamado.chamadoProtocolo = await allocateNextProtocolo();
+    const withProtocol = await assignProtocolIfNeeded(chamado._id.toString());
+    if (withProtocol) {
+      chamado.chamadoProtocolo = withProtocol.chamadoProtocolo;
+    }
   }
 
   await applyAssignmentToChamado(chamado, { source: 'app-integrado' });

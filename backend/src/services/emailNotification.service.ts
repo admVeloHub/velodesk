@@ -1,4 +1,4 @@
-/** emailNotification.service v1.1.0 — formatação rica + thread Gmail */
+/** emailNotification.service v1.2.0 — outbound para ticket sem cliente cadastrado */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { loadDadosForRef } from './cliente.service';
 import { buildProtocolSubject, sendOutboundEmail } from './email-outbound.service';
@@ -28,10 +28,19 @@ function baseTemplate(title: string, bodyHtml: string): string {
 
 export async function resolveClienteEmailFromChamado(chamado: IChamadoN1): Promise<string | null> {
   const ref = chamado.cliente?.[0];
-  if (!ref) return null;
-  const dados = await loadDadosForRef(ref);
-  const email = dados?.clienteEmail?.lista?.[0];
-  return email?.includes('@') ? email.trim().toLowerCase() : null;
+  if (ref) {
+    const dados = await loadDadosForRef(ref);
+    const email = dados?.clienteEmail?.lista?.[0];
+    if (email?.includes('@')) return email.trim().toLowerCase();
+  }
+
+  for (const reg of chamado.registro ?? []) {
+    const meta = (reg.metadados ?? {}) as Record<string, unknown>;
+    const from = String(meta.emailFrom ?? '').trim().toLowerCase();
+    if (from.includes('@')) return from;
+  }
+
+  return null;
 }
 
 export async function sendTicketOpenedEmail(

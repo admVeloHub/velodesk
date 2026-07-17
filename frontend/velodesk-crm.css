@@ -1,4 +1,4 @@
-/* Velodesk CRM v1.7.2 — badge tabulação Auditoria no painel direito */
+/* Velodesk CRM v1.7.3 — workflow avançar + decisão aprovação + CTA 360 */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -5059,4 +5059,51 @@ body.desk-v2-mode #cockpitFocusContext {
     text-align: center;
     padding: 10px 14px;
     border-radius: 8px;
+}
+
+#velodeskDeskV2Root .ticket-client-profile__cell-workflow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+#velodeskDeskV2Root .desk-workflow-advance-btn {
+    white-space: nowrap;
+}
+
+#velodeskDeskV2Root .rp-workflow-decision-toggles {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+#velodeskDeskV2Root .rp-workflow-decision-btn {
+    flex: 1;
+    border: 1px solid #d8dbe8;
+    background: #fff;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: var(--desk-fs-sm);
+    cursor: pointer;
+}
+
+#velodeskDeskV2Root .rp-workflow-decision-btn.is-active {
+    border-color: #1694ff;
+    background: rgba(22, 148, 255, 0.08);
+    color: #000058;
+    font-weight: 600;
+}
+
+#velodeskDeskV2Root .rp-workflow-decision-btn--reject.is-active {
+    border-color: #e05252;
+    background: rgba(224, 82, 82, 0.08);
+    color: #8b1a1a;
+}
+
+.ws-workflow-cta-hint {
+    margin-top: 8px;
+    color: #000058;
+    font-weight: 600;
+    font-size: 0.92rem;
 }

@@ -1,10 +1,58 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.30.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.33.0 | DATE: 2026-07-17 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Gmail inbound, protocolo externo e workflows automáticos
+
+- **Data/Hora**: 2026-07-17
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.33.0
+  - index v1.9.5, emailBootstrap.service v1.0.0, gmailWatch.service v1.1.0
+  - email-inbound.service v1.4.0, cliente.service v1.2.0, emailNotification.service v1.2.0, emailThread.service v1.1.0
+  - chamadoProtocoloWatcher v1.0.0, workflowNotificacao.service v1.0.0, workflowSistemaExecutor v1.0.0
+  - test-gmail-inbound.ts v1.0.0, test-gmail-watch.ts v1.0.0
+- **Arquivos modificados / incluídos**:
+  - **Gmail inbound**: bootstrap após `desk_config`, retry do watch, health preciso; ticket abre sem CPF; thread e-mail (root inbound + outbound); scripts `test:gmail-inbound` / `test:gmail-watch`
+  - **Protocolo Tabajara**: watcher change stream + atribuição atômica para inserts externos no MongoDB
+  - **Workflows**: passos automáticos/sistema, notificações internas, rotas e painel Desk; seeds e DTO sync
+  - Frontend: Desk workflow panel, NotificationContext, WorkflowStepEditor, client profile bar
+- **Descrição**: Habilita diálogo e-mail completo (inbound sem CPF obrigatório, respostas do cliente no ticket, agente responde pelo remetente gravado). Corrige race do watch Gmail no Cloud Run. Protocolo oficial atribuído pelo Desk em inserts diretos. Expande engine de workflow com execução automática e notificações.
+- **Pré-requisito GCP**: delegação `gmail.readonly` na SA `email-service@velohub-471220.iam.gserviceaccount.com`
+- **Validação pós-deploy**:
+  ```powershell
+  Invoke-RestMethod -Uri "https://velodesk-278491073220.us-east1.run.app/api/inbound/gmail/health" | ConvertTo-Json
+  ```
+  Esperado: `emailTransportReady: true`, `ready: true`, `historyId` preenchido
+- **Status**: Concluído
+
+---
+
+## Alteração local — Protocolo atribuído pelo Desk em inserts externos
+
+- **Data/Hora**: 2026-07-16
+- **Tipo**: GitHub Push (incluído em 2026-07-17)
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.31.0
+  - ChamadoN1 v1.5.1, protocoloUtils v1.0.0, chamadoProtocoloAssign v1.0.0, chamadoProtocoloWatcher v1.0.0
+  - app-inbound.service v1.2.0, index v1.9.4
+- **Arquivos modificados**:
+  - `backend/src/models/ChamadoN1.ts` — `chamadoProtocolo` opcional no insert; índice sparse unique
+  - `backend/src/services/protocoloUtils.ts` — detecta protocolo pendente vs numérico oficial
+  - `backend/src/services/chamadoProtocoloAssign.service.ts` — atribuição atômica + reconcile
+  - `backend/src/services/chamadoProtocoloWatcher.service.ts` — change stream em `chamados_n1`
+  - `backend/src/services/app-inbound.service.ts` — ignora marcadores `__SIMULACAO_PENDENTE__`
+  - `backend/src/index.ts` — inicia watcher após conexão MongoDB
+- **Descrição**: Corrige interferência do Gerador Tabajara no número de protocolo. Inserts diretos no MongoDB (simulação) não recebem protocolo; o Desk detecta via change stream e atribui imediatamente via contador sequencial. Chamados legados com marcador pendente são reconciliados no startup.
+- **Status**: Concluído (push 2026-07-17)
+
+---
 
 ### GitHub Push — Remoção total do Kanban legado (Desk CRM / boxes)
 

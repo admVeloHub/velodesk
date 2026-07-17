@@ -1,4 +1,4 @@
-/** chamado.mapper v1.8.6 — filtro tickets ativos para snapshot gestão */
+/** chamado.mapper v1.9.0 — workflow top-level + lateralForm.workflow derivado */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -6,6 +6,7 @@ import { loadDadosForRef, resolveClienteRefFromBody } from './cliente.service';
 import { allocateNextProtocolo } from './protocolo.service';
 import type { IClienteDados } from '../models/Cliente';
 import { assertTabulacaoForStatus } from './tabulation.service';
+import { buildLateralWorkflowDto, loadWorkflowDefForChamado, syncLegacyWorkflowFromBody } from './workflowDto.util';
 
 export type RegistroOrigin = 'agente' | 'cliente';
 
@@ -50,6 +51,9 @@ function registroMetadados(reg: IRegistro): Record<string, unknown> {
 }
 
 function findLatestWorkflowFromRegistro(chamado: IChamadoN1): Record<string, unknown> | null {
+  if (chamado.workflow?.active && chamado.workflow.workflowId) {
+    return null;
+  }
   const registros = chamado.registro ?? [];
   for (let i = registros.length - 1; i >= 0; i -= 1) {
     const meta = registroMetadados(registros[i]);
@@ -102,7 +106,7 @@ function diffTabulacao(before: ITabulacao, after: ITabulacao): Record<string, un
   return change;
 }
 
-function readTabulacaoSnapshot(tab?: ITabulacao | null): ITabulacao {
+export function readTabulacaoSnapshot(tab?: ITabulacao | null): ITabulacao {
   if (!tab) {
     return {
       tipoChamado: '',
@@ -453,6 +457,7 @@ export async function applyBodyToChamado(
   }
 
   const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
+  syncLegacyWorkflowFromBody(chamado, lf.workflow as Record<string, unknown> | undefined);
   const nextEscalonar = String(lf.escalonar ?? '').trim();
   const prevWorkflow = findLatestWorkflowFromRegistro(chamado);
   const nextWorkflow = lf.workflow;
@@ -683,7 +688,18 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
     || chamado.chamadoProtocolo;
 
   const clientCpf = ref?.clienteCpf || cadastro?.clienteCpf;
-  const persistedWorkflow = findLatestWorkflowFromRegistro(chamado);
+
+  let lateralWorkflow: Record<string, unknown> | undefined;
+  if (chamado.workflow?.active && chamado.workflow.workflowId) {
+    const definicao = await loadWorkflowDefForChamado(chamado);
+    if (definicao) {
+      lateralWorkflow = buildLateralWorkflowDto(chamado, definicao) ?? undefined;
+    }
+  }
+  if (!lateralWorkflow) {
+    const persistedWorkflow = findLatestWorkflowFromRegistro(chamado);
+    lateralWorkflow = persistedWorkflow ?? undefined;
+  }
   const persistedApproval = findLatestApprovalFromRegistro(chamado);
 
   return {
@@ -713,7 +729,7 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
       clienteEmail: cadastro?.clienteEmail?.lista ?? [],
       clienteTelefone: cadastro?.clienteTelefone?.lista ?? [],
       cpf: clientCpf,
-      workflow: persistedWorkflow ?? undefined,
+      workflow: lateralWorkflow,
       approval: persistedApproval ?? undefined,
     },
     messages,

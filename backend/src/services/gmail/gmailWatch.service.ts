@@ -1,5 +1,6 @@
-/** gmailWatch.service v1.0.0 — users.watch + renovação */
+/** gmailWatch.service v1.1.0 — users.watch + renovação + health preciso */
 import { env } from '../../config/env';
+import { isDeskConfigConnected } from '../../config/database';
 import { getGmailWatchStateModel, findGmailWatchSingleton } from '../../models/GmailWatchState';
 import { createGmailClient, getGmailTopicName, GMAIL_SCOPE_READONLY } from './gmailAuth';
 import { getDelegatedUserEmail, isEmailTransportReady } from '../emailTransport.service';
@@ -11,6 +12,7 @@ let renewalTimer: ReturnType<typeof setInterval> | null = null;
 
 export interface GmailWatchHealth {
   enabled: boolean;
+  emailTransportReady: boolean;
   ready: boolean;
   mailbox: string | null;
   historyId: string | null;
@@ -74,14 +76,18 @@ export async function setupGmailWatch(): Promise<{ historyId: string; expiration
 }
 
 export async function ensureGmailWatchFresh(): Promise<void> {
-  if (!env.gmailInboundEnabled) return;
+  try {
+    if (!env.gmailInboundEnabled || !isDeskConfigConnected()) return;
 
-  const state = await findGmailWatchSingleton();
-  const now = Date.now();
-  const needsRenew = !state?.expiration || state.expiration - now < RENEW_BEFORE_MS;
+    const state = await findGmailWatchSingleton();
+    const now = Date.now();
+    const needsRenew = !state?.expiration || state.expiration - now < RENEW_BEFORE_MS;
 
-  if (needsRenew) {
-    await setupGmailWatch();
+    if (needsRenew) {
+      await setupGmailWatch();
+    }
+  } catch (err) {
+    console.error('[gmailWatch] ensureGmailWatchFresh:', (err as Error).message);
   }
 }
 
@@ -96,12 +102,24 @@ export function startGmailWatchRenewalLoop(): void {
 }
 
 export async function getGmailWatchHealth(): Promise<GmailWatchHealth> {
-  const state = await findGmailWatchSingleton();
+  let state: Awaited<ReturnType<typeof findGmailWatchSingleton>> = null;
+
+  try {
+    if (isDeskConfigConnected()) {
+      state = await findGmailWatchSingleton();
+    }
+  } catch (err) {
+    console.warn('[gmailWatch] health — desk_config:', (err as Error).message);
+  }
+
   const expiration = state?.expiration ?? null;
+  const transportReady = isEmailTransportReady();
+  const watchActive = !!(state?.historyId && state?.expiration);
 
   return {
     enabled: env.gmailInboundEnabled,
-    ready: isEmailTransportReady(),
+    emailTransportReady: transportReady,
+    ready: transportReady && watchActive,
     mailbox: (state?.mailbox ?? getDelegatedUserEmail()) || null,
     historyId: state?.historyId ?? null,
     expiration,

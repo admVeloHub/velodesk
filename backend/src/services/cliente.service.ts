@@ -1,4 +1,4 @@
-﻿/** cliente.service v1.1.1 — upsert por clienteId quando CPF ausente */
+﻿/** cliente.service v1.2.0 — inbound e-mail: lookup por e-mail, sem upsert sem CPF */
 import mongoose from 'mongoose';
 import { getClienteModel, ICliente, IClienteDados } from '../models/Cliente';
 import type { IClienteRef } from '../models/ChamadoN1';
@@ -46,12 +46,18 @@ function dadosFromBody(body: Record<string, unknown>): IClienteDados | null {
 
   if (!cpf && !nome) return null;
 
-  return {
+  const dados: IClienteDados = {
     clienteCpf: cpf,
     clienteNome: nome,
     clienteEmail: { lista: emailLista },
     clienteTelefone: { lista: telLista },
   };
+
+  if (!cpf) {
+    delete (dados as { clienteCpf?: string }).clienteCpf;
+  }
+
+  return dados;
 }
 
 export function getPrimaryDados(cliente: ICliente | null): IClienteDados | null {
@@ -86,21 +92,13 @@ export async function resolveClienteRefFromEmail(
   const email = parsed.email;
   if (!email) return null;
 
-  let cliente = await findClienteByEmail(email);
-
-  if (!cliente) {
-    const nome = String(displayName ?? parsed.name ?? email.split('@')[0]).trim();
-    cliente = await upsertClienteFromBody({
-      clientName: nome,
-      lateralForm: { clienteEmail: [email], clienteNome: nome },
-    });
-  }
-
+  const cliente = await findClienteByEmail(email);
   if (!cliente) return null;
 
   const dados = getPrimaryDados(cliente);
+  const cpf = normalizeCpf(dados?.clienteCpf);
   return {
-    clienteCpf: normalizeCpf(dados?.clienteCpf),
+    clienteCpf: cpf,
     clienteId: cliente._id as mongoose.Types.ObjectId,
   };
 }
@@ -131,7 +129,13 @@ export async function loadDadosForRef(ref?: IClienteRef | null): Promise<IClient
 
 function applyDadosToCliente(existing: ICliente, dados: IClienteDados): void {
   if (!existing.clienteDados?.length) {
-    existing.clienteDados = [dados];
+    const entry: Record<string, unknown> = {
+      clienteNome: dados.clienteNome,
+      clienteEmail: dados.clienteEmail,
+      clienteTelefone: dados.clienteTelefone,
+    };
+    if (dados.clienteCpf) entry.clienteCpf = dados.clienteCpf;
+    existing.clienteDados = [entry as unknown as IClienteDados];
     return;
   }
   if (dados.clienteNome) existing.clienteDados[0].clienteNome = dados.clienteNome;
@@ -166,7 +170,27 @@ export async function upsertClienteFromBody(body: Record<string, unknown>): Prom
     }
   }
 
-  return Cliente.create({ clienteDados: [dados], atendimentoHistorico: [] });
+  const emails = dados.clienteEmail?.lista ?? [];
+  if (!cpf && emails.length) {
+    const byEmail = await findClienteByEmail(emails[0]);
+    if (byEmail) {
+      applyDadosToCliente(byEmail, dados);
+      await byEmail.save();
+      return byEmail;
+    }
+    return null;
+  }
+
+  if (!cpf) return null;
+
+  const createDados: Record<string, unknown> = {
+    clienteNome: dados.clienteNome,
+    clienteEmail: dados.clienteEmail,
+    clienteTelefone: dados.clienteTelefone,
+  };
+  if (cpf) createDados.clienteCpf = cpf;
+
+  return Cliente.create({ clienteDados: [createDados], atendimentoHistorico: [] });
 }
 
 export async function resolveClienteRefFromBody(
@@ -196,8 +220,16 @@ export async function resolveClienteRefFromBody(
     lateral.clienteNome !== undefined ||
     lateral.cpf !== undefined;
 
-  if (!cliente && hasContactData) {
+  if (!cliente && cpf && hasContactData) {
     cliente = await upsertClienteFromBody(body);
+  }
+
+  if (!cliente && !cpf) {
+    const emailList = normalizeStringList(lateral.clienteEmail);
+    for (const item of emailList) {
+      cliente = await findClienteByEmail(item);
+      if (cliente) break;
+    }
   }
 
   const resolvedCpf = cpf || normalizeCpf(getPrimaryDados(cliente)?.clienteCpf);

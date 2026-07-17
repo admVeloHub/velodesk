@@ -1,4 +1,4 @@
-/** tickets.routes v1.4.0 — responsavel pela sessão no POST manual */
+/** tickets.routes v1.5.0 — POST /:id/workflow/advance */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -15,6 +15,13 @@ import {
 } from '../services/chamado.mapper';
 import { TabulacaoValidationError } from '../services/tabulation.service';
 import { notifyAgentReplyAsync, notifyTicketOpenedAsync } from '../services/emailNotification.service';
+import {
+  advanceWorkflowManual,
+  advanceWorkflowWithDecision,
+  setWorkflowPendingDecision,
+  tryActivateWorkflowOnTabulation,
+  WorkflowAdvanceError,
+} from '../services/workflowTicket.service';
 
 const router = Router();
 
@@ -111,6 +118,10 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
 
   try {
     await applyBodyToChamado(chamado, req.body, req.user);
+    await tryActivateWorkflowOnTabulation(
+      chamado,
+      String(req.body.author ?? req.user?.name ?? req.user?.email ?? 'Sistema'),
+    );
     await chamado.save();
 
     const boxes = await loadBoxes();
@@ -170,6 +181,31 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
     publicMessage: result.public,
     internalNote: result.internal,
   });
+});
+
+router.post('/:id/workflow/advance', authMiddleware, async (req, res: Response) => {
+  const chamado = await ChamadoN1.findById(req.params.id);
+  if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+
+  const decision = req.body?.decision;
+  try {
+    if (decision === 'approve' || decision === 'reject') {
+      await advanceWorkflowWithDecision(chamado, decision, req.user);
+    } else if (req.body?.pendingDecision === 'approve' || req.body?.pendingDecision === 'reject') {
+      setWorkflowPendingDecision(chamado, req.body.pendingDecision);
+      await advanceWorkflowManual(chamado, req.user);
+    } else {
+      await advanceWorkflowManual(chamado, req.user);
+    }
+    await chamado.save();
+    const boxes = await loadBoxes();
+    res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  } catch (err) {
+    if (err instanceof WorkflowAdvanceError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    throw err;
+  }
 });
 
 export default router;

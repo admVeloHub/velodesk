@@ -1,6 +1,6 @@
 /**
- * gestaoSnapshot.service v1.0.0 — snapshot horário de tickets ativos
- * VERSION: v1.0.0 | DATE: 2026-07-14
+ * gestaoSnapshot.service v1.0.1 — fallback de protocolo ausente no inventário
+ * VERSION: v1.0.1 | DATE: 2026-07-16
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -70,12 +70,19 @@ function extractThemeKey(chamado: IChamadoN1): string {
   return parts.join(' — ').slice(0, 120) || 'sem tema';
 }
 
+function resolveProtocolo(chamado: IChamadoN1): string {
+  const protocolo = String(chamado.chamadoProtocolo || '').trim();
+  if (protocolo) return protocolo;
+  const ticketId = String(chamado._id || '').trim();
+  return ticketId ? `ticket:${ticketId}` : 'sem-protocolo';
+}
+
 function buildTicketEntry(chamado: IChamadoN1): IGestaoTicketSnapshotEntry {
   const status = currentStatus(chamado);
   const lastInteraction = lastInteractionDate(chamado);
   return {
-    ticketId: String(chamado._id),
-    protocolo: chamado.chamadoProtocolo,
+    ticketId: String(chamado._id || ''),
+    protocolo: resolveProtocolo(chamado),
     status,
     titulo: String(chamado.chamadoTitulo || '').slice(0, 200),
     produto: readTabField(chamado, 'produto'),
@@ -123,12 +130,13 @@ export async function buildGestaoHourlySnapshot(): Promise<GestaoHourlySnapshot>
 
   for (const chamado of activeChamados) {
     const status = currentStatus(chamado);
+    const protocolo = resolveProtocolo(chamado);
     countsByStatus[status] = (countsByStatus[status] || 0) + 1;
     tickets.push(buildTicketEntry(chamado));
 
     if (isSlaBreached(chamado)) {
       slaBreached.push({
-        protocolo: chamado.chamadoProtocolo,
+        protocolo,
         status,
         hours: Math.round(hoursSince(lastInteractionDate(chamado))),
       });
@@ -137,13 +145,13 @@ export async function buildGestaoHourlySnapshot(): Promise<GestaoHourlySnapshot>
     if (status === 'novo' && !readResponsavel(chamado)) {
       const mins = minutesSince(chamado.createdAt);
       if (mins >= env.gestaoStuckNovoMinutes) {
-        semResponsavel.push({ protocolo: chamado.chamadoProtocolo, minutes: Math.round(mins) });
+        semResponsavel.push({ protocolo, minutes: Math.round(mins) });
       }
     }
 
     const idleHours = hoursSince(lastInteractionDate(chamado));
     if (idleHours >= env.gestaoStuckActiveHours && status !== 'novo') {
-      parados.push({ protocolo: chamado.chamadoProtocolo, hours: Math.round(idleHours) });
+      parados.push({ protocolo, hours: Math.round(idleHours) });
     }
 
     const theme = extractThemeKey(chamado);

@@ -1,4 +1,4 @@
-/** emailThread.service v1.0.0 — Message-ID / In-Reply-To / References para thread Gmail */
+/** emailThread.service v1.1.0 — thread root a partir do Message-Id inbound */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { getEffectiveFromAddress } from './emailTransport.service';
 
@@ -42,9 +42,11 @@ export function collectEmailThreadState(chamado: IChamadoN1): EmailThreadState {
     const meta = (reg.metadados ?? {}) as Record<string, unknown>;
     const root = normalizeEmailMessageId(meta.emailThreadRootId);
     const outbound = normalizeEmailMessageId(meta.emailOutboundMessageId);
+    const inbound = normalizeEmailMessageId(meta.emailMessageId);
 
     if (root && !rootId) rootId = root;
     if (outbound) referenceIds.push(outbound);
+    if (inbound && !rootId) rootId = inbound;
   }
 
   if (!rootId && referenceIds.length) {

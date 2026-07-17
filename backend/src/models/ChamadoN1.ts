@@ -1,5 +1,15 @@
-/** ChamadoN1 v1.4.0 — autor em registro[] (quem realizou a ação) */
+/** ChamadoN1 v1.5.1 — chamadoProtocolo opcional até atribuição pelo Desk */
 import mongoose, { Schema, Document, Types } from 'mongoose';
+
+export interface IChamadoWorkflow {
+  active: boolean;
+  workflowId: Types.ObjectId | null;
+  step: number;
+  passoId: Types.ObjectId | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  pendingDecision?: 'approve' | 'reject' | null;
+}
 
 export interface IClienteRef {
   clienteCpf: string;
@@ -36,6 +46,7 @@ export interface IChamadoN1 extends Document {
   cliente: IClienteRef[];
   tabulacao: ITabulacao[];
   registro: IRegistro[];
+  workflow?: IChamadoWorkflow;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -76,18 +87,34 @@ const RegistroSchema = new Schema<IRegistro>(
   { _id: false }
 );
 
+const ChamadoWorkflowSchema = new Schema<IChamadoWorkflow>(
+  {
+    active: { type: Boolean, default: false },
+    workflowId: { type: Schema.Types.ObjectId, default: null },
+    step: { type: Number, default: 0 },
+    passoId: { type: Schema.Types.ObjectId, default: null },
+    startedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    pendingDecision: { type: String, enum: ['approve', 'reject'], default: null },
+  },
+  { _id: false },
+);
+
 const ChamadoN1Schema = new Schema<IChamadoN1>(
   {
-    chamadoProtocolo: { type: String, required: true, unique: true },
+    chamadoProtocolo: { type: String },
     chamadoTitulo: { type: String, default: '' },
     cliente: { type: [ClienteRefSchema], default: [] },
     tabulacao: { type: [TabulacaoSchema], default: [] },
     registro: { type: [RegistroSchema], default: [] },
+    workflow: { type: ChamadoWorkflowSchema, default: undefined },
   },
   {
     timestamps: true,
     collection: 'chamados_n1',
   }
 );
+
+ChamadoN1Schema.index({ chamadoProtocolo: 1 }, { unique: true, sparse: true, name: 'chamadoProtocolo_1' });
 
 export const ChamadoN1 = mongoose.model<IChamadoN1>('ChamadoN1', ChamadoN1Schema);

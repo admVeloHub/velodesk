@@ -1,6 +1,6 @@
 /**
- * DeskRightPanel v1.4.2 — tabulação sugerida pelo Agente de Auditoria
- * VERSION: v1.4.2 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * DeskRightPanel v1.5.0 — aprovação abaixo de Detalhe; tabulação read-only por atuação
+ * VERSION: v1.5.0 | DATE: 2026-07-16
  */
 import React, { useEffect, useState } from 'react';
 import { DEFAULT_TIPO, hasApplyableTabulation, parseTabulationDisplay } from '../../../services/tabulationConfig';
@@ -59,6 +59,10 @@ export default function DeskRightPanel({
   iaHasTabulationSuggestion = false,
   iaShowSection = false,
   iaAuditScore = null,
+  tabulationReadonly = false,
+  workflowProgress = null,
+  workflowDecision = null,
+  onWorkflowDecisionChange,
 }) {
   const { loading, getMotivos, getDetalhes, getProdutoNames, getTipoChamadoOptions, getCanalContatoOptions } = useTabulation();
   const { currentAgentValue } = useDeskAgents();
@@ -95,6 +99,7 @@ export default function DeskRightPanel({
     || hasApplyableTabulation(parsedTabulation)
   );
   const inWorkflow = isTicketInWorkflow(ticket);
+  const isApprovalStep = workflowProgress?.activeStep?.acao?.tipo === 'aprovacao';
   const canForward = Boolean(
     rightFields.motivo && detalheOptions.length > 0 && !inWorkflow,
   );
@@ -129,6 +134,7 @@ export default function DeskRightPanel({
             fieldKey="canal"
             value={rightFields.canal}
             options={canalOptions.length ? canalOptions : CANAL_OPTIONS_FALLBACK}
+            readonly={tabulationReadonly}
             onFieldChange={onFieldChange}
           />
           <SelectField
@@ -137,6 +143,7 @@ export default function DeskRightPanel({
             fieldKey="tipo"
             value={rightFields.tipo || DEFAULT_TIPO}
             options={tipoOptions.length ? tipoOptions : TIPO_OPTIONS_FALLBACK}
+            readonly={tabulationReadonly}
             onFieldChange={onFieldChange}
           />
           <SelectField
@@ -146,6 +153,7 @@ export default function DeskRightPanel({
             value={rightFields.produto}
             options={produtoOptions}
             showPlaceholder
+            readonly={tabulationReadonly}
             onFieldChange={onFieldChange}
           />
           {rightFields.produto && motivoOptions.length > 0 && (
@@ -156,6 +164,7 @@ export default function DeskRightPanel({
               value={rightFields.motivo}
               options={motivoOptions}
               showPlaceholder
+              readonly={tabulationReadonly}
               onFieldChange={onFieldChange}
             />
           )}
@@ -167,9 +176,31 @@ export default function DeskRightPanel({
               value={rightFields.detalhe}
               options={detalheOptions}
               showPlaceholder
+              readonly={tabulationReadonly}
               onFieldChange={onFieldChange}
             />
           )}
+          {isApprovalStep ? (
+            <div className="rp-field rp-field--workflow-decision">
+              <span className="rp-field__label">Decisão de aprovação</span>
+              <div className="rp-workflow-decision-toggles">
+                <button
+                  type="button"
+                  className={'rp-workflow-decision-btn' + (workflowDecision === 'approve' ? ' is-active' : '')}
+                  onClick={() => onWorkflowDecisionChange?.('approve')}
+                >
+                  Aprovado
+                </button>
+                <button
+                  type="button"
+                  className={'rp-workflow-decision-btn rp-workflow-decision-btn--reject' + (workflowDecision === 'reject' ? ' is-active' : '')}
+                  onClick={() => onWorkflowDecisionChange?.('reject')}
+                >
+                  Reprovado
+                </button>
+              </div>
+            </div>
+          ) : null}
           {canForward ? (
             <SelectField
               id="selEscalonar"

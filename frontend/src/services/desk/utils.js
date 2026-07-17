@@ -315,7 +315,10 @@ export function getWorkflowProgress(ticket) {
   const template = getWorkflowTemplateForTicket(ticket);
   if (!workflow || !template) return null;
 
-  const currentStepId = workflow.currentStepId || template.defaultActiveStepId;
+  const stepIndex = typeof workflow.step === 'number' ? workflow.step : null;
+  const currentStepId = stepIndex != null && template.steps[stepIndex]
+    ? template.steps[stepIndex].id
+    : (workflow.currentStepId || template.defaultActiveStepId);
   const currentIndex = template.steps.findIndex((s) => s.id === currentStepId);
   const activeStepIndex = currentIndex >= 0 ? currentIndex : 0;
   const activeStep = template.steps[activeStepIndex];
@@ -418,15 +421,14 @@ function pushWorkflowSystemMessage(ticket, text) {
   });
 }
 
-/** Ativa workflow no encaminhamento/commit e aplica avanço automático por status */
-export function syncTicketWorkflowOnCommit(ticket, rightFields, escalonar, statusId, author) {
+/** Ativa workflow no encaminhamento/commit — avanço de etapa só via botão/API */
+export function syncTicketWorkflowOnCommit(ticket, rightFields, escalonar, _statusId, author) {
   if (!ticket) return { activated: false, advanced: false };
 
   const lf = ticket.lateralForm || {};
   let workflow = lf.workflow;
   let template = getWorkflowTemplateForTicket(ticket);
   let activated = false;
-  let advanced = false;
 
   if (!getWorkflowInstanceKey(workflow)) {
     const activation = maybeActivateWorkflowForTicket(ticket, rightFields, escalonar, author);
@@ -440,44 +442,15 @@ export function syncTicketWorkflowOnCommit(ticket, rightFields, escalonar, statu
     }
   }
 
-  if (getWorkflowInstanceKey(workflow) && !template) {
-    const key = getWorkflowInstanceKey(workflow);
-    template = getWorkflowTemplateById(key)
-      || (String(key).startsWith('escalonar-')
-        ? buildEscalonarWorkflowTemplate(String(key).replace('escalonar-', ''))
-        : null);
-  }
-
-  if (workflow && template && workflow.status !== 'completed') {
-    const auto = evaluateWorkflowAutoAdvance(workflow, template, { statusId });
-    if (auto.advanced) {
-      workflow = auto.workflow;
-      advanced = true;
-      const nextStep = template.steps.find((s) => s.id === auto.nextStepId);
-      if (nextStep) {
-        const atribuido = resolveAtribuidoForStep(nextStep);
-        if (atribuido) ticket.lateralForm = { ...(ticket.lateralForm || lf), atribuido };
-      }
-      const prevId = auto.previousStepId;
-      const nextId = auto.nextStepId;
-      if (prevId) {
-        pushWorkflowSystemMessage(
-          ticket,
-          buildWorkflowAdvanceMessage(template, prevId, nextId, author),
-        );
-      }
-    }
-  }
-
   if (workflow) {
-    ticket.lateralForm = { ...lf, workflow, escalonar: escalonar || lf.escalonar };
+    ticket.lateralForm = { ...(ticket.lateralForm || lf), workflow, escalonar: escalonar || lf.escalonar };
   }
 
   if (activated && template) {
     injectWorkflowSystemMessage(ticket, template, escalonar);
   }
 
-  return { activated, advanced, workflow, template };
+  return { activated, advanced: false, workflow, template };
 }
 
 export function advanceTicketWorkflowByDecision(ticket, variavel, author) {
