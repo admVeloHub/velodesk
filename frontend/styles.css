@@ -516,6 +516,9 @@ body {
     padding: 0 !important;
     margin-top: 0 !important; /* Remover margin-top para ficar rente ao topo */
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 /* Relatórios: área principal precisa rolar (conteúdo longo + gráficos) */
@@ -15244,6 +15247,13 @@ input:checked + .slider:before {
 #config .config-content {
     background: var(--config-bg);
     padding: 1.25rem 1.5rem 2rem;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 #config .config-section-body {

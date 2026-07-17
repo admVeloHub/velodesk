@@ -1,10 +1,29 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.33.0 | DATE: 2026-07-17 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.34.0 | DATE: 2026-07-17 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Correção scroll vertical (conversa Desk + Config)
+
+- **Data/Hora**: 2026-07-17
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.34.0
+  - velodesk-crm.css v1.7.4, viewport-scale.css v1.0.6
+- **Arquivos modificados**:
+  - `frontend/velodesk-crm.css` — `.conversation`: remove `justify-content: flex-end` que bloqueava scroll; `margin-top: auto` no 1º item
+  - `frontend/styles.css` — `#config`: flex chain + `overflow-y: auto` em `.config-content`
+  - `frontend/velodesk-ecosystem.css` — editor workflow: `min-height: 0` e scroll em `.wf-config-panel`
+  - `frontend/src/styles/viewport-scale.css` — `zoom` em vez de `transform` (scroll em filhos no Chrome)
+- **Descrição**: Restaura rolagem vertical no histórico de mensagens dos tickets e nas telas de configuração (incl. editor de workflows).
+- **Status**: Concluído
+
+---
 
 ### GitHub Push — Gmail inbound, protocolo externo e workflows automáticos
 

@@ -5892,12 +5892,18 @@ body.desk-v2-mode #aiChatbotModal {
 #config .config-content:has(.wf-config-shell) {
     padding: 0;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
 }
 
 .wf-config-shell {
     display: grid;
     grid-template-columns: 240px minmax(0, 1fr);
-    min-height: calc(100vh - 120px);
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: 100%;
     background: #f3f4f6;
     border-radius: 12px;
     overflow: hidden;
@@ -5981,6 +5987,7 @@ body.desk-v2-mode #aiChatbotModal {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 0;
     overflow: hidden;
 }
 
@@ -6182,9 +6189,13 @@ body.desk-v2-mode #aiChatbotModal {
 }
 
 .wf-config-panel {
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 24px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .wf-config-trigger__summary {

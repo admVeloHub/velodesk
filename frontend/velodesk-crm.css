@@ -1,4 +1,4 @@
-/* Velodesk CRM v1.7.3 — workflow avançar + decisão aprovação + CTA 360 */
+/* Velodesk CRM v1.7.4 — scroll conversa + config */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -2171,12 +2171,20 @@
 #velodeskDeskV2Root .conversation {
     flex: 1 1 0;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 12px 14px;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
+    justify-content: flex-start;
     gap: 10px;
     min-height: 0;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Mensagens no rodapé quando poucas; com overflow, margin-top:auto cede e o scroll funciona */
+#velodeskDeskV2Root .conversation > :first-child:not(.conversation-empty) {
+    margin-top: auto;
 }
 
 #velodeskDeskV2Root .conversation:has(.conversation-empty) {
@@ -3471,7 +3479,14 @@
     z-index: 8100;
 }
 
-#velodeskDeskV2Root .crm-right-panel__scroll { flex: 1; overflow-y: auto; }
+#velodeskDeskV2Root .crm-right-panel__scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
 
 #velodeskDeskV2Root .rp-section {
     padding: 12px 14px;
