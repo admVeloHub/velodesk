@@ -1,10 +1,36 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.34.0 | DATE: 2026-07-17 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.35.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Caixa Gmail suporte@ + script update-email-mailbox
+
+- **Data/Hora**: 2026-07-20
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.35.0
+  - update-email-mailbox.ts v1.0.0, test-gmail-inbound.ts v1.0.1
+- **Arquivos modificados / incluídos**:
+  - `backend/scripts/update-email-mailbox.ts` — troca `defaultFromEmail` / `delegatedUserEmail` em `desk_config.email_transport`
+  - `backend/package.json` — script `npm run update:email-mailbox`
+  - `backend/scripts/test-gmail-inbound.ts` — documentação de teste apontando para `suporte@velotax.com.br`
+- **Alteração operacional (MongoDB, fora do git)**:
+  - `desk_config.email_transport`: remetente e delegação de `atendimento@velotax.com.br` → `suporte@velotax.com.br`
+  - Gmail watch reativado na caixa `suporte@` (health produção: `mailbox=suporte@velotax.com.br`)
+- **Descrição**: Corrige endereço de atendimento e-mail (inbound/outbound) para `suporte@velotax.com.br`; adiciona script operacional para futuras trocas de caixa sem re-seed da SA.
+- **Validação pós-deploy**:
+  ```powershell
+  Invoke-RestMethod -Uri "https://velodesk-278491073220.us-east1.run.app/api/inbound/gmail/health" | ConvertTo-Json
+  ```
+  Esperado: `mailbox: suporte@velotax.com.br`, `ready: true`
+- **Status**: Concluído
+
+---
 
 ### GitHub Push — Correção scroll vertical (conversa Desk + Config)
 
