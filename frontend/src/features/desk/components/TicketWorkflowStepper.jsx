@@ -12,6 +12,13 @@ function StepIcon({ step }) {
   return <i className={'ti ' + step.icon} aria-hidden="true" />;
 }
 
+function connectorClass(prevStep, nextStep) {
+  let cls = 'desk-workflow-stepper__connector';
+  if (prevStep?.state === 'completed') cls += ' is-completed';
+  else if (nextStep?.state === 'signaled') cls += ' is-signaled';
+  return cls;
+}
+
 export default function TicketWorkflowStepper({ ticket }) {
   const progress = getWorkflowProgress(ticket);
   if (!progress) return null;
@@ -31,10 +38,7 @@ export default function TicketWorkflowStepper({ ticket }) {
             <React.Fragment key={step.id}>
               {index > 0 && (
                 <li
-                  className={
-                    'desk-workflow-stepper__connector'
-                    + (stepsWithState[index - 1].state === 'completed' ? ' is-completed' : '')
-                  }
+                  className={connectorClass(stepsWithState[index - 1], step)}
                   aria-hidden="true"
                 />
               )}
@@ -52,6 +56,7 @@ export default function TicketWorkflowStepper({ ticket }) {
                       className={
                         'desk-workflow-stepper__status'
                         + (step.state === 'active' && progress.slaRemainingLabel ? ' desk-workflow-stepper__status--sla' : '')
+                        + (step.state === 'signaled' ? ' desk-workflow-stepper__status--signaled' : '')
                       }
                     >
                       {subtitle}

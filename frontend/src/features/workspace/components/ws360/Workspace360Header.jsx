@@ -1,9 +1,10 @@
 /**
- * Workspace360Header v1.2.0 — cabeçalho do Painel 360°
+ * Workspace360Header v1.3.0 — cabeçalho do Painel 360° + tags de produtos
  */
 import React from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import ProfileRoleSwitcher from '../../../../components/ProfileRoleSwitcher';
+import Workspace360ServiceStatus from './Workspace360ServiceStatus';
 
 export default function Workspace360Header({ greeting, agentName, dateTimeLabel }) {
   const { darkMode, toggleDarkMode } = useTheme();
@@ -17,6 +18,7 @@ export default function Workspace360Header({ greeting, agentName, dateTimeLabel 
         <p className="ws360-header__datetime">{dateTimeLabel}</p>
       </div>
       <div className="ws360-header__actions">
+        <Workspace360ServiceStatus className="ws360-service-status--header" tagsOnly />
         <button
           type="button"
           className="btn-header-theme ws360-theme-toggle"

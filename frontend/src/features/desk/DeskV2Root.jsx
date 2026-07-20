@@ -8,6 +8,8 @@ import {
   filterTickets,
   resolveDeskSearchEntries,
   pickDefaultTicket,
+  pickDefaultQueueId,
+  countByQueue,
   buildRegistroThread,
   normalizeTicketForDeskV2,
   getAgentName,
@@ -51,6 +53,7 @@ import { htmlToPlainText } from '../../services/desk/composeRichEditor';
 import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
 import DeskAiRevisionModal from './components/DeskAiRevisionModal';
 import { resolveAutomaticaConfig } from '../config/workflow/workflowConfigData';
+import ProdutosForwardPopover from './components/ProdutosForwardPopover';
 
 function applyRightFieldsToTicket(t, rightFields, escalonar) {
   const prevLf = t.lateralForm || {};
@@ -117,7 +120,7 @@ export default function DeskV2Root() {
   const { user } = useAuth();
   const { config } = useTabulation();
 
-  const [activeQueue, setActiveQueue] = useState('em-andamento');
+  const [activeQueue, setActiveQueue] = useState('novos');
   const [activeSort, setActiveSort] = useState('data');
   const [searchDraft, setSearchDraft] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
@@ -131,6 +134,8 @@ export default function DeskV2Root() {
   const [sendStatus, setSendStatus] = useState('em-andamento');
   const [rightFields, setRightFields] = useState({});
   const [escalonar, setEscalonar] = useState(null);
+  const [produtosPopoverOpen, setProdutosPopoverOpen] = useState(false);
+  const [produtosSolicitacaoSubmitted, setProdutosSolicitacaoSubmitted] = useState(false);
   const [waChatOpen, setWaChatOpen] = useState(false);
   const [aiRevisionOpen, setAiRevisionOpen] = useState(false);
   const [aiRevisionSubmitting, setAiRevisionSubmitting] = useState(false);
@@ -233,6 +238,13 @@ export default function DeskV2Root() {
     restoreCustomBoxes();
     setQueueStatuses(getAllQueueStatuses());
   }, []);
+
+  useEffect(() => {
+    if (appliedSearch.trim()) return;
+    if (countByQueue(activeQueue) > 0) return;
+    const nextQueue = pickDefaultQueueId(activeQueue);
+    if (nextQueue !== activeQueue) setActiveQueue(nextQueue);
+  }, [refreshKey, appliedSearch, activeQueue]);
 
   useEffect(() => {
     loadSpellEngine().catch(() => {});
@@ -583,8 +595,40 @@ export default function DeskV2Root() {
   };
 
   const handleEscalonarChange = (value) => {
+    if (value === 'produtos') {
+      setEscalonar('produtos');
+      setProdutosSolicitacaoSubmitted(false);
+      setProdutosPopoverOpen(true);
+      return;
+    }
     setEscalonar(value || null);
+    setProdutosSolicitacaoSubmitted(false);
+    setProdutosPopoverOpen(false);
   };
+
+  const handleProdutosPopoverClose = () => {
+    setProdutosPopoverOpen(false);
+    setEscalonar(null);
+    setProdutosSolicitacaoSubmitted(false);
+  };
+
+  const handleProdutosPopoverSubmitted = () => {
+    setProdutosSolicitacaoSubmitted(true);
+    setProdutosPopoverOpen(false);
+  };
+
+  useEffect(() => {
+    if (
+      escalonar === 'produtos'
+      && !produtosSolicitacaoSubmitted
+      && !produtosPopoverOpen
+      && ticket
+      && !isDraftTicket(ticket)
+      && !isTicketInWorkflow(ticket)
+    ) {
+      setProdutosPopoverOpen(true);
+    }
+  }, [escalonar, produtosSolicitacaoSubmitted, produtosPopoverOpen, ticket]);
 
   const workflowActivatingRef = useRef(false);
 
@@ -595,6 +639,8 @@ export default function DeskV2Root() {
 
     const fields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
     const isAgentForward = isAgentForwardEscalonar(escalonar);
+
+    if (escalonar === 'produtos' && !produtosSolicitacaoSubmitted) return undefined;
 
     if (isAgentForward) {
       if (!fields.produto || !fields.motivo || !fields.detalhe) return undefined;
@@ -652,6 +698,7 @@ export default function DeskV2Root() {
     rightFields.detalhe,
     rightFields.tipo,
     escalonar,
+    produtosSolicitacaoSubmitted,
     showNotification,
     syncTicketViews,
   ]);
@@ -1057,6 +1104,14 @@ export default function DeskV2Root() {
         submitting={aiRevisionSubmitting}
         onClose={() => setAiRevisionOpen(false)}
         onSubmit={handleAiRevisionSubmit}
+      />
+
+      <ProdutosForwardPopover
+        open={produtosPopoverOpen}
+        ticket={ticket}
+        client={client}
+        onClose={handleProdutosPopoverClose}
+        onSubmitted={handleProdutosPopoverSubmitted}
       />
     </div>
   );

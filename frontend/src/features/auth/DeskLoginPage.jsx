@@ -36,6 +36,9 @@ function resolveLoginError(err) {
   if (status === 403) {
     return 'Usuário sem permissão para acessar o Desk.';
   }
+  if (status === 429) {
+    return 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.';
+  }
   if (status === 401 && apiMsg) {
     return apiMsg;
   }
@@ -62,6 +65,7 @@ export default function DeskLoginPage() {
   const [gsiReady, setGsiReady] = useState(false);
   const buttonRef = useRef(null);
   const initializedRef = useRef(false);
+  const devLoginAttemptedRef = useRef(false);
   const clientId = getGoogleClientId();
 
   useEffect(() => {
@@ -137,9 +141,10 @@ export default function DeskLoginPage() {
 
   useEffect(() => {
     if (!isDevQuickLoginEnabled() || clientId || isAuthenticated) return undefined;
+    if (devLoginAttemptedRef.current) return undefined;
 
     let active = true;
-    let retryTimer = null;
+    devLoginAttemptedRef.current = true;
 
     const attemptDevLogin = async () => {
       if (!active) return;
@@ -153,9 +158,6 @@ export default function DeskLoginPage() {
         if (!active) return;
         const message = resolveLoginError(err) || 'Não foi possível entrar no ambiente local. Verifique se o backend está rodando.';
         setError(message);
-        if (/banco de dados|backend/i.test(message)) {
-          retryTimer = window.setTimeout(attemptDevLogin, 3000);
-        }
       } finally {
         if (active) setLoading(false);
       }
@@ -165,7 +167,6 @@ export default function DeskLoginPage() {
 
     return () => {
       active = false;
-      if (retryTimer) window.clearTimeout(retryTimer);
     };
   }, [clientId, completeLogin, isAuthenticated]);
 

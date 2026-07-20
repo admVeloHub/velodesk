@@ -111,7 +111,9 @@ export async function loadBoxesFromApi() {
       injectDraftTickets(adaptColumnsFromApi(data, { fila: params?.fila }), drafts)
     );
   } catch (err) {
-    console.warn('ticketsCache: falha ao carregar boxes', err.message);
+    const message = err?.response?.data?.message || err?.message || 'Erro desconhecido';
+    console.warn('ticketsCache: falha ao carregar boxes', message);
+    throw err;
   }
   return columns;
 }

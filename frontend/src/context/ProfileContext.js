@@ -66,7 +66,11 @@ export function ProfileProvider({ children }) {
 
   const setProfile = useCallback((id) => {
     const normalized = normalizeProfileId(id);
-    if (!PROFILES[normalized] || normalized === profileId) {
+    if (!PROFILES[normalized]) {
+      setDropdownOpen(false);
+      return;
+    }
+    if (normalized === profileId && normalized !== 'especiais') {
       setDropdownOpen(false);
       return;
     }

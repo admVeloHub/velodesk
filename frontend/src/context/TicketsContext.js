@@ -34,6 +34,16 @@ export function TicketsProvider({ children }) {
       setLoading(true);
       try {
         await refreshTicketsFromApi();
+      } catch (err) {
+        const status = err?.response?.status;
+        const apiMsg = String(err?.response?.data?.message || '').trim();
+        if (status === 401 || status === 403) {
+          console.warn('TicketsContext: sessão inválida ao carregar tickets — faça login novamente.');
+        } else if (status === 503 || /mongodb|banco/i.test(apiMsg)) {
+          console.warn('TicketsContext: backend/Mongo indisponível ao carregar tickets.');
+        } else {
+          console.warn('TicketsContext: falha ao carregar tickets.', apiMsg || err?.message);
+        }
       } finally {
         setLoading(false);
       }

@@ -100,6 +100,7 @@ export async function deleteGrupo(id: string): Promise<boolean> {
 export const DEFAULT_GRUPOS = [
   { slug: 'n1', nome: 'N1', descricao: 'Atendimento N1', ordem: 0, ativo: true, membros: [{ tipo: 'perfil_desk' as const, valor: 'agent' }] },
   { slug: 'financeiro', nome: 'Financeiro', descricao: 'Equipe financeira', ordem: 1, ativo: true, membros: [] },
-  { slug: 'n2', nome: 'N2', descricao: 'Suporte N2', ordem: 2, ativo: true, membros: [] },
-  { slug: 'suporte', nome: 'Suporte', descricao: 'Diagnóstico técnico', ordem: 3, ativo: true, membros: [] },
+  { slug: 'produtos', nome: 'Produtos', descricao: 'Equipe de produtos', ordem: 2, ativo: true, membros: [] },
+  { slug: 'n2', nome: 'N2', descricao: 'Suporte N2', ordem: 3, ativo: true, membros: [] },
+  { slug: 'suporte', nome: 'Suporte', descricao: 'Diagnóstico técnico', ordem: 4, ativo: true, membros: [] },
 ];
