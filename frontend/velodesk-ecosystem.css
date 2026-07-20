@@ -6,6 +6,10 @@
     --eco-accent: #1634FF;
     --eco-violet: #1694FF;
     --eco-surface: #F3F7FC;
+    --eco-carbon: #272A30;
+    --eco-sky: #006AB9;
+    --eco-gold: #FCC200;
+    --eco-green: #15A237;
     --eco-card: #ffffff;
     --eco-border: #D0DBEE;
     --eco-shadow: 0 4px 16px rgba(0, 0, 88, 0.08);
@@ -3569,6 +3573,49 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     box-shadow: 0 0 0 3px rgba(22, 52, 255, 0.12);
 }
 
+.ws360-leaderboard__columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+}
+
+.ws360-leaderboard__column + .ws360-leaderboard__column {
+    border-left: 1px dashed rgba(148, 163, 184, 0.45);
+    padding-left: 1.5rem;
+}
+
+.ws360-leaderboard__column-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0 0 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.ws360-leaderboard__column-title i {
+    color: var(--eco-blue, #1634FF);
+    font-size: 0.95rem;
+}
+
+@media (max-width: 760px) {
+    .ws360-leaderboard__columns {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .ws360-leaderboard__column + .ws360-leaderboard__column {
+        border-left: none;
+        padding-left: 0;
+        border-top: 1px dashed rgba(148, 163, 184, 0.45);
+        padding-top: 1rem;
+        margin-top: 0.5rem;
+    }
+}
+
 .ws360-leaderboard__list {
     list-style: none;
     margin: 0;
@@ -4516,6 +4563,46 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     padding: 1.25rem 1.35rem 1.15rem;
 }
 
+.ws360-escalated--compact {
+    padding: 1rem 1.1rem 0.95rem;
+}
+
+.ws360-escalated--compact .ws360-escalated__icon {
+    width: 30px;
+    height: 30px;
+    font-size: 0.85rem;
+}
+
+.ws360-escalated--compact .ws360-escalated__title {
+    font-size: 0.88rem;
+}
+
+.ws360-escalated--compact .ws360-escalated-card {
+    padding: 8px 10px;
+    border-left-width: 3px;
+}
+
+.ws360-escalated--compact .ws360-escalated-card__label {
+    font-size: 0.68rem;
+    margin-bottom: 2px;
+}
+
+.ws360-escalated--compact .ws360-escalated-card__value {
+    font-size: 1.15rem;
+}
+
+.ws360-escalated--compact .ws360-escalated__cards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 220px));
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.ws360-escalated--compact .ws360-escalated__sla-banner {
+    margin-bottom: 0;
+    padding: 8px 10px;
+    font-size: 0.76rem;
+}
+
 .ws360-escalated__head {
     display: flex;
     align-items: center;
@@ -4627,6 +4714,10 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     border-left-color: #000058;
 }
 
+.ws360-escalated-card--red {
+    border-left-color: #b42318;
+}
+
 .ws360-escalated-card__label {
     display: block;
     font-size: 0.8125rem;
@@ -4668,6 +4759,89 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
 .ws360-escalated__sla-banner i {
     font-size: 1rem;
     flex-shrink: 0;
+}
+
+.ws360-escalated__sla-banner--toggle {
+    width: 100%;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: var(--eco-font, inherit);
+    position: relative;
+}
+
+.ws360-escalated__sla-banner--toggle:disabled {
+    cursor: default;
+}
+
+.ws360-escalated__sla-chevron {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.ws360-escalated__overdue-list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 6px;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.ws360-escalated__overdue-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 8px 10px;
+}
+
+.ws360-escalated__overdue-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    font-size: 0.76rem;
+}
+
+.ws360-escalated__overdue-info strong {
+    font-size: 0.8rem;
+    color: var(--eco-navy, #000058);
+}
+
+.ws360-escalated__overdue-info span {
+    color: #64748b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ws360-escalated__overdue-area {
+    align-self: flex-start;
+    background: rgba(180, 35, 24, 0.1);
+    color: #b42318;
+    font-weight: 700;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+}
+
+.ws360-escalated__overdue-open {
+    flex-shrink: 0;
+    border: none;
+    background: var(--eco-blue, #1634FF);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.3rem 0.65rem;
+    border-radius: 8px;
+    cursor: pointer;
 }
 
 .ws360-escalated__footer {

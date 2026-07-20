@@ -103,6 +103,13 @@ export const workspace360Api = {
   agents: () => api.get('/workspace360/agents').then((r) => r.data),
 };
 
+export const gestaoInsightsApi = {
+  volume: (params) => api.get('/gestao-insights/volume', { params }).then((r) => r.data),
+  resumo: (params) => api.get('/gestao-insights/resumo', { params }).then((r) => r.data),
+  motivos: (params) => api.get('/gestao-insights/motivos', { params }).then((r) => r.data),
+  casosEspeciais: (params) => api.get('/gestao-insights/casos-especiais', { params }).then((r) => r.data),
+};
+
 export const usersApi = {
   list: () => api.get('/users').then((r) => r.data),
 };

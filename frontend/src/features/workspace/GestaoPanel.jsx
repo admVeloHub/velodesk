@@ -8,13 +8,17 @@ import { buildSupervisor360View, computeSupervisor360View, mapEntryToRow } from 
 import { useWorkspace360 } from '../../hooks/useWorkspace360';
 import { useNotifications } from '../../context/NotificationContext';
 import { useTickets } from '../../context/TicketsContext';
-import Workspace360SupervisorKpis from './components/ws360/Workspace360SupervisorKpis';
 import Workspace360EscalatedCases from './components/ws360/Workspace360EscalatedCases';
 import Workspace360EscalatedCasesList from './components/ws360/Workspace360EscalatedCasesList';
 import Workspace360OperationalLeaderboard from './components/ws360/Workspace360OperationalLeaderboard';
 import Workspace360SupervisorReports from './components/ws360/Workspace360SupervisorReports';
 import Workspace360RedistributeModal from './components/ws360/Workspace360RedistributeModal';
 import Workspace360EscalateModal from './components/ws360/Workspace360EscalateModal';
+import GestaoVolumeCard from './components/gestaoInsights/GestaoVolumeCard';
+import GestaoVolumeStatsCard from './components/gestaoInsights/GestaoVolumeStatsCard';
+import GestaoMotivosCard from './components/gestaoInsights/GestaoMotivosCard';
+import GestaoCasosEspeciaisCard from './components/gestaoInsights/GestaoCasosEspeciaisCard';
+import GestaoPeriodFilter from './components/gestaoInsights/GestaoPeriodFilter';
 
 export default function GestaoPanel() {
   const navigate = useNavigate();
@@ -24,6 +28,7 @@ export default function GestaoPanel() {
   const [escalatedListOpen, setEscalatedListOpen] = useState(false);
   const [redistributeOpen, setRedistributeOpen] = useState(false);
   const [escalateOpen, setEscalateOpen] = useState(false);
+  const [insightsPeriod, setInsightsPeriod] = useState({ period: 'mes' });
 
   const view = useMemo(() => {
     if (data) return buildSupervisor360View(data);
@@ -96,49 +101,60 @@ export default function GestaoPanel() {
           API indisponível — exibindo dados locais da fila.
         </p>
       ) : null}
-      <div className="ws-hero ws-hero--supervisor">
-        <div>
-          <h3>Performance da equipe</h3>
-        </div>
-        <div className="ws-hero-actions">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setRedistributeOpen(true)}
-          >
-            Redistribuir
-          </button>
-          <button type="button" className="btn-secondary" onClick={() => setEscalateOpen(true)}>
-            Escalonar
-          </button>
-          <button type="button" className="btn-secondary" onClick={() => navigate('/tickets?desk=v2')}>
-            Abrir fila
-          </button>
-        </div>
+      <div className="gestao-actions-bar">
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => setRedistributeOpen(true)}
+        >
+          Redistribuir
+        </button>
+        <button type="button" className="btn-secondary" onClick={() => setEscalateOpen(true)}>
+          Escalonar
+        </button>
+        <button type="button" className="btn-secondary" onClick={() => navigate('/tickets?desk=v2')}>
+          Abrir fila
+        </button>
       </div>
 
-      <Workspace360SupervisorKpis kpis={d} />
+      <div className="gestao-period-row">
+        <span className="gestao-period-row__label">
+          <i className="ti ti-calendar-stats" aria-hidden="true" />
+          Período de análise
+        </span>
+        <GestaoPeriodFilter value={insightsPeriod} onChange={setInsightsPeriod} idPrefix="gestao-global" />
+      </div>
 
-      {escalatedListOpen ? (
-        <Workspace360EscalatedCasesList
-          groups={escalatedListGroups}
-          slaCriticalCount={view.escalated?.slaCriticalCount ?? 0}
-          onBack={() => setEscalatedListOpen(false)}
-          onOpenTicket={handleOpenEscalatedTicket}
-        />
-      ) : (
-        <>
-          <div className="ws-grid-2">
-            <Workspace360EscalatedCases
-              escalated={view.escalated}
-              onViewAll={() => setEscalatedListOpen(true)}
-              onDismiss={() => showNotification('Alerta de escalonamento registrado.', 'info')}
-            />
-            <Workspace360OperationalLeaderboard entries={view.leaderboard} />
-          </div>
-          <Workspace360SupervisorReports />
-        </>
-      )}
+      <div className="gestao-insights-stack">
+        <GestaoVolumeStatsCard period={insightsPeriod} onOpenTicket={handleOpenEscalatedTicket} />
+
+        {escalatedListOpen ? (
+          <Workspace360EscalatedCasesList
+            groups={escalatedListGroups}
+            slaCriticalCount={view.escalated?.slaCriticalCount ?? 0}
+            onBack={() => setEscalatedListOpen(false)}
+            onOpenTicket={handleOpenEscalatedTicket}
+          />
+        ) : (
+          <Workspace360EscalatedCases
+            escalated={view.escalated}
+            onViewAll={() => setEscalatedListOpen(true)}
+            onDismiss={() => showNotification('Alerta de escalonamento registrado.', 'info')}
+            onOpenTicket={handleOpenEscalatedTicket}
+          />
+        )}
+
+        <div className="gestao-insights-row gestao-insights-row--chart">
+          <GestaoVolumeCard period={insightsPeriod} />
+          <GestaoMotivosCard period={insightsPeriod} />
+        </div>
+        <GestaoCasosEspeciaisCard />
+      </div>
+
+      <div className="ws-grid-2">
+        <Workspace360OperationalLeaderboard entries={view.leaderboard} />
+      </div>
+      <Workspace360SupervisorReports />
 
       <Workspace360RedistributeModal
         open={redistributeOpen}

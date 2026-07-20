@@ -9,6 +9,7 @@ import { DEV_QUICK_LOGIN_EMAIL, isDevQuickLoginEnabled } from '../../config/devA
 import { getProfileDefaultPath } from '../../config/profiles';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
+import { resolveDevLoginError } from './devLoginHelpers';
 
 function getPostLoginPath(location, profileId) {
   const from = location?.state?.from;
@@ -39,7 +40,7 @@ export default function DevQuickLoginButton() {
       applyProfileFromAccess(deskProfile);
       navigate(getPostLoginPath(location, deskProfile), { replace: true });
     } catch (err) {
-      console.error('[DevQuickLogin]', err?.response?.data?.message || err?.message || err);
+      console.error('[DevQuickLogin]', resolveDevLoginError(err));
     } finally {
       setLoading(false);
     }

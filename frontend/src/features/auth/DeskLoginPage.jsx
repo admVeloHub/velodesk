@@ -16,6 +16,11 @@ import { loadGoogleGsiScript } from '../../utils/loadGoogleGsiScript';
 import DeskLoadingGate from './DeskLoadingGate';
 import DeskAccessDenied from './DeskAccessDenied';
 import DevQuickLoginButton from './DevQuickLoginButton';
+import {
+  DEV_LOGIN_RETRY_MS,
+  isDevLoginRetryableError,
+  resolveDevLoginError,
+} from './devLoginHelpers';
 import './desk-login.css';
 
 function getGoogleButtonWidth(containerEl) {
@@ -148,6 +153,7 @@ export default function DeskLoginPage() {
     if (devLoginAttemptedRef.current) return undefined;
 
     let active = true;
+    let retryTimer = null;
     devLoginAttemptedRef.current = true;
 
     const attemptDevLogin = async () => {
@@ -160,8 +166,11 @@ export default function DeskLoginPage() {
         await completeLogin(data);
       } catch (err) {
         if (!active) return;
-        const message = resolveLoginError(err) || 'Não foi possível entrar no ambiente local. Verifique se o backend está rodando.';
+        const message = resolveDevLoginError(err);
         setError(message);
+        if (isDevLoginRetryableError(err)) {
+          retryTimer = window.setTimeout(attemptDevLogin, DEV_LOGIN_RETRY_MS);
+        }
       } finally {
         if (active) setLoading(false);
       }
@@ -171,6 +180,7 @@ export default function DeskLoginPage() {
 
     return () => {
       active = false;
+      if (retryTimer) window.clearTimeout(retryTimer);
     };
   }, [clientId, completeLogin, isAuthenticated]);
 

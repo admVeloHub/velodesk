@@ -45,12 +45,6 @@ function startOfDayInTz(date: Date, tz = TZ): Date {
   return new Date(`${y}-${m}-${d}T00:00:00-03:00`);
 }
 
-function isSameDayInTz(a: Date, b: Date, tz = TZ): boolean {
-  const fmt = (dt: Date) =>
-    new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(dt);
-  return fmt(a) === fmt(b);
-}
-
 function periodRange(period = '7d'): { from: Date; to: Date } {
   const to = new Date();
   const from = new Date(to);
@@ -427,11 +421,17 @@ export async function buildSupervisor360Payload(authUser: AuthPayload, query: Wo
   }).length;
 
   const escalatedTickets = filtered.filter((c) => escalationCategory(c) !== null);
+  const slaCriticalOnlyTickets = active.filter((c) => isSlaBreached(c) && escalationCategory(c) === null);
   const categories = [
     { id: 'financeiro', label: 'Financeiro', count: 0, accent: 'orange' },
     { id: 'estorno', label: 'Estorno', count: 0, accent: 'navy' },
+    { id: 'sla-critico', label: 'SLA crítico', count: slaCriticalOnlyTickets.length, accent: 'red' },
   ];
-  const escalatedGroups: Record<string, IChamadoN1[]> = { financeiro: [], estorno: [] };
+  const escalatedGroups: Record<string, IChamadoN1[]> = {
+    financeiro: [],
+    estorno: [],
+    'sla-critico': slaCriticalOnlyTickets,
+  };
   escalatedTickets.forEach((c) => {
     const cat = escalationCategory(c);
     if (!cat) return;
@@ -440,7 +440,8 @@ export async function buildSupervisor360Payload(authUser: AuthPayload, query: Wo
     if (row) row.count++;
   });
 
-  const slaCriticalCount = escalatedTickets.filter((c) => isSlaBreached(c)).length;
+  /** Total de tickets ativos já fora do prazo de SLA, escalados ou não — usado no banner do card. */
+  const slaCriticalCount = active.filter((c) => isSlaBreached(c)).length;
 
   const escalatedGroupEntries = await Promise.all(
     categories.map(async (cat) => ({
@@ -511,6 +512,46 @@ function wasResolvedWithSlaBreach(chamado: IChamadoN1): boolean {
   return false;
 }
 
+interface LeaderboardEntry {
+  id: string;
+  rank: number;
+  name: string;
+  medal: boolean;
+  trend: 'up' | 'down';
+  sla: string;
+  primaryValue: number;
+  primaryLabel: string;
+  tma: string;
+  csat: number | null;
+  vsLastWeek: string;
+  shift: null;
+  channel: null;
+}
+
+/** Hash determinístico (0–1) — usado só para gerar a "pesquisa média" fictícia por agente, sem Math.random(). */
+function seededRatio(seed: string): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return (hash % 1000) / 1000;
+}
+
+/** Nota de pesquisa fictícia (4.0–5.0) — aguardando captura real de avaliação do cliente por agente. */
+function fakeCsatForAgent(key: string): number {
+  return Math.round((4 + seededRatio(key)) * 10) / 10;
+}
+
+function computeDelta(current: number, previous: number): number {
+  if (previous) return Math.round(((current - previous) / previous) * 100);
+  return current > 0 ? 100 : 0;
+}
+
+function rankEntries(entries: LeaderboardEntry[]): LeaderboardEntry[] {
+  return entries
+    .sort((a, b) => b.primaryValue - a.primaryValue)
+    .slice(0, 20)
+    .map((entry, index) => ({ ...entry, rank: index + 1, medal: index === 0 }));
+}
+
 async function buildLeaderboard(chamados: IChamadoN1[], from: Date, to: Date) {
   const users = await User.find({ role: { $in: ['agent', 'supervisor'] } }).select('name email').lean();
   const userByKey = new Map<string, string>();
@@ -521,55 +562,130 @@ async function buildLeaderboard(chamados: IChamadoN1[], from: Date, to: Date) {
     if (local) userByKey.set(local, u.name);
   });
 
-  const byAgent = new Map<string, { resolved: number; resolvedToday: number; resolvedYesterday: number; slaOk: number; slaTotal: number; tmaSum: number; tmaN: number }>();
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+  /** Comparação sempre com o mesmo período, 7 dias antes (semana anterior). */
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const prevFrom = new Date(from.getTime() - WEEK_MS);
+  const prevTo = new Date(to.getTime() - WEEK_MS);
 
+  const chamadoById = new Map<string, IChamadoN1>();
+  chamados.forEach((c) => {
+    chamadoById.set(String((c as unknown as { _id: unknown })._id), c);
+  });
+
+  // ── Ranking por tickets resolvidos ──
+  const byResolver = new Map<string, { resolved: number; resolvedPrevWeek: number; slaOk: number; slaTotal: number; tmaSum: number; tmaN: number }>();
   chamados.forEach((c) => {
     const resp = (c.tabulacao?.[c.tabulacao.length - 1]?.responsavel ?? '').trim().toLowerCase();
-    if (!resp) return;
-    if (!byAgent.has(resp)) {
-      byAgent.set(resp, { resolved: 0, resolvedToday: 0, resolvedYesterday: 0, slaOk: 0, slaTotal: 0, tmaSum: 0, tmaN: 0 });
-    }
-    const row = byAgent.get(resp)!;
-    if (currentStatus(c) !== 'resolvido') return;
+    if (!resp || currentStatus(c) !== 'resolvido') return;
     const resolvedAt = getResolvedAt(c);
-    if (!resolvedAt || resolvedAt < from || resolvedAt > to) return;
-    row.resolved++;
-    if (isSameDayInTz(resolvedAt, today)) row.resolvedToday++;
-    if (isSameDayInTz(resolvedAt, yesterday)) row.resolvedYesterday++;
-    row.slaTotal++;
-    if (!wasResolvedWithSlaBreach(c)) row.slaOk++;
-    const start = c.createdAt ? new Date(c.createdAt) : resolvedAt;
-    row.tmaSum += resolvedAt.getTime() - start.getTime();
-    row.tmaN++;
+    if (!resolvedAt) return;
+    const inCurrent = resolvedAt >= from && resolvedAt <= to;
+    const inPrev = resolvedAt >= prevFrom && resolvedAt <= prevTo;
+    if (!inCurrent && !inPrev) return;
+    if (!byResolver.has(resp)) {
+      byResolver.set(resp, { resolved: 0, resolvedPrevWeek: 0, slaOk: 0, slaTotal: 0, tmaSum: 0, tmaN: 0 });
+    }
+    const row = byResolver.get(resp)!;
+    if (inCurrent) {
+      row.resolved++;
+      row.slaTotal++;
+      if (!wasResolvedWithSlaBreach(c)) row.slaOk++;
+      const start = c.createdAt ? new Date(c.createdAt) : resolvedAt;
+      row.tmaSum += resolvedAt.getTime() - start.getTime();
+      row.tmaN++;
+    } else {
+      row.resolvedPrevWeek++;
+    }
   });
 
-  const entries = [...byAgent.entries()].map(([key, stats], index) => {
-    const name = userByKey.get(key) ?? key;
-    const delta = stats.resolvedYesterday
-      ? Math.round(((stats.resolvedToday - stats.resolvedYesterday) / stats.resolvedYesterday) * 100)
-      : stats.resolvedToday > 0 ? 100 : 0;
-    return {
-      id: key.replace(/\s+/g, '-'),
-      rank: index + 1,
-      name,
-      trend: delta >= 0 ? 'up' : 'down',
-      medal: index === 0,
-      sla: stats.slaTotal ? `${Math.round((stats.slaOk / stats.slaTotal) * 100)}%` : '—',
-      resolved: stats.resolved,
-      tma: stats.tmaN ? formatDurationMs(stats.tmaSum / stats.tmaN) : '—',
-      csat: null,
-      vsYesterday: `${delta >= 0 ? '+' : ''}${delta}%`,
-      shift: null,
-      channel: null,
-    };
+  const resolvedRanking = rankEntries(
+    [...byResolver.entries()]
+      .filter(([, stats]) => stats.resolved > 0)
+      .map(([key, stats]) => {
+        const delta = computeDelta(stats.resolved, stats.resolvedPrevWeek);
+        return {
+          id: `resolved-${key.replace(/\s+/g, '-')}`,
+          rank: 0,
+          name: userByKey.get(key) ?? key,
+          medal: false,
+          trend: delta >= 0 ? 'up' as const : 'down' as const,
+          sla: stats.slaTotal ? `${Math.round((stats.slaOk / stats.slaTotal) * 100)}%` : '—',
+          primaryValue: stats.resolved,
+          primaryLabel: 'resolvidos',
+          tma: stats.tmaN ? formatDurationMs(stats.tmaSum / stats.tmaN) : '—',
+          csat: fakeCsatForAgent(key),
+          vsLastWeek: `${delta >= 0 ? '+' : ''}${delta}%`,
+          shift: null,
+          channel: null,
+        };
+      }),
+  );
+
+  // ── Ranking por interações (todo evento registrado pelo agente, não só a resolução) ──
+  const byInteractor = new Map<string, { interactions: number; interactionsPrevWeek: number; touched: Set<string> }>();
+  chamados.forEach((c) => {
+    const chamadoId = String((c as unknown as { _id: unknown })._id);
+    (c.registro ?? []).forEach((reg) => {
+      if (reg.origin !== 'agente') return;
+      const author = (reg.autor ?? '').trim().toLowerCase();
+      if (!author) return;
+      const at = reg.data ? new Date(reg.data) : null;
+      if (!at) return;
+      const inCurrent = at >= from && at <= to;
+      const inPrev = at >= prevFrom && at <= prevTo;
+      if (!inCurrent && !inPrev) return;
+      if (!byInteractor.has(author)) {
+        byInteractor.set(author, { interactions: 0, interactionsPrevWeek: 0, touched: new Set() });
+      }
+      const row = byInteractor.get(author)!;
+      if (inCurrent) {
+        row.interactions++;
+        row.touched.add(chamadoId);
+      } else {
+        row.interactionsPrevWeek++;
+      }
+    });
   });
 
-  entries.sort((a, b) => b.resolved - a.resolved);
-  entries.forEach((e, i) => { e.rank = i + 1; e.medal = i === 0; });
-  return entries.slice(0, 20);
+  const interactionRanking = rankEntries(
+    [...byInteractor.entries()]
+      .filter(([, stats]) => stats.interactions > 0)
+      .map(([key, stats]) => {
+        const delta = computeDelta(stats.interactions, stats.interactionsPrevWeek);
+        let slaOk = 0;
+        let slaTotal = 0;
+        let tmaSum = 0;
+        let tmaN = 0;
+        stats.touched.forEach((id) => {
+          const c = chamadoById.get(id);
+          if (!c || currentStatus(c) !== 'resolvido') return;
+          const resolvedAt = getResolvedAt(c);
+          if (!resolvedAt) return;
+          slaTotal++;
+          if (!wasResolvedWithSlaBreach(c)) slaOk++;
+          const start = c.createdAt ? new Date(c.createdAt) : resolvedAt;
+          tmaSum += resolvedAt.getTime() - start.getTime();
+          tmaN++;
+        });
+        return {
+          id: `interaction-${key.replace(/\s+/g, '-')}`,
+          rank: 0,
+          name: userByKey.get(key) ?? key,
+          medal: false,
+          trend: delta >= 0 ? 'up' as const : 'down' as const,
+          sla: slaTotal ? `${Math.round((slaOk / slaTotal) * 100)}%` : '—',
+          primaryValue: stats.interactions,
+          primaryLabel: 'interações',
+          tma: tmaN ? formatDurationMs(tmaSum / tmaN) : '—',
+          csat: fakeCsatForAgent(key),
+          vsLastWeek: `${delta >= 0 ? '+' : ''}${delta}%`,
+          shift: null,
+          channel: null,
+        };
+      }),
+  );
+
+  return { resolvedRanking, interactionRanking };
 }
 
 function buildReport(reportId: string, chamados: IChamadoN1[], query: Workspace360Query) {
