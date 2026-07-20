@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useTickets } from '../../../context/TicketsContext';
 
-import { findTicketEntry } from '../../../services/kanbanStorage';
+import { findTicketEntry } from '../../../services/ticketsStorage';
 
 import { formatCpf, getClientContactFields, getTicketProtocolLabel } from '../../../services/desk/utils';
 

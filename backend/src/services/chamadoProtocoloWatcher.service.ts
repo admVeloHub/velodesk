@@ -1,5 +1,4 @@
-/** chamadoProtocoloWatcher v1.0.1 — detecta inserts sem protocolo e atribui imediatamente */
-import type { ChangeStream, ChangeStreamDocument } from 'mongodb';
+/** chamadoProtocoloWatcher v1.0.2 — change stream via mongoose (sem tipos mongodb v7) */
 import mongoose from 'mongoose';
 import { isMongoConnected } from '../config/database';
 import {
@@ -9,9 +8,24 @@ import {
 } from './chamadoProtocoloAssign.service';
 import { needsProtocolAssignment } from './protocoloUtils';
 
-type ChamadoChangeStream = ChangeStream<Record<string, unknown>>;
+/** Tipos locais — coll.watch() usa mongodb embutido no mongoose (v6), não o pacote mongodb v7 */
+interface ChamadoChangeEvent {
+  operationType: string;
+  fullDocument?: {
+    _id?: { toString(): string };
+    chamadoProtocolo?: string;
+  };
+  documentKey?: { _id?: { toString(): string } };
+  updateDescription?: { updatedFields?: Record<string, unknown> };
+}
 
-let changeStream: ChamadoChangeStream | null = null;
+interface ChamadoWatchStream {
+  on(event: 'change', listener: (change: ChamadoChangeEvent) => void): void;
+  on(event: 'error', listener: (err: Error) => void): void;
+  close(): Promise<void>;
+}
+
+let changeStream: ChamadoWatchStream | null = null;
 const processingIds = new Set<string>();
 
 async function handleChamadoId(chamadoId: string): Promise<void> {
@@ -27,25 +41,17 @@ async function handleChamadoId(chamadoId: string): Promise<void> {
   }
 }
 
-function extractDocumentId(change: ChangeStreamDocument): string | null {
+function extractDocumentId(change: ChamadoChangeEvent): string | null {
   if (change.operationType === 'insert') {
-    const insertChange = change as ChangeStreamDocument & {
-      fullDocument?: { _id?: { toString(): string } };
-      documentKey?: { _id?: { toString(): string } };
-    };
-    return insertChange.fullDocument?._id?.toString()
-      ?? insertChange.documentKey?._id?.toString()
+    return change.fullDocument?._id?.toString()
+      ?? change.documentKey?._id?.toString()
       ?? null;
   }
 
   if (change.operationType === 'update') {
-    const updateChange = change as ChangeStreamDocument & {
-      updateDescription?: { updatedFields?: Record<string, unknown> };
-      documentKey?: { _id?: { toString(): string } };
-    };
-    const protocolo = updateChange.updateDescription?.updatedFields?.chamadoProtocolo;
+    const protocolo = change.updateDescription?.updatedFields?.chamadoProtocolo;
     if (protocolo !== undefined && needsProtocolAssignment(protocolo)) {
-      return updateChange.documentKey?._id?.toString() ?? null;
+      return change.documentKey?._id?.toString() ?? null;
     }
   }
 
@@ -62,7 +68,8 @@ export async function startChamadoProtocoloWatcher(): Promise<void> {
   const stream = coll.watch(
     [{ $match: { operationType: { $in: ['insert', 'update'] } } }],
     { fullDocument: 'updateLookup' },
-  );
+  ) as unknown as ChamadoWatchStream;
+
   changeStream = stream;
 
   stream.on('change', (change) => {
@@ -76,10 +83,7 @@ export async function startChamadoProtocoloWatcher(): Promise<void> {
       return;
     }
 
-    const updateChange = change as ChangeStreamDocument & {
-      fullDocument?: { chamadoProtocolo?: string };
-    };
-    if (needsProtocolAssignment(updateChange.fullDocument?.chamadoProtocolo)) {
+    if (needsProtocolAssignment(change.fullDocument?.chamadoProtocolo)) {
       void handleChamadoId(chamadoId);
     }
   });

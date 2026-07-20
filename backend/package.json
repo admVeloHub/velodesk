@@ -24,7 +24,7 @@
     "test:gmail-inbound": "tsx scripts/test-gmail-inbound.ts"
   },
   "dependencies": {
-    "@google-cloud/pubsub": "^5.3.1",
+    "@google-cloud/pubsub": "^5.0.0",
     "@google/generative-ai": "^0.21.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

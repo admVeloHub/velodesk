@@ -1,10 +1,31 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.36.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.37.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Fix build Cloud Run (watcher TS + frontend Vite)
+
+- **Data/Hora**: 2026-07-20
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.37.0
+  - chamadoProtocoloWatcher.service v1.0.2
+  - env.ts v1.18.1
+  - useProdSolicTicketPrefill.js (import ticketsStorage)
+- **Arquivos modificados**:
+  - `backend/src/services/chamadoProtocoloWatcher.service.ts` — tipos locais no change stream (remove import mongodb v7; corrige TS2739/TS2345 no Docker)
+  - `backend/src/config/env.ts`, `backend/.env.example`, `.env.docker.example` — roleta ativa por padrão no deploy (`!== 'false'`)
+  - `frontend/package.json`, `frontend/package-lock.json` — Vite 5.4.21 (evita quebra do Vite 8 pós audit)
+  - `frontend/src/features/cadastral/components/useProdSolicTicketPrefill.js` — import `ticketsStorage` (kanbanStorage removido)
+- **Descrição**: Desbloqueia Cloud Build nos steps `npm run build` (API + SPA). Protocolo watcher compatível com mongoose; frontend build estável.
+- **Status**: Concluído
+
+---
 
 ### GitHub Push — Fix build Cloud Run (ChangeStream TS strict)
 

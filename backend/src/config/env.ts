@@ -1,4 +1,4 @@
-/** env v1.18.0 — colaboradores: MONGO_ENV (VeloHubCentral) em runtime */
+/** env v1.18.1 — roleta ativa por padrão (opt-out com ASSIGNMENT_ROUTER_ENABLED=false) */
 import fs from 'fs';
 import path from 'path';
 
@@ -146,7 +146,8 @@ export const env = {
     .filter(Boolean),
   gestaoAlertWhatsapp: (process.env.GESTAO_ALERT_WHATSAPP || '').trim(),
   ticketSequenceFloor: (process.env.TICKET_SEQUENCE_FLOOR || '100177678').trim(),
-  assignmentRouterEnabled: process.env.ASSIGNMENT_ROUTER_ENABLED === 'true',
+  /** Ativo por padrão; desligar com ASSIGNMENT_ROUTER_ENABLED=false */
+  assignmentRouterEnabled: process.env.ASSIGNMENT_ROUTER_ENABLED !== 'false',
   assignmentRouterStrategy: (process.env.ASSIGNMENT_ROUTER_STRATEGY || 'least_loaded').trim(),
   assignmentRouterTerminalStatuses: (process.env.ASSIGNMENT_ROUTER_TERMINAL_STATUSES || 'resolvido,cancelado,fechado')
     .split(',')
