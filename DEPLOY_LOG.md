@@ -1,10 +1,33 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.37.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.38.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Merge dev → main (Desk CRM, workflows, Gmail, agentes IA, POPs)
+
+- **Data/Hora**: 2026-07-20
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.38.0
+  - POPs/ (21 documentos .docx operacionais)
+  - Merge de 25 commits de `dev` (c58e3a3)
+- **Escopo principal incluído no merge**:
+  - Desk CRM v2: workflows persistidos, stepper, pedidos de informação, Reclame Aqui, canais Especiais, encaminhamento Produtos
+  - Agentes IA paralelos (atendimento, auditoria, gestão de chamados) + Workspace360
+  - Gmail inbound/outbound E2E, protocolo externo, caixa suporte@, watcher de protocolo
+  - Fix build Cloud Run (watcher TS, Vite 5.4, roleta ativa por padrão)
+  - Remoção frontend-legacy; colaboradores Desk; tabulação e spellcheck
+- **Arquivos novos neste commit**:
+  - `POPs/` — POPs operacionais Velotax (CAD, Cup, EP, FIN, IDQ, IR26, SEG-CEL, SEG-PR)
+- **Descrição**: Promove `dev` para `main` com o estado estável atual do Velodesk (API + SPA + POPs locais). Base para deploy produção a partir de `main`.
+- **Status**: Concluído
+
+---
 
 ### GitHub Push — Fix build Cloud Run (watcher TS + frontend Vite)
 
