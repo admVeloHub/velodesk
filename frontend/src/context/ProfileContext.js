@@ -1,6 +1,6 @@
 /**
- * ProfileContext v1.6.0 — portal lock por RBAC
- * VERSION: v1.6.0 | DATE: 2026-07-17
+ * ProfileContext v1.7.0 — deskProfile gestao|agent do cadastro
+ * VERSION: v1.7.0 | DATE: 2026-07-20
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -70,7 +70,8 @@ export function ProfileProvider({ children }) {
 
   const applyProfileFromAccess = useCallback((deskProfile) => {
     const perm = readCachedPermissions();
-    const fallback = deskProfile === 'supervisor' ? 'gestao' : 'agent';
+    const raw = String(deskProfile || '').trim().toLowerCase();
+    const fallback = (raw === 'supervisor' || raw === 'gestao') ? 'gestao' : 'agent';
     const allowed = perm?.portalVisivel || [fallback];
     const id = allowed.includes(fallback) ? fallback : (allowed[0] || 'agent');
     const normalized = normalizeProfileId(id);

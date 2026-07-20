@@ -1,6 +1,6 @@
 /**
  * Modal — configurações de conta do usuário
- * VERSION: v1.0.0 | DATE: 2026-06-19
+ * VERSION: v1.1.0 | DATE: 2026-07-20
  */
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -10,6 +10,8 @@ import { useNotifications } from '../../context/NotificationContext';
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 import { getInitials } from '../../services/desk/utils';
 import ProfileRoleSwitcher from '../../components/ProfileRoleSwitcher';
+
+const showVisionSwitcher = !import.meta.env.PROD;
 
 export default function AccountSettingsModal({ open, onClose }) {
   const { user, updateUser } = useAuth();
@@ -138,13 +140,15 @@ export default function AccountSettingsModal({ open, onClose }) {
             </div>
           </section>
 
-          <section className="account-modal__section">
-            <h3 className="account-modal__section-title">Perfil operacional</h3>
-            <p className="account-modal__section-desc">
-              Alterne a visão do portal entre Agente e Supervisor.
-            </p>
-            <ProfileRoleSwitcher variant="menu" className="account-modal__role-switcher" />
-          </section>
+          {showVisionSwitcher ? (
+            <section className="account-modal__section">
+              <h3 className="account-modal__section-title">Perfil operacional</h3>
+              <p className="account-modal__section-desc">
+                Alterne a visão do portal entre Agente e Supervisor.
+              </p>
+              <ProfileRoleSwitcher variant="menu" className="account-modal__role-switcher" />
+            </section>
+          ) : null}
 
           <section className="account-modal__section">
             <h3 className="account-modal__section-title">Preferências</h3>

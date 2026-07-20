@@ -1,6 +1,7 @@
 /**
  * Seletor de perfil operacional — Agente / Supervisor
- * VERSION: v1.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.2.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team
+ * Em produção o componente não é montado pelos hosts (Header / Painel 360°).
  */
 import React, { useState } from 'react';
 import { PROFILES } from '../config/profiles';

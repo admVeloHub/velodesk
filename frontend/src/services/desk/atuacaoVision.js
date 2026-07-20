@@ -1,6 +1,6 @@
 /**
- * atuacaoVision v1.1.0 — hasAtendimentoFuncao para permissões Desk
- * VERSION: v1.1.0 | DATE: 2026-07-16
+ * atuacaoVision v1.1.1 — aliases suporte-supervisao
+ * VERSION: v1.1.1 | DATE: 2026-07-20
  */
 
 export const DESK_VISION = {
@@ -16,6 +16,7 @@ export const DESK_VISION_LABELS = {
 const SUPERVISION_FUNCOES = new Set([
   'gestao',
   'suporte supervisao',
+  'suporte-supervisao',
   'direcao',
 ]);
 
