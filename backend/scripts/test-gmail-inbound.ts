@@ -1,4 +1,4 @@
-/** test-gmail-inbound.ts v1.0.0 — teste E2E Gmail inbound (history + pubsub simulado) */
+/** test-gmail-inbound.ts v1.0.1 — teste E2E Gmail inbound (history + pubsub simulado) */
 import mongoose from 'mongoose';
 import { connectDatabase, disconnectDatabase, isDeskConfigConnected } from '../src/config/database';
 import { env } from '../src/config/env';
@@ -31,7 +31,7 @@ Uso: npm run test:gmail-inbound -- [opções]
   --help              Esta ajuda
 
 Exemplo E2E:
-  1) Envie e-mail para atendimento@velotax.com.br com assunto "[TEST INBOUND] ..."
+  1) Envie e-mail para suporte@velotax.com.br com assunto "[TEST INBOUND] ..."
   2) npm run test:gmail-inbound -- --watch --history
 `);
 }
@@ -102,7 +102,7 @@ async function runHistoryTest(startOverride?: string) {
   const results = await processGmailHistory(startId);
   if (results.length === 0) {
     console.log('Nenhuma mensagem nova processada.');
-    console.log('Envie e-mail para atendimento@velotax.com.br e rode novamente com --history');
+    console.log('Envie e-mail para suporte@velotax.com.br e rode novamente com --history');
     return;
   }
 
