@@ -1,10 +1,26 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.35.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.36.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Fix build Cloud Run (ChangeStream TS strict)
+
+- **Data/Hora**: 2026-07-20
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.36.0
+  - chamadoProtocoloWatcher.service v1.0.1
+- **Arquivos modificados**:
+  - `backend/src/services/chamadoProtocoloWatcher.service.ts` — tipagem `ChangeStream<Record<string, unknown>>` + variável local `stream` (corrige TS18047/TS2739 no `tsc` do Docker)
+- **Descrição**: Desbloqueia Cloud Build que falhava no step `npm run build` após merge Reclame Aqui / protocolo watcher.
+- **Status**: Concluído
+
+---
 
 ### GitHub Push — Caixa Gmail suporte@ + script update-email-mailbox
 

@@ -1,4 +1,4 @@
-/** chamadoProtocoloWatcher v1.0.0 — detecta inserts sem protocolo e atribui imediatamente */
+/** chamadoProtocoloWatcher v1.0.1 — detecta inserts sem protocolo e atribui imediatamente */
 import type { ChangeStream, ChangeStreamDocument } from 'mongodb';
 import mongoose from 'mongoose';
 import { isMongoConnected } from '../config/database';
@@ -9,7 +9,9 @@ import {
 } from './chamadoProtocoloAssign.service';
 import { needsProtocolAssignment } from './protocoloUtils';
 
-let changeStream: ChangeStream | null = null;
+type ChamadoChangeStream = ChangeStream<Record<string, unknown>>;
+
+let changeStream: ChamadoChangeStream | null = null;
 const processingIds = new Set<string>();
 
 async function handleChamadoId(chamadoId: string): Promise<void> {
@@ -57,12 +59,13 @@ export async function startChamadoProtocoloWatcher(): Promise<void> {
   await reconcilePendingProtocolos();
 
   const coll = mongoose.connection.collection('chamados_n1');
-  changeStream = coll.watch(
+  const stream = coll.watch(
     [{ $match: { operationType: { $in: ['insert', 'update'] } } }],
     { fullDocument: 'updateLookup' },
   );
+  changeStream = stream;
 
-  changeStream.on('change', (change) => {
+  stream.on('change', (change) => {
     if (change.operationType !== 'insert' && change.operationType !== 'update') return;
 
     const chamadoId = extractDocumentId(change);
@@ -81,7 +84,7 @@ export async function startChamadoProtocoloWatcher(): Promise<void> {
     }
   });
 
-  changeStream.on('error', (err) => {
+  stream.on('error', (err) => {
     console.error('[protocolo-watcher] change stream erro:', err);
     changeStream = null;
     setTimeout(() => {
