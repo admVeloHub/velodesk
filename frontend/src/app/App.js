@@ -47,6 +47,7 @@ import AlteracoesCadastraisPage from '../pages/AlteracoesCadastraisPage';
 import EspeciaisSelectPage from '../features/especiais/EspeciaisSelectPage';
 import EspeciaisChannelPage from '../features/especiais/EspeciaisChannelPage';
 import ReclameAquiChannelPage from '../features/especiais/ReclameAquiChannelPage';
+import { PermissionProvider } from '../context/PermissionContext';
 
 import { initCockpitGlobals } from '../config/cockpitConfig';
 
@@ -140,9 +141,11 @@ function AppProviders({ children }) {
 
           null,
 
-          React.createElement(ProfileProvider, null,
-            React.createElement(TabulationProvider, null,
-              React.createElement(WorkflowConfigProvider, null, children)
+          React.createElement(PermissionProvider, null,
+            React.createElement(ProfileProvider, null,
+              React.createElement(TabulationProvider, null,
+                React.createElement(WorkflowConfigProvider, null, children)
+              )
             )
           )
 

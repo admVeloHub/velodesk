@@ -160,9 +160,22 @@ export function resolveStepIcon(acaoTipo) {
 }
 
 export const ATRIBUICAO_TIPOS = [
-  { value: 'grupo', label: 'Grupo de responsabilidade' },
+  { value: 'funcao', label: 'Função do agente' },
+  { value: 'grupo', label: 'Grupo (legado)' },
   { value: 'colaborador', label: 'Colaborador' },
   { value: 'responsavel_ticket', label: 'Responsável do ticket' },
+];
+
+export const FUNCAO_ATRIBUICAO_OPCOES = [
+  { value: 'atendimento', label: 'Atendimento' },
+  { value: 'n2', label: 'N2' },
+  { value: 'suporte', label: 'Suporte' },
+  { value: 'financeiro', label: 'Financeiro' },
+  { value: 'reclame-aqui', label: 'Reclame Aqui' },
+  { value: 'bacen', label: 'Bacen' },
+  { value: 'procon', label: 'Procon' },
+  { value: 'consumidor-gov', label: 'Consumidor .GOV' },
+  { value: 'gestao', label: 'Gestão' },
 ];
 
 export const ATRIBUICAO_SISTEMA = { value: 'sistema', label: 'Sistema (automático)' };
@@ -277,7 +290,7 @@ export function createEmptyPassoEnvelope(ordem = 0) {
       nome: 'Nova etapa',
       descricao: '',
       slaHoras: null,
-      atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' },
+      atribuicao: { tipo: 'funcao', funcaoSlug: 'atendimento', grupoSlug: '', colaborador: '' },
       acao: { tipo: 'manual', rotas: [] },
     },
   };

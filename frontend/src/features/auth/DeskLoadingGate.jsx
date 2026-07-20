@@ -7,7 +7,8 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 import { GATE_STATUS, runDeskAccessGate } from '../../services/deskAccessGate';
-import { getProfileDefaultPath } from '../../config/profiles';
+import { getProfileDefaultPath, normalizeProfileId } from '../../config/profiles';
+import { fetchMyPermissions } from '../../services/permissions/permissionService';
 import DeskAccessDenied from './DeskAccessDenied';
 
 const shellStyle = {
@@ -22,9 +23,10 @@ const shellStyle = {
 
 export default function DeskLoadingGate() {
   const { authStatus, bootstrapFromGate } = useAuth();
-  const { applyGateProfile } = useProfile();
+  const { applyGateProfile, applyDefaultPortalFromPermissions } = useProfile();
   const [phase, setPhase] = useState('loading');
   const [reason, setReason] = useState('');
+  const [landingPath, setLandingPath] = useState('/workspace');
 
   useEffect(() => {
     if (authStatus === 'authorized') return;
@@ -38,7 +40,11 @@ export default function DeskLoadingGate() {
       if (result.status === GATE_STATUS.AUTHORIZED) {
         try {
           await bootstrapFromGate(result);
+          await fetchMyPermissions().catch(() => null);
           applyGateProfile(result.colaborador);
+          applyDefaultPortalFromPermissions();
+          const profileId = normalizeProfileId(localStorage.getItem('velodeskProfile') || 'agent');
+          setLandingPath(getProfileDefaultPath(profileId));
           setPhase('authorized');
         } catch (err) {
           setReason(err?.message || 'Não foi possível conectar ao backend do Desk.');
@@ -52,10 +58,10 @@ export default function DeskLoadingGate() {
     })();
 
     return () => { cancelled = true; };
-  }, [authStatus, bootstrapFromGate, applyGateProfile]);
+  }, [authStatus, bootstrapFromGate, applyGateProfile, applyDefaultPortalFromPermissions]);
 
   if (authStatus === 'authorized' || phase === 'authorized') {
-    return <Navigate to={getProfileDefaultPath('agent')} replace />;
+    return <Navigate to={landingPath} replace />;
   }
 
   if (phase === GATE_STATUS.ACCESS_DENIED) {

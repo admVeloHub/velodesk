@@ -1,11 +1,12 @@
 /**
- * ProfileContext v1.5.0 — seletor Agente / Gestão / Workflow
- * VERSION: v1.5.0 | DATE: 2026-07-13 | AUTHOR: VeloHub Development Team
+ * ProfileContext v1.6.0 — portal lock por RBAC
+ * VERSION: v1.6.0 | DATE: 2026-07-17
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PROFILES, getProfileMeta, getProfileDefaultPath, normalizeProfileId } from '../config/profiles';
 import { useNotifications } from './NotificationContext';
+import { isPortalAllowed, readCachedPermissions } from '../services/permissions/permissionService';
 
 const ProfileContext = createContext(null);
 
@@ -42,10 +43,21 @@ export function ProfileProvider({ children }) {
     document.body.dataset.velodeskProfile = profileId;
   }, [profileId]);
 
+  const applyDefaultPortalFromPermissions = useCallback(() => {
+    const perm = readCachedPermissions();
+    const allowed = perm?.portalVisivel || ['agent'];
+    const preferred = allowed.includes('gestao') ? 'gestao'
+      : allowed.includes('especiais') ? 'especiais'
+        : allowed.includes('workflow') ? 'workflow'
+          : 'agent';
+    const id = normalizeProfileId(preferred);
+    localStorage.setItem('velodeskProfile', id);
+    setProfileIdState(id);
+  }, []);
+
   const applyGateProfile = useCallback((colaborador) => {
-    localStorage.setItem('velodeskProfile', 'agent');
+    applyDefaultPortalFromPermissions();
     localStorage.removeItem('velodesk_profile_locked');
-    setProfileIdState('agent');
     const meta = colaborador ? {
       atuacao: colaborador.atuacao || [],
       departamento: colaborador.departamento || '',
@@ -54,13 +66,17 @@ export function ProfileProvider({ children }) {
       localStorage.setItem('velodesk_colaborador_meta', JSON.stringify(meta));
       setSegmentation(meta);
     }
-  }, []);
+  }, [applyDefaultPortalFromPermissions]);
 
   const applyProfileFromAccess = useCallback((deskProfile) => {
-    const id = deskProfile === 'supervisor' ? 'gestao' : 'agent';
-    localStorage.setItem('velodeskProfile', id);
+    const perm = readCachedPermissions();
+    const fallback = deskProfile === 'supervisor' ? 'gestao' : 'agent';
+    const allowed = perm?.portalVisivel || [fallback];
+    const id = allowed.includes(fallback) ? fallback : (allowed[0] || 'agent');
+    const normalized = normalizeProfileId(id);
+    localStorage.setItem('velodeskProfile', normalized);
     localStorage.removeItem('velodesk_profile_locked');
-    setProfileIdState(id);
+    setProfileIdState(normalized);
     setDropdownOpen(false);
   }, []);
 
@@ -71,6 +87,11 @@ export function ProfileProvider({ children }) {
       return;
     }
     if (normalized === profileId && normalized !== 'especiais') {
+      setDropdownOpen(false);
+      return;
+    }
+    if (!isPortalAllowed(normalized)) {
+      showNotification('Sem permissão para a visão: ' + PROFILES[normalized].label, 'warning');
       setDropdownOpen(false);
       return;
     }
@@ -97,6 +118,7 @@ export function ProfileProvider({ children }) {
       setProfile,
       applyGateProfile,
       applyProfileFromAccess,
+      applyDefaultPortalFromPermissions,
       toggleDropdown,
       setDropdownOpen,
       isNavAllowed,

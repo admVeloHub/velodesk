@@ -10,6 +10,9 @@ import {
 } from './tabulation.service';
 import { WORKFLOW_TEST_PROTOCOL_PREFIX } from './workflowTestSeed.service';
 import { seedWorkflowConfig } from './workflowConfigSeed.service';
+import { seedFuncoesPermissoes } from './funcaoPermissao.service';
+import { migrateGrupoToFuncao } from './migrateGrupoToFuncao.service';
+import { migrateEscalonarPermissao } from './migrateEscalonarPermissao.service';
 import { env } from '../config/env';
 
 const DEMO_CPFS = ['12345678901', '11122233300'];
@@ -60,6 +63,11 @@ export async function purgeLegacyDemoData() {
   await purgeAllMockTickets();
 }
 
+export async function runDeskConfigMigrations(): Promise<void> {
+  await migrateEscalonarPermissao();
+  await migrateGrupoToFuncao();
+}
+
 export async function seedDevelopmentData() {
   if (env.nodeEnv !== 'development') return;
 
@@ -76,7 +84,9 @@ export async function seedDevelopmentData() {
   }
 
   await seedTabulationConfig();
+  await seedFuncoesPermissoes();
   await seedWorkflowConfig();
+  await runDeskConfigMigrations();
 }
 
 async function seedTabulationConfig() {

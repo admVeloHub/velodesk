@@ -22,6 +22,10 @@ import {
   tryActivateWorkflowOnTabulation,
   WorkflowAdvanceError,
 } from '../services/workflowTicket.service';
+import {
+  assertCanActOnTicket,
+  PermissionDeniedError,
+} from '../services/permission.service';
 
 const router = Router();
 
@@ -107,6 +111,15 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
   const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
 
+  try {
+    await assertCanActOnTicket(req.user!, chamado);
+  } catch (err) {
+    if (err instanceof PermissionDeniedError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    throw err;
+  }
+
   if (req.body.boxId && (req.body.status === undefined || String(req.body.status).trim() === '')) {
     const box = await Box.findById(req.body.boxId);
     if (box) req.body.status = statusFromBoxName(box.name);
@@ -144,6 +157,15 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
   const { text, sender, internal, attachments, internalText, anotacaoInterna, author } = req.body;
   const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+
+  try {
+    await assertCanActOnTicket(req.user!, chamado);
+  } catch (err) {
+    if (err instanceof PermissionDeniedError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    throw err;
+  }
 
   const attachmentList = Array.isArray(attachments)
     ? attachments.map((item: unknown) => String(item ?? '').trim()).filter(Boolean)

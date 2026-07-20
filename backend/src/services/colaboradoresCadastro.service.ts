@@ -79,6 +79,26 @@ export async function listColaboradoresDesk(): Promise<ColaboradorDeskPublico[]>
     .sort((a, b) => a.colaboradorNome.localeCompare(b.colaboradorNome, 'pt-BR'));
 }
 
+export async function listColaboradoresVelotaxDesk(): Promise<ColaboradorDeskPublico[]> {
+  const col = getCadastroCollection();
+  const docs = await col
+    .find(
+      {
+        desligado: { $ne: true },
+        $or: DESK_ACCESS_OR,
+        empresa: { $regex: /^velotax$/i },
+      },
+      { maxTimeMS: 10000 },
+    )
+    .project(PUBLIC_PROJECTION)
+    .toArray();
+
+  return docs
+    .map((d) => mapPublico(d as Record<string, unknown>))
+    .filter((d): d is ColaboradorDeskPublico => Boolean(d))
+    .sort((a, b) => a.colaboradorNome.localeCompare(b.colaboradorNome, 'pt-BR'));
+}
+
 export async function findColaboradorByEmail(email: string): Promise<ColaboradorDeskPublico | null> {
   const normalized = String(email || '').trim().toLowerCase();
   if (!normalized) return null;

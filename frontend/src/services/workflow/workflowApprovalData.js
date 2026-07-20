@@ -5,6 +5,7 @@ import { getAllCockpitTickets } from '../ticketsStorage';
 import { getSlaClass, getWorkflowProgress, isTicketInWorkflow, getTicketProtocolLabel, getAgentName } from '../desk/utils';
 import { resolveApprovalHeader, ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import { getRuntimeGrupos } from '../desk/workflowRuntimeStore';
+import { agentCanDecideTicket as permAgentCanDecide, canApproveWorkflow } from '../permissions/permissionService';
 
 const QUEUE_LABEL = 'Aguardando aprovação';
 
@@ -18,25 +19,8 @@ function isPerfilDeskAmplo(valor) {
 }
 
 function agentCanDecideTicket(ticket) {
-  const atribuido = String(ticket?.lateralForm?.atribuido || '').trim();
-  const agent = normalizeText(getAgentName());
-  if (!atribuido || !agent) return true;
-
-  if (atribuido.startsWith('grupo:')) {
-    const slug = atribuido.slice(6);
-    const grupo = getRuntimeGrupos().find((g) => g.slug === slug);
-    if (!grupo) return false;
-    if (!grupo.membros?.length) return true;
-    return grupo.membros.some((m) => {
-      const val = normalizeText(m.valor);
-      if (m.tipo === 'colaborador') return val === agent || agent.includes(val);
-      if (m.tipo === 'email') return val === agent || agent.includes(val);
-      if (m.tipo === 'perfil_desk') return isPerfilDeskAmplo(m.valor);
-      return false;
-    });
-  }
-
-  return normalizeText(atribuido) === agent || atribuido.toLowerCase().includes(agent);
+  if (!canApproveWorkflow()) return false;
+  return permAgentCanDecide(ticket);
 }
 
 function formatRelativeTime(iso) {

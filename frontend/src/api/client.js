@@ -38,6 +38,22 @@ api.interceptors.response.use(
 
 export default api;
 
+export const permissionsApi = {
+  me: () => api.get('/permissions/me').then((r) => r.data),
+};
+
+export const funcoesPermissoesApi = {
+  list: () => api.get('/funcoes-permissoes').then((r) => r.data),
+  catalog: () => api.get('/funcoes-permissoes/catalog').then((r) => r.data),
+  update: (slug, data) => api.put(`/funcoes-permissoes/${encodeURIComponent(slug)}`, data).then((r) => r.data),
+  effective: (slug) => api.get(`/funcoes-permissoes/${encodeURIComponent(slug)}/effective`).then((r) => r.data),
+};
+
+export const agentesDeskApi = {
+  list: () => api.get('/agentes-desk').then((r) => r.data),
+  sync: () => api.post('/agentes-desk/sync').then((r) => r.data),
+};
+
 export const authApi = {
   login: (email, password) =>
     api.post('/login', { email, password }).then((r) => r.data),
