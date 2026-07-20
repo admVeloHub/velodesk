@@ -1,10 +1,26 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.38.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.39.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Remove POPs/ do repositório remoto
+
+- **Data/Hora**: 2026-07-20
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.39.0
+  - `.gitignore` — ignora `POPs/` (documentos operacionais locais, fora do git)
+- **Arquivos removidos do repositório**:
+  - `POPs/` — 21 documentos .docx (permanecem apenas fora do controle de versão / ambiente local)
+- **Descrição**: Retira POPs do GitHub; base de POPs continua na vector store OpenAI usada pela sugestão IA.
+- **Status**: Concluído
+
+---
 
 ### GitHub Push — Merge dev → main (Desk CRM, workflows, Gmail, agentes IA, POPs)
 

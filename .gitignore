@@ -35,6 +35,8 @@ Thumbs.db
 .vercel/
 _vercel-deploy/
 
+POPs/
+
 # Temp
 tmp/
 temp/
