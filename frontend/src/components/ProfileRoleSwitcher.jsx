@@ -5,12 +5,15 @@
 import React, { useState } from 'react';
 import { PROFILES } from '../config/profiles';
 import { useProfile } from '../context/ProfileContext';
+import { usePermissionsOptional } from '../context/PermissionContext';
 
-function ProfileRoleOptions({ profileId, onSelect }) {
+function ProfileRoleOptions({ profileId, onSelect, allowedPortals }) {
+  const portalIds = Object.keys(PROFILES).filter((id) => allowedPortals.includes(id));
+
   return (
     <>
       <div className="eco-profile-dropdown-header">Visão do portal</div>
-      {Object.keys(PROFILES).map((id) => (
+      {portalIds.map((id) => (
         <button
           key={id}
           type="button"
@@ -36,6 +39,8 @@ export default function ProfileRoleSwitcher({
   onSelect,
 }) {
   const { profile, profileId, profileLocked, setProfile } = useProfile();
+  const permsCtx = usePermissionsOptional();
+  const allowedPortals = permsCtx?.portalVisivel || Object.keys(PROFILES);
   const [open, setOpen] = useState(false);
 
   const handleSelect = (id) => {
@@ -63,7 +68,7 @@ export default function ProfileRoleSwitcher({
   if (variant === 'menu') {
     return (
       <div className={'profile-role-menu' + (className ? ' ' + className : '')}>
-        <ProfileRoleOptions profileId={profileId} onSelect={handleSelect} />
+        <ProfileRoleOptions profileId={profileId} onSelect={handleSelect} allowedPortals={allowedPortals} />
       </div>
     );
   }
@@ -86,7 +91,7 @@ export default function ProfileRoleSwitcher({
         </button>
         {open ? (
           <div className="eco-profile-dropdown open" id={badgeId + 'Dropdown'}>
-            <ProfileRoleOptions profileId={profileId} onSelect={handleSelect} />
+            <ProfileRoleOptions profileId={profileId} onSelect={handleSelect} allowedPortals={allowedPortals} />
           </div>
         ) : null}
       </div>

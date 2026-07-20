@@ -11,6 +11,8 @@ backend/dist/
 # WhatsApp auth cache
 backend/.wwebjs_auth/
 backend/.wwebjs_cache/
+backend/src/whatsapp/.wwebjs_auth/
+backend/src/whatsapp/.wwebjs_cache/
 
 # Environment (dev local usa FONTE DA VERDADE/.env-velodesk via bootstrap)
 .env

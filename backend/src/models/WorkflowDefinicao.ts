@@ -28,7 +28,8 @@ export interface IWorkflowAutomaticaConfig {
 export type IWorkflowSistemaConfig = IWorkflowAutomaticaConfig;
 
 export interface IWorkflowAtribuicao {
-  tipo: 'grupo' | 'colaborador' | 'responsavel_ticket' | 'sistema';
+  tipo: 'funcao' | 'grupo' | 'colaborador' | 'responsavel_ticket' | 'sistema';
+  funcaoSlug: string;
   grupoSlug: string;
   colaborador: string;
   sistema?: IWorkflowSistemaConfig;
@@ -109,7 +110,8 @@ const AutomaticaConfigSchema = new Schema<IWorkflowAutomaticaConfig>(
 
 const AtribuicaoSchema = new Schema<IWorkflowAtribuicao>(
   {
-    tipo: { type: String, required: true, enum: ['grupo', 'colaborador', 'responsavel_ticket', 'sistema'] },
+    tipo: { type: String, required: true, enum: ['funcao', 'grupo', 'colaborador', 'responsavel_ticket', 'sistema'] },
+    funcaoSlug: { type: String, default: '' },
     grupoSlug: { type: String, default: '' },
     colaborador: { type: String, default: '' },
     sistema: { type: AutomaticaConfigSchema, default: undefined },
@@ -132,7 +134,7 @@ const PassoConfigSchema = new Schema<IWorkflowPassoConfig>(
     nome: { type: String, required: true },
     descricao: { type: String, default: '' },
     slaHoras: { type: Number, default: null },
-    atribuicao: { type: AtribuicaoSchema, default: () => ({ tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }) },
+    atribuicao: { type: AtribuicaoSchema, default: () => ({ tipo: 'funcao', funcaoSlug: 'atendimento', grupoSlug: '', colaborador: '' }) },
     acao: {
       tipo: { type: String, enum: ['manual', 'aprovacao', 'automatica'], default: 'manual' },
       rotas: { type: [RotaSchema], default: [] },

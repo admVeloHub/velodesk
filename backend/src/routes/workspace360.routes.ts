@@ -1,15 +1,14 @@
-/** workspace360.routes v1.1.0 — Painel 360° com suporte a profile=gestao|agent */
+/** workspace360.routes v1.2.0 — RBAC por função */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { isMongoConnected } from '../config/database';
-import { env } from '../config/env';
-import { User } from '../models/User';
 import {
   buildAgent360Payload,
   buildReportPayload,
   buildSupervisor360Payload,
   Workspace360Query,
 } from '../services/workspace360.service';
+import { hasPermission, resolveUserPermissions } from '../services/permission.service';
 
 const router = Router();
 
@@ -22,11 +21,14 @@ function parseQuery(req: { query: Record<string, unknown> }): Workspace360Query 
   };
 }
 
-function wantsSupervisorPayload(req: { query: Record<string, unknown> }, role: string): boolean {
+function wantsSupervisorPayload(
+  req: { query: Record<string, unknown> },
+  hasEquipe: boolean,
+): boolean {
   const profile = String(req.query.profile ?? '').trim().toLowerCase();
-  if (profile === 'gestao' || profile === 'supervisor') return true;
+  if (profile === 'gestao' || profile === 'supervisor') return hasEquipe;
   if (profile === 'agent') return false;
-  return role === 'supervisor';
+  return hasEquipe;
 }
 
 router.get('/', authMiddleware, async (req, res: Response) => {
@@ -35,9 +37,10 @@ router.get('/', authMiddleware, async (req, res: Response) => {
   }
 
   try {
-    const role = String(req.user?.role ?? '').trim().toLowerCase();
+    const resolved = await resolveUserPermissions(req.user!);
+    const hasEquipe = hasPermission(resolved.permissoes, 'workspace', 'painel_360_equipe');
     const query = parseQuery(req);
-    const supervisorView = wantsSupervisorPayload(req, role);
+    const supervisorView = wantsSupervisorPayload(req, hasEquipe);
 
     if (query.report && supervisorView) {
       const report = await buildReportPayload(req.user!, query);
@@ -46,9 +49,6 @@ router.get('/', authMiddleware, async (req, res: Response) => {
     }
 
     if (supervisorView) {
-      if (role !== 'supervisor' && env.nodeEnv === 'production') {
-        return res.status(403).json({ message: 'Perfil Gestão requer permissão de supervisor.' });
-      }
       const payload = await buildSupervisor360Payload(req.user!, query);
       return res.json(payload);
     }
@@ -67,6 +67,11 @@ router.get('/agents', authMiddleware, async (req, res: Response) => {
     return res.status(503).json({ message: 'Banco indisponível' });
   }
   try {
+    const resolved = await resolveUserPermissions(req.user!);
+    if (!hasPermission(resolved.permissoes, 'workspace', 'painel_360_equipe')) {
+      return res.status(403).json({ message: 'Sem permissão para listar agentes' });
+    }
+    const { User } = await import('../models/User');
     const users = await User.find({ role: { $in: ['agent', 'supervisor'] } })
       .select('name email role')
       .sort({ name: 1 })

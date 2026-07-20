@@ -913,7 +913,32 @@ export function meusChamadosNovosResponsavelFilter(candidates: string[]) {
   };
 }
 
-export function buildChamadoQueryFilter(status: string, queue?: string, responsavelCandidates?: string[]) {
+function lastTabulacaoAtribuidoExpr() {
+  return {
+    $toLower: {
+      $ifNull: [
+        {
+          $let: {
+            vars: { lastTab: { $arrayElemAt: ['$tabulacao', -1] } },
+            in: '$$lastTab.atribuido',
+          },
+        },
+        '',
+      ],
+    },
+  };
+}
+
+export function atribuidoFuncaoFilter(funcaoSlug: string) {
+  const expected = `funcao:${String(funcaoSlug || '').trim().toLowerCase()}`;
+  return {
+    $expr: {
+      $eq: [lastTabulacaoAtribuidoExpr(), expected],
+    },
+  };
+}
+
+export function buildChamadoQueryFilter(status: string, queue?: string, responsavelCandidates?: string[], extraFilter?: Record<string, unknown>) {
   const filters: Record<string, unknown>[] = [lastStatusFilter(status)];
 
   if (queue === 'meus-chamados' && responsavelCandidates?.length) {
@@ -921,6 +946,10 @@ export function buildChamadoQueryFilter(status: string, queue?: string, responsa
       ? meusChamadosNovosResponsavelFilter(responsavelCandidates)
       : meusChamadosResponsavelFilter(responsavelCandidates);
     filters.push(responsavelFilter);
+  }
+
+  if (queue === 'funcao-atribuido' && extraFilter) {
+    filters.push(extraFilter);
   }
 
   return filters.length === 1 ? filters[0] : { $and: filters };

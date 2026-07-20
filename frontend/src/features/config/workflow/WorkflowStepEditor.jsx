@@ -8,6 +8,7 @@ import {
   ACAO_TIPOS,
   ATRIBUICAO_SISTEMA,
   ATRIBUICAO_TIPOS,
+  FUNCAO_ATRIBUICAO_OPCOES,
   CTA_ALVOS,
   resolveAutomaticaConfig,
   SISTEMA_MODOS,
@@ -119,12 +120,12 @@ export default function WorkflowStepEditor({
 
     nextAcao.automatica = undefined;
     const nextAtribuicao = cfg.atribuicao?.tipo === 'sistema'
-      ? { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }
-      : (cfg.atribuicao || { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' });
+      ? { tipo: 'funcao', funcaoSlug: 'atendimento', grupoSlug: '', colaborador: '' }
+      : (cfg.atribuicao || { tipo: 'funcao', funcaoSlug: 'atendimento', grupoSlug: '', colaborador: '' });
     patchPasso({ acao: nextAcao, atribuicao: nextAtribuicao });
   };
 
-  const atribuicaoTipo = isAutomatica ? 'sistema' : (cfg.atribuicao?.tipo || 'grupo');
+  const atribuicaoTipo = isAutomatica ? 'sistema' : (cfg.atribuicao?.tipo || 'funcao');
 
   useEffect(() => {
     if (isAutomatica && cfg.atribuicao?.tipo !== 'sistema') {
@@ -332,6 +333,20 @@ export default function WorkflowStepEditor({
               </select>
             )}
           </label>
+          {!isAutomatica && atribuicaoTipo === 'funcao' ? (
+            <label className="wf-step-editor__field">
+              <span>Função</span>
+              <select
+                value={cfg.atribuicao?.funcaoSlug || ''}
+                onChange={(e) => patchAtribuicao({ funcaoSlug: e.target.value, tipo: 'funcao' })}
+              >
+                <option value="">Selecione…</option>
+                {FUNCAO_ATRIBUICAO_OPCOES.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {!isAutomatica && atribuicaoTipo === 'grupo' ? (
             <label className="wf-step-editor__field">
               <span>Grupo</span>

@@ -13,7 +13,9 @@ import {
   buildTabulationFieldsFromTicket,
   resolveAtribuidoForPasso,
 } from './workflowMatcher.service';
-import { getActiveGrupos } from './grupoResponsabilidade.service';
+import {
+  canUserActOnWorkflowStep,
+} from './permission.service';
 import { executeSistemaStep, isDevolutivaPasso } from './workflowSistemaExecutor.service';
 import { buildLateralWorkflowDto } from './workflowDto.util';
 
@@ -60,7 +62,7 @@ function applyAtribuidoForPasso(chamado: IChamadoN1, passo: IWorkflowPassoEnvelo
   const fields = buildTabulationFieldsFromTicket({
     tabulacao: chamado.tabulacao as unknown as Array<Record<string, string>>,
   });
-  const atribuido = resolveAtribuidoForPasso(passo.passo?.atribuicao || { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, fields);
+  const atribuido = resolveAtribuidoForPasso(passo.passo?.atribuicao || { tipo: 'funcao', funcaoSlug: 'atendimento', colaborador: '' }, fields);
   if (!atribuido) return;
   const tab = readTabulacaoSnapshot(chamado.tabulacao[0]);
   chamado.tabulacao = [{ ...tab, atribuido }];
@@ -225,45 +227,19 @@ export async function canUserActOnStep(
   const passo = passoAtIndex(definicao, wf.step ?? 0);
   if (!passo) return false;
 
-  const atribuicao = passo.passo?.atribuicao;
   const automatica = resolveAutomaticaConfig(passo.passo);
 
   if (isAutomaticaStep(passo.passo) && automatica?.modo !== 'call_to_action') {
     return false;
   }
 
-  if (!atribuicao) return false;
-
-  const userEmail = String(authUser.email || '').trim().toLowerCase();
-  const userName = String(authUser.name || '').trim().toLowerCase();
-  const fields = buildTabulationFieldsFromTicket({
-    tabulacao: chamado.tabulacao as unknown as Array<Record<string, string>>,
-  });
-
-  if (atribuicao.tipo === 'sistema') {
+  const atribuicao = passo.passo?.atribuicao;
+  if (atribuicao?.tipo === 'sistema') {
     return automatica?.modo === 'call_to_action';
   }
 
-  if (atribuicao.tipo === 'colaborador') {
-    const target = String(atribuicao.colaborador || '').trim().toLowerCase();
-    return target === userEmail || target === userName;
-  }
-
-  if (atribuicao.tipo === 'responsavel_ticket') {
-    const resp = String(fields.responsavel || '').trim().toLowerCase();
-    return resp === userEmail || resp === userName || resp.includes(userEmail);
-  }
-
-  if (atribuicao.tipo === 'grupo') {
-    const grupos = await getActiveGrupos();
-    const grupo = grupos.find((g) => g.slug === atribuicao.grupoSlug);
-    return (grupo?.membros || []).some((m) => {
-      const val = String(m.valor || '').trim().toLowerCase();
-      return val && (val === userEmail || val === userName || userEmail.includes(val));
-    });
-  }
-
-  return true;
+  const isApproval = passo.passo?.acao?.tipo === 'aprovacao';
+  return canUserActOnWorkflowStep(authUser, chamado, isApproval);
 }
 
 export async function advanceWorkflowManual(

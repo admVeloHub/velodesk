@@ -138,6 +138,7 @@ function buildDecisionFromPasso(passoConfig, slug) {
 
 function getTeamFromAtribuicao(atribuicao) {
   if (!atribuicao) return 'n1';
+  if (atribuicao.tipo === 'funcao') return atribuicao.funcaoSlug || 'atendimento';
   if (atribuicao.tipo === 'grupo') return atribuicao.grupoSlug || 'n1';
   if (atribuicao.tipo === 'colaborador') return 'n1';
   return 'n1';
@@ -214,8 +215,13 @@ export function resolveAtribuidoForStep(step, fields = {}) {
   switch (atribuicao.tipo) {
     case 'colaborador':
       return String(atribuicao.colaborador || '').trim();
-    case 'grupo':
-      return atribuicao.grupoSlug ? `grupo:${atribuicao.grupoSlug}` : '';
+    case 'funcao':
+      return atribuicao.funcaoSlug ? `funcao:${atribuicao.funcaoSlug}` : '';
+    case 'grupo': {
+      const map = { n1: 'atendimento', n2: 'n2', financeiro: 'financeiro', suporte: 'suporte' };
+      const slug = atribuicao.grupoSlug ? (map[atribuicao.grupoSlug] || atribuicao.grupoSlug) : '';
+      return slug ? `funcao:${slug}` : '';
+    }
     case 'responsavel_ticket':
       return String(fields.responsavel || '').trim();
     default:

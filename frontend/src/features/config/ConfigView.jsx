@@ -7,15 +7,19 @@ import { Navigate } from 'react-router-dom';
 import { useProfile } from '../../context/ProfileContext';
 import { CONFIG_SECTIONS, getConfigSection } from './configSections';
 import TabulationFormsSection from './components/TabulationFormsSection';
-import GruposAtribuicoesSection from './grupos/GruposAtribuicoesSection';
+import FuncoesPermissoesSection from './funcoes/FuncoesPermissoesSection';
 import WorkflowsConfigSection from './workflow/WorkflowsConfigSection';
+import { usePermissions } from '../../context/PermissionContext';
 
 export default function ConfigView() {
   const { isNavAllowed } = useProfile();
+  const { can } = usePermissions();
   const [section, setSection] = useState(null);
   const active = section ? getConfigSection(section) : null;
 
-  if (!isNavAllowed('config')) {
+  const canViewConfig = isNavAllowed('config') && can('config', 'visualizar');
+
+  if (!canViewConfig) {
     return <Navigate to="/workspace" replace />;
   }
 
@@ -92,8 +96,8 @@ export default function ConfigView() {
                 <TabulationFormsSection />
               ) : section === 'workflows' ? (
                 <WorkflowsConfigSection />
-              ) : section === 'grupos-atribuicoes' ? (
-                <GruposAtribuicoesSection />
+              ) : section === 'funcoes-permissoes' ? (
+                <FuncoesPermissoesSection />
               ) : (
                 <p className="config-placeholder-msg">
                   Editor de {active?.label?.toLowerCase()} — em desenvolvimento.

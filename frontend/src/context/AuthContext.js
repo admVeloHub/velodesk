@@ -10,6 +10,7 @@ import { isHubSessionActive, readHubSession } from '../config/hubSession';
 import { setApiMode } from '../services/ticketsCache';
 import { getDeskDisplayName, isLegacyDeskUser } from '../utils/userDisplayName';
 import { clearDeskAuthSession, isBackendJwtUsable } from '../utils/backendJwt';
+import { clearCachedPermissions } from '../services/permissions/permissionService';
 
 const AuthContext = createContext(null);
 
@@ -33,6 +34,7 @@ function readStoredColaborador() {
 
 function clearStoredAuthSession() {
   clearDeskAuthSession();
+  clearCachedPermissions();
 }
 
 function isAllowedGoogleUser(user) {

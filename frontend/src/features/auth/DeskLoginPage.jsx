@@ -8,7 +8,8 @@ import { authApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 import { getGoogleClientId } from '../../config/googleAuthConfig';
-import { getProfileDefaultPath } from '../../config/profiles';
+import { getProfileDefaultPath, normalizeProfileId } from '../../config/profiles';
+import { fetchMyPermissions } from '../../services/permissions/permissionService';
 import { isGoogleDeskAuthMode } from '../../config/deskAuthMode';
 import { DEV_QUICK_LOGIN_EMAIL, isDevQuickLoginEnabled } from '../../config/devAuth';
 import { loadGoogleGsiScript } from '../../utils/loadGoogleGsiScript';
@@ -59,7 +60,7 @@ export default function DeskLoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { authStatus, bootstrapFromGoogleLogin, isAuthenticated } = useAuth();
-  const { applyProfileFromAccess, profileId } = useProfile();
+  const { applyProfileFromAccess, profileId, applyDefaultPortalFromPermissions } = useProfile();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [gsiReady, setGsiReady] = useState(false);
@@ -80,10 +81,13 @@ export default function DeskLoginPage() {
       throw new Error('Resposta de autenticação inválida.');
     }
     await bootstrapFromGoogleLogin(data);
+    await fetchMyPermissions().catch(() => null);
     const deskProfile = data.user.deskProfile || data.user.role;
     applyProfileFromAccess(deskProfile);
-    navigate(getPostLoginPath(location, deskProfile), { replace: true });
-  }, [applyProfileFromAccess, bootstrapFromGoogleLogin, location, navigate]);
+    applyDefaultPortalFromPermissions();
+    const profile = normalizeProfileId(localStorage.getItem('velodeskProfile') || 'agent');
+    navigate(getPostLoginPath(location, profile), { replace: true });
+  }, [applyProfileFromAccess, applyDefaultPortalFromPermissions, bootstrapFromGoogleLogin, location, navigate]);
 
   const handleCredential = useCallback(async (response) => {
     setLoading(true);
