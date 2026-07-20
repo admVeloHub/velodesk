@@ -1,6 +1,6 @@
 /**
- * ProfileContext v1.5.0 — seletor Agente / Gestão / Workflow
- * VERSION: v1.5.0 | DATE: 2026-07-13 | AUTHOR: VeloHub Development Team
+ * ProfileContext v1.7.0 — deskProfile gestao|agent do cadastro
+ * VERSION: v1.7.0 | DATE: 2026-07-20
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -43,9 +43,6 @@ export function ProfileProvider({ children }) {
   }, [profileId]);
 
   const applyGateProfile = useCallback((colaborador) => {
-    localStorage.setItem('velodeskProfile', 'agent');
-    localStorage.removeItem('velodesk_profile_locked');
-    setProfileIdState('agent');
     const meta = colaborador ? {
       atuacao: colaborador.atuacao || [],
       departamento: colaborador.departamento || '',
@@ -57,20 +54,18 @@ export function ProfileProvider({ children }) {
   }, []);
 
   const applyProfileFromAccess = useCallback((deskProfile) => {
-    const id = deskProfile === 'supervisor' ? 'gestao' : 'agent';
-    localStorage.setItem('velodeskProfile', id);
+    const raw = String(deskProfile || '').trim().toLowerCase();
+    const id = (raw === 'supervisor' || raw === 'gestao') ? 'gestao' : 'agent';
+    const normalized = normalizeProfileId(id);
+    localStorage.setItem('velodeskProfile', normalized);
     localStorage.removeItem('velodesk_profile_locked');
-    setProfileIdState(id);
+    setProfileIdState(normalized);
     setDropdownOpen(false);
   }, []);
 
   const setProfile = useCallback((id) => {
     const normalized = normalizeProfileId(id);
-    if (!PROFILES[normalized]) {
-      setDropdownOpen(false);
-      return;
-    }
-    if (normalized === profileId && normalized !== 'especiais') {
+    if (!PROFILES[normalized] || normalized === profileId) {
       setDropdownOpen(false);
       return;
     }

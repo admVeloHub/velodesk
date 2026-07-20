@@ -1,14 +1,23 @@
-/** auth.routes v1.2.0 — login + Google SSO + dev quick login */
+/** auth.routes v1.3.0 — Google SSO via cadastro Desk (acessos.Desk); sem allowlist/dev-login */
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { User } from '../models/User';
 import { signToken } from '../middleware/auth';
-import { isMongoConnected } from '../config/database';
-import { resolveDeskAccessRole } from '../config/deskAccessAllowlist';
+import { isFuncionariosConnected, isMongoConnected } from '../config/database';
 import { verifyGoogleIdToken } from '../services/googleAuth.service';
+import { resolveDeskAccessFromCadastro } from '../services/deskCadastroAccess.service';
 import { env } from '../config/env';
 
 const router = Router();
+
+function displayNameFromColaborador(
+  colaboradorNome: string,
+  email: string,
+): string {
+  const nome = String(colaboradorNome || '').trim();
+  if (nome) return nome;
+  return String(email || '').split('@')[0] || email;
+}
 
 router.post('/login', async (req: Request, res: Response) => {
   try {
@@ -23,10 +32,36 @@ router.post('/login', async (req: Request, res: Response) => {
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Credenciais inválidas' });
     }
-    const token = signToken({ userId: user.id, email: user.email, role: user.role, name: user.name });
+
+    const access = await resolveDeskAccessFromCadastro(user.email);
+    if (!access.ok) {
+      return res.status(access.status).json({ message: access.reason });
+    }
+
+    if (user.role !== access.role) {
+      user.role = access.role;
+      await user.save();
+    }
+
+    const name = displayNameFromColaborador(access.colaborador.colaboradorNome, user.email);
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      role: access.role,
+      name,
+    });
+
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: {
+        id: user.id,
+        name,
+        email: user.email,
+        role: access.role,
+        deskProfile: access.deskProfile,
+        source: 'cadastro-desk',
+      },
+      colaborador: access.colaborador,
     });
   } catch (err) {
     console.error('Erro no login:', err);
@@ -38,6 +73,11 @@ router.post('/auth/google', async (req: Request, res: Response) => {
   try {
     if (!isMongoConnected()) {
       return res.status(503).json({ message: 'Banco de dados indisponível. Aguarde o backend conectar ao MongoDB.' });
+    }
+    if (!isFuncionariosConnected()) {
+      return res.status(503).json({
+        message: 'Cadastro de colaboradores indisponível. Aguarde a conexão com o VeloHubCentral.',
+      });
     }
 
     const clientId = env.googleClientId;
@@ -51,44 +91,57 @@ router.post('/auth/google', async (req: Request, res: Response) => {
     }
 
     const googleUser = await verifyGoogleIdToken(credential, clientId);
-    const deskRole = resolveDeskAccessRole(googleUser.email);
-    if (!deskRole) {
-      return res.status(403).json({ message: 'Usuário sem permissão para acessar o Desk nesta fase de testes.' });
+    const access = await resolveDeskAccessFromCadastro(googleUser.email);
+    if (!access.ok) {
+      return res.status(access.status).json({ message: access.reason });
     }
+
+    const name = displayNameFromColaborador(
+      access.colaborador.colaboradorNome,
+      googleUser.email,
+    );
 
     let user = await User.findOne({ email: googleUser.email });
     if (!user) {
       const hash = await bcrypt.hash(`google-sso:${googleUser.email}`, 10);
       user = await User.create({
-        name: googleUser.name,
+        name,
         email: googleUser.email,
         password: hash,
-        role: deskRole,
+        role: access.role,
       });
-    } else if (user.role !== deskRole) {
-      user.role = deskRole;
-      user.name = googleUser.name || user.name;
-      await user.save();
+    } else {
+      let dirty = false;
+      if (user.role !== access.role) {
+        user.role = access.role;
+        dirty = true;
+      }
+      if (name && user.name !== name) {
+        user.name = name;
+        dirty = true;
+      }
+      if (dirty) await user.save();
     }
 
     const token = signToken({
       userId: user.id,
       email: user.email,
-      role: user.role,
-      name: googleUser.email.split('@')[0],
+      role: access.role,
+      name,
     });
 
     res.json({
       token,
       user: {
         id: user.id,
-        name: googleUser.email.split('@')[0],
+        name,
         email: user.email,
-        role: user.role,
-        deskProfile: deskRole,
-        picture: googleUser.picture || null,
+        role: access.role,
+        deskProfile: access.deskProfile,
+        picture: googleUser.picture || access.colaborador.profile_pic || null,
         source: 'google-desk',
       },
+      colaborador: access.colaborador,
     });
   } catch (err) {
     console.error('Erro no login Google:', err);
@@ -97,66 +150,11 @@ router.post('/auth/google', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/auth/dev-login', async (req: Request, res: Response) => {
-  try {
-    if (env.nodeEnv === 'production') {
-      return res.status(404).json({ message: 'Not found' });
-    }
-
-    if (!isMongoConnected()) {
-      return res.status(503).json({ message: 'Banco de dados indisponível. Aguarde o backend conectar ao MongoDB.' });
-    }
-
-    const email = String(req.body?.email || '').trim().toLowerCase();
-    if (!email) {
-      return res.status(400).json({ message: 'Email é obrigatório' });
-    }
-
-    const deskRole = resolveDeskAccessRole(email);
-    if (!deskRole) {
-      return res.status(403).json({ message: 'Usuário sem permissão para acessar o Desk nesta fase de testes.' });
-    }
-
-    const displayName = email.split('@')[0];
-
-    let user = await User.findOne({ email });
-    if (!user) {
-      const hash = await bcrypt.hash(`dev-login:${email}`, 10);
-      user = await User.create({
-        name: displayName,
-        email,
-        password: hash,
-        role: deskRole,
-      });
-    } else if (user.role !== deskRole) {
-      user.role = deskRole;
-      await user.save();
-    }
-
-    const token = signToken({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      name: displayName,
-    });
-
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        name: displayName,
-        email: user.email,
-        role: user.role,
-        deskProfile: deskRole,
-        picture: null,
-        source: 'google-desk',
-      },
-    });
-  } catch (err) {
-    console.error('Erro no login dev:', err);
-    const message = err instanceof Error ? err.message : 'Erro no login dev';
-    res.status(500).json({ message });
-  }
+/** Login provisório desativado — use Google SSO com acessos.Desk no cadastro. */
+router.post('/auth/dev-login', (_req: Request, res: Response) => {
+  return res.status(404).json({
+    message: 'Login de desenvolvimento desativado. Use o login Google com acessos.Desk no cadastro.',
+  });
 });
 
 export default router;
