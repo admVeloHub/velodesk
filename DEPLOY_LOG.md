@@ -1,10 +1,31 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.39.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.40.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Redeploy Cloud Run (trigger migrado para main)
+
+- **Data/Hora**: 2026-07-20
+- **Tipo**: GitHub Push → Cloud Build → Cloud Run
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main
+- **Projeto GCP**: velohub-471220
+- **Serviço**: velodesk (us-east1)
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.40.0
+  - Dockerfile raiz v2.0.0 (web + API combinados)
+- **Contexto**: Gatilho Cloud Build alterado de `dev` para `main`; push forçado para rebuild/deploy com estado atual (`ebab610` — merge dev→main, fix build Cloud Run, POPs removidos do git).
+- **Validação pós-deploy**:
+  ```powershell
+  Invoke-RestMethod -Uri "https://velodesk-278491073220.us-east1.run.app/health" | ConvertTo-Json
+  Invoke-RestMethod -Uri "https://velodesk-278491073220.us-east1.run.app/api/inbound/gmail/health" | ConvertTo-Json
+  ```
+- **Status**: Em andamento (disparado via push main)
+
+---
 
 ### GitHub Push — Remove POPs/ do repositório remoto
 
