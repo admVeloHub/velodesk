@@ -4,19 +4,14 @@
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { getSlaClass, getWorkflowProgress, isTicketInWorkflow, getTicketProtocolLabel, getAgentName } from '../desk/utils';
 import { resolveApprovalHeader, ticketAwaitingDecision } from '../desk/workflowDefinitions';
-import { getRuntimeGrupos } from '../desk/workflowRuntimeStore';
 import { agentCanDecideTicket as permAgentCanDecide, canApproveWorkflow } from '../permissions/permissionService';
+import {
+  getWorkflowTeamQueueMeta,
+  isTeamStepActive,
+  ticketMatchesWorkflowTeam,
+} from './workflowTeamQueues';
 
 const QUEUE_LABEL = 'Aguardando aprovação';
-
-function normalizeText(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function isPerfilDeskAmplo(valor) {
-  const v = String(valor || '').trim();
-  return v === 'agent' || v === 'gestao' || v === 'supervisor';
-}
 
 function agentCanDecideTicket(ticket) {
   if (!canApproveWorkflow()) return false;
@@ -186,7 +181,7 @@ function buildReembolsoApprovalDetail(ticket, progress, header) {
   };
 }
 
-function buildQueueItem(entry) {
+function buildQueueItem(entry, teamId = null) {
   const { ticket } = entry;
   const progress = getWorkflowProgress(ticket);
   const header = resolveApprovalHeader(ticket, progress);
@@ -197,6 +192,8 @@ function buildQueueItem(entry) {
     : channelLabel(ticket);
   const lf = ticket.lateralForm || {};
   const stepStarted = progress.workflow?.stepHistory?.find((h) => h.stepId === progress.activeStep?.id && h.status === 'active');
+  const awaitingDecision = ticketAwaitingDecision(ticket, progress);
+  const teamStepActive = teamId ? isTeamStepActive(ticket, teamId, progress) : false;
 
   let urgencyBadge = null;
   if (sla === 'critical') urgencyBadge = { text: 'Urgente', tone: 'critical' };
@@ -231,6 +228,13 @@ function buildQueueItem(entry) {
     urgencyBadge,
     slaBadge: { text: 'SLA', tone: sla === 'critical' ? 'critical' : 'warn' },
     queueLabel: header.queueLabel || QUEUE_LABEL,
+    awaitingDecision,
+    teamStepActive,
+    queueStatus: awaitingDecision
+      ? 'decisao'
+      : teamStepActive
+        ? 'etapa-ativa'
+        : 'aguardando',
   };
 }
 
@@ -257,6 +261,41 @@ function buildDetailView(ticket, progress) {
     actionLabels: Object.fromEntries((header.rotas || []).map((r) => [r.variavel, r.rotulo]).filter(([k]) => k)),
     ...detail,
   };
+}
+
+function collectTeamWorkflowEntries(teamId) {
+  const items = [];
+
+  getAllCockpitTickets().forEach((entry) => {
+    const { ticket } = entry;
+    if (!ticketMatchesWorkflowTeam(ticket, teamId)) return;
+    const progress = getWorkflowProgress(ticket);
+    items.push({ entry, progress, queueItem: buildQueueItem(entry, teamId) });
+  });
+
+  return items;
+}
+
+function sortTeamQueueEntries(items, teamId) {
+  return [...items].sort((a, b) => {
+    const rank = (item) => {
+      const { queueItem } = item;
+      if (queueItem.awaitingDecision) return 0;
+      if (queueItem.teamStepActive) return 1;
+      if (queueItem.queueStatus === 'aguardando') return 2;
+      return 3;
+    };
+    const rankDiff = rank(a) - rank(b);
+    if (rankDiff !== 0) return rankDiff;
+
+    const prio = { critical: 0, warn: 1, ok: 2 };
+    const slaDiff = (prio[a.queueItem.slaTone] || 9) - (prio[b.queueItem.slaTone] || 9);
+    if (slaDiff !== 0) return slaDiff;
+
+    const aTime = new Date(a.entry.ticket.updatedAt || a.entry.ticket.createdAt || 0).getTime();
+    const bTime = new Date(b.entry.ticket.updatedAt || b.entry.ticket.createdAt || 0).getTime();
+    return bTime - aTime;
+  });
 }
 
 function collectPendingEntries() {
@@ -290,6 +329,32 @@ function countApprovedToday() {
   return count || 8;
 }
 
+export function computeWorkflowTeamQueue(teamId) {
+  const meta = getWorkflowTeamQueueMeta(teamId);
+  const label = meta?.name || teamId;
+  const entries = sortTeamQueueEntries(collectTeamWorkflowEntries(teamId), teamId);
+  let slaCritical = 0;
+  let awaitingDecisionCount = 0;
+
+  entries.forEach((item) => {
+    if (item.queueItem.slaTone === 'critical' || item.queueItem.slaTone === 'warn') slaCritical += 1;
+    if (item.queueItem.awaitingDecision) awaitingDecisionCount += 1;
+  });
+
+  return {
+    teamId,
+    queueLabel: label,
+    queue: entries.map((item) => item.queueItem),
+    summary: {
+      pendingCount: entries.length,
+      awaitingDecisionCount,
+      approvedTodayCount: countApprovedToday(),
+      slaCriticalCount: slaCritical,
+    },
+    entries,
+  };
+}
+
 export function computeWorkflowApprovalQueue() {
   const pending = collectPendingEntries();
   let slaCritical = 0;
@@ -317,7 +382,37 @@ export function computeWorkflowApprovalQueue() {
   };
 }
 
-export function getWorkflowApprovalDetail(ticketId) {
+export function getWorkflowTeamDetail(ticketId, teamId) {
+  const id = String(ticketId);
+  const match = getAllCockpitTickets().find(({ ticket }) => String(ticket.id) === id);
+  if (!match || !ticketMatchesWorkflowTeam(match.ticket, teamId)) return null;
+
+  const progress = getWorkflowProgress(match.ticket);
+  const awaitingDecision = ticketAwaitingDecision(match.ticket, progress);
+  const teamStepActive = isTeamStepActive(match.ticket, teamId, progress);
+  const detail = buildDetailView(match.ticket, progress);
+  const activeStepTitle = progress?.activeStep?.title || progress?.activeStep?.label || 'etapa anterior';
+
+  return {
+    ...detail,
+    ticket: match.ticket,
+    awaitingDecision,
+    teamStepActive,
+    statusBadge: awaitingDecision
+      ? detail.statusBadge
+      : teamStepActive
+        ? 'Etapa do time'
+        : 'Aguardando etapa anterior',
+    statusMessage: !awaitingDecision && !teamStepActive
+      ? `Este ticket está na etapa "${activeStepTitle}" antes do time ${getWorkflowTeamQueueMeta(teamId)?.name || teamId}.`
+      : null,
+    actions: awaitingDecision ? detail.actions : [],
+  };
+}
+
+export function getWorkflowApprovalDetail(ticketId, teamId = null) {
+  if (teamId) return getWorkflowTeamDetail(ticketId, teamId);
+
   const id = String(ticketId);
   let match = getAllCockpitTickets().find(({ ticket }) => String(ticket.id) === id);
   if (!match) return null;

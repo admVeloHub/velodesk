@@ -531,7 +531,7 @@ body {
 }
 
 /* Páginas com conteúdo longo: rolagem só no main-content, não no body */
-.main-content:has(.page.active:not(#tickets):not(#chat):not(#config):not(#especiais-reclame-aqui)) {
+.main-content:has(.page.active:not(#tickets):not(#chat):not(#config):not(#especiais-reclame-aqui):not(#workflow)) {
     overflow-y: auto;
     overflow-x: hidden;
     padding-top: var(--velo-chrome-top);
@@ -539,7 +539,7 @@ body {
 }
 
 /* Ajustar padding apenas para páginas que não são tickets, chat, reports ou config */
-.main-content .page:not(#tickets):not(#chat):not(#reports):not(#config):not(#especiais-reclame-aqui) {
+.main-content .page:not(#tickets):not(#chat):not(#reports):not(#config):not(#especiais-reclame-aqui):not(#workflow) {
     padding: 0.5rem 1rem;
     padding-top: 0.25rem;
 }

@@ -170,8 +170,10 @@ export default function DeskResolvedTicketTable({
                 >
                   <td className="desk-resolved-table__num">{protocol || '—'}</td>
                   <td className="desk-resolved-table__title-cell">
-                    <span className="desk-resolved-table__icon" aria-hidden="true">R</span>
-                    <span className="desk-resolved-table__subject" title={title}>{title}</span>
+                    <div className="desk-resolved-table__title-inner">
+                      <span className="desk-resolved-table__icon" aria-hidden="true">R</span>
+                      <span className="desk-resolved-table__subject" title={title}>{title}</span>
+                    </div>
                   </td>
                   <td className="desk-resolved-table__resp">{responsible}</td>
                   <td className="desk-resolved-table__date">{resolvedAt}</td>

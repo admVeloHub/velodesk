@@ -7,7 +7,6 @@ import { isAgentForwardEscalonar } from '../../services/desk/constants';
 import {
   filterTickets,
   resolveDeskSearchEntries,
-  pickDefaultTicket,
   pickDefaultQueueId,
   countByQueue,
   buildRegistroThread,
@@ -40,6 +39,7 @@ import DeskTicketList from './components/DeskTicketList';
 import DeskResolvedTicketTable from './components/DeskResolvedTicketTable';
 import DeskTicketTabsBar from './components/DeskTicketTabsBar';
 import DeskClientProfileBar from './components/DeskClientProfileBar';
+import ClientTicketHistoryModal from './components/ClientTicketHistoryModal';
 import DeskConversation from './components/DeskConversation';
 import TicketWorkflowInfoRequestCallout from './components/TicketWorkflowInfoRequestCallout';
 import { markWorkflowInfoRequestsReadForTicket } from '../../services/workflow/workflowInfoNotifications';
@@ -124,6 +124,7 @@ export default function DeskV2Root() {
 
   const [activeQueue, setActiveQueue] = useState('novos');
   const [activeSort, setActiveSort] = useState('data');
+  const [entrySortOldestFirst, setEntrySortOldestFirst] = useState(false);
   const [searchDraft, setSearchDraft] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [queueCollapsed, setQueueCollapsed] = useState(() => localStorage.getItem('velodeskCrmQueueCollapsed') === '1');
@@ -139,6 +140,7 @@ export default function DeskV2Root() {
   const [produtosPopoverOpen, setProdutosPopoverOpen] = useState(false);
   const [produtosSolicitacaoSubmitted, setProdutosSolicitacaoSubmitted] = useState(false);
   const [waChatOpen, setWaChatOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [aiRevisionOpen, setAiRevisionOpen] = useState(false);
   const [aiRevisionSubmitting, setAiRevisionSubmitting] = useState(false);
   const [composeSpellErrors, setComposeSpellErrors] = useState([]);
@@ -187,8 +189,8 @@ export default function DeskV2Root() {
   }, [syncTicketViews, showNotification]);
 
   const entries = appliedSearch.trim()
-    ? resolveDeskSearchEntries(appliedSearch, activeSort)
-    : filterTickets(activeQueue, '', activeSort);
+    ? resolveDeskSearchEntries(appliedSearch, activeSort, entrySortOldestFirst)
+    : filterTickets(activeQueue, '', activeSort, entrySortOldestFirst);
   const isResolvedQueue = activeQueue === 'resolvidos';
   const entry = activeTabId ? findTicketEntry(activeTabId) : null;
   const ticket = entry?.ticket;
@@ -277,20 +279,11 @@ export default function DeskV2Root() {
   }, [ticket?.id]);
 
   useEffect(() => {
-    if (suppressAutoSelectRef.current && !activeTabId) return;
-
-    if (openTabs.length > 0) {
-      if (activeTabId && findTicketEntry(activeTabId)) return;
-      const last = openTabs[openTabs.length - 1];
-      if (last) setActiveTabId(last.id);
-      return;
-    }
-
+    if (openTabs.length === 0) return;
     if (activeTabId && findTicketEntry(activeTabId)) return;
-    if (activeQueue === 'resolvidos') return;
-    const def = pickDefaultTicket(activeQueue);
-    if (def) openTicket(def);
-  }, [activeQueue, activeTabId, refreshKey, entries.length, openTabs, openTicket, setActiveTabId]);
+    const last = openTabs[openTabs.length - 1];
+    if (last) setActiveTabId(last.id);
+  }, [activeTabId, refreshKey, entries.length, openTabs, setActiveTabId]);
 
   useEffect(() => {
     if (!activeTabId) {
@@ -365,16 +358,14 @@ export default function DeskV2Root() {
   };
 
   const selectQueue = (queueId) => {
-    suppressAutoSelectRef.current = false;
+    if (openTabs.length === 0) {
+      suppressAutoSelectRef.current = true;
+    }
     setActiveQueue(queueId);
     setSearchDraft('');
     setAppliedSearch('');
     localStorage.setItem('velodeskCrmTicketListCollapsed', '0');
     setListCollapsed(false);
-    if (openTabs.length === 0 && queueId !== 'resolvidos') {
-      const def = pickDefaultTicket(queueId);
-      if (def) openTicket(def);
-    }
   };
 
   const handleSearchSubmit = () => {
@@ -386,7 +377,7 @@ export default function DeskV2Root() {
       return;
     }
 
-    const results = resolveDeskSearchEntries(q, activeSort);
+    const results = resolveDeskSearchEntries(q, activeSort, entrySortOldestFirst);
     if (!results.length) {
       showNotification('Nenhum ticket encontrado para CPF ou número informado.', 'warning');
       return;
@@ -939,7 +930,6 @@ export default function DeskV2Root() {
       {!isResolvedQueue ? (
         <DeskTicketList
           queueStatuses={queueStatuses}
-          activeQueue={activeQueue}
           activeTicketId={activeTabId}
           activeSort={activeSort}
           entries={entries}
@@ -947,6 +937,8 @@ export default function DeskV2Root() {
           collapsed={listCollapsed}
           onSelectTicket={selectTicket}
           onSortChange={setActiveSort}
+          entrySortOldestFirst={entrySortOldestFirst}
+          onToggleEntrySort={() => setEntrySortOldestFirst((v) => !v)}
           onCollapse={() => handleListCollapse(true)}
           onExpand={() => handleListCollapse(false)}
           onReload={reload}
@@ -980,7 +972,7 @@ export default function DeskV2Root() {
               ticket={ticket}
               client={client}
               onSaveContact={handleSaveContact}
-              onSelectTicket={selectTicket}
+              onOpenHistory={() => setHistoryOpen(true)}
               onAdvanceWorkflow={handleAdvanceWorkflow}
               advancingWorkflow={advancingWorkflow}
               canAdvanceWorkflow={canAdvanceWorkflow}
@@ -1013,6 +1005,13 @@ export default function DeskV2Root() {
                 {ticketStatus.label}
               </span>
             </nav>
+            <ClientTicketHistoryModal
+              open={historyOpen}
+              onClose={() => setHistoryOpen(false)}
+              ticket={ticket}
+              client={client}
+              onSelectTicket={selectTicket}
+            />
             <div className={'crm-conversation-wrap' + (waChatOpen ? ' crm-conversation-wrap--wa' : '')}>
               {mainTab === 'conversa' && waChatOpen ? (
                 <div className="tab-panel is-active" data-panel="conversa">
