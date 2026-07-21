@@ -18,7 +18,7 @@ export interface DateRange {
   end: Date;
 }
 
-function dayKey(date: Date, tz = TZ): string {
+export function dayKey(date: Date, tz = TZ): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(date);
 }
 
@@ -69,7 +69,7 @@ export function resolvePeriodRange(query: GestaoInsightsQuery = {}): DateRange {
 }
 
 /** Sequência de chaves de dia (YYYY-MM-DD) entre start e end, inclusive. */
-function dayKeysBetween(range: DateRange): string[] {
+export function dayKeysBetween(range: DateRange): string[] {
   const keys: string[] = [];
   const cursor = new Date(range.start);
   while (cursor <= range.end) {
@@ -107,7 +107,7 @@ function formatDurationMs(ms: number): string {
   return `${minutes}m`;
 }
 
-function labelForDay(key: string): string {
+export function labelForDay(key: string): string {
   const date = new Date(`${key}T12:00:00`);
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: TZ });
 }

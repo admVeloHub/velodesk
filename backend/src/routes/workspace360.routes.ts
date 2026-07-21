@@ -18,6 +18,9 @@ function parseQuery(req: { query: Record<string, unknown> }): Workspace360Query 
     channel: typeof req.query.channel === 'string' ? req.query.channel : undefined,
     team: typeof req.query.team === 'string' ? req.query.team : undefined,
     report: typeof req.query.report === 'string' ? req.query.report : undefined,
+    leaderboardPeriod: typeof req.query.leaderboardPeriod === 'string' ? req.query.leaderboardPeriod : undefined,
+    leaderboardFrom: typeof req.query.leaderboardFrom === 'string' ? req.query.leaderboardFrom : undefined,
+    leaderboardTo: typeof req.query.leaderboardTo === 'string' ? req.query.leaderboardTo : undefined,
   };
 }
 

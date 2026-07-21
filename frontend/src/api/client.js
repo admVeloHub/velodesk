@@ -110,6 +110,10 @@ export const gestaoInsightsApi = {
   casosEspeciais: (params) => api.get('/gestao-insights/casos-especiais', { params }).then((r) => r.data),
 };
 
+export const aiUsageApi = {
+  report: (params) => api.get('/ai-usage/report', { params }).then((r) => r.data),
+};
+
 export const usersApi = {
   list: () => api.get('/users').then((r) => r.data),
 };
