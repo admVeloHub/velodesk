@@ -1,9 +1,10 @@
 /**
- * TabulationContext v1.2.0 — opções dinâmicas tipo/canal
- * VERSION: v1.2.0 | DATE: 2026-07-07 | AUTHOR: VeloHub Development Team
+ * TabulationContext v1.3.0 — opções dinâmicas + tratamento 429
+ * VERSION: v1.3.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { tabulationApi } from '../api/client';
+import { isRateLimitError, RATE_LIMIT_USER_MESSAGE } from '../utils/apiErrors';
 import { useAuth } from './AuthContext';
 import {
   EMPTY_TABULATION,
@@ -41,6 +42,12 @@ export function TabulationProvider({ children }) {
         return;
       } catch (err) {
         const status = err?.response?.status;
+        if (isRateLimitError(err)) {
+          setError(RATE_LIMIT_USER_MESSAGE);
+          setConfig(EMPTY_TABULATION);
+          setLoading(false);
+          return;
+        }
         const isTransient = status === 503 && attempt < maxAttempts;
         if (isTransient) {
           await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));

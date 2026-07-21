@@ -1,6 +1,6 @@
 /**
- * PermissionContext v1.0.0 — permissões RBAC da sessão
- * VERSION: v1.0.0 | DATE: 2026-07-17
+ * PermissionContext v1.1.0 — permissões RBAC + tratamento 429
+ * VERSION: v1.1.0 | DATE: 2026-07-21
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
@@ -14,6 +14,7 @@ import {
   readCachedPermissions,
   shouldUseMeusChamadosFila,
 } from '../services/permissions/permissionService';
+import { isRateLimitError, RATE_LIMIT_USER_MESSAGE } from '../utils/apiErrors';
 
 const PermissionContext = createContext(null);
 
@@ -30,7 +31,10 @@ export function PermissionProvider({ children }) {
       setPermissions(data);
       return data;
     } catch (err) {
-      setError(err?.message || 'Erro ao carregar permissões');
+      const message = isRateLimitError(err)
+        ? RATE_LIMIT_USER_MESSAGE
+        : (err?.message || 'Erro ao carregar permissões');
+      setError(message);
       throw err;
     } finally {
       setLoading(false);

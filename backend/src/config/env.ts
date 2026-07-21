@@ -1,4 +1,4 @@
-/** env v1.18.1 — roleta ativa por padrão (opt-out com ASSIGNMENT_ROUTER_ENABLED=false) */
+/** env v1.19.0 — API_RATE_LIMIT_MAX configurável (default 5000 prod) */
 import fs from 'fs';
 import path from 'path';
 
@@ -68,9 +68,16 @@ function resolveMongoFuncionariosUri(): string {
   return getMongoHubCentralUri();
 }
 
+function resolveApiRateLimitMax(): number {
+  const raw = parseInt(process.env.API_RATE_LIMIT_MAX || '', 10);
+  if (Number.isFinite(raw) && raw > 0) return raw;
+  return (process.env.NODE_ENV || 'development') === 'development' ? 2000 : 5000;
+}
+
 export const env = {
   port: parseInt(process.env.PORT || process.env.VELODESK_BACKEND || '8001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
+  apiRateLimitMax: resolveApiRateLimitMax(),
   mongoUri: requireMongoUri(),
   mongoDbName: process.env.MONGODB_DB_NAME || 'b2c_chamados',
   mongoCadastrosDbName: process.env.MONGODB_CADASTROS_DB_NAME || 'b2c_cadastros',

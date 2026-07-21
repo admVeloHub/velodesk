@@ -1,10 +1,11 @@
 /**
- * TicketsContext v1.4.0 — recarrega boxes/tickets quando sessão/papel muda
- * VERSION: v1.4.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.5.0 — tratamento 429 + recarga quando sessão/papel muda
+ * VERSION: v1.5.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi } from '../services/ticketsStorage';
 import { getTicketProtocolLabel } from '../services/desk/utils';
+import { isRateLimitError, RATE_LIMIT_USER_MESSAGE } from '../utils/apiErrors';
 import { useAuth } from './AuthContext';
 
 const TicketsContext = createContext(null);
@@ -39,6 +40,8 @@ export function TicketsProvider({ children }) {
         const apiMsg = String(err?.response?.data?.message || '').trim();
         if (status === 401 || status === 403) {
           console.warn('TicketsContext: sessão inválida ao carregar tickets — faça login novamente.');
+        } else if (isRateLimitError(err)) {
+          console.warn('TicketsContext: rate limit ao carregar tickets.', RATE_LIMIT_USER_MESSAGE);
         } else if (status === 503 || /mongodb|banco/i.test(apiMsg)) {
           console.warn('TicketsContext: backend/Mongo indisponível ao carregar tickets.');
         } else {

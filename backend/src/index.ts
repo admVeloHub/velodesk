@@ -1,4 +1,4 @@
-/** index v1.9.5 — bootstrap Gmail inbound após desk_config pronto */
+/** index v1.9.6 — rate limit 5000 + isenção GET leitura frequente */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -38,6 +38,7 @@ import permissionsRoutes from './routes/permissions.routes';
 import funcoesPermissoesRoutes from './routes/funcoesPermissoes.routes';
 import agentesDeskRoutes from './routes/agentesDesk.routes';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
+import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
 import {
   getOpenAiTicketSuggestStatus,
@@ -77,18 +78,10 @@ app.use('/api', authRoutes);
 
 const apiRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: env.nodeEnv === 'development' ? 2000 : 200,
+  max: env.apiRateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => {
-    const path = req.path || '';
-    return path === '/health'
-      || path === '/api/health'
-      || path === '/login'
-      || path === '/api/login'
-      || path.startsWith('/auth/')
-      || path.startsWith('/api/auth/');
-  },
+  skip: shouldSkipApiRateLimit,
 });
 
 app.use('/api/', apiRateLimiter);
