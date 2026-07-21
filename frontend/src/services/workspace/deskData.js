@@ -5,7 +5,9 @@
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { getAgentName } from '../clientDb';
 import { getSlaClass, isTicketInWorkflow, getWorkflowProgress } from '../desk/utils';
+import { ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import { getWorkflowInfoRequests, resolveDeskTicketIdForInfoRequest } from '../workflow/workflowInfoNotifications';
+import { getWorkflowTeamQueueMeta, ticketMatchesWorkflowTeam } from '../workflow/workflowTeamQueues';
 
 function computeProductionWeek() {
   const mockCounts = [6, 7, 9, 5, 8, 3, 4];
@@ -453,8 +455,13 @@ export function computeManagementStats() {
   };
 }
 
-export function computeWorkflow360View() {
-  const entries = getAllCockpitTickets().filter(({ ticket }) => isTicketInWorkflow(ticket));
+export function computeWorkflow360View(teamId = null) {
+  const teamMeta = teamId ? getWorkflowTeamQueueMeta(teamId) : null;
+  const entries = getAllCockpitTickets().filter(({ ticket }) => {
+    if (!isTicketInWorkflow(ticket)) return false;
+    if (teamId) return ticketMatchesWorkflowTeam(ticket, teamId);
+    return true;
+  });
   const now = new Date();
   const greeting = now.getHours() < 12 ? 'Bom dia' : now.getHours() < 18 ? 'Boa tarde' : 'Boa noite';
   const dateLabel = now.toLocaleDateString('pt-BR', {
@@ -467,6 +474,7 @@ export function computeWorkflow360View() {
 
   let slaCritical = 0;
   let awaitingExternal = 0;
+  let awaitingDecision = 0;
   let completedToday = 0;
 
   const enriched = entries.map((entry) => {
@@ -475,6 +483,7 @@ export function computeWorkflow360View() {
     if (sla === 'critical' || sla === 'warning') slaCritical++;
     const progress = getWorkflowProgress(ticket);
     if (progress?.awaitingTeamLabel) awaitingExternal++;
+    if (ticketAwaitingDecision(ticket, progress)) awaitingDecision++;
     if (progress?.workflow?.status === 'completed') completedToday++;
     return { ...entry, sla, progress };
   }).sort((a, b) => {
@@ -488,14 +497,21 @@ export function computeWorkflow360View() {
     .map((entry) => mapEntryToRow(entry, 'workflow'));
 
   const externalRows = enriched
-    .filter(({ progress }) => progress?.awaitingTeamLabel)
+    .filter(({ progress, ticket }) => {
+      if (teamId) {
+        return ticketAwaitingDecision(ticket, progress)
+          || progress?.activeStep?.team === teamId;
+      }
+      return progress?.awaitingTeamLabel;
+    })
     .slice(0, 5)
     .map((entry) => mapEntryToRow(entry, 'workflow'));
 
+  const teamLabel = teamMeta?.name || 'Workflow';
   const sections = [
     {
       id: 'workflow-active',
-      title: 'Fluxos em andamento',
+      title: teamId ? `Encaminhados · ${teamLabel}` : 'Fluxos em andamento',
       icon: 'ti ti-arrows-exchange',
       variant: 'workflow',
       count: enriched.filter(({ progress }) => progress?.workflow?.status !== 'completed').length,
@@ -503,10 +519,10 @@ export function computeWorkflow360View() {
     },
     {
       id: 'workflow-external',
-      title: 'Aguardando time externo',
+      title: teamId ? `Aguardando ação · ${teamLabel}` : 'Aguardando time externo',
       icon: 'ti ti-building-bank',
       variant: 'workflow',
-      count: awaitingExternal,
+      count: teamId ? awaitingDecision : awaitingExternal,
       tickets: externalRows,
     },
   ];
@@ -514,11 +530,13 @@ export function computeWorkflow360View() {
   return {
     greeting,
     agentName: getAgentName() || 'operador',
+    teamId,
+    teamLabel,
     dateTimeLabel: `${dateLabel.charAt(0).toUpperCase()}${dateLabel.slice(1)} · ${timeLabel}`,
     kpis: [
-      { id: 'total', label: 'Em workflow', value: String(enriched.length), hint: 'ativos', tone: 'neutral', icon: 'ti ti-arrows-exchange' },
+      { id: 'total', label: teamId ? `Fila ${teamLabel}` : 'Em workflow', value: String(enriched.length), hint: 'ativos', tone: 'neutral', icon: 'ti ti-arrows-exchange' },
       { id: 'sla', label: 'SLA em risco', value: String(slaCritical), hint: slaCritical > 0 ? 'atenção' : null, tone: slaCritical > 0 ? 'warn' : 'neutral', icon: 'ti ti-clock-exclamation' },
-      { id: 'external', label: 'Aguardando time', value: String(awaitingExternal), hint: 'externo', tone: awaitingExternal > 0 ? 'warn' : 'neutral', icon: 'ti ti-users' },
+      { id: 'external', label: teamId ? 'Aguardando decisão' : 'Aguardando time', value: String(teamId ? awaitingDecision : awaitingExternal), hint: teamId ? teamLabel : 'externo', tone: (teamId ? awaitingDecision : awaitingExternal) > 0 ? 'warn' : 'neutral', icon: 'ti ti-users' },
       { id: 'done', label: 'Concluídos hoje', value: String(completedToday), hint: 'workflow', tone: 'success', icon: 'ti ti-circle-check' },
     ],
     sections,

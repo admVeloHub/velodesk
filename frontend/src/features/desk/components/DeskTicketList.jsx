@@ -1,46 +1,56 @@
 /**
- * DeskTicketList v1.0.1 — lista de tickets da fila
- * VERSION: v1.0.1 | DATE: 2026-06-24
+ * DeskTicketList v2.0.0 — lista branca no padrão mockup
  */
-import React from 'react';
-import { SLA_LABELS, SLA_SHORT_LABELS } from '../../../services/desk/constants';
+import React, { useMemo } from 'react';
 import {
-  buildTags,
-  formatTicketDate,
-  getSlaClass,
+  formatTicketListTime,
+  getTicketQueueEntryAt,
   getTicketTitle,
+  isTicketInWorkflow,
   normalizeTicketForDeskV2,
-  statusMeta,
 } from '../../../services/desk/utils';
 
 export default function DeskTicketList({
   queueStatuses,
-  activeQueue,
   activeTicketId,
   activeSort,
   entries,
   searchActive,
   collapsed,
+  entrySortOldestFirst,
   onSelectTicket,
   onSortChange,
+  onToggleEntrySort,
   onCollapse,
   onExpand,
   onReload,
   refreshing = false,
 }) {
-  const queueName = queueStatuses.find((s) => s.id === activeQueue)?.name || '';
-  const listTitle = searchActive ? `Busca · ${entries.length}` : `${queueName} · ${entries.length}`;
+  const queueDotById = useMemo(() => {
+    const map = new Map();
+    queueStatuses.forEach((queue) => map.set(queue.id, queue.dot));
+    return map;
+  }, [queueStatuses]);
 
   return (
     <aside className={'ticket-list-panel' + (collapsed ? ' is-collapsed' : '')} id="crmTicketListPanel">
       <div className="ticket-list-panel__inner">
-        <div className="ticket-list-header">
+        <header className="ticket-list-header">
           <div className="ticket-list-header__row">
-            <h2 className="ticket-list-header__title" id="ticketListTitle">
-              {listTitle}
-            </h2>
+            <div className="ticket-list-header__title-wrap">
+              <h2 className="ticket-list-header__title" id="ticketListTitle">
+                Fila de atendimento
+              </h2>
+            </div>
             <div className="ticket-list-header__actions">
-              <button type="button" className="crm-panel-retract" id="btnCollapseTickets" onClick={onCollapse} title="Recolher lista" aria-expanded={!collapsed}>
+              <button
+                type="button"
+                className="crm-panel-retract"
+                id="btnCollapseTickets"
+                onClick={onCollapse}
+                title="Recolher lista"
+                aria-expanded={!collapsed}
+              >
                 <i className="ti ti-chevron-left" />
               </button>
               <button
@@ -57,20 +67,39 @@ export default function DeskTicketList({
               </button>
             </div>
           </div>
-          <div className="sort-chips">
-            {['data', 'sla'].map((sort) => (
-              <button
-                key={sort}
-                type="button"
-                className={'sort-chip' + (activeSort === sort ? ' is-active' : '')}
-                data-sort={sort}
-                onClick={() => onSortChange(sort)}
-              >
-                {sort === 'data' ? 'Data' : 'SLA'}
-              </button>
-            ))}
+
+          <div className="ticket-list-tabs-bar">
+            <div className="ticket-list-tabs" role="tablist" aria-label="Ordenar tickets">
+              {['data', 'sla'].map((sort) => (
+                <button
+                  key={sort}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeSort === sort}
+                  className={'ticket-list-tab' + (activeSort === sort ? ' is-active' : '')}
+                  onClick={() => onSortChange(sort)}
+                >
+                  {sort === 'data' ? 'Data' : 'SLA'}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={'ticket-list-entry-sort' + (entrySortOldestFirst ? ' is-active' : '')}
+              onClick={onToggleEntrySort}
+              title={entrySortOldestFirst ? 'Entrada: mais antigos primeiro' : 'Ordenar por entrada na caixa (mais antigos primeiro)'}
+              aria-label="Ordenar por entrada na caixa"
+              aria-pressed={entrySortOldestFirst}
+            >
+              <i className="ti ti-sort-ascending" aria-hidden="true" />
+            </button>
           </div>
-        </div>
+
+          {searchActive ? (
+            <p className="ticket-list-header__search-hint">Busca · {entries.length} ticket(s)</p>
+          ) : null}
+        </header>
+
         <ul className="ticket-cards" id="ticketCards">
           {entries.length === 0 ? (
             <li className="crm-empty-state" style={{ padding: 16 }}>
@@ -78,10 +107,11 @@ export default function DeskTicketList({
             </li>
           ) : entries.map(({ ticket: t, queueId }) => {
             normalizeTicketForDeskV2(t);
-            const meta = statusMeta(queueId);
-            const sla = getSlaClass(t);
-            const tags = buildTags(t);
+            const inWorkflow = isTicketInWorkflow(t);
             const isActive = String(t.id) === String(activeTicketId);
+            const queueDot = queueDotById.get(queueId) || '#9ca3af';
+            const entryAt = getTicketQueueEntryAt(t);
+
             return (
               <li
                 key={t.id}
@@ -93,40 +123,42 @@ export default function DeskTicketList({
                 tabIndex={0}
                 onKeyDown={(e) => e.key === 'Enter' && onSelectTicket(t.id)}
               >
-                <div className="crm-ticket-card__top">
-                  <span className="crm-ticket-card__name">{t.clientName || t.solicitante || 'Cliente'}</span>
-                  <span className={'status-badge status-badge--' + meta.cls}>{meta.label}</span>
-                </div>
-                <div className="crm-ticket-card__subject">{getTicketTitle(t)}</div>
-                <div className="crm-ticket-card__meta">
-                  <span>{formatTicketDate(t.updatedAt || t.createdAt)}</span>
-                </div>
-                {tags.length > 0 && (
-                  <div className="crm-ticket-card__tags">
-                    {tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className={'crm-tag' + (tag === 'Workflow' ? ' crm-tag--workflow' : '')}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
                 <span
-                  className={'crm-ticket-card__sla crm-ticket-card__sla--' + sla}
-                  title={SLA_LABELS[sla]}
-                  aria-label={SLA_LABELS[sla]}
-                >
-                  {SLA_SHORT_LABELS[sla]}
-                </span>
+                  className="crm-ticket-card__dot"
+                  style={{ background: queueDot }}
+                  aria-hidden="true"
+                />
+                <div className="crm-ticket-card__content">
+                  <div className="crm-ticket-card__row-top">
+                    <span className="crm-ticket-card__name">
+                      {t.clientName || t.solicitante || 'Cliente'}
+                    </span>
+                    <time className="crm-ticket-card__time" dateTime={entryAt}>
+                      {formatTicketListTime(entryAt)}
+                    </time>
+                  </div>
+                  <div className="crm-ticket-card__row-bottom">
+                    <span className="crm-ticket-card__subject" title={getTicketTitle(t)}>
+                      {getTicketTitle(t)}
+                    </span>
+                    {inWorkflow ? (
+                      <span className="crm-tag crm-tag--workflow">Workflow</span>
+                    ) : null}
+                  </div>
+                </div>
               </li>
             );
           })}
         </ul>
       </div>
       {collapsed && (
-        <button type="button" className="crm-panel-expand-tab crm-panel-expand-tab--tickets" id="btnExpandTickets" onClick={onExpand} title="Expandir lista">
+        <button
+          type="button"
+          className="crm-panel-expand-tab crm-panel-expand-tab--tickets"
+          id="btnExpandTickets"
+          onClick={onExpand}
+          title="Expandir lista"
+        >
           <i className="ti ti-chevron-right" /><span>LISTA</span>
         </button>
       )}

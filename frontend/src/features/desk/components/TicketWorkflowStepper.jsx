@@ -26,7 +26,10 @@ export default function TicketWorkflowStepper({ ticket }) {
   const { template, stepsWithState } = progress;
 
   return (
-    <section className="desk-workflow-stepper" aria-label={`Workflow ativo: ${template.title}`}>
+    <section
+      className="desk-workflow-stepper desk-workflow-stepper--compact"
+      aria-label={`Workflow ativo: ${template.title}`}
+    >
       <p className="desk-workflow-stepper__eyebrow" title={`Workflow ativo: ${template.title}`}>
         <i className="ti ti-arrows-exchange" aria-hidden="true" />
         {template.title}
@@ -49,20 +52,6 @@ export default function TicketWorkflowStepper({ ticket }) {
                 <span className="desk-workflow-stepper__circle">
                   <StepIcon step={step} />
                 </span>
-                <div className="desk-workflow-stepper__text">
-                  <span className="desk-workflow-stepper__label">{step.label}</span>
-                  {subtitle ? (
-                    <span
-                      className={
-                        'desk-workflow-stepper__status'
-                        + (step.state === 'active' && progress.slaRemainingLabel ? ' desk-workflow-stepper__status--sla' : '')
-                        + (step.state === 'signaled' ? ' desk-workflow-stepper__status--signaled' : '')
-                      }
-                    >
-                      {subtitle}
-                    </span>
-                  ) : null}
-                </div>
               </li>
             </React.Fragment>
           );

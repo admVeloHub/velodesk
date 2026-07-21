@@ -72,7 +72,7 @@ export function isPortalAllowed(portalId, perm = readCachedPermissions()) {
 export function shouldUseMeusChamadosFila(perm = readCachedPermissions()) {
   if (!perm) return true;
   if (hasPermission(perm.permissoes, 'tickets', 'ver_todos')) return false;
-  if (perm.funcaoSlug === 'financeiro') return false;
+  if (perm.funcaoSlug === 'financeiro' || perm.funcaoSlug === 'produtos') return false;
   return hasPermission(perm.permissoes, 'tickets', 'ver_meus');
 }
 
@@ -80,7 +80,7 @@ function normalizeAtribuido(value) {
   const raw = String(value ?? '').trim();
   if (!raw) return '';
   if (raw.startsWith('grupo:')) {
-    const map = { n1: 'atendimento', n2: 'n2', financeiro: 'financeiro', suporte: 'suporte' };
+    const map = { n1: 'atendimento', n2: 'n2', financeiro: 'financeiro', produtos: 'produtos', suporte: 'suporte' };
     const slug = raw.slice(6).toLowerCase();
     return `funcao:${map[slug] || slug}`;
   }
@@ -131,6 +131,11 @@ export function canActOnTicket(ticket, perm = readCachedPermissions()) {
   if (funcaoSlug === 'financeiro' || funcoes.includes('financeiro')) {
     const atribuido = normalizeAtribuido(ticket?.lateralForm?.atribuido);
     return atribuido === 'funcao:financeiro';
+  }
+
+  if (funcaoSlug === 'produtos' || funcoes.includes('produtos')) {
+    const atribuido = normalizeAtribuido(ticket?.lateralForm?.atribuido);
+    return atribuido === 'funcao:produtos';
   }
 
   for (const cf of funcoes) {
@@ -199,4 +204,15 @@ export function filterTicketForUser(ticket, perm = readCachedPermissions()) {
   if (hasPermission(perm?.permissoes, 'tickets', 'ver_todos')) return true;
   if (canActOnTicket(ticket, perm)) return true;
   return ticketMatchesAgentResponsavel(ticket, perm);
+}
+
+const WORKFLOW_TEAM_QUEUE_SLUGS = ['financeiro', 'produtos'];
+
+export function resolveWorkflowTeamQueueForUser(perm = readCachedPermissions()) {
+  if (!perm) return null;
+  if (WORKFLOW_TEAM_QUEUE_SLUGS.includes(perm.funcaoSlug)) return perm.funcaoSlug;
+  for (const funcao of perm.funcoes || []) {
+    if (WORKFLOW_TEAM_QUEUE_SLUGS.includes(funcao)) return funcao;
+  }
+  return null;
 }

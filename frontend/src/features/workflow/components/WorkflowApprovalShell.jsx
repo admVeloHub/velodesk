@@ -1,15 +1,17 @@
 /**
- * WorkflowApprovalShell — master-detail
+ * WorkflowApprovalShell — master-detail com fila por time (Financeiro / Produtos)
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTickets } from '../../../context/TicketsContext';
 import { useNotifications } from '../../../context/NotificationContext';
 import { getAgentName } from '../../../services/desk/utils';
+import { resolveWorkflowTeamQueueForUser } from '../../../services/permissions/permissionService';
 import {
-  computeWorkflowApprovalQueue,
+  computeWorkflowTeamQueue,
   getWorkflowApprovalDetail,
 } from '../../../services/workflow/workflowApprovalData';
+import { getWorkflowTeamQueueMeta } from '../../../services/workflow/workflowTeamQueues';
 import {
   approveWorkflowDecision,
   rejectWorkflowDecision,
@@ -17,6 +19,13 @@ import {
 } from '../../../services/workflow/workflowDecisionHandlers';
 import WorkflowApprovalQueue from './WorkflowApprovalQueue';
 import WorkflowApprovalDetail from './WorkflowApprovalDetail';
+
+const EMPTY_SUMMARY = {
+  pendingCount: 0,
+  awaitingDecisionCount: 0,
+  approvedTodayCount: 0,
+  slaCriticalCount: 0,
+};
 
 export default function WorkflowApprovalShell() {
   const [searchParams] = useSearchParams();
@@ -26,6 +35,12 @@ export default function WorkflowApprovalShell() {
   const [busy, setBusy] = useState(false);
   const [demoRevision, setDemoRevision] = useState(0);
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
+
+  const teamQueueId = useMemo(() => resolveWorkflowTeamQueueForUser(), [refreshKey, demoRevision]);
+  const teamMeta = useMemo(
+    () => (teamQueueId ? getWorkflowTeamQueueMeta(teamQueueId) : null),
+    [teamQueueId],
+  );
 
   useEffect(() => {
     const onDemoChange = () => setDemoRevision((v) => v + 1);
@@ -37,10 +52,12 @@ export default function WorkflowApprovalShell() {
     setInfoPanelOpen(false);
   }, [selectedId]);
 
-  const queueData = useMemo(
-    () => computeWorkflowApprovalQueue(),
-    [refreshKey, demoRevision],
-  );
+  const queueData = useMemo(() => {
+    if (!teamQueueId) {
+      return { queueLabel: 'Workflow', queue: [], summary: EMPTY_SUMMARY, teamId: null };
+    }
+    return computeWorkflowTeamQueue(teamQueueId);
+  }, [teamQueueId, refreshKey, demoRevision]);
 
   useEffect(() => {
     const fromUrl = searchParams.get('ticket');
@@ -56,8 +73,8 @@ export default function WorkflowApprovalShell() {
   }, [queueData.queue, searchParams, selectedId]);
 
   const detail = useMemo(
-    () => (selectedId ? getWorkflowApprovalDetail(selectedId) : null),
-    [selectedId, refreshKey, demoRevision],
+    () => (selectedId && teamQueueId ? getWorkflowApprovalDetail(selectedId, teamQueueId) : null),
+    [selectedId, teamQueueId, refreshKey, demoRevision],
   );
 
   const runAction = useCallback(async (actionFn, successMsg) => {
@@ -109,10 +126,25 @@ export default function WorkflowApprovalShell() {
     }
   }, [busy, refreshTickets, selectedId, showNotification]);
 
+  if (!teamQueueId) {
+    return (
+      <div className="wf-approval-shell wf-approval-shell--empty">
+        <section className="wf-approval-detail wf-approval-detail--empty wf-approval-detail--full">
+          <div className="wf-approval-detail__empty">
+            <h2>Sem fila de workflow atribuída</h2>
+            <p>
+              Este perfil exige função Financeiro ou Produtos para acessar a fila de atendimento.
+            </p>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="wf-approval-shell">
       <WorkflowApprovalQueue
-        queueLabel={queueData.queueLabel}
+        queueLabel={teamMeta?.name || queueData.queueLabel}
         items={queueData.queue}
         selectedId={selectedId}
         onSelect={setSelectedId}

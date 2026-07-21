@@ -4,7 +4,6 @@
  */
 import React, { useEffect, useState } from 'react';
 import { getClientContactFields, getClientActiveProducts, getProductTagClass, getTicketProtocolLabel, isTicketInWorkflow } from '../../../services/desk/utils';
-import ClientTicketHistoryModal from './ClientTicketHistoryModal';
 import TicketWorkflowStepper from './TicketWorkflowStepper';
 
 function resolveProtocolLabel(ticket) {
@@ -18,13 +17,12 @@ export default function DeskClientProfileBar({
   ticket,
   client,
   onSaveContact,
-  onSelectTicket,
+  onOpenHistory,
   onAdvanceWorkflow,
   advancingWorkflow = false,
   canAdvanceWorkflow = false,
 }) {
   const [editOpen, setEditOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
   const [draft, setDraft] = useState({ name: '', email: '', phone: '' });
   const contact = getClientContactFields(ticket, client);
@@ -129,13 +127,22 @@ export default function DeskClientProfileBar({
               </div>
             )}
           </span>
+          {inWorkflow ? (
+            <div className="ticket-client-profile__client-actions">
+              <TicketWorkflowStepper ticket={ticket} />
+              {canAdvanceWorkflow ? (
+                <button
+                  type="button"
+                  className="btn-primary btn-sm desk-workflow-advance-btn ticket-client-advance-btn"
+                  onClick={onAdvanceWorkflow}
+                  disabled={advancingWorkflow}
+                >
+                  {advancingWorkflow ? 'Avançando…' : 'Avançar'}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-
-        {inWorkflow ? (
-          <div className="ticket-client-profile__cell-workflow">
-            <TicketWorkflowStepper ticket={ticket} />
-          </div>
-        ) : null}
 
         <div className="ticket-client-profile__protocol-row ticket-client-profile__cell-protocol">
           <span className="ticket-client-profile__protocol" id="profileProtocol">
@@ -158,35 +165,18 @@ export default function DeskClientProfileBar({
               ))}
             </div>
           ) : null}
+          <div className="ticket-client-profile__protocol-actions">
+            <button
+              type="button"
+              className="btn-secondary btn-sm ticket-client-history-btn"
+              id="btnClientHistory"
+              onClick={onOpenHistory}
+            >
+              <i className="fas fa-history" /> Histórico
+            </button>
+          </div>
         </div>
       </section>
-      <div className="crm-client-profile-bar__history">
-        {inWorkflow && canAdvanceWorkflow ? (
-          <button
-            type="button"
-            className="btn-primary btn-sm desk-workflow-advance-btn ticket-client-advance-btn"
-            onClick={onAdvanceWorkflow}
-            disabled={advancingWorkflow}
-          >
-            {advancingWorkflow ? 'Avançando…' : 'Avançar'}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className="btn-secondary btn-sm ticket-client-history-btn"
-          id="btnClientHistory"
-          onClick={() => setHistoryOpen(true)}
-        >
-          <i className="fas fa-history" /> Histórico
-        </button>
-      </div>
-      <ClientTicketHistoryModal
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        ticket={ticket}
-        client={client}
-        onSelectTicket={onSelectTicket}
-      />
     </div>
   );
 }

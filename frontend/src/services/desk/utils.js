@@ -113,6 +113,51 @@ export function formatTicketDate(iso) {
     ' · ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
+/** Hora curta para card da lista (ex.: 14:56). */
+export function formatTicketListTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Badge de canal para card da lista branca. */
+export function resolveTicketChannelBadge(ticket) {
+  if (!ticket) return { label: 'Digital', variant: 'digital' };
+
+  const lf = ticket.lateralForm || {};
+  const raw = [
+    lf.canal,
+    ticket.channel,
+    ticket.source,
+    lf.reclameAqui ? 'reclame aqui' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (raw.includes('reclame') || raw.includes('reclame-aqui') || ticket.channel === 'reclame-aqui') {
+    return { label: 'RA', variant: 'ra' };
+  }
+  if (isTicketInWorkflow(ticket)) {
+    return { label: 'Workflow', variant: 'workflow' };
+  }
+  if (raw.includes('whats') || raw.includes('wa')) {
+    return { label: 'WA', variant: 'wa' };
+  }
+  if (raw.includes('tel') || raw.includes('phone') || raw.includes('telefone') || raw.includes('call')) {
+    return { label: 'Tel.', variant: 'tel' };
+  }
+  if (raw.includes('mail') || raw.includes('email') || raw.includes('e-mail')) {
+    return { label: 'Digital', variant: 'digital' };
+  }
+  if (raw.includes('portal') || raw.includes('digital') || raw.includes('web')) {
+    return { label: 'Digital', variant: 'digital' };
+  }
+
+  return { label: 'Digital', variant: 'digital' };
+}
+
 /** Data de finalização (último registro com status resolvido). */
 export function getTicketResolvedAt(ticket) {
   if (!ticket) return null;
@@ -129,6 +174,17 @@ export function getTicketResolvedAt(ticket) {
     return ticket.updatedAt || ticket.createdAt || null;
   }
   return ticket.updatedAt || ticket.createdAt || null;
+}
+
+/** Data de entrada na caixa/fila atual (último registro de status). */
+export function getTicketQueueEntryAt(ticket) {
+  if (!ticket) return null;
+  const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
+  if (historico.length) {
+    const last = historico[historico.length - 1];
+    return last.time || last.timestamp || last.data || null;
+  }
+  return ticket.createdAt || ticket.updatedAt || null;
 }
 
 /** Formato curto para coluna Finalização (ex.: 21 Jan). */
@@ -687,9 +743,19 @@ export function migrateAllTicketsForDeskV2() {
   if (changed) saveTicketColumns(columns);
 }
 
-export function sortTicketEntries(entries, activeSort, sortDir = 'desc') {
+function compareQueueEntryTime(a, b, dir = 1) {
+  const aTime = new Date(getTicketQueueEntryAt(a.ticket) || 0).getTime();
+  const bTime = new Date(getTicketQueueEntryAt(b.ticket) || 0).getTime();
+  if (aTime !== bTime) return dir * (aTime - bTime);
+  return String(a.ticket.id).localeCompare(String(b.ticket.id), 'pt-BR', { numeric: true });
+}
+
+export function sortTicketEntries(entries, activeSort, sortDir = 'desc', forceEntrySort = false) {
   const dir = sortDir === 'asc' ? 1 : -1;
   return [...entries].sort((a, b) => {
+    if (forceEntrySort) {
+      return compareQueueEntryTime(a, b, 1);
+    }
     if (activeSort === 'prioridade') {
       const prio = { critica: 0, alta: 1, normal: 2, baixa: 3 };
       return (prio[a.ticket.priority] || 9) - (prio[b.ticket.priority] || 9);
@@ -705,7 +771,7 @@ export function sortTicketEntries(entries, activeSort, sortDir = 'desc') {
       const bTime = new Date(getTicketResolvedAt(b.ticket) || 0).getTime();
       return dir * (aTime - bTime);
     }
-    return new Date(b.ticket.updatedAt || 0) - new Date(a.ticket.updatedAt || 0);
+    return compareQueueEntryTime(a, b, dir);
   });
 }
 
@@ -713,7 +779,7 @@ function shouldFilterByAgentResponsavel(queueId) {
   return queueId !== 'resolvidos';
 }
 
-export function filterTickets(activeQueue, searchQuery, activeSort) {
+export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOldestFirst = false) {
   const q = (searchQuery || '').toLowerCase();
   const filterByResponsavel = shouldFilterByAgentResponsavel(activeQueue);
   const filtered = getAllCockpitTickets()
@@ -726,11 +792,11 @@ export function filterTickets(activeQueue, searchQuery, activeSort) {
       const hay = [t.id, t.title, t.description, t.clientName, t.solicitante, cpf, formatCpf(cpf)].join(' ').toLowerCase();
       return hay.indexOf(q) >= 0;
     });
-  return sortTicketEntries(filtered, activeSort);
+  return sortTicketEntries(filtered, activeSort, 'desc', entrySortOldestFirst);
 }
 
 /** Busca global por Enter: número do ticket ou todos os tickets do CPF. */
-export function resolveDeskSearchEntries(rawQuery, activeSort) {
+export function resolveDeskSearchEntries(rawQuery, activeSort, entrySortOldestFirst = false) {
   const trimmed = String(rawQuery || '').trim();
   if (!trimmed) return [];
 
@@ -743,7 +809,7 @@ export function resolveDeskSearchEntries(rawQuery, activeSort) {
       const tCpf = normalizeCpf(t.lateralForm?.cpf || t.clientCPF || '');
       return tCpf === digits;
     });
-    return sortTicketEntries(byCpf, activeSort);
+    return sortTicketEntries(byCpf, activeSort, 'desc', entrySortOldestFirst);
   }
 
   const idQuery = trimmed.replace(/^#/, '').trim();
@@ -754,13 +820,13 @@ export function resolveDeskSearchEntries(rawQuery, activeSort) {
       if (!ticketMatchesAgentResponsavel(t)) return false;
       return String(t.id) === idQuery || String(t.id) === idDigits;
     });
-    if (exact.length) return sortTicketEntries(exact, activeSort);
+    if (exact.length) return sortTicketEntries(exact, activeSort, 'desc', entrySortOldestFirst);
 
     const partial = all.filter(({ ticket: t }) => {
       if (!ticketMatchesAgentResponsavel(t)) return false;
       return String(t.id).includes(idDigits);
     });
-    if (partial.length) return sortTicketEntries(partial, activeSort);
+    if (partial.length) return sortTicketEntries(partial, activeSort, 'desc', entrySortOldestFirst);
   }
 
   if (idQuery.length >= 3) {
@@ -769,7 +835,7 @@ export function resolveDeskSearchEntries(rawQuery, activeSort) {
       const hay = [t.id, t.title, t.clientName, t.solicitante].join(' ').toLowerCase();
       return hay.includes(idQuery.toLowerCase());
     });
-    if (loose.length) return sortTicketEntries(loose, activeSort);
+    if (loose.length) return sortTicketEntries(loose, activeSort, 'desc', entrySortOldestFirst);
   }
 
   return [];
