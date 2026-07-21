@@ -23,6 +23,7 @@ import {
   parseAiJson,
 } from './openaiAgent.util';
 import { getFeedbackExamplesForPrompt } from './agentFeedback.service';
+import { logAiUsage } from '../aiUsage.service';
 
 interface AtendimentoParsed {
   respostaSugerida?: string;
@@ -35,6 +36,7 @@ async function callAtendimentoOpenAi(
   systemPrompt: string,
   userBlock: string,
   vectorStoreIds: string[],
+  usageContext: { ticketId?: string; protocolo?: string },
 ): Promise<{ parsed: AtendimentoParsed | null; model: string }> {
   const openai = createOpenAiClient();
   const tools = vectorStoreIds.length
@@ -58,9 +60,22 @@ async function callAtendimentoOpenAi(
     },
   });
 
+  const model = response.model || env.openaiModel;
+  if (response.usage) {
+    void logAiUsage({
+      provider: 'openai',
+      model,
+      feature: 'atendimento',
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      ticketId: usageContext.ticketId,
+      protocolo: usageContext.protocolo,
+    });
+  }
+
   const rawText = extractOutputText(response);
   const parsed = parseAiJson<AtendimentoParsed>(rawText);
-  return { parsed, model: response.model || env.openaiModel };
+  return { parsed, model };
 }
 
 export async function composeAtendimento(params: AtendimentoInput): Promise<AtendimentoResult> {
@@ -83,6 +98,7 @@ export async function composeAtendimento(params: AtendimentoInput): Promise<Aten
       getAtendimentoPersona(),
       userBlock,
       vectorIds,
+      { ticketId: params.ticketId, protocolo: params.protocolo },
     );
 
     if (!parsed?.respostaSugerida?.trim()) {
@@ -133,7 +149,12 @@ export async function reviseAtendimento(params: RevisaoInput): Promise<Atendimen
     );
 
     const vectorIds = getAtendimentoVectorStoreIds();
-    const { parsed, model } = await callAtendimentoOpenAi(systemPrompt, userBlock, vectorIds);
+    const { parsed, model } = await callAtendimentoOpenAi(
+      systemPrompt,
+      userBlock,
+      vectorIds,
+      { ticketId: params.ticketId, protocolo: params.protocolo },
+    );
 
     if (!parsed?.respostaSugerida?.trim()) {
       return { success: false, error: 'Revisão da IA inválida ou vazia' };

@@ -29,6 +29,7 @@ import {
   trimStr,
 } from './openaiAgent.util';
 import { detectCriticalKeywords } from './criticalKeywords.service';
+import { logAiUsage } from '../aiUsage.service';
 
 interface AuditoriaParsed {
   aprovado?: boolean;
@@ -180,6 +181,18 @@ export async function validateAuditoria(params: AuditoriaInput): Promise<Auditor
       },
     });
 
+    const model = response.model || env.openaiModel;
+    if (response.usage) {
+      void logAiUsage({
+        provider: 'openai',
+        model,
+        feature: 'auditoria',
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        protocolo: params.protocolo,
+      });
+    }
+
     const rawText = extractOutputText(response);
     const parsed = parseAiJson<AuditoriaParsed>(rawText);
 
@@ -189,7 +202,7 @@ export async function validateAuditoria(params: AuditoriaInput): Promise<Auditor
 
     const tabulacaoSugerida = resolveTabulacaoSugerida(parsed.tabulacaoSugerida, config);
     const result = applyPostAuditRules(parsed, params, precheckKeywords, tabulacaoSugerida);
-    return { ...result, model: response.model || env.openaiModel };
+    return { ...result, model };
   } catch (err) {
     console.error('[agent-auditoria]', err);
     return { success: false, error: mapOpenAiErrorMessage(err) };

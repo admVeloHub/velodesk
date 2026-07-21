@@ -1,13 +1,16 @@
 /**
  * Leaderboard operacional — painel supervisor
- * VERSION: v3.0.0 | DATE: 2026-07-20
+ * VERSION: v4.0.0 | DATE: 2026-07-21
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   filterOperationalLeaderboard,
   LEADERBOARD_CHANNEL_OPTIONS,
   LEADERBOARD_SHIFT_OPTIONS,
 } from '../../../../services/workspace/deskData';
+import { fetchWorkspace360Leaderboard } from '../../../../services/workspace/workspace360Api';
+import GestaoPeriodFilter from '../gestaoInsights/GestaoPeriodFilter';
+import '../gestaoInsights/gestaoInsights.css';
 
 function trendClass(trend) {
   return trend === 'down' ? 'ws360-leaderboard__trend--down' : 'ws360-leaderboard__trend--up';
@@ -72,9 +75,32 @@ function LeaderboardColumn({ icon, title, rows }) {
   );
 }
 
-export default function Workspace360OperationalLeaderboard({ entries }) {
+export default function Workspace360OperationalLeaderboard() {
   const [shift, setShift] = useState('all');
   const [channel, setChannel] = useState('all');
+  const [period, setPeriod] = useState({ period: 'mes' });
+  const [entries, setEntries] = useState({ resolvedRanking: [], interactionRanking: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+    fetchWorkspace360Leaderboard({ period: period.period, from: period.from, to: period.to })
+      .then((result) => {
+        if (active) setEntries(result);
+      })
+      .catch(() => {
+        if (active) setError('Não foi possível carregar o leaderboard operacional.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [period.period, period.from, period.to]);
 
   const resolvedRows = useMemo(
     () => filterOperationalLeaderboard(entries?.resolvedRanking, { shift, channel }),
@@ -115,13 +141,20 @@ export default function Workspace360OperationalLeaderboard({ entries }) {
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
+          <GestaoPeriodFilter value={period} onChange={setPeriod} idPrefix="gestao-leaderboard" />
         </div>
       </header>
 
-      <div className="ws360-leaderboard__columns">
-        <LeaderboardColumn icon="ti-circle-check" title="Mais resolveram" rows={resolvedRows} />
-        <LeaderboardColumn icon="ti-messages" title="Mais interagiram" rows={interactionRows} />
-      </div>
+      {error ? <p className="gestao-insight-card__error">{error}</p> : null}
+
+      {loading ? (
+        <p className="gestao-insight-card__loading">Carregando…</p>
+      ) : (
+        <div className="ws360-leaderboard__columns">
+          <LeaderboardColumn icon="ti-circle-check" title="Mais resolveram" rows={resolvedRows} />
+          <LeaderboardColumn icon="ti-messages" title="Mais interagiram" rows={interactionRows} />
+        </div>
+      )}
     </section>
   );
 }

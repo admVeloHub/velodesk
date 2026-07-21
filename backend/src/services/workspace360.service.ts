@@ -10,6 +10,7 @@ import {
   isSlaBreached,
   meusChamadosResponsavelFilter,
 } from './chamado.mapper';
+import { resolvePeriodRange } from './gestaoInsights.service';
 
 const SLA_LIMIT_HOURS: Record<string, number> = {
   'em-aberto': 4,
@@ -30,6 +31,10 @@ export interface Workspace360Query {
   channel?: string;
   team?: string;
   report?: string;
+  /** Período próprio do leaderboard operacional — independente do `period` usado nos KPIs/escalonados. */
+  leaderboardPeriod?: string;
+  leaderboardFrom?: string;
+  leaderboardTo?: string;
 }
 
 function startOfDayInTz(date: Date, tz = TZ): Date {
@@ -473,7 +478,12 @@ export async function buildSupervisor360Payload(authUser: AuthPayload, query: Wo
     c.highVolume = c.tickets > avgTickets * 1.3;
   });
 
-  const leaderboard = await buildLeaderboard(filtered, from, to);
+  const leaderboardRange = resolvePeriodRange({
+    period: query.leaderboardPeriod ?? '7d',
+    from: query.leaderboardFrom,
+    to: query.leaderboardTo,
+  });
+  const leaderboard = await buildLeaderboard(filtered, leaderboardRange.start, leaderboardRange.end);
   const reports: Record<string, unknown> = {};
   if (query.report) {
     reports[query.report] = buildReport(query.report, filtered, query);

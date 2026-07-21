@@ -3545,8 +3545,13 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
 .ws360-leaderboard__filters {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
     margin-bottom: 0.35rem;
+}
+
+.ws360-leaderboard__filters .gestao-period-filter {
+    align-items: flex-start;
 }
 
 .ws360-leaderboard__select {

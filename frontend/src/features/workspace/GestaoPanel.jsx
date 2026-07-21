@@ -19,6 +19,7 @@ import GestaoVolumeStatsCard from './components/gestaoInsights/GestaoVolumeStats
 import GestaoMotivosCard from './components/gestaoInsights/GestaoMotivosCard';
 import GestaoCasosEspeciaisCard from './components/gestaoInsights/GestaoCasosEspeciaisCard';
 import GestaoPeriodFilter from './components/gestaoInsights/GestaoPeriodFilter';
+import AiUsageCostCard from './components/aiUsage/AiUsageCostCard';
 
 export default function GestaoPanel() {
   const navigate = useNavigate();
@@ -149,10 +150,11 @@ export default function GestaoPanel() {
           <GestaoMotivosCard period={insightsPeriod} />
         </div>
         <GestaoCasosEspeciaisCard />
+        <AiUsageCostCard />
       </div>
 
       <div className="ws-grid-2">
-        <Workspace360OperationalLeaderboard entries={view.leaderboard} />
+        <Workspace360OperationalLeaderboard />
       </div>
       <Workspace360SupervisorReports />
 
