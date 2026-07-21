@@ -1,10 +1,35 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.42.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.43.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk UX: Meus Tickets, preferência ao salvar e seleção manual
+
+- **Data/Hora**: 2026-07-21
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.43.0
+  - DeskV2Root v3.8.1, DeskRightPanel v1.6.2, DeskMyTicketsTable v1.1.0
+  - agentDeskPreferences v1.0.0, desk/utils v3.1.0, desk/constants (Meus Tickets + termômetro off)
+  - velodesk-crm.css v1.8.5, Sidebar v1.10.2
+- **Arquivos modificados**:
+  - `frontend/src/features/desk/DeskV2Root.jsx` — não auto-abre primeiro ticket ao trocar fila; tabs preservadas; tabela priorizada em Resolvidos/Meus Tickets
+  - `frontend/src/features/desk/components/DeskRightPanel.jsx` — config agente (Fechar/Manter ao salvar) em portal; termômetro oculto
+  - `frontend/src/features/desk/components/DeskMyTicketsTable.jsx` — fila virtual Meus Tickets por status/SLA
+  - `frontend/src/services/desk/agentDeskPreferences.js` — preferência local `velodeskDeskAutoCloseOnSave`
+  - `frontend/src/services/desk/utils.js` — filtro Meus Tickets, `pickNextTicketFromEntries`, listas visíveis
+  - `frontend/src/services/desk/constants.js` — `MEUS_TICKETS_QUEUE_ID`, `DESK_THERMOMETER_UI_ENABLED=false`
+  - `frontend/velodesk-crm.css` — estilos Meus Tickets, popover config agente, fila tabular
+  - `frontend/src/components/Sidebar.jsx`, CSS cockpit/ecosystem — faixa retrátil 10px e ajustes visuais
+- **Descrição**: Melhorias de UX no Desk v2 — seleção manual de tickets, fila Meus Tickets, comportamento configurável ao salvar, prioridade de tabela em Resolvidos/Meus Tickets sem fechar tabs.
+- **Status**: Pendente push
+
+---
 
 ### GitHub Push — Pacote filas e roleta (resolvidos global, presença, cap-10)
 

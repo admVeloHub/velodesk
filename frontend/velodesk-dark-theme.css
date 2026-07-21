@@ -145,7 +145,7 @@ body.velodesk-dark .header {
     border-bottom-color: var(--velo-dark-border);
 }
 
-body.velodesk-dark .sidebar {
+body.velodesk-dark .sidebar:not(.velo-nav-rail) {
     background: #111827;
 }
 
@@ -844,14 +844,14 @@ body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor__expand-btn:hover {
 }
 
 body.velodesk-dark #velodeskDeskV2Root .crm-compose-toolbar__btn--active {
-    background: #3b82f6;
+    background: #1634FF;
     color: #fff;
-    border-color: #3b82f6;
+    border-color: #1634FF;
 }
 
 body.velodesk-dark #velodeskDeskV2Root .crm-compose-toolbar__btn--active:hover {
-    background: #2563eb;
-    border-color: #2563eb;
+    background: #1634FF;
+    border-color: #1634FF;
 }
 
 body.velodesk-dark #velodeskDeskV2Root .crm-compose-toolbar--internal .crm-compose-toolbar__btn--active {

@@ -1,17 +1,18 @@
 /**
- * Sidebar rail — 3 estados: recolhida (5px) | hover (52px ícones) | fixada chevron (220px + labels)
- * VERSION: v1.9.3 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * Sidebar rail — 3 estados: recolhida (10px) | hover (52px ícones) | fixada chevron (220px + labels)
+ * VERSION: v1.10.1 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team
  */
 
 :root {
     --velo-sidebar-compact: 0px;
-    --velo-sidebar-trigger-w: 5px;
+    --velo-sidebar-trigger-w: 10px;
+    --velo-sidebar-trigger-color: #1634FF;
     --velo-sidebar-expanded: 52px;
     --velo-sidebar-pinned: 220px;
-    --velo-sidebar-bg: #000058;
-    --velo-sidebar-accent: #1634FF;
-    --velo-sidebar-icon-muted: rgba(255, 255, 255, 0.55);
-    --velo-sidebar-icon-active-bg: rgba(22, 52, 255, 0.35);
+    --velo-sidebar-bg: #1634FF;
+    --velo-sidebar-accent: #000058;
+    --velo-sidebar-icon-muted: rgba(255, 255, 255, 0.72);
+    --velo-sidebar-icon-active-bg: rgba(0, 0, 88, 0.28);
     --velo-sidebar-avatar-bg: #1694FF;
 }
 
@@ -26,6 +27,12 @@
     transition: width 0.2s ease;
 }
 
+.velo-nav-rail-wrap:not(.is-open):not(.is-pinned),
+.velo-nav-rail-wrap.is-open:not(.is-pinned),
+.velo-nav-rail-wrap.is-pinned {
+    background: #1634FF;
+}
+
 .velo-nav-rail-wrap.is-open:not(.is-pinned) {
     width: var(--velo-sidebar-expanded);
 }
@@ -38,15 +45,15 @@
 .velo-nav-rail-wrap::after {
     content: '';
     position: absolute;
-    top: 50%;
+    top: 0;
     left: 0;
-    width: 3px;
-    height: 56px;
-    transform: translateY(-50%);
-    background: var(--velo-sidebar-accent);
+    width: 100%;
+    height: 100%;
+    background: #1634FF;
     border-radius: 0 4px 4px 0;
-    opacity: 0.55;
+    opacity: 1;
     pointer-events: none;
+    z-index: 9000;
     transition: opacity 0.2s ease;
 }
 
@@ -77,7 +84,7 @@
     bottom: 0;
     height: 100vh;
     width: var(--velo-sidebar-expanded);
-    background: var(--velo-sidebar-bg);
+    background: var(--velo-sidebar-bg) !important;
     border-right: 0.5px solid rgba(255, 255, 255, 0.06);
     padding: 10px 0;
     gap: 4px;
@@ -499,6 +506,7 @@ body.velo-nav-rail-mode .sidebar-toggle-btn {
 }
 
 #mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn {
+    position: relative;
     width: var(--ws360-bell-size, 40px);
     height: var(--ws360-bell-size, 40px);
     padding: 0;
@@ -508,38 +516,40 @@ body.velo-nav-rail-mode .sidebar-toggle-btn {
     gap: 0;
     border-radius: 50%;
     font-size: 1rem;
-    color: var(--eco-navy, #04072E);
+    color: var(--eco-navy, #000058);
     background: #fff;
     border: 1px solid var(--eco-border, #E4E6EA);
     box-shadow: 0 2px 8px rgba(0, 0, 88, 0.06);
     cursor: pointer;
-    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 #mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn span {
     display: none;
 }
 
-.velo-nav-rail-wrap.is-open #mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn {
-    width: calc(100% - 12px);
-    height: auto;
-    min-height: 36px;
-    border-radius: 8px;
-    padding: 0 10px;
-    justify-content: flex-start;
-    gap: 8px;
-}
-
-.velo-nav-rail-wrap.is-open #mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn span {
-    display: inline;
-    font-size: 0.82rem;
-    font-weight: 500;
+.velo-nav-rail-wrap.is-open:not(.is-pinned) .velo-nav-rail__logout-btn:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--velo-sidebar-accent);
+    color: #fff;
+    padding: 0.35rem 0.6rem;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 9000;
 }
 
 #mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn:hover {
     background: #fef2f2;
     border-color: rgba(185, 28, 28, 0.25);
     color: #b91c1c;
+    transform: scale(1.04);
 }
 
 body.velodesk-dark #mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn {
@@ -563,7 +573,7 @@ body.velodesk-dark #mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn:hover {
     justify-content: center;
     border-radius: 50%;
     font-size: 1rem;
-    color: var(--eco-navy, #04072E);
+    color: var(--eco-navy, #000058);
     background: #fff;
     border: 1px solid var(--eco-border, #E4E6EA);
     box-shadow: 0 2px 8px rgba(0, 0, 88, 0.06);
@@ -607,4 +617,8 @@ body.velodesk-dark #mainSidebar.velo-nav-rail .velo-nav-rail__logout-btn:hover {
     white-space: nowrap;
     pointer-events: none;
     z-index: 9000;
+}
+
+body.velodesk-dark #mainSidebar.sidebar.velo-nav-rail {
+    background: var(--velo-sidebar-bg) !important;
 }

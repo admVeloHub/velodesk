@@ -127,7 +127,7 @@
 .funcoes-permissoes-section .fp-velohub-list li {
   padding: 0.35rem 0;
   font-size: 0.875rem;
-  color: #1e40af;
+  color: #1634FF;
   border-bottom: 1px solid #E4E6EA;
 }
 
@@ -253,7 +253,7 @@
 
 .funcoes-permissoes-section .fp-config-modal__hint {
   margin-top: 1rem;
-  color: #1e40af;
+  color: #1634FF;
   font-style: italic;
 }
 
@@ -288,7 +288,7 @@
 
 .funcoes-permissoes-section .fp-config-modal__pendente-desc {
   font-size: 0.8rem;
-  color: #1e40af;
+  color: #1634FF;
 }
 
 .funcoes-permissoes-section .fp-config-modal__editor {

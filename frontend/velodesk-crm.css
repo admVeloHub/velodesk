@@ -1,4 +1,4 @@
-/* Velodesk CRM v1.7.4 — scroll conversa + config */
+/* Velodesk CRM v1.8.5 — Meus Tickets seções retráteis */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -34,8 +34,9 @@
     --blue-primary: #1634FF;
     --blue-sidebar: #000058;
     --blue-dark: #000058;
-    --blue-queue: #04072E;
-    --blue-medium: #1694FF;
+    --blue-queue: #000058;
+    --blue-medium: #1634FF;
+    --blue-light: #1694FF;
     --yellow-alert: #FCC200;
     --green-status: #15A237;
     --gray-border: #E4E6EA;
@@ -52,7 +53,9 @@
     --rp-panel-gap-right: 8px;
     --rp-panel-width: 220px;
     --desk-col-queue: 168px;
+    --desk-queue-rail-inset: calc(var(--velo-sidebar-trigger-w, 10px) + 4px);
     --desk-col-list: 236px;
+    --desk-panel-collapsed-w: 36px;
     --desk-compose-min-h: 80px;
     --desk-compose-max-h: min(108px, 18vh);
     --compose-footer-height: 44px;
@@ -202,14 +205,15 @@
     margin-top: auto;
 }
 
-/* Col 2 */
+/* Col 2 — fila: fundo até a borda; conteúdo recuado da faixa retrátil */
 #velodeskDeskV2Root .queue-panel {
     width: var(--desk-col-queue);
+    min-width: var(--desk-col-queue);
     flex-shrink: 0;
     height: 100%;
     min-height: 0;
     align-self: stretch;
-    background: #04072E;
+    background: var(--blue-queue);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -222,7 +226,10 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    min-width: var(--desk-col-queue);
+    min-width: 0;
+    width: 100%;
+    padding-left: var(--desk-queue-rail-inset);
+    box-sizing: border-box;
     opacity: 1;
     transition: opacity 0.2s ease;
 }
@@ -242,8 +249,8 @@
 }
 
 #velodeskDeskV2Root .queue-panel.is-collapsed {
-    width: 36px;
-    min-width: 36px;
+    width: var(--desk-panel-collapsed-w);
+    min-width: var(--desk-panel-collapsed-w);
 }
 
 #velodeskDeskV2Root .queue-panel.is-collapsed .queue-panel__inner {
@@ -491,12 +498,14 @@
 }
 
 #velodeskDeskV2Root .crm-panel-expand-tab--queue {
-    background: #04072E;
+    background: var(--blue-queue);
     color: rgba(255, 255, 255, 0.55);
+    padding-left: var(--desk-queue-rail-inset);
+    box-sizing: border-box;
 }
 
 #velodeskDeskV2Root .crm-panel-expand-tab--queue:hover {
-    background: #0a0f3d;
+    background: var(--blue-medium);
     color: #fff;
 }
 
@@ -2086,7 +2095,7 @@
 
 #velodeskDeskV2Root .velo-tag--fiber { background: #1634FF; }
 #velodeskDeskV2Root .velo-tag--tv { background: #1694FF; }
-#velodeskDeskV2Root .velo-tag--mobile { background: #0891b2; }
+#velodeskDeskV2Root .velo-tag--mobile { background: #1694FF; }
 #velodeskDeskV2Root .velo-tag--combo { background: #0d9488; }
 #velodeskDeskV2Root .velo-tag--landline { background: #1634FF; }
 #velodeskDeskV2Root .velo-tag--streaming { background: #db2777; }
@@ -2195,7 +2204,7 @@
 #velodeskDeskV2Root .crm-note-card--ai .crm-note-card__accent { background: #7c3aed; }
 #velodeskDeskV2Root .crm-note-card--system .crm-note-card__accent { background: #94a3b8; }
 #velodeskDeskV2Root .crm-note-card--sla .crm-note-card__accent { background: #eab308; }
-#velodeskDeskV2Root .crm-note-card--changelog .crm-note-card__accent { background: #0ea5e9; }
+#velodeskDeskV2Root .crm-note-card--changelog .crm-note-card__accent { background: #1694FF; }
 #velodeskDeskV2Root .crm-note-card--registro .crm-note-card__accent { background: #006AB9; }
 #velodeskDeskV2Root .crm-note-card--workflow .crm-note-card__accent { background: #006AB9; }
 
@@ -2259,7 +2268,7 @@
 
 #velodeskDeskV2Root .crm-note-card--changelog .crm-note-card__avatar {
     background: #e0f2fe;
-    color: #0284c7;
+    color: #1694FF;
 }
 
 #velodeskDeskV2Root .crm-note-card--registro .crm-note-card__avatar {
@@ -2310,12 +2319,12 @@
 
 #velodeskDeskV2Root .crm-note-card__badge--agent {
     background: #eff6ff;
-    color: #1d4ed8;
+    color: #1634FF;
 }
 
 #velodeskDeskV2Root .crm-note-card__badge--ai {
     background: #eff6ff;
-    color: #2563eb;
+    color: #1634FF;
 }
 
 #velodeskDeskV2Root .crm-note-card__badge--system {
@@ -4019,7 +4028,7 @@
 }
 
 #velodeskDeskV2Root .cascade-flow__trigger--secondary.is-selected {
-    border-color: #0891b2;
+    border-color: #1694FF;
     background: #ECFEFF;
 }
 
@@ -4107,7 +4116,7 @@
 
 #velodeskDeskV2Root .cascade-flow__option--action:hover {
     background: #ECFEFF;
-    color: #0891b2;
+    color: #1694FF;
 }
 
 #velodeskDeskV2Root .cascade-flow__summary {
@@ -4661,6 +4670,137 @@
     flex-direction: column;
     gap: 6px;
     border-top: 0.5px solid #f0f1f5;
+}
+
+#velodeskDeskV2Root .crm-right-panel__settings-bar {
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 6px 14px 0;
+    border-top: 0.5px solid #f0f1f5;
+}
+
+#velodeskDeskV2Root .crm-right-panel__settings-wrap {
+    position: relative;
+}
+
+#velodeskDeskV2Root .crm-right-panel__settings-btn {
+    width: 32px;
+    height: 32px;
+    border: 0.5px solid #E4E6EA;
+    border-radius: 8px;
+    background: #fff;
+    color: #006AB9;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+#velodeskDeskV2Root .crm-right-panel__settings-btn .ti {
+    font-size: 17px;
+}
+
+#velodeskDeskV2Root .crm-right-panel__settings-btn:hover,
+#velodeskDeskV2Root .crm-right-panel__settings-btn.is-open {
+    background: #EEF6FC;
+    border-color: #006AB9;
+    color: #006AB9;
+}
+
+/* Popover config agente — portal fixed acima de todo o Desk */
+.crm-agent-settings-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 8300;
+    pointer-events: none;
+}
+
+.crm-agent-settings-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 8299;
+    pointer-events: auto;
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: rgba(15, 23, 42, 0.28);
+    cursor: default;
+}
+
+.crm-agent-settings-popover {
+    position: fixed;
+    z-index: 8301;
+    pointer-events: auto;
+    min-width: 240px;
+    background: #fff;
+    border: 0.5px solid #E4E6EA;
+    border-radius: 10px;
+    box-shadow: 0 16px 40px rgba(0, 0, 88, 0.18);
+    padding: 14px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.crm-agent-settings-popover__title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #000058;
+    line-height: 1.3;
+}
+
+.crm-agent-settings-popover__row {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.crm-agent-settings-popover__toggle {
+    min-width: 92px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.crm-agent-settings-popover__toggle.is-close {
+    background: transparent;
+    border: 1.5px solid #006AB9;
+    color: #006AB9;
+}
+
+.crm-agent-settings-popover__toggle.is-close:hover {
+    background: #EEF6FC;
+}
+
+.crm-agent-settings-popover__toggle.is-keep {
+    background: #000058;
+    border: 1.5px solid #000058;
+    color: #fff;
+}
+
+.crm-agent-settings-popover__toggle.is-keep:hover {
+    background: #001a7a;
+    border-color: #001a7a;
+}
+
+body.velodesk-dark .crm-agent-settings-popover {
+    background: #1a1d2e;
+    border-color: #2d3148;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+body.velodesk-dark .crm-agent-settings-popover__title {
+    color: #e8eaf0;
 }
 
 #velodeskDeskV2Root .rp-footer-btn {
@@ -5765,6 +5905,7 @@ body.desk-v2-mode #cockpitFocusContext {
 }
 
 /* ── Tabela Finalizados (fila Resolvidos) ── */
+#velodeskDeskV2Root .crm-main-content--table-queue,
 #velodeskDeskV2Root .crm-main-content--resolved-table {
     background: #fff;
     margin-right: 0;
@@ -5995,4 +6136,227 @@ body.desk-v2-mode #cockpitFocusContext {
     text-align: center;
     color: #9ca3af;
     font-size: 13px;
+}
+
+/* ── Meus Tickets (lista tabular por status / SLA) ── */
+#velodeskDeskV2Root .desk-my-tickets-table {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    background: #fff;
+    color: #1a1a2e;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 24px 12px;
+    flex-shrink: 0;
+    border-bottom: 0.5px solid #f0f1f5;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__heading {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #000058;
+    letter-spacing: -0.02em;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__subtitle {
+    font-size: 13px;
+    color: #6b7280;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 8px 24px 24px;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__empty {
+    padding: 48px 16px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 14px;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__section + .desk-my-tickets-table__section {
+    margin-top: 20px;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 8px;
+    margin: 0;
+    border: none;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    transition: background 0.12s ease;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__section-header:hover {
+    background: #f8f9fc;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__section-chevron {
+    font-size: 16px;
+    color: #006AB9;
+    flex-shrink: 0;
+    transition: transform 0.18s ease;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__section-chevron.is-collapsed {
+    transform: rotate(-90deg);
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__section.is-collapsed .desk-my-tickets-table__section-header {
+    margin-bottom: 0;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__section-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__section-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #000058;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__section-count {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    background: #f3f4f8;
+    border-radius: 999px;
+    padding: 2px 8px;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__grid thead th {
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #9ca3af;
+    border-bottom: 0.5px solid #eef0f4;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__th-num { width: 148px; }
+#velodeskDeskV2Root .desk-my-tickets-table__th-sla { width: 140px; }
+
+#velodeskDeskV2Root .desk-my-tickets-table__row {
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__row:hover {
+    background: #f8f9fc;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__row td {
+    padding: 10px 12px;
+    border-bottom: 0.5px solid #f0f1f5;
+    vertical-align: middle;
+    font-size: 13px;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__num {
+    font-weight: 600;
+    color: #006AB9;
+    white-space: nowrap;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__subject {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #1a1a2e;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__sla {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__sla-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__sla-badge--ok {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__sla-badge--warning {
+    background: #fffbeb;
+    color: #b45309;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__sla-badge--critical {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__sla-time {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__row.is-sla-critical {
+    background: #fffafa;
+}
+
+#velodeskDeskV2Root .desk-my-tickets-table__row.is-sla-warning {
+    background: #fffdf7;
 }

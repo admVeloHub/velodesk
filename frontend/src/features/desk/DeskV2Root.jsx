@@ -1,6 +1,6 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.6.0 | DATE: 2026-07-03
+ * VERSION: v3.8.1 | DATE: 2026-07-21
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { isAgentForwardEscalonar } from '../../services/desk/constants';
@@ -9,6 +9,11 @@ import {
   resolveDeskSearchEntries,
   pickDefaultQueueId,
   countByQueue,
+  pickNextTicketFromEntries,
+  resolveDeskWorkingEntries,
+  getEntryTicketId,
+  isDeskTableQueue,
+  isMeusTicketsQueue,
   buildRegistroThread,
   normalizeTicketForDeskV2,
   getAgentName,
@@ -37,6 +42,7 @@ import CreateTicketPanel from './components/CreateTicketPanel';
 import DeskQueuePanel from './components/DeskQueuePanel';
 import DeskTicketList from './components/DeskTicketList';
 import DeskResolvedTicketTable from './components/DeskResolvedTicketTable';
+import DeskMyTicketsTable from './components/DeskMyTicketsTable';
 import DeskTicketTabsBar from './components/DeskTicketTabsBar';
 import DeskClientProfileBar from './components/DeskClientProfileBar';
 import ClientTicketHistoryModal from './components/ClientTicketHistoryModal';
@@ -56,6 +62,7 @@ import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
 import DeskAiRevisionModal from './components/DeskAiRevisionModal';
 import { resolveAutomaticaConfig } from '../config/workflow/workflowConfigData';
 import ProdutosForwardPopover from './components/ProdutosForwardPopover';
+import { getAutoCloseOnSave } from '../../services/desk/agentDeskPreferences';
 
 function applyRightFieldsToTicket(t, rightFields, escalonar) {
   const prevLf = t.lateralForm || {};
@@ -146,7 +153,9 @@ export default function DeskV2Root() {
   const [composeSpellErrors, setComposeSpellErrors] = useState([]);
   const [spellIgnoredWords, setSpellIgnoredWords] = useState(() => new Set());
   const [queueStatuses, setQueueStatuses] = useState(() => getAllQueueStatuses());
-  const suppressAutoSelectRef = useRef(false);
+  const suppressAutoSelectRef = useRef(true);
+  const pendingAdvanceTicketIdRef = useRef(null);
+  const [tableQueueBrowsing, setTableQueueBrowsing] = useState(false);
   const tabSessionsRef = useRef({});
   const prevActiveTabIdRef = useRef(null);
   const [colaboradorAtuacao, setColaboradorAtuacao] = useState([]);
@@ -188,10 +197,10 @@ export default function DeskV2Root() {
     }
   }, [syncTicketViews, showNotification]);
 
-  const entries = appliedSearch.trim()
-    ? resolveDeskSearchEntries(appliedSearch, activeSort, entrySortOldestFirst)
-    : filterTickets(activeQueue, '', activeSort, entrySortOldestFirst);
+  const entries = resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst);
+  const isTableQueueView = isDeskTableQueue(activeQueue);
   const isResolvedQueue = activeQueue === 'resolvidos';
+  const isMyTicketsQueue = isMeusTicketsQueue(activeQueue);
   const entry = activeTabId ? findTicketEntry(activeTabId) : null;
   const ticket = entry?.ticket;
   const ticketStatus = statusMeta(entry?.queueId || 'em-andamento');
@@ -279,11 +288,14 @@ export default function DeskV2Root() {
   }, [ticket?.id]);
 
   useEffect(() => {
+    if (pendingAdvanceTicketIdRef.current) return;
+    if (tableQueueBrowsing) return;
+    if (suppressAutoSelectRef.current && !activeTabId) return;
     if (openTabs.length === 0) return;
     if (activeTabId && findTicketEntry(activeTabId)) return;
     const last = openTabs[openTabs.length - 1];
     if (last) setActiveTabId(last.id);
-  }, [activeTabId, refreshKey, entries.length, openTabs, setActiveTabId]);
+  }, [activeTabId, refreshKey, entries.length, openTabs, setActiveTabId, tableQueueBrowsing]);
 
   useEffect(() => {
     if (!activeTabId) {
@@ -327,7 +339,8 @@ export default function DeskV2Root() {
   }, [config, activeTabId]);
 
   const selectTicket = (id) => {
-    suppressAutoSelectRef.current = false;
+    suppressAutoSelectRef.current = true;
+    setTableQueueBrowsing(false);
     persistTabSession(activeTabId);
     const entry = findTicketEntry(id);
     if (!entry) {
@@ -339,6 +352,7 @@ export default function DeskV2Root() {
 
   const activateTicketTab = (id) => {
     if (String(id) === String(activeTabId)) return;
+    setTableQueueBrowsing(false);
     persistTabSession(activeTabId);
     setActiveTabId(id);
   };
@@ -353,19 +367,47 @@ export default function DeskV2Root() {
     closeTicketTab(id);
   };
 
+  const advanceAfterSaveIfEnabled = useCallback((savedTicketId, plannedNextId, listAnchorId = savedTicketId) => {
+    if (!getAutoCloseOnSave() || !savedTicketId) return;
+
+    let nextId = plannedNextId;
+    if (!nextId) {
+      const freshList = resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst);
+      nextId = pickNextTicketFromEntries(listAnchorId, freshList);
+    }
+
+    if (String(savedTicketId) === String(activeTabId)) {
+      persistTabSession(activeTabId);
+    }
+    delete tabSessionsRef.current[String(savedTicketId)];
+
+    const willOpenNext = nextId && String(nextId) !== String(savedTicketId);
+    suppressAutoSelectRef.current = !willOpenNext;
+    closeTicketTab(savedTicketId);
+
+    if (!willOpenNext) return;
+
+    pendingAdvanceTicketIdRef.current = String(nextId);
+    suppressAutoSelectRef.current = false;
+    queueMicrotask(() => {
+      setTableQueueBrowsing(false);
+      openTicket(nextId);
+      pendingAdvanceTicketIdRef.current = null;
+    });
+  }, [activeQueue, appliedSearch, activeSort, entrySortOldestFirst, openTicket, closeTicketTab, activeTabId, persistTabSession]);
+
   const selectMainTab = (tab) => {
     setMainTab(tab);
   };
 
   const selectQueue = (queueId) => {
-    if (openTabs.length === 0) {
-      suppressAutoSelectRef.current = true;
-    }
+    suppressAutoSelectRef.current = true;
     setActiveQueue(queueId);
     setSearchDraft('');
     setAppliedSearch('');
     localStorage.setItem('velodeskCrmTicketListCollapsed', '0');
     setListCollapsed(false);
+    setTableQueueBrowsing(isDeskTableQueue(queueId));
   };
 
   const handleSearchSubmit = () => {
@@ -384,6 +426,7 @@ export default function DeskV2Root() {
     }
 
     suppressAutoSelectRef.current = false;
+    setTableQueueBrowsing(false);
     persistTabSession(activeTabId);
     openTicket(results[0].ticket.id);
 
@@ -420,6 +463,11 @@ export default function DeskV2Root() {
   const handleCommitWithStatus = async (statusId) => {
     if (!ticket || !entry) return null;
     const status = statusId || sendStatus;
+    const savedListTicketId = getEntryTicketId(entry);
+    const workingListBeforeSave = resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst);
+    const plannedNextId = getAutoCloseOnSave()
+      ? pickNextTicketFromEntries(savedListTicketId, workingListBeforeSave)
+      : null;
     const messageHtml = String(composeText || '').trim();
     const internalNoteHtml = String(internalText || '').trim();
     const messageText = htmlToPlainText(messageHtml).trim();
@@ -532,7 +580,8 @@ export default function DeskV2Root() {
           messageText || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
           'success',
         );
-        syncTicketViews();
+        await syncTicketViews();
+        advanceAfterSaveIfEnabled(newId, plannedNextId, draftId);
         return newId;
       }
 
@@ -582,7 +631,8 @@ export default function DeskV2Root() {
         messageText || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
         'success',
       );
-      syncTicketViews();
+      await syncTicketViews();
+      advanceAfterSaveIfEnabled(ticket.id, plannedNextId, savedListTicketId);
       return ticket.id;
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Erro ao salvar ticket.';
@@ -769,7 +819,8 @@ export default function DeskV2Root() {
     persistTabSession(activeTabId);
     delete tabSessionsRef.current[String(id)];
     prevActiveTabIdRef.current = null;
-    suppressAutoSelectRef.current = false;
+    suppressAutoSelectRef.current = true;
+    setTableQueueBrowsing(false);
     setCreateOpen(false);
     openTicket(id);
     setActiveQueue('novos');
@@ -781,6 +832,7 @@ export default function DeskV2Root() {
     setQueueStatuses(getAllQueueStatuses());
     setActiveQueue(box.id);
     suppressAutoSelectRef.current = true;
+    setTableQueueBrowsing(isDeskTableQueue(box.id));
     syncTicketViews();
   };
 
@@ -911,8 +963,12 @@ export default function DeskV2Root() {
     }
   }, [ticketAi, showNotification]);
 
+  const showTableQueueMain = isTableQueueView && tableQueueBrowsing && !createOpen;
+  const showTicketMain = Boolean(ticket) && !showTableQueueMain;
+  const showOpenTabsBar = openTabs.length > 0 && !createOpen;
+
   return (
-    <div className={'app-shell' + (isResolvedQueue ? ' app-shell--resolved-table' : '')} id="deskAppShell">
+    <div className={'app-shell' + (isTableQueueView ? ' app-shell--table-queue' : '')} id="deskAppShell">
       <DeskQueuePanel
         queueStatuses={queueStatuses}
         activeQueue={activeQueue}
@@ -927,7 +983,7 @@ export default function DeskV2Root() {
         onQueueBoxCreated={handleQueueBoxCreated}
       />
 
-      {!isResolvedQueue ? (
+      {!isTableQueueView ? (
         <DeskTicketList
           queueStatuses={queueStatuses}
           activeTicketId={activeTabId}
@@ -946,29 +1002,41 @@ export default function DeskV2Root() {
         />
       ) : null}
 
-      <main className={'crm-main-content' + (createOpen ? ' crm-main-content--create' : '') + (isResolvedQueue && !ticket ? ' crm-main-content--resolved-table' : '')} id="crmMainContent">
+      <main className={'crm-main-content' + (createOpen ? ' crm-main-content--create' : '') + (showTableQueueMain ? ' crm-main-content--table-queue' : '')} id="crmMainContent">
         {createOpen ? (
           <CreateTicketPanel
             onClose={() => setCreateOpen(false)}
             onSaved={handleCreateSaved}
           />
-        ) : isResolvedQueue && !activeTabId && !ticket ? (
-          <DeskResolvedTicketTable
-            entries={entries}
-            searchActive={!!appliedSearch.trim()}
-            onSelectTicket={selectTicket}
-            onReload={reload}
-            refreshing={ticketsLoading}
-          />
-        ) : !ticket ? (
-          <div className="crm-empty-state" id="crmEmptyMain">Selecione um ticket na lista ao lado</div>
         ) : (
-          <div className="crm-ticket-view">
-            <DeskTicketTabsBar
-              onSelectTab={activateTicketTab}
-              onCloseTab={closeTicketTabHandler}
-            />
-            <DeskClientProfileBar
+          <>
+            {showOpenTabsBar ? (
+              <DeskTicketTabsBar
+                onSelectTab={activateTicketTab}
+                onCloseTab={closeTicketTabHandler}
+              />
+            ) : null}
+            {showTableQueueMain && isMyTicketsQueue ? (
+              <DeskMyTicketsTable
+                entries={entries}
+                searchActive={!!appliedSearch.trim()}
+                onSelectTicket={selectTicket}
+                onReload={reload}
+                refreshing={ticketsLoading}
+              />
+            ) : showTableQueueMain && isResolvedQueue ? (
+              <DeskResolvedTicketTable
+                entries={entries}
+                searchActive={!!appliedSearch.trim()}
+                onSelectTicket={selectTicket}
+                onReload={reload}
+                refreshing={ticketsLoading}
+              />
+            ) : !showTicketMain ? (
+              <div className="crm-empty-state" id="crmEmptyMain">Selecione um ticket na lista ao lado</div>
+            ) : (
+              <div className="crm-ticket-view">
+                <DeskClientProfileBar
               ticket={ticket}
               client={client}
               onSaveContact={handleSaveContact}
@@ -1087,6 +1155,8 @@ export default function DeskV2Root() {
               )}
             </div>
           </div>
+            )}
+          </>
         )}
       </main>
 

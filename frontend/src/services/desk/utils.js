@@ -1,11 +1,11 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.0.4 | DATE: 2026-07-21
+ * VERSION: v3.1.0 | DATE: 2026-07-21
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
-import { ticketMatchesAgentResponsavel } from './responsavelSegmentation';
-import { QUEUE_STATUSES, isAgentForwardEscalonar } from './constants';
+import { ticketAssignedToCurrentAgent, ticketMatchesAgentResponsavel } from './responsavelSegmentation';
+import { MEUS_TICKETS_QUEUE_ID, QUEUE_STATUSES, isAgentForwardEscalonar } from './constants';
 import { lookupClient, getAgentName } from '../clientDb';
 import {
   advanceWorkflowStep,
@@ -776,21 +776,73 @@ export function sortTicketEntries(entries, activeSort, sortDir = 'desc', forceEn
 }
 
 function shouldFilterByAgentResponsavel(queueId) {
-  return queueId !== 'resolvidos';
+  return queueId !== 'resolvidos' && queueId !== MEUS_TICKETS_QUEUE_ID;
+}
+
+export function isMeusTicketsQueue(queueId) {
+  return queueId === MEUS_TICKETS_QUEUE_ID;
+}
+
+export function isDeskTableQueue(queueId) {
+  return queueId === 'resolvidos' || isMeusTicketsQueue(queueId);
+}
+
+export const MY_TICKETS_STATUS_SECTIONS = [
+  { id: 'novos', label: 'Novos', dot: '#1634FF' },
+  { id: 'em-andamento', label: 'Em andamento', dot: '#15A237' },
+  { id: 'pendente', label: 'Pendente', dot: '#FCC200' },
+  { id: 'resolvidos', label: 'Resolvidos', dot: '#9ca3af' },
+];
+
+function matchesTicketSearch(entry, q) {
+  if (!q) return true;
+  const t = entry.ticket;
+  const cpf = normalizeCpf(t.lateralForm?.cpf || t.clientCPF || '');
+  const hay = [t.id, t.title, t.description, t.clientName, t.solicitante, cpf, formatCpf(cpf)].join(' ').toLowerCase();
+  return hay.indexOf(q) >= 0;
+}
+
+function filterMyTicketsEntries(searchQuery) {
+  const q = (searchQuery || '').toLowerCase();
+  return getAllCockpitTickets().filter((entry) => {
+    if (!ticketAssignedToCurrentAgent(entry.ticket)) return false;
+    return matchesTicketSearch(entry, q);
+  });
+}
+
+export function formatTicketSlaRemaining(ticket) {
+  normalizeTicketForDeskV2(ticket);
+  const remaining = ticket.slaRemaining;
+  if (remaining == null) return '—';
+  if (remaining <= 0) return 'Vencido';
+  const hours = Math.floor(remaining / 60);
+  const minutes = remaining % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes} min`;
+}
+
+export function groupMyTicketsByStatus(entries) {
+  return MY_TICKETS_STATUS_SECTIONS.map((section) => ({
+    ...section,
+    entries: sortTicketEntries(
+      (entries || []).filter((entry) => entry.queueId === section.id),
+      'sla',
+      'asc',
+    ),
+  })).filter((section) => section.entries.length > 0);
 }
 
 export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOldestFirst = false) {
   const q = (searchQuery || '').toLowerCase();
+  if (isMeusTicketsQueue(activeQueue)) {
+    return sortTicketEntries(filterMyTicketsEntries(q), 'sla', 'asc');
+  }
   const filterByResponsavel = shouldFilterByAgentResponsavel(activeQueue);
   const filtered = getAllCockpitTickets()
     .filter((entry) => {
       if (entry.queueId !== activeQueue) return false;
       if (filterByResponsavel && !ticketMatchesAgentResponsavel(entry.ticket)) return false;
-      if (!q) return true;
-      const t = entry.ticket;
-      const cpf = normalizeCpf(t.lateralForm?.cpf || t.clientCPF || '');
-      const hay = [t.id, t.title, t.description, t.clientName, t.solicitante, cpf, formatCpf(cpf)].join(' ').toLowerCase();
-      return hay.indexOf(q) >= 0;
+      return matchesTicketSearch(entry, q);
     });
   return sortTicketEntries(filtered, activeSort, 'desc', entrySortOldestFirst);
 }
@@ -842,6 +894,9 @@ export function resolveDeskSearchEntries(rawQuery, activeSort, entrySortOldestFi
 }
 
 export function countByQueue(queueId) {
+  if (isMeusTicketsQueue(queueId)) {
+    return filterMyTicketsEntries('').length;
+  }
   const filterByResponsavel = shouldFilterByAgentResponsavel(queueId);
   return getAllCockpitTickets().filter((e) => {
     if (e.queueId !== queueId) return false;
@@ -853,29 +908,46 @@ export function countByQueue(queueId) {
 /** Fila com tickets visíveis — prioriza Novos (maior volume no Atlas). */
 export function pickDefaultQueueId(preferred = 'novos') {
   if (countByQueue(preferred) > 0) return preferred;
-  const match = QUEUE_STATUSES.find((queue) => queue.id !== 'resolvidos' && countByQueue(queue.id) > 0);
+  const match = QUEUE_STATUSES.find((queue) => (
+    queue.id !== 'resolvidos'
+    && queue.id !== MEUS_TICKETS_QUEUE_ID
+    && countByQueue(queue.id) > 0
+  ));
   return match?.id || preferred;
 }
 
 export function pickDefaultTicket(activeQueue) {
   const list = filterTickets(activeQueue || 'novos', '', 'data');
-  return list[0]?.ticket?.id ?? null;
+  return getEntryTicketId(list[0]) ?? null;
+}
+
+export function getEntryTicketId(entry) {
+  return entry?.ticket?.id ?? entry?.ticket?._id ?? null;
+}
+
+/** Lista visível no Desk (fila ativa ou busca aplicada). */
+export function resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst = false) {
+  const search = String(appliedSearch || '').trim();
+  return search
+    ? resolveDeskSearchEntries(search, activeSort, entrySortOldestFirst)
+    : filterTickets(activeQueue, '', activeSort, entrySortOldestFirst);
 }
 
 /** Próximo ticket na lista visível após salvar/fechar o atual. */
 export function pickNextTicketFromEntries(currentId, entries) {
   const list = entries || [];
-  if (!list.length) return null;
-  const idx = list.findIndex((e) => String(e.ticket.id) === String(currentId));
+  if (!list.length || currentId == null) return null;
+  const current = String(currentId);
+  const idx = list.findIndex((e) => String(getEntryTicketId(e)) === current);
   if (idx === -1) {
-    const fallback = list.find((e) => String(e.ticket.id) !== String(currentId));
-    return fallback?.ticket?.id ?? null;
+    const fallback = list.find((e) => String(getEntryTicketId(e)) !== current);
+    return getEntryTicketId(fallback) ?? null;
   }
   for (let i = idx + 1; i < list.length; i += 1) {
-    return list[i].ticket.id;
+    return getEntryTicketId(list[i]);
   }
   for (let i = 0; i < idx; i += 1) {
-    return list[i].ticket.id;
+    return getEntryTicketId(list[i]);
   }
   return null;
 }

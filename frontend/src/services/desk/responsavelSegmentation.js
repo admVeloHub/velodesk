@@ -1,6 +1,6 @@
 /**
- * responsavelSegmentation v1.4.0 — delega RBAC ao permissionService
- * VERSION: v1.4.0 | DATE: 2026-07-17
+ * responsavelSegmentation v1.4.1 — ticketAssignedToCurrentAgent para Meus Tickets
+ * VERSION: v1.4.1 | DATE: 2026-07-21
  */
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 import { normalizeProfileId } from '../../config/profiles';
@@ -98,6 +98,14 @@ export function ticketMatchesAgentResponsavel(ticket, profileId = readDeskProfil
   if (!responsavel && status === 'novo') return true;
   if (!responsavel) return false;
 
+  const candidates = buildResponsavelCandidates();
+  return candidates.includes(responsavel);
+}
+
+/** Apenas tickets com responsável explícito igual ao agente logado. */
+export function ticketAssignedToCurrentAgent(ticket) {
+  const responsavel = normalize(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
+  if (!responsavel) return false;
   const candidates = buildResponsavelCandidates();
   return candidates.includes(responsavel);
 }
