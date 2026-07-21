@@ -1,10 +1,26 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.42.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.42.1 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Hotfix build main: assignmentRouter sem agenteDesk
+
+- **Data/Hora**: 2026-07-21
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.42.1
+  - assignmentRouter v1.2.1
+- **Arquivos modificados**:
+  - `backend/src/services/assignmentRouter.service.ts` — remove import de `agenteDesk.service` (ausente em `main`); pool da roleta via `colaboradoresCadastro.service` apenas
+- **Descrição**: Corrige falha Cloud Build (`TS2307` / `TS7006`) introduzida no push do pacote filas/roleta: código referenciava módulo existente só na branch `dev`.
+- **Status**: Concluído
+
+---
 
 ### GitHub Push — Pacote filas e roleta (resolvidos global, presença, cap-10)
 

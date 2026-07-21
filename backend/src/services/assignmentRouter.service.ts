@@ -1,11 +1,10 @@
-/** assignmentRouter.service v1.2.0 — roleta cap-10 online + adoção manual + flag atribuicaoRoleta */
+/** assignmentRouter.service v1.2.1 — pool via colaboradoresCadastro (main sem agenteDesk) */
 import { env } from '../config/env';
 import type { AuthPayload } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { listOnlineEligiblePresenceKeys } from './agentPresence.service';
-import { listAgentesDesk } from './agenteDesk.service';
-import { listColaboradoresDesk } from './colaboradoresCadastro.service';
+import { listColaboradoresDesk, type ColaboradorDeskPublico } from './colaboradoresCadastro.service';
 import { extractFuncoes } from '../utils/normalizeFuncao';
 
 type RoletaPoolAgent = {
@@ -263,25 +262,19 @@ function agentEligibleForRoletaPool(agent: {
 }
 
 async function loadRoletaPoolAgents(): Promise<RoletaPoolAgent[]> {
-  const synced = await listAgentesDesk();
-  if (synced.length > 0) {
-    return synced.map((agente) => ({
-      email: agente.email,
-      colaboradorNome: agente.colaboradorNome,
-      atuacao: agente.atuacao,
-      funcaoSlug: agente.funcaoSlug,
-      afastado: agente.afastado,
-    }));
-  }
-
   const colaboradores = await listColaboradoresDesk();
-  return colaboradores.map((col) => ({
+  return colaboradores.map(mapColaboradorToRoletaPoolAgent);
+}
+
+function mapColaboradorToRoletaPoolAgent(col: ColaboradorDeskPublico): RoletaPoolAgent {
+  const funcoes = extractFuncoes(col.atuacao);
+  return {
     email: col.userMail,
     colaboradorNome: col.colaboradorNome,
     atuacao: col.atuacao,
-    funcaoSlug: null,
+    funcaoSlug: funcoes[0] ?? null,
     afastado: col.afastado,
-  }));
+  };
 }
 
 async function loadOnlineEligibleAgents(): Promise<Array<{ responsavel: string; candidates: string[] }>> {
