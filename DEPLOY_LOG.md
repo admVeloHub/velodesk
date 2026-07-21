@@ -1,10 +1,36 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.40.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.41.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Correção rate limit 429 (5000 + isenção GET leitura)
+
+- **Data/Hora**: 2026-07-21
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.41.0
+  - index.ts v1.9.6, env.ts v1.19.0, rateLimitPolicy v1.0.0
+  - ticketsCache v1.7.0, ProtectedRoute v1.3.0, apiErrors v1.0.0
+  - TicketsContext v1.5.0, TabulationContext v1.3.0, WorkflowConfigContext v1.1.0
+  - PermissionContext v1.1.0 (dev), NotificationContext v1.2.0
+- **Arquivos modificados**:
+  - `backend/src/index.ts` — limite global via `API_RATE_LIMIT_MAX` (default 5000 prod)
+  - `backend/src/config/env.ts` — `apiRateLimitMax`
+  - `backend/src/middleware/rateLimitPolicy.ts` — isenção GET leitura frequente
+  - `frontend/src/routes/ProtectedRoute.jsx` — remove `/api/boxes` duplicado
+  - `frontend/src/services/ticketsCache.js` — dedup in-flight `loadBoxesFromApi`
+  - `frontend/src/utils/apiErrors.js` — mensagem 429 compartilhada
+  - Contexts: Tickets, Tabulation, Workflow, Notification — tratamento 429
+  - `PermissionContext` — apenas em `dev` (arquivo ausente em `main`)
+- **Descrição**: Corrige 429 em produção (limite 200/15min insuficiente). Aumenta cota para 5000, isenta GETs de leitura do Desk, elimina chamada duplicada a boxes e deduplica requisições concorrentes.
+- **Status**: Concluído
+
+---
 
 ### GitHub Push — Redeploy Cloud Run (trigger migrado para main)
 

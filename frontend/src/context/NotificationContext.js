@@ -1,6 +1,6 @@
 /**
- * NotificationContext v1.1.0 — sininho com notificações CTA persistidas
- * VERSION: v1.1.0 | DATE: 2026-07-16
+ * NotificationContext v1.2.0 — sininho + tratamento 429 no poll
+ * VERSION: v1.2.0 | DATE: 2026-07-21
  */
 import React, {
   createContext,
@@ -10,6 +10,7 @@ import React, {
   useEffect,
 } from 'react';
 import { workflowNotificacoesApi } from '../api/client';
+import { isRateLimitError, RATE_LIMIT_USER_MESSAGE } from '../utils/apiErrors';
 import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext(null);
@@ -43,7 +44,10 @@ export function NotificationProvider({ children }) {
         return [...rows, ...ephemeral].slice(0, 40);
       });
       setUnreadPersisted(data?.unread ?? 0);
-    } catch {
+    } catch (err) {
+      if (isRateLimitError(err)) {
+        console.warn('NotificationContext: rate limit ao carregar notificações.', RATE_LIMIT_USER_MESSAGE);
+      }
       /* API indisponível — mantém só toasts locais */
     }
   }, [isAuthenticated, user?.email]);

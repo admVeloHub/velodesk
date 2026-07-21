@@ -1,9 +1,10 @@
 /**
- * WorkflowConfigContext v1.0.0
- * VERSION: v1.0.0 | DATE: 2026-07-14
+ * WorkflowConfigContext v1.1.0 — tratamento 429
+ * VERSION: v1.1.0 | DATE: 2026-07-21
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { workflowApi } from '../api/client';
+import { isRateLimitError, RATE_LIMIT_USER_MESSAGE } from '../utils/apiErrors';
 import { useAuth } from './AuthContext';
 import { setWorkflowRuntimeConfig, clearWorkflowRuntimeConfig } from '../services/desk/workflowRuntimeStore';
 
@@ -41,6 +42,13 @@ export function WorkflowConfigProvider({ children }) {
         return;
       } catch (err) {
         const status = err?.response?.status;
+        if (isRateLimitError(err)) {
+          setError(RATE_LIMIT_USER_MESSAGE);
+          setConfig(EMPTY_CONFIG);
+          clearWorkflowRuntimeConfig();
+          setLoading(false);
+          return;
+        }
         const isTransient = status === 503 && attempt < maxAttempts;
         if (isTransient) {
           await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
