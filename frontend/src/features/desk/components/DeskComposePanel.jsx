@@ -374,6 +374,7 @@ export default function DeskComposePanel({
                     placeholder={publicPlaceholder}
                     value={composeText}
                     hasSpellErrors={spell.flaggedErrors.length > 0}
+                    expandable
                     onFormatStateChange={publicFormat.handleFormatStateChange}
                     onChange={handlePublicChange}
                     onKeyDown={handlePublicKeyDown}

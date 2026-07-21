@@ -134,16 +134,6 @@ export default function DeskClientProfileBar({
         {inWorkflow ? (
           <div className="ticket-client-profile__cell-workflow">
             <TicketWorkflowStepper ticket={ticket} />
-            {canAdvanceWorkflow ? (
-              <button
-                type="button"
-                className="btn-primary btn-sm desk-workflow-advance-btn"
-                onClick={onAdvanceWorkflow}
-                disabled={advancingWorkflow}
-              >
-                {advancingWorkflow ? 'Avançando…' : 'Avançar Workflow'}
-              </button>
-            ) : null}
           </div>
         ) : null}
 
@@ -171,6 +161,16 @@ export default function DeskClientProfileBar({
         </div>
       </section>
       <div className="crm-client-profile-bar__history">
+        {inWorkflow && canAdvanceWorkflow ? (
+          <button
+            type="button"
+            className="btn-primary btn-sm desk-workflow-advance-btn ticket-client-advance-btn"
+            onClick={onAdvanceWorkflow}
+            disabled={advancingWorkflow}
+          >
+            {advancingWorkflow ? 'Avançando…' : 'Avançar'}
+          </button>
+        ) : null}
         <button
           type="button"
           className="btn-secondary btn-sm ticket-client-history-btn"

@@ -314,7 +314,8 @@ function classifyEscalationCategory(ticket) {
 
 /** Fallback local do Painel 360° Gestão quando a API não responde */
 export function computeSupervisor360View() {
-  const entries = getAllCockpitTickets().filter((entry) => entry.queueId !== 'resolvidos');
+  const allEntries = getAllCockpitTickets();
+  const entries = allEntries.filter((entry) => entry.queueId !== 'resolvidos');
   let slaRisk = 0;
   let slaCriticalCount = 0;
 
@@ -324,11 +325,24 @@ export function computeSupervisor360View() {
     if (sla === 'critical') slaCriticalCount += 1;
   });
 
+  const slaCriticalOnlyEntries = entries.filter(
+    (entry) => getSlaClass(entry.ticket) === 'critical' && !classifyEscalationCategory(entry.ticket),
+  );
+
   const categories = [
     { id: 'financeiro', label: 'Financeiro', count: 0, accent: 'orange' },
     { id: 'estorno', label: 'Estorno', count: 0, accent: 'navy' },
+    { id: 'sla-critico', label: 'SLA crítico', count: slaCriticalOnlyEntries.length, accent: 'red' },
   ];
-  const groupedEntries = { financeiro: [], estorno: [] };
+  const groupedEntries = {
+    financeiro: [],
+    estorno: [],
+    'sla-critico': slaCriticalOnlyEntries.slice(0, 20).map((entry) => ({
+      ticket: entry.ticket,
+      queueId: entry.queueId,
+      sla: getSlaClass(entry.ticket),
+    })),
+  };
 
   entries.forEach((entry) => {
     const categoryId = classifyEscalationCategory(entry.ticket);
@@ -362,25 +376,46 @@ export function computeSupervisor360View() {
     };
   });
 
-  const agentStats = new Map();
-  entries.forEach(({ ticket }) => {
-    const agent = String(ticket.responsibleAgent || ticket.lateralForm?.responsavel || 'Sem responsável').trim();
-    if (!agentStats.has(agent)) agentStats.set(agent, { tickets: 0 });
-    agentStats.get(agent).tickets += 1;
+  const agentOf = (ticket) => String(ticket.responsibleAgent || ticket.lateralForm?.responsavel || 'Sem responsável').trim();
+
+  const resolvedStats = new Map();
+  allEntries
+    .filter((entry) => entry.queueId === 'resolvidos')
+    .forEach(({ ticket }) => {
+      const agent = agentOf(ticket);
+      resolvedStats.set(agent, (resolvedStats.get(agent) || 0) + 1);
+    });
+
+  const interactionStats = new Map();
+  allEntries.forEach(({ ticket }) => {
+    const agent = agentOf(ticket);
+    interactionStats.set(agent, (interactionStats.get(agent) || 0) + 1);
   });
 
-  const leaderboard = [...agentStats.entries()]
-    .sort((a, b) => b[1].tickets - a[1].tickets)
+  const buildMockRanking = (statsMap, primaryLabel) => [...statsMap.entries()]
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
-    .map(([agent, stats], index) => ({
+    .map(([agent, count], index) => ({
+      id: `${primaryLabel}-${agent.replace(/\s+/g, '-')}`,
       rank: index + 1,
-      agent,
-      tickets: stats.tickets,
-      slaPct: 90,
+      name: agent,
+      medal: index === 0,
+      trend: 'up',
+      sla: '90%',
+      primaryValue: count,
+      primaryLabel,
       tma: '—',
+      csat: null,
+      vsLastWeek: '—',
       shift: 'all',
       channel: 'all',
     }));
+
+  const leaderboard = {
+    resolvedRanking: buildMockRanking(resolvedStats, 'resolvidos'),
+    interactionRanking: buildMockRanking(interactionStats, 'interações'),
+  };
 
   return buildSupervisor360View({
     kpis: {
@@ -588,7 +623,7 @@ export function buildSupervisor360View(apiPayload) {
     kpis: buildSupervisorKpis(apiPayload?.kpis),
     escalated: apiPayload?.escalated ?? { categories: [], slaCriticalCount: 0, groups: [] },
     channelVision: apiPayload?.channelVision ?? [],
-    leaderboard: apiPayload?.leaderboard ?? [],
+    leaderboard: apiPayload?.leaderboard ?? { resolvedRanking: [], interactionRanking: [] },
   };
 }
 

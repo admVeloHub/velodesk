@@ -1,0 +1,458 @@
+/**
+ * gestaoInsights.css v1.0.0 — cards analíticos da Gestão (volume, motivos, casos especiais)
+ * Paleta oficial: #F3F7FC #272A30 #000058 #1634FF #1694FF · #006AB9 #FCC200 #15A237
+ */
+
+.gestao-actions-bar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+/* ── Linha de período global (topo da página) ── */
+.gestao-period-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    background: var(--eco-surface, #F3F7FC);
+    border: 1px solid var(--eco-border, #D0DBEE);
+    border-radius: var(--eco-radius-sm, 12px);
+    padding: 0.75rem 1.1rem;
+    margin-bottom: 1.25rem;
+}
+
+.gestao-period-row__label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--eco-navy, #000058);
+}
+
+.gestao-period-row__label i {
+    font-size: 1rem;
+    color: var(--eco-blue, #1634FF);
+}
+
+.gestao-period-row .gestao-period-filter {
+    align-items: center;
+}
+
+.gestao-insights-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.gestao-insights-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.gestao-insights-row--chart {
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+}
+
+@media (max-width: 900px) {
+    .gestao-insights-row--chart {
+        grid-template-columns: 1fr;
+    }
+}
+
+.gestao-insight-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.gestao-insight-card__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.gestao-insight-card__head h4 { margin: 0; }
+
+.gestao-insight-card__loading,
+.gestao-insight-card__empty {
+    color: #64748b;
+    font-size: 0.85rem;
+    margin: 0.5rem 0;
+}
+
+.gestao-insight-card__error {
+    color: #b42318;
+    background: #fef3f2;
+    border: 1px solid #fecdca;
+    border-radius: var(--eco-radius-sm, 12px);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.gestao-insight-card__mock-note {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.74rem;
+    color: var(--eco-sky, #006AB9);
+    background: rgba(0, 106, 185, 0.08);
+    border-radius: 999px;
+    padding: 0.3rem 0.75rem;
+    margin: 0;
+    width: fit-content;
+}
+
+/* ── Seletor de período ── */
+.gestao-period-filter {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+}
+
+.gestao-period-filter__pills {
+    display: flex;
+    gap: 0.35rem;
+    background: var(--eco-surface, #F3F7FC);
+    border-radius: 999px;
+    padding: 0.2rem;
+}
+
+.gestao-period-filter__pill {
+    border: none;
+    background: transparent;
+    color: var(--eco-navy, #000058);
+    font-size: 0.76rem;
+    font-weight: 600;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s var(--eco-ease, ease), color 0.2s var(--eco-ease, ease);
+}
+
+.gestao-period-filter__pill:hover { background: rgba(0, 0, 88, 0.08); }
+
+.gestao-period-filter__pill--active {
+    background: linear-gradient(135deg, var(--eco-navy, #000058), var(--eco-blue, #1634FF));
+    color: #fff;
+}
+
+.gestao-period-filter__range {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.gestao-period-filter__date {
+    border: 1px solid var(--eco-border, #D0DBEE);
+    border-radius: 8px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.78rem;
+    color: var(--eco-carbon, #272A30);
+}
+
+.gestao-period-filter__range-sep {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.gestao-period-filter__apply {
+    border: none;
+    background: var(--eco-blue, #1634FF);
+    color: #fff;
+    font-size: 0.76rem;
+    font-weight: 600;
+    padding: 0.28rem 0.7rem;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.gestao-period-filter__apply:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.gestao-period-filter__sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+}
+
+/* ── Card de volume ── */
+.gestao-volume-card__chart-wrap {
+    position: relative;
+    height: 280px;
+}
+
+/* ── Resumo do período (totais + ticket mais antigo) ── */
+.gestao-volume-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+}
+
+@media (max-width: 720px) {
+    .gestao-volume-stats__tile--oldest {
+        grid-column: 1 / -1;
+    }
+}
+
+.gestao-volume-stats__tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.8rem 0.9rem;
+    border-radius: var(--eco-radius-sm, 12px);
+    background: var(--eco-surface, #F3F7FC);
+}
+
+.gestao-volume-stats__value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--eco-carbon, #272A30);
+    font-family: var(--eco-display, inherit);
+}
+
+.gestao-volume-stats__label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.25;
+}
+
+.gestao-volume-stats__tile--oldest {
+    padding: 0;
+    grid-column: span 1;
+}
+
+.gestao-volume-stats__oldest-toggle {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    background: none;
+    border: none;
+    padding: 0.8rem 0.9rem;
+    cursor: pointer;
+    text-align: left;
+    position: relative;
+}
+
+.gestao-volume-stats__oldest-toggle:disabled { cursor: default; }
+
+.gestao-volume-stats__chevron {
+    position: absolute;
+    top: 0.8rem;
+    right: 0.7rem;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.gestao-volume-stats__tile--expanded {
+    background: var(--eco-surface, #F3F7FC);
+    border-radius: var(--eco-radius-sm, 12px);
+}
+
+.gestao-volume-stats__oldest-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 0.6rem 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.gestao-volume-stats__oldest-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.5rem 0.65rem;
+}
+
+.gestao-volume-stats__oldest-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+    font-size: 0.76rem;
+}
+
+.gestao-volume-stats__oldest-info strong {
+    color: var(--eco-navy, #000058);
+    font-size: 0.8rem;
+}
+
+.gestao-volume-stats__oldest-info span {
+    color: #64748b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gestao-volume-stats__oldest-meta { font-size: 0.68rem; }
+
+.gestao-volume-stats__oldest-open {
+    flex-shrink: 0;
+    border: none;
+    background: var(--eco-blue, #1634FF);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.3rem 0.65rem;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+/* ── Card de motivos por produto ── */
+.gestao-motivos-card__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.gestao-motivos-card__item {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.gestao-motivos-card__rank {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--eco-surface, #F3F7FC);
+    color: var(--eco-navy, #000058);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.gestao-motivos-card__body { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+
+.gestao-motivos-card__labels {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    flex-wrap: wrap;
+}
+
+.gestao-motivos-card__produto {
+    background: rgba(22, 52, 255, 0.1);
+    color: var(--eco-blue, #1634FF);
+    font-weight: 700;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.gestao-motivos-card__motivo {
+    color: var(--eco-carbon, #272A30);
+    font-weight: 600;
+}
+
+.gestao-motivos-card__bar-track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--eco-surface, #F3F7FC);
+    overflow: hidden;
+}
+
+.gestao-motivos-card__bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--eco-navy, #000058), var(--eco-blue, #1634FF));
+}
+
+.gestao-motivos-card__stats {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.15;
+}
+
+.gestao-motivos-card__stats strong {
+    font-size: 0.9rem;
+    color: var(--eco-navy, #000058);
+}
+
+.gestao-motivos-card__stats span {
+    font-size: 0.68rem;
+    color: #64748b;
+}
+
+/* ── Card de casos especiais ── */
+.gestao-casos-especiais-card__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.9rem;
+}
+
+.gestao-casos-especiais-card__tile {
+    --tile-accent: var(--eco-blue, #1634FF);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.9rem 1rem;
+    border-radius: var(--eco-radius-sm, 12px);
+    background: var(--eco-surface, #F3F7FC);
+    border-left: 4px solid var(--tile-accent);
+}
+
+.gestao-casos-especiais-card__tile-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--tile-accent);
+    color: #fff;
+    font-size: 0.85rem;
+}
+
+.gestao-casos-especiais-card__tile-value {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--eco-carbon, #272A30);
+    font-family: var(--eco-display, inherit);
+}
+
+.gestao-casos-especiais-card__tile-label {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+@media (max-width: 640px) {
+    .gestao-insight-card__head { flex-direction: column; align-items: stretch; }
+    .gestao-period-filter { align-items: stretch; }
+    .gestao-period-filter__pills { justify-content: space-between; }
+}

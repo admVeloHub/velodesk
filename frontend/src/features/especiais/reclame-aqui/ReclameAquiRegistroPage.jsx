@@ -13,7 +13,6 @@ import {
 } from '../../../services/especiais/reclameAquiData';
 import {
   createEmptyReclamacao,
-  formatPrazoRa,
   getReclamacaoById,
   saveReclamacaoDraft,
 } from '../../../services/especiais/reclameAquiStore';
@@ -102,10 +101,6 @@ export default function ReclameAquiRegistroPage() {
       return;
     }
     window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleModeracao = () => {
-    showNotification('Módulo de moderação em breve.', 'info');
   };
 
   const protocoloDisplay = form.protocoloRa ? `#${form.protocoloRa}` : '—';
@@ -252,22 +247,6 @@ export default function ReclameAquiRegistroPage() {
                 placeholder="Escreva a resposta pública..."
               />
             </section>
-
-            <section className="ra-registro__moderacao">
-              <div className="ra-registro__moderacao-icon">
-                <i className="ti ti-shield" aria-hidden="true" />
-              </div>
-              <div className="ra-registro__moderacao-content">
-                <h3>Solicitar moderação</h3>
-                <p>
-                  Caso a reclamação viole as regras da plataforma, você pode solicitar
-                  moderação para análise pela equipe do Reclame Aqui.
-                </p>
-                <button type="button" className="ra-registro__moderacao-btn" onClick={handleModeracao}>
-                  Abrir módulo de moderação
-                </button>
-              </div>
-            </section>
           </main>
 
           <aside className="ra-registro__side">
@@ -354,23 +333,6 @@ export default function ReclameAquiRegistroPage() {
             </section>
 
             <section className="ra-registro__side-card">
-              <h3 className="ra-registro__side-title">Prazo e status</h3>
-              <span className={`ra-badge ra-badge--${form.statusRa}`}>
-                {getStatusLabel(form.statusRa)}
-              </span>
-              <div className="ra-registro__sla-block">
-                <div className="ra-sla">
-                  <div className="ra-sla__track">
-                    <div
-                      className={`ra-sla__fill ra-sla__fill--${form.slaTone}`}
-                      style={{ width: `${form.slaPct}%` }}
-                    />
-                  </div>
-                  <span className="ra-sla__pct">{form.slaPct}%</span>
-                </div>
-                <p className="ra-registro__sla-text">{slaRestante}</p>
-                <p className="ra-registro__prazo-text">Prazo: {formatPrazoRa(form.prazoRa)}</p>
-              </div>
               <div className="ra-registro__field">
                 <label htmlFor="ra-atendente">Atendente</label>
                 <input

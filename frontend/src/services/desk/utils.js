@@ -113,6 +113,41 @@ export function formatTicketDate(iso) {
     ' · ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
+/** Data de finalização (último registro com status resolvido). */
+export function getTicketResolvedAt(ticket) {
+  if (!ticket) return null;
+  normalizeTicketForDeskV2(ticket);
+  const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
+  for (let i = historico.length - 1; i >= 0; i -= 1) {
+    const entry = historico[i];
+    const status = String(entry.status ?? '').trim().toLowerCase();
+    if (status === 'resolvido' || status === 'resolvidos') {
+      return entry.time || entry.timestamp || entry.data || null;
+    }
+  }
+  if (String(ticket.status || '').toLowerCase() === 'resolvido') {
+    return ticket.updatedAt || ticket.createdAt || null;
+  }
+  return ticket.updatedAt || ticket.createdAt || null;
+}
+
+/** Formato curto para coluna Finalização (ex.: 21 Jan). */
+export function formatResolvedDateShort(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const day = d.toLocaleDateString('pt-BR', { day: 'numeric' });
+  const monthRaw = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+  const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1);
+  return `${day} ${month}`;
+}
+
+export function getTicketResponsible(ticket) {
+  if (!ticket) return '—';
+  normalizeTicketForDeskV2(ticket);
+  return String(ticket.responsibleAgent || ticket.lateralForm?.responsavel || '').trim() || '—';
+}
+
 export function getTicketTitle(ticket) {
   const raw = ticket?.title || ticket?.description || 'Sem assunto';
   return repairUtf8Mojibake(raw);
@@ -133,8 +168,6 @@ export function buildTags(ticket) {
   const lf = ticket.lateralForm || {};
   if (isTicketInWorkflow(ticket)) tags.push('Workflow');
   if (lf.produto) tags.push(repairUtf8Mojibake(lf.produto.replace(/Internet\s+/i, '').trim() || lf.produto));
-  if (lf.motivo) tags.push(repairUtf8Mojibake(lf.motivo));
-  if (!tags.length && ticket.priority) tags.push(ticket.priority);
   return tags.slice(0, 4);
 }
 
@@ -654,7 +687,8 @@ export function migrateAllTicketsForDeskV2() {
   if (changed) saveTicketColumns(columns);
 }
 
-export function sortTicketEntries(entries, activeSort) {
+export function sortTicketEntries(entries, activeSort, sortDir = 'desc') {
+  const dir = sortDir === 'asc' ? 1 : -1;
   return [...entries].sort((a, b) => {
     if (activeSort === 'prioridade') {
       const prio = { critica: 0, alta: 1, normal: 2, baixa: 3 };
@@ -662,6 +696,14 @@ export function sortTicketEntries(entries, activeSort) {
     }
     if (activeSort === 'sla') {
       return (a.ticket.slaRemaining || 999) - (b.ticket.slaRemaining || 999);
+    }
+    if (activeSort === 'titulo') {
+      return dir * getTicketTitle(a.ticket).localeCompare(getTicketTitle(b.ticket), 'pt-BR', { sensitivity: 'base' });
+    }
+    if (activeSort === 'finalizacao') {
+      const aTime = new Date(getTicketResolvedAt(a.ticket) || 0).getTime();
+      const bTime = new Date(getTicketResolvedAt(b.ticket) || 0).getTime();
+      return dir * (aTime - bTime);
     }
     return new Date(b.ticket.updatedAt || 0) - new Date(a.ticket.updatedAt || 0);
   });
@@ -735,7 +777,7 @@ export function countByQueue(queueId) {
 /** Fila com tickets visíveis — prioriza Novos (maior volume no Atlas). */
 export function pickDefaultQueueId(preferred = 'novos') {
   if (countByQueue(preferred) > 0) return preferred;
-  const match = QUEUE_STATUSES.find((queue) => countByQueue(queue.id) > 0);
+  const match = QUEUE_STATUSES.find((queue) => queue.id !== 'resolvidos' && countByQueue(queue.id) > 0);
   return match?.id || preferred;
 }
 
