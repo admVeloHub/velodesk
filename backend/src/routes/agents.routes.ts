@@ -1,6 +1,6 @@
 /**
- * agents.routes v1.1.0 — snapshots horários do Agente 3
- * VERSION: v1.1.0 | DATE: 2026-07-14
+ * agents.routes v1.2.0 — presença heartbeat/offline + snapshots Agente 3
+ * VERSION: v1.2.0 | DATE: 2026-07-21
  */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
@@ -31,8 +31,33 @@ import {
 } from '../services/agents/agentFeedback.service';
 import { validateTicketAiInput } from '../services/openaiTicketSuggest.service';
 import type { RevisaoOrigem, TicketAiTabulationResult } from '../services/agents/agentTypes';
+import { recordAgentHeartbeat, recordAgentOffline } from '../services/agentPresence.service';
+import { rebalanceAgentToCap, provisionalResponsavelFromAuth } from '../services/assignmentRouter.service';
 
 const router = Router();
+
+router.post('/presence/heartbeat', authMiddleware, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'Não autenticado' });
+
+  const result = await recordAgentHeartbeat(req.user);
+
+  if (result.wasOffline && env.assignmentRouterEnabled) {
+    const key = provisionalResponsavelFromAuth(req.user);
+    if (key) {
+      void rebalanceAgentToCap(key).catch((err) => {
+        console.warn('[agents/presence/heartbeat] rebalance falhou', err);
+      });
+    }
+  }
+
+  return res.json({ success: true, ...result, source: 'agents_presence_heartbeat' });
+});
+
+router.post('/presence/offline', authMiddleware, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'Não autenticado' });
+  await recordAgentOffline(req.user);
+  return res.json({ success: true, online: false, source: 'agents_presence_offline' });
+});
 
 router.get('/status', authMiddleware, (_req: Request, res: Response) => {
   const status = getAgentsStatus();

@@ -1,12 +1,23 @@
-/** assignmentRouter.service v1.1.0 — roleta em responsavel only; sessão no desk manual */
+/** assignmentRouter.service v1.2.0 — roleta cap-10 online + adoção manual + flag atribuicaoRoleta */
 import { env } from '../config/env';
 import type { AuthPayload } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import type { IChamadoN1 } from '../models/ChamadoN1';
-import { User } from '../models/User';
+import { listOnlineEligiblePresenceKeys } from './agentPresence.service';
+import { listAgentesDesk } from './agenteDesk.service';
+import { listColaboradoresDesk } from './colaboradoresCadastro.service';
+import { extractFuncoes } from '../utils/normalizeFuncao';
+
+type RoletaPoolAgent = {
+  email: string;
+  colaboradorNome: string;
+  atuacao: unknown;
+  funcaoSlug: string | null;
+  afastado: boolean;
+};
 
 export interface AssignmentContext {
-  source: 'email-inbound' | 'app-integrado' | 'api-tickets';
+  source: 'email-inbound' | 'app-integrado' | 'api-tickets' | 'backfill' | 'manual-retry';
   canal?: string;
 }
 
@@ -71,11 +82,13 @@ export function pickLeastLoadedAgent(
 ): AssignmentResult | null {
   if (agents.length === 0) return null;
 
+  const cap = env.assignmentRouterMaxOpen;
   const ranked = agents
     .map((agent) => ({
       responsavel: agent.responsavel,
       carga: countLoadForAgent(countByResponsavel, agent.candidates),
     }))
+    .filter((agent) => agent.carga < cap)
     .sort((a, b) => {
       if (a.carga !== b.carga) return a.carga - b.carga;
       return a.responsavel.localeCompare(b.responsavel, 'pt-BR');
@@ -84,7 +97,7 @@ export function pickLeastLoadedAgent(
   return ranked[0] ?? null;
 }
 
-function ensureTabulacaoSlot(partial: Partial<IChamadoN1>): void {
+function ensureTabulacaoSlot(partial: Partial<IChamadoN1> | IChamadoN1): void {
   if (!partial.tabulacao?.length) {
     partial.tabulacao = [{
       tipoChamado: '',
@@ -95,6 +108,21 @@ function ensureTabulacaoSlot(partial: Partial<IChamadoN1>): void {
       atribuido: '',
     }];
   }
+}
+
+export function markChamadoAtribuicaoRoleta(chamado: Partial<IChamadoN1> | IChamadoN1): void {
+  const registros = chamado.registro ?? [];
+  const target = registros[registros.length - 1] ?? registros[0];
+  if (!target) return;
+  target.metadados = {
+    ...(target.metadados ?? {}),
+    atribuicaoRoleta: true,
+    atribuidoEm: new Date().toISOString(),
+  };
+}
+
+export function isChamadoAtribuicaoRoleta(chamado: IChamadoN1): boolean {
+  return (chamado.registro ?? []).some((reg) => reg.metadados?.atribuicaoRoleta === true);
 }
 
 export function shouldAutoAssign(partial: Partial<IChamadoN1>): boolean {
@@ -117,47 +145,82 @@ export function applySessionResponsavelIfNeeded(
   partial.tabulacao![0].responsavel = responsavel;
 }
 
-async function aggregateActiveTicketCounts(): Promise<Map<string, number>> {
-  const terminalStatuses = resolveTerminalStatuses();
-  const rows = await ChamadoN1.aggregate<{ _id: string; count: number }>([
-    {
-      $match: {
-        $expr: {
-          $and: [
+export function applyManualResponsavelClaim(
+  chamado: IChamadoN1,
+  authUser?: AuthPayload | null
+): boolean {
+  if (!authUser) return false;
+
+  const tabulacao = chamado.tabulacao ?? [];
+  const lastTab = tabulacao[tabulacao.length - 1] ?? tabulacao[0];
+  if (String(lastTab?.responsavel ?? '').trim()) return false;
+
+  const responsavel = provisionalResponsavelFromAuth(authUser);
+  if (!responsavel) return false;
+
+  ensureTabulacaoSlot(chamado);
+  const idx = chamado.tabulacao!.length - 1;
+  chamado.tabulacao![idx].responsavel = responsavel;
+  return true;
+}
+
+function roletaTicketMatchExpr(terminalStatuses: string[]) {
+  return {
+    $expr: {
+      $and: [
+        {
+          $not: {
+            $in: [
+              {
+                $toLower: {
+                  $ifNull: [{ $arrayElemAt: ['$registro.status', -1] }, 'novo'],
+                },
+              },
+              terminalStatuses,
+            ],
+          },
+        },
+        {
+          $ne: [
             {
-              $not: {
-                $in: [
+              $toLower: {
+                $ifNull: [
                   {
-                    $toLower: {
-                      $ifNull: [{ $arrayElemAt: ['$registro.status', -1] }, 'novo'],
+                    $let: {
+                      vars: { lastTab: { $arrayElemAt: ['$tabulacao', -1] } },
+                      in: '$$lastTab.responsavel',
                     },
                   },
-                  terminalStatuses,
+                  '',
                 ],
               },
             },
-            {
-              $ne: [
-                {
-                  $toLower: {
-                    $ifNull: [
-                      {
-                        $let: {
-                          vars: { lastTab: { $arrayElemAt: ['$tabulacao', -1] } },
-                          in: '$$lastTab.responsavel',
-                        },
-                      },
-                      '',
-                    ],
-                  },
-                },
-                '',
-              ],
-            },
+            '',
           ],
         },
-      },
+        {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: { $ifNull: ['$registro', []] },
+                  as: 'reg',
+                  cond: { $eq: ['$$reg.metadados.atribuicaoRoleta', true] },
+                },
+              },
+            },
+            0,
+          ],
+        },
+      ],
     },
+  };
+}
+
+async function aggregateRoletaOpenCounts(): Promise<Map<string, number>> {
+  const terminalStatuses = resolveTerminalStatuses();
+  const rows = await ChamadoN1.aggregate<{ _id: string; count: number }>([
+    { $match: roletaTicketMatchExpr(terminalStatuses) },
     {
       $group: {
         _id: {
@@ -187,28 +250,96 @@ async function aggregateActiveTicketCounts(): Promise<Map<string, number>> {
   return map;
 }
 
-async function loadEligibleAgents(): Promise<Array<{ responsavel: string; candidates: string[] }>> {
-  const users = await User.find({ role: 'agent' }).select('name email').sort({ email: 1 });
-  return users
-    .map((user) => {
-      const responsavel = provisionalResponsavelFromUser(user);
-      if (!responsavel) return null;
-      return {
-        responsavel,
-        candidates: buildAgentCandidates(user),
-      };
-    })
-    .filter((item): item is { responsavel: string; candidates: string[] } => Boolean(item));
+function agentEligibleForRoletaPool(agent: {
+  funcaoSlug: string | null;
+  atuacao: unknown;
+  afastado: boolean;
+}): boolean {
+  if (agent.afastado) return false;
+  const funcoes = extractFuncoes(agent.atuacao);
+  if (funcoes.includes('atendimento') || funcoes.includes('n2')) return true;
+  if (agent.funcaoSlug && agent.funcaoSlug !== 'gestao') return true;
+  return false;
+}
+
+async function loadRoletaPoolAgents(): Promise<RoletaPoolAgent[]> {
+  const synced = await listAgentesDesk();
+  if (synced.length > 0) {
+    return synced.map((agente) => ({
+      email: agente.email,
+      colaboradorNome: agente.colaboradorNome,
+      atuacao: agente.atuacao,
+      funcaoSlug: agente.funcaoSlug,
+      afastado: agente.afastado,
+    }));
+  }
+
+  const colaboradores = await listColaboradoresDesk();
+  return colaboradores.map((col) => ({
+    email: col.userMail,
+    colaboradorNome: col.colaboradorNome,
+    atuacao: col.atuacao,
+    funcaoSlug: null,
+    afastado: col.afastado,
+  }));
+}
+
+async function loadOnlineEligibleAgents(): Promise<Array<{ responsavel: string; candidates: string[] }>> {
+  const [onlineKeys, agentes] = await Promise.all([
+    listOnlineEligiblePresenceKeys(),
+    loadRoletaPoolAgents(),
+  ]);
+
+  const onlineSet = new Set(onlineKeys.map((key) => key.toLowerCase()));
+  const agents: Array<{ responsavel: string; candidates: string[] }> = [];
+
+  for (const agente of agentes) {
+    if (!agentEligibleForRoletaPool(agente)) continue;
+
+    const responsavel = provisionalResponsavelFromUser({
+      name: agente.colaboradorNome,
+      email: agente.email,
+    });
+    if (!responsavel) continue;
+
+    const responsavelKey = responsavel.toLowerCase();
+    if (!onlineSet.has(responsavelKey)) continue;
+
+    agents.push({
+      responsavel,
+      candidates: buildAgentCandidates({
+        name: agente.colaboradorNome,
+        email: agente.email,
+      }),
+    });
+  }
+
+  return agents;
 }
 
 export async function resolveLeastLoadedAgent(): Promise<AssignmentResult | null> {
   const [agents, countByResponsavel] = await Promise.all([
-    loadEligibleAgents(),
-    aggregateActiveTicketCounts(),
+    loadOnlineEligibleAgents(),
+    aggregateRoletaOpenCounts(),
   ]);
 
   if (agents.length === 0) return null;
   return pickLeastLoadedAgent(agents, countByResponsavel);
+}
+
+function applyRoletaAssignment(
+  target: Partial<IChamadoN1> | IChamadoN1,
+  assignment: AssignmentResult,
+  context: AssignmentContext
+): void {
+  ensureTabulacaoSlot(target);
+  const idx = target.tabulacao!.length - 1;
+  target.tabulacao![idx].responsavel = assignment.responsavel;
+  markChamadoAtribuicaoRoleta(target);
+
+  console.info(
+    `[assignmentRouter] responsavel=${assignment.responsavel} (carga=${assignment.carga}) source=${context.source}`
+  );
 }
 
 export async function applyAssignmentIfNeeded(
@@ -219,16 +350,11 @@ export async function applyAssignmentIfNeeded(
 
   const assignment = await resolveLeastLoadedAgent();
   if (!assignment) {
-    console.warn('[assignmentRouter] pool vazio — chamado permanece sem responsavel', context);
+    console.warn('[assignmentRouter] pool vazio ou cap atingido — chamado permanece sem responsavel', context);
     return;
   }
 
-  ensureTabulacaoSlot(partial);
-  partial.tabulacao![0].responsavel = assignment.responsavel;
-
-  console.info(
-    `[assignmentRouter] responsavel=${assignment.responsavel} (carga=${assignment.carga}) source=${context.source}`
-  );
+  applyRoletaAssignment(partial, assignment, context);
 }
 
 export async function applyAssignmentToChamado(
@@ -240,15 +366,78 @@ export async function applyAssignmentToChamado(
 
   const assignment = await resolveLeastLoadedAgent();
   if (!assignment) {
-    console.warn('[assignmentRouter] pool vazio — chamado permanece sem responsavel', context);
+    console.warn('[assignmentRouter] pool vazio ou cap atingido — chamado permanece sem responsavel', context);
     return false;
   }
 
-  ensureTabulacaoSlot(chamado);
-  chamado.tabulacao![0].responsavel = assignment.responsavel;
-
-  console.info(
-    `[assignmentRouter] responsavel=${assignment.responsavel} (carga=${assignment.carga}) source=${context.source}`
-  );
+  applyRoletaAssignment(chamado, assignment, context);
   return true;
+}
+
+async function findOrphanTickets(limit: number): Promise<IChamadoN1[]> {
+  return ChamadoN1.find({
+    $expr: {
+      $and: [
+        {
+          $eq: [
+            { $toLower: { $ifNull: [{ $arrayElemAt: ['$registro.status', -1] }, 'novo'] } },
+            'novo',
+          ],
+        },
+        {
+          $eq: [
+            {
+              $toLower: {
+                $ifNull: [
+                  {
+                    $let: {
+                      vars: { lastTab: { $arrayElemAt: ['$tabulacao', -1] } },
+                      in: '$$lastTab.responsavel',
+                    },
+                  },
+                  '',
+                ],
+              },
+            },
+            '',
+          ],
+        },
+      ],
+    },
+  })
+    .sort({ createdAt: 1 })
+    .limit(limit);
+}
+
+export async function rebalanceAgentToCap(responsavelKey: string): Promise<number> {
+  if (!env.assignmentRouterEnabled) return 0;
+
+  const key = String(responsavelKey ?? '').trim().toLowerCase();
+  if (!key) return 0;
+
+  const counts = await aggregateRoletaOpenCounts();
+  const current = counts.get(key) ?? 0;
+  const slots = env.assignmentRouterMaxOpen - current;
+  if (slots <= 0) return 0;
+
+  const orphans = await findOrphanTickets(slots);
+  let assigned = 0;
+
+  for (const chamado of orphans) {
+    if (assigned >= slots) break;
+    if (String(chamado.tabulacao?.[0]?.responsavel ?? '').trim()) continue;
+
+    ensureTabulacaoSlot(chamado);
+    const idx = chamado.tabulacao!.length - 1;
+    chamado.tabulacao![idx].responsavel = responsavelKey;
+    markChamadoAtribuicaoRoleta(chamado);
+    await chamado.save();
+    assigned += 1;
+  }
+
+  if (assigned > 0) {
+    console.info(`[assignmentRouter] backfill responsavel=${responsavelKey} atribuidos=${assigned}`);
+  }
+
+  return assigned;
 }

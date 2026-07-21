@@ -1,9 +1,12 @@
-/** tickets.routes v1.5.0 — POST /:id/workflow/advance */
+/** tickets.routes v1.6.0 — adoção manual órfão PUT/messages (P3b) */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { Box } from '../models/Box';
-import { applySessionResponsavelIfNeeded } from '../services/assignmentRouter.service';
+import {
+  applyManualResponsavelClaim,
+  applySessionResponsavelIfNeeded,
+} from '../services/assignmentRouter.service';
 import {
   appendRegistroEntry,
   applyBodyToChamado,
@@ -130,6 +133,7 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
   }
 
   try {
+    applyManualResponsavelClaim(chamado, req.user);
     await applyBodyToChamado(chamado, req.body, req.user);
     await tryActivateWorkflowOnTabulation(
       chamado,
@@ -176,6 +180,8 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
   const noteText = isInternalOnly
     ? String(text ?? '')
     : String(internalText ?? anotacaoInterna ?? '');
+
+  applyManualResponsavelClaim(chamado, req.user);
 
   const result = appendRegistroEntry(chamado, {
     mensagemPublica: publicText,

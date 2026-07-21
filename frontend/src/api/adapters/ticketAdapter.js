@@ -1,6 +1,6 @@
 /**
- * ticketAdapter v1.4.5 — repara mojibake UTF-8 em títulos e mensagens
- * VERSION: v1.4.5 | DATE: 2026-07-14 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.4.6 — meus-resolvidos global na fila meus-chamados
+ * VERSION: v1.4.6 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team
  */
 import { getAgentName } from '../../services/clientDb';
 import { DEFAULT_TIPO } from '../../services/tabulationConfig';
@@ -11,6 +11,7 @@ const MEUS_CHAMADOS_BOX_MAP = {
   'meus-em-aberto': 'em-andamento',
   'meus-em-andamento': 'em-andamento',
   'meus-pendente': 'em-espera',
+  'meus-resolvidos': 'resolvidos',
 };
 
 const DEFAULT_BOXES = [

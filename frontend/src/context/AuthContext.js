@@ -1,6 +1,6 @@
 /**
- * AuthContext v1.7.0 — login oficial cadastro Desk (sem allowlist)
- * VERSION: v1.7.0 | DATE: 2026-07-20 | AUTHOR: VeloHub Development Team
+ * AuthContext v1.8.0 — presença offline no logout
+ * VERSION: v1.8.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import { isGoogleDeskAuthMode, isGoogleDeskSession } from '../config/deskAuthMode';
@@ -10,6 +10,7 @@ import { setApiMode } from '../services/ticketsCache';
 import { getDeskDisplayName, isLegacyDeskUser } from '../utils/userDisplayName';
 import { clearDeskAuthSession, isBackendJwtUsable } from '../utils/backendJwt';
 import { clearCachedPermissions } from '../services/permissions/permissionService';
+import { notifyAgentOfflineAndStop } from '../services/agentPresence';
 
 const AuthContext = createContext(null);
 
@@ -152,6 +153,7 @@ export function AuthProvider({ children }) {
     } catch {
       /* noop */
     }
+    void notifyAgentOfflineAndStop();
     clearStoredAuthSession();
     setAuthStatus('pending');
     setUser(null);

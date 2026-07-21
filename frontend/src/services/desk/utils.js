@@ -1,6 +1,6 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.0.1 | DATE: 2026-07-14
+ * VERSION: v3.0.4 | DATE: 2026-07-21
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
@@ -709,12 +709,17 @@ export function sortTicketEntries(entries, activeSort, sortDir = 'desc') {
   });
 }
 
+function shouldFilterByAgentResponsavel(queueId) {
+  return queueId !== 'resolvidos';
+}
+
 export function filterTickets(activeQueue, searchQuery, activeSort) {
   const q = (searchQuery || '').toLowerCase();
+  const filterByResponsavel = shouldFilterByAgentResponsavel(activeQueue);
   const filtered = getAllCockpitTickets()
     .filter((entry) => {
       if (entry.queueId !== activeQueue) return false;
-      if (!ticketMatchesAgentResponsavel(entry.ticket)) return false;
+      if (filterByResponsavel && !ticketMatchesAgentResponsavel(entry.ticket)) return false;
       if (!q) return true;
       const t = entry.ticket;
       const cpf = normalizeCpf(t.lateralForm?.cpf || t.clientCPF || '');
@@ -771,7 +776,12 @@ export function resolveDeskSearchEntries(rawQuery, activeSort) {
 }
 
 export function countByQueue(queueId) {
-  return getAllCockpitTickets().filter((e) => e.queueId === queueId && ticketMatchesAgentResponsavel(e.ticket)).length;
+  const filterByResponsavel = shouldFilterByAgentResponsavel(queueId);
+  return getAllCockpitTickets().filter((e) => {
+    if (e.queueId !== queueId) return false;
+    if (filterByResponsavel && !ticketMatchesAgentResponsavel(e.ticket)) return false;
+    return true;
+  }).length;
 }
 
 /** Fila com tickets visíveis — prioriza Novos (maior volume no Atlas). */
@@ -783,9 +793,30 @@ export function pickDefaultQueueId(preferred = 'novos') {
 
 export function pickDefaultTicket(activeQueue) {
   const list = filterTickets(activeQueue || 'novos', '', 'data');
-  if (list.length) return list[0].ticket.id;
-  const all = getAllCockpitTickets();
-  return all[0]?.ticket?.id ?? null;
+  return list[0]?.ticket?.id ?? null;
+}
+
+/** Próximo ticket na lista visível após salvar/fechar o atual. */
+export function pickNextTicketFromEntries(currentId, entries) {
+  const list = entries || [];
+  if (!list.length) return null;
+  const idx = list.findIndex((e) => String(e.ticket.id) === String(currentId));
+  if (idx === -1) {
+    const fallback = list.find((e) => String(e.ticket.id) !== String(currentId));
+    return fallback?.ticket?.id ?? null;
+  }
+  for (let i = idx + 1; i < list.length; i += 1) {
+    return list[i].ticket.id;
+  }
+  for (let i = 0; i < idx; i += 1) {
+    return list[i].ticket.id;
+  }
+  return null;
+}
+
+/** Próximo ticket na fila ativa após salvar/fechar o atual. */
+export function pickNextTicketInQueue(currentId, activeQueue, activeSort) {
+  return pickNextTicketFromEntries(currentId, filterTickets(activeQueue, '', activeSort));
 }
 
 export function isConversationMessage(message) {

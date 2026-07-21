@@ -1,10 +1,37 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.41.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.42.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Pacote filas e roleta (resolvidos global, presença, cap-10)
+
+- **Data/Hora**: 2026-07-21
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.42.0
+  - chamado.mapper v1.9.1, assignmentRouter v1.2.0, agentPresence v1.0.0, AgentPresence model v1.0.0
+  - agents.routes v1.2.0, tickets.routes v1.6.0, env.ts v1.20.0
+  - ticketAdapter v1.4.6, desk/utils v3.0.4, AuthContext v1.8.0, AppShell v2.5.0
+  - agentPresence.js v1.0.0, AgentPresenceHeartbeat v1.0.0, test-assignment-router v1.2.0
+- **Arquivos modificados**:
+  - `backend/src/services/chamado.mapper.ts` — coluna `meus-resolvidos` sem filtro de responsável
+  - `backend/src/services/assignmentRouter.service.ts` — roleta cap-10 online, flag `atribuicaoRoleta`, backfill, claim manual
+  - `backend/src/services/agentPresence.service.ts`, `backend/src/models/AgentPresence.ts` — heartbeat/offline
+  - `backend/src/routes/agents.routes.ts` — `POST /presence/heartbeat` e `/offline`
+  - `backend/src/routes/tickets.routes.ts` — adoção manual de órfão no PUT/messages
+  - `backend/src/config/env.ts` — `ASSIGNMENT_ROUTER_MAX_OPEN`, `ASSIGNMENT_ROUTER_PRESENCE_TTL_MS`
+  - `frontend/src/api/adapters/ticketAdapter.js`, `frontend/src/services/desk/utils.js` — resolvidos global na UI
+  - `frontend/src/services/agentPresence.js`, `AgentPresenceHeartbeat.jsx`, `AuthContext.js`, `AppShell.jsx`
+  - `backend/scripts/test-assignment-router.ts` — testes cap e claim manual
+- **Descrição**: Agentes veem Resolvidos de todos os responsáveis; roleta distribui inbound com cap 10 por agente online (presença heartbeat); adoção manual de órfãos no save/mensagem fora do cap.
+- **Status**: Pendente push
+
+---
 
 ### GitHub Push — Correção rate limit 429 (5000 + isenção GET leitura)
 
@@ -27,7 +54,7 @@
   - `frontend/src/utils/apiErrors.js` — mensagem 429 compartilhada
   - Contexts: Tickets, Tabulation, Workflow, Permission, Notification — tratamento 429
 - **Descrição**: Corrige 429 em produção (limite 200/15min insuficiente). Aumenta cota para 5000, isenta GETs de leitura do Desk, elimina chamada duplicada a boxes e deduplica requisições concorrentes.
-- **Status**: Pendente push
+- **Status**: Concluído (`6058948` em `main`)
 
 ---
 
