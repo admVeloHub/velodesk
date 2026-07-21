@@ -8245,6 +8245,36 @@ body.desk-v2-mode #aiChatbotModal {
 .ra-page-wrap {
     padding: 0;
     background: #f4f6fb;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* RA CRM — preenche main-content (fila + lista + ticket + sidebar) */
+.main-content:has(#especiais-reclame-aqui.active) {
+    background: transparent !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.main-content:has(#especiais-reclame-aqui.active) #especiais-reclame-aqui.page.active {
+    display: flex !important;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+    padding: 0 !important;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 .ra-panel {
@@ -9532,20 +9562,6 @@ body.desk-v2-mode #aiChatbotModal {
     color: #64748b;
 }
 
-.ra-ticket__channel-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.35rem 0.65rem;
-    border-radius: 999px;
-    border: 1px solid #fdba74;
-    background: #fff7ed;
-    color: #c2410c;
-    font-size: 0.78rem;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
 .ra-ticket__profile-actions {
     display: inline-flex;
     align-items: center;
@@ -9557,6 +9573,194 @@ body.desk-v2-mode #aiChatbotModal {
 #especiais-reclame-aqui .ra-ticket__profile-actions .ticket-client-history-btn {
     align-self: auto;
     margin-top: 0;
+}
+
+#especiais-reclame-aqui .ra-ticket__profile-actions .tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.65rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #6b7280;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+#especiais-reclame-aqui .ra-ticket__profile-actions .tab-btn.is-active {
+    color: #1634FF;
+    border-color: #1634FF;
+    background: #eef2ff;
+}
+
+#especiais-reclame-aqui .ra-ticket__profile-actions .tab-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px 18px 24px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__header {
+    margin-bottom: 16px;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__title {
+    margin: 0 0 4px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #000058;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__subtitle {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #64748b;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__section-title {
+    margin: 0 0 12px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product {
+    background: #fff;
+    border: 0.5px solid #e4e6ea;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product--active {
+    border-color: #1634FF;
+    box-shadow: 0 0 0 1px rgba(22, 52, 255, 0.12);
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__tag.velo-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.2;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #1634FF;
+    background: rgba(22, 52, 255, 0.08);
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__desc {
+    margin: 0 0 12px;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: #334155;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__meta {
+    margin: 0;
+    display: grid;
+    gap: 10px;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__meta dt {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #94a3b8;
+    margin-bottom: 2px;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__meta dd {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #1e293b;
+    line-height: 1.45;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__motivos {
+    margin: 0;
+    padding-left: 18px;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 220px;
+    padding: 24px;
+    background: #fff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    color: #64748b;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__empty .ti {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    opacity: 0.65;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__empty p {
+    margin: 0;
+    font-size: 0.9375rem;
+}
+
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__empty-hint {
+    margin-top: 6px !important;
+    font-size: 0.875rem !important;
+    color: #94a3b8;
 }
 
 .ra-ticket__complaint {
@@ -9797,6 +10001,11 @@ body.desk-v2-mode #aiChatbotModal {
     color: #0f172a;
 }
 
+#especiais-reclame-aqui .ra-ticket__side .ra-ticket__moderacao {
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
 .ra-ticket__deadline-value {
     color: #ea580c;
     font-weight: 700;
@@ -9877,7 +10086,8 @@ body.desk-v2-mode #aiChatbotModal {
 #especiais-reclame-aqui .ra-crm-shell {
     display: flex;
     align-items: stretch;
-    height: calc(100vh - 48px);
+    flex: 1;
+    height: 100%;
     min-height: 0;
     overflow: hidden;
     background: #f4f6fb;
@@ -10418,7 +10628,7 @@ body.desk-v2-mode #aiChatbotModal {
     #especiais-reclame-aqui .ra-crm-shell {
         flex-wrap: wrap;
         height: auto;
-        min-height: calc(100vh - 48px);
+        min-height: 100%;
         overflow: auto;
     }
 

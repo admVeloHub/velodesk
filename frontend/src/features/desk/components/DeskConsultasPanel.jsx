@@ -7,7 +7,6 @@ import { useTabulation } from '../../../context/TabulationContext';
 import { getMotivos } from '../../../services/tabulationConfig';
 import { getProductCatalogMeta } from '../../../services/desk/processDefinitions';
 import {
-  getClientAnalise,
   getClientContactFields,
   getClientProducts,
   getProductTagClass,
@@ -58,11 +57,6 @@ export default function DeskConsultasPanel({ ticket, client }) {
   const contact = getClientContactFields(ticket, client);
   const products = getClientProducts(ticket, client);
   const ticketProduto = String(ticket?.lateralForm?.produto || '').trim();
-  const thermo = client?.termometro ?? 38;
-  const thermoLabel = client?.termometroLabel || (thermo >= 55 ? 'Crítico' : thermo >= 45 ? 'Atenção' : 'Estável');
-  const situacao = client?.situacao || 'Informe o CPF no cadastro do ticket';
-  const risco = client?.risco || '—';
-  const analise = getClientAnalise(client);
 
   const productCards = useMemo(() => products.map((produto) => ({
     produto,
@@ -81,31 +75,6 @@ export default function DeskConsultasPanel({ ticket, client }) {
           </p>
         </div>
       </header>
-
-      <section className="crm-consultas__summary" aria-label="Resumo do cliente">
-        <div className="crm-consultas__summary-grid">
-          <div className="crm-consultas__summary-card">
-            <strong>CPF</strong>
-            <span>{contact.cpf || '—'}</span>
-          </div>
-          <div className="crm-consultas__summary-card">
-            <strong>Situação</strong>
-            <span>{situacao}</span>
-          </div>
-          <div className="crm-consultas__summary-card crm-consultas__summary-card--risk">
-            <strong>Risco</strong>
-            <span>{risco}</span>
-          </div>
-          <div className="crm-consultas__summary-card">
-            <strong>Termômetro</strong>
-            <span>{thermo} — {thermoLabel}</span>
-          </div>
-        </div>
-        <p className="crm-consultas__analise">
-          <i className="ti ti-sparkles" aria-hidden="true" />
-          {analise}
-        </p>
-      </section>
 
       <section className="crm-consultas__products" aria-label="Produtos do cliente">
         <h3 className="crm-consultas__section-title">

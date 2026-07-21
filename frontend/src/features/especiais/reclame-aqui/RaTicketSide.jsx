@@ -3,6 +3,7 @@
  */
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useNotifications } from '../../../context/NotificationContext';
 import { getStatusLabel } from '../../../services/especiais/reclameAquiData';
 import { formatRaDeadlineLabel } from '../../../services/especiais/reclameAquiTicketService';
 import { formatComplaintDate } from './raTicketFormatters';
@@ -15,6 +16,11 @@ export default function RaTicketSide({
   onCloseChat,
 }) {
   const navigate = useNavigate();
+  const { showNotification } = useNotifications();
+
+  const handleModeracao = () => {
+    showNotification('Módulo de moderação em breve.', 'info');
+  };
 
   if (!raItem) return null;
 
@@ -77,6 +83,18 @@ export default function RaTicketSide({
               <dd>{phones[1] || '—'}</dd>
             </div>
           </dl>
+        </section>
+
+        <section className="ra-registro__moderacao ra-ticket__moderacao">
+          <div className="ra-registro__moderacao-icon">
+            <i className="ti ti-shield" aria-hidden="true" />
+          </div>
+          <div className="ra-registro__moderacao-content">
+            <h3>Solicitar moderação</h3>
+            <button type="button" className="ra-registro__moderacao-btn" onClick={handleModeracao}>
+              Abrir módulo de moderação
+            </button>
+          </div>
         </section>
 
         <div className="ra-ticket__side-footer">

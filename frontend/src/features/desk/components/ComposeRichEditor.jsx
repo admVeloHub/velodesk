@@ -8,6 +8,7 @@ import React, {
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
 } from 'react';
 import {
   execComposeFormat,
@@ -32,9 +33,11 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
   onClick,
   onFormatStateChange,
   hasSpellErrors = false,
+  expandable = false,
 }, ref) {
   const editorRef = useRef(null);
   const lastHtmlRef = useRef('');
+  const [expanded, setExpanded] = useState(false);
 
   const notifyFormatState = useCallback(() => {
     onFormatStateChange?.(readComposeFormatState(editorRef.current));
@@ -92,15 +95,23 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
     lastHtmlRef.current = readEditorHtml(root);
   }, [value]);
 
+  useEffect(() => {
+    setExpanded(false);
+  }, [id]);
+
   const wrapClass = 'compose-rich-editor-wrap spell-textarea-wrap'
-    + (hasSpellErrors ? ' spell-textarea-wrap--has-errors' : '');
+    + (hasSpellErrors ? ' spell-textarea-wrap--has-errors' : '')
+    + (expandable ? ' compose-rich-editor-wrap--expandable' : '')
+    + (expanded ? ' compose-rich-editor-wrap--expanded' : '');
 
   return (
     <div className={wrapClass}>
       <div
         ref={editorRef}
         id={id}
-        className={'compose-rich-editor response-textarea spell-textarea-input ' + className}
+        className={'compose-rich-editor response-textarea spell-textarea-input '
+          + className
+          + (expanded ? ' compose-rich-editor--expanded' : '')}
         contentEditable
         suppressContentEditableWarning
         role="textbox"
@@ -156,6 +167,18 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
           });
         }}
       />
+      {expandable ? (
+        <button
+          type="button"
+          className="compose-rich-editor__expand-btn"
+          aria-label={expanded ? 'Recolher editor' : 'Expandir editor'}
+          aria-pressed={expanded}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          <i className={'ti ' + (expanded ? 'ti-arrows-minimize' : 'ti-arrows-maximize')} aria-hidden="true" />
+        </button>
+      ) : null}
     </div>
   );
 });
