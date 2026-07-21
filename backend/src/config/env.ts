@@ -1,4 +1,4 @@
-/** env v1.19.0 — API_RATE_LIMIT_MAX configurável (default 5000 prod) */
+/** env v1.20.0 — roleta cap-10 + presença TTL */
 import fs from 'fs';
 import path from 'path';
 
@@ -155,7 +155,9 @@ export const env = {
   ticketSequenceFloor: (process.env.TICKET_SEQUENCE_FLOOR || '100177678').trim(),
   /** Ativo por padrão; desligar com ASSIGNMENT_ROUTER_ENABLED=false */
   assignmentRouterEnabled: process.env.ASSIGNMENT_ROUTER_ENABLED !== 'false',
-  assignmentRouterStrategy: (process.env.ASSIGNMENT_ROUTER_STRATEGY || 'least_loaded').trim(),
+  assignmentRouterStrategy: (process.env.ASSIGNMENT_ROUTER_STRATEGY || 'cap_online').trim(),
+  assignmentRouterMaxOpen: parseInt(process.env.ASSIGNMENT_ROUTER_MAX_OPEN || '10', 10),
+  assignmentRouterPresenceTtlMs: parseInt(process.env.ASSIGNMENT_ROUTER_PRESENCE_TTL_MS || '300000', 10),
   assignmentRouterTerminalStatuses: (process.env.ASSIGNMENT_ROUTER_TERMINAL_STATUSES || 'resolvido,cancelado,fechado')
     .split(',')
     .map((item) => item.trim().toLowerCase())

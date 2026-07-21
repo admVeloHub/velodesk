@@ -1,5 +1,6 @@
-/** test-assignment-router v1.1.0 — testes unitários da lógica da roleta */
+/** test-assignment-router v1.2.0 — cap-10 + claim manual */
 import {
+  applyManualResponsavelClaim,
   applySessionResponsavelIfNeeded,
   buildAgentCandidates,
   countLoadForAgent,
@@ -118,11 +119,42 @@ function testProvisionalFromAuth() {
   );
 }
 
+function testPickLeastLoadedCap() {
+  const agents = [
+    { responsavel: 'agente.a', candidates: ['agente.a'] },
+    { responsavel: 'agente.b', candidates: ['agente.b'] },
+  ];
+  const counts = new Map<string, number>([
+    ['agente.a', 10],
+    ['agente.b', 2],
+  ]);
+  const picked = pickLeastLoadedAgent(agents, counts);
+  assert(picked?.responsavel === 'agente.b', 'agente no cap deve ser excluído (carga 10)');
+}
+
+function testManualClaim() {
+  const chamado = {
+    tabulacao: [{ tipoChamado: '', produto: '', motivo: '', detalhe: '', responsavel: '', atribuido: '' }],
+    registro: [],
+  } as import('../src/models/ChamadoN1').IChamadoN1;
+
+  const claimed = applyManualResponsavelClaim(chamado, {
+    userId: '1',
+    email: 'ana.silva@velodesk.local',
+    role: 'agent',
+    name: 'Ana Silva',
+  });
+  assert(claimed === true, 'claim manual deve atribuir órfão');
+  assert(chamado.tabulacao[0].responsavel === 'ana.silva', 'responsavel da sessão no claim');
+}
+
 function run() {
   testProvisionalResponsavel();
   testProvisionalFromAuth();
   testSessionResponsavel();
+  testManualClaim();
   testPickLeastLoaded();
+  testPickLeastLoadedCap();
   testPickLeastLoadedTieBreak();
   testCountLoadMultipleCandidates();
   testShouldAutoAssign();

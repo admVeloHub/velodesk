@@ -1,11 +1,12 @@
 /**
  * AppShell — layout cockpit
- * VERSION: v2.4.0 | DATE: 2026-06-30
+ * VERSION: v2.5.0 | DATE: 2026-07-21
  */
 import React, { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import TicketTabsBar from '../components/TicketTabsBar';
+import AgentPresenceHeartbeat from '../components/AgentPresenceHeartbeat';
 import AIChatbotModal from '../features/modals/AIChatbotModal';
 import { VeloNewsProvider } from '../features/velonews/VeloNewsProvider';
 import VeloNewsCriticalBubble from '../features/velonews/VeloNewsCriticalBubble';
@@ -32,6 +33,7 @@ export default function AppShell() {
 
   return (
     <VeloNewsProvider>
+      <AgentPresenceHeartbeat />
       <div id="mainApp" className="main-app sidebar-collapsed velo-chromeless" style={{ display: 'grid' }}>
         <TicketTabsBar />
         <Sidebar onOpenAI={() => setAiOpen((v) => !v)} />

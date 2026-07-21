@@ -1,4 +1,4 @@
-/** chamado.mapper v1.9.0 — workflow top-level + lateralForm.workflow derivado */
+/** chamado.mapper v1.9.1 — meus-resolvidos global sem filtro responsável */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -281,6 +281,7 @@ export const MEUS_CHAMADOS_COLUMNS = [
   { id: 'meus-em-aberto', name: 'Em Aberto', status: 'em-aberto', order: 1 },
   { id: 'meus-em-andamento', name: 'Em Andamento', status: 'em-andamento', order: 2 },
   { id: 'meus-pendente', name: 'Pendente', status: 'pendente', order: 3 },
+  { id: 'meus-resolvidos', name: 'Resolvidos', status: 'resolvido', order: 4 },
 ] as const;
 
 const SLA_LIMIT_HOURS: Record<string, number> = {
@@ -916,7 +917,7 @@ export function meusChamadosNovosResponsavelFilter(candidates: string[]) {
 export function buildChamadoQueryFilter(status: string, queue?: string, responsavelCandidates?: string[]) {
   const filters: Record<string, unknown>[] = [lastStatusFilter(status)];
 
-  if (queue === 'meus-chamados' && responsavelCandidates?.length) {
+  if (queue === 'meus-chamados' && responsavelCandidates?.length && status !== 'resolvido') {
     const responsavelFilter = status === 'novo'
       ? meusChamadosNovosResponsavelFilter(responsavelCandidates)
       : meusChamadosResponsavelFilter(responsavelCandidates);
