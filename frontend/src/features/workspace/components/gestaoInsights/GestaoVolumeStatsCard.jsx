@@ -8,13 +8,13 @@ import './gestaoInsights.css';
 
 export default function GestaoVolumeStatsCard({ period, onOpenTicket }) {
   return (
-    <section className="ws-panel gestao-insight-card gestao-volume-stats-card">
-      <header className="gestao-insight-card__head">
+    <section className="ws-panel gestao-insight-card gestao-volume-stats-card gestao-volume-stats-card--compact">
+      <header className="gestao-insight-card__head gestao-insight-card__head--compact">
         <h4>
           <span aria-hidden="true">
             <i className="ti ti-list-numbers" />
           </span>
-          Resumo do período
+          Resumo
         </h4>
       </header>
 

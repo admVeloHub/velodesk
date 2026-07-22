@@ -17,6 +17,7 @@ import {
   Legend,
 } from 'chart.js';
 import { gestaoInsightsApi } from '../../../../api/client';
+import GestaoGranularityToggle from './GestaoGranularityToggle';
 import './gestaoInsights.css';
 
 ChartJS.register(
@@ -59,13 +60,14 @@ export default function GestaoVolumeCard({ period }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [granularity, setGranularity] = useState('dia');
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError('');
     gestaoInsightsApi
-      .volume({ period: period.period, from: period.from, to: period.to })
+      .volume({ period: period.period, from: period.from, to: period.to, granularity })
       .then((result) => {
         if (active) setData(result);
       })
@@ -78,7 +80,7 @@ export default function GestaoVolumeCard({ period }) {
     return () => {
       active = false;
     };
-  }, [period.period, period.from, period.to]);
+  }, [period.period, period.from, period.to, granularity]);
 
   const chartData = useMemo(() => {
     const series = data?.series ?? [];
@@ -162,9 +164,14 @@ export default function GestaoVolumeCard({ period }) {
           </span>
           Volume de tickets
         </h4>
+        <GestaoGranularityToggle value={granularity} onChange={setGranularity} />
       </header>
 
       {error ? <p className="gestao-insight-card__error">{error}</p> : null}
+
+      {granularity === 'mes' ? (
+        <p className="gestao-granularity-hint">Meses fechados do ano corrente — o período selecionado acima não se aplica nesta visão.</p>
+      ) : null}
 
       <div className="gestao-volume-card__chart-wrap">
         {loading ? (

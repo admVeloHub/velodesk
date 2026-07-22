@@ -79,6 +79,94 @@ export function dayKeysBetween(range: DateRange): string[] {
   return keys.length ? keys : [dayKey(range.start)];
 }
 
+/** Chave de mês (YYYY-MM) no fuso da Gestão — usada na visão "mês fechado" dos gráficos. */
+export function monthKey(date: Date, tz = TZ): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit' }).format(date);
+}
+
+const MONTH_LABELS_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+export function labelForMonth(key: string): string {
+  const [y, m] = key.split('-').map(Number);
+  const idx = Math.min(11, Math.max(0, (m || 1) - 1));
+  return `${MONTH_LABELS_PT[idx]}/${String(y).slice(-2)}`;
+}
+
+/** Sequência de chaves de mês (YYYY-MM) entre start e end, inclusive — dedup por dia para evitar armadilhas de calendário/DST. */
+export function monthKeysBetween(range: DateRange): string[] {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  const cursor = new Date(range.start);
+  while (cursor <= range.end) {
+    const key = monthKey(cursor);
+    if (!seen.has(key)) {
+      seen.add(key);
+      keys.push(key);
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return keys.length ? keys : [monthKey(range.start)];
+}
+
+/** Granularidade de exibição dos gráficos da Gestão: dia a dia ou mês fechado (jan/fev/mar…). */
+export type ChartGranularity = 'dia' | 'mes';
+
+export function resolveGranularity(query: { granularity?: string } = {}): ChartGranularity {
+  return query.granularity === 'mes' ? 'mes' : 'dia';
+}
+
+/**
+ * Intervalo de datas usado para montar a série do gráfico, considerando a granularidade:
+ * - `dia`: respeita o período selecionado (Hoje/Ontem/Mês/Personalizado), como já era.
+ * - `mes`: ignora o período diário e sempre mostra o ano corrente (jan → mês atual), permitindo
+ *   comparar "mês fechado" contra mês fechado.
+ */
+export function resolveSeriesRange(query: GestaoInsightsQuery & { granularity?: string } = {}): {
+  range: DateRange;
+  granularity: ChartGranularity;
+} {
+  const granularity = resolveGranularity(query);
+  const range = granularity === 'mes' ? getCurrentYearRange() : resolvePeriodRange(query);
+  return { range, granularity };
+}
+
+export type ComparisonMode = 'mom' | 'yoy';
+
+/**
+ * Deriva o período anterior equivalente para comparação:
+ * - `yoy`: mesmo intervalo de datas, um ano antes.
+ * - `mom`: intervalo de mesma duração, imediatamente anterior ao início do período atual
+ *   (aproxima "mês anterior" para o período "Mês" e mantém a lógica consistente para
+ *   qualquer outro período — Hoje/Ontem/Personalizado).
+ */
+export function resolveComparisonRange(range: DateRange, mode: ComparisonMode): DateRange {
+  if (mode === 'yoy') {
+    const start = new Date(range.start);
+    start.setFullYear(start.getFullYear() - 1);
+    const end = new Date(range.end);
+    end.setFullYear(end.getFullYear() - 1);
+    return { start, end };
+  }
+
+  const spanMs = range.end.getTime() - range.start.getTime();
+  const end = new Date(range.start.getTime() - 1000);
+  const start = new Date(end.getTime() - spanMs);
+  return { start: startOfDayInTz(start), end: endOfDayInTz(end) };
+}
+
+/** Início/fim do mês e do ano corrente (usados nos totais compactos dos cards de detalhe). */
+export function getCurrentMonthRange(): DateRange {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { start: startOfDayInTz(start), end: endOfDayInTz(now) };
+}
+
+export function getCurrentYearRange(): DateRange {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  return { start: startOfDayInTz(start), end: endOfDayInTz(now) };
+}
+
 function getResolvedAt(chamado: IChamadoN1): Date | null {
   const regs = chamado.registro ?? [];
   for (let i = regs.length - 1; i >= 0; i--) {
@@ -141,12 +229,47 @@ export interface VolumeSeriesDay {
 export interface VolumeSeriesResult {
   range: { start: string; end: string };
   series: VolumeSeriesDay[];
+  granularity: ChartGranularity;
   mock: { notaMedia: true };
 }
 
-/** Volume diário de tickets abertos/encerrados no período + nota média (fictícia). */
-export async function getVolumeSeries(query: GestaoInsightsQuery = {}): Promise<VolumeSeriesResult> {
-  const range = resolvePeriodRange(query);
+/** Agrega uma série diária em buckets de mês fechado (soma para contagens, média para a nota). */
+function aggregateVolumeByMonth(daily: VolumeSeriesDay[]): VolumeSeriesDay[] {
+  const buckets = new Map<string, { abertos: number; encerrados: number; notaSum: number; notaN: number }>();
+  const order: string[] = [];
+  daily.forEach((day) => {
+    const key = monthKey(new Date(`${day.date}T12:00:00`));
+    if (!buckets.has(key)) {
+      buckets.set(key, { abertos: 0, encerrados: 0, notaSum: 0, notaN: 0 });
+      order.push(key);
+    }
+    const bucket = buckets.get(key)!;
+    bucket.abertos += day.abertos;
+    bucket.encerrados += day.encerrados;
+    bucket.notaSum += day.notaMedia;
+    bucket.notaN += 1;
+  });
+  return order.map((key) => {
+    const bucket = buckets.get(key)!;
+    return {
+      date: key,
+      label: labelForMonth(key),
+      abertos: bucket.abertos,
+      encerrados: bucket.encerrados,
+      notaMedia: bucket.notaN > 0 ? Math.round((bucket.notaSum / bucket.notaN) * 10) / 10 : 0,
+    };
+  });
+}
+
+/**
+ * Volume de tickets abertos/encerrados no período + nota média (fictícia).
+ * `granularity=dia` (padrão) respeita o período selecionado; `granularity=mes` sempre mostra
+ * os meses fechados do ano corrente (jan, fev, mar…), permitindo comparar mês a mês.
+ */
+export async function getVolumeSeries(
+  query: GestaoInsightsQuery & { granularity?: string } = {},
+): Promise<VolumeSeriesResult> {
+  const { range, granularity } = resolveSeriesRange(query);
   const keys = dayKeysBetween(range);
 
   const abertosMap = new Map<string, number>(keys.map((k) => [k, 0]));
@@ -175,7 +298,7 @@ export async function getVolumeSeries(query: GestaoInsightsQuery = {}): Promise<
     }
   });
 
-  const series: VolumeSeriesDay[] = keys.map((key) => ({
+  const dailySeries: VolumeSeriesDay[] = keys.map((key) => ({
     date: key,
     label: labelForDay(key),
     abertos: abertosMap.get(key) ?? 0,
@@ -183,9 +306,12 @@ export async function getVolumeSeries(query: GestaoInsightsQuery = {}): Promise<
     notaMedia: fakeNotaMediaForDay(key),
   }));
 
+  const series = granularity === 'mes' ? aggregateVolumeByMonth(dailySeries) : dailySeries;
+
   return {
     range: { start: range.start.toISOString(), end: range.end.toISOString() },
     series,
+    granularity,
     mock: { notaMedia: true },
   };
 }
@@ -381,12 +507,22 @@ export interface CasosEspeciaisResult {
   mock: true;
 }
 
-const CASOS_ESPECIAIS_ORGAOS: { id: CasoEspecialEntry['id']; label: string }[] = [
+export const CASOS_ESPECIAIS_ORGAOS: { id: CasoEspecialEntry['id']; label: string }[] = [
   { id: 'bacen', label: 'Bacen' },
   { id: 'procon', label: 'Procon' },
   { id: 'consumidorGov', label: 'Consumidor.gov' },
   { id: 'reclameAqui', label: 'Reclame Aqui' },
 ];
+
+/** Base diária fictícia (determinística) de casos por órgão — usada tanto no total do card quanto na série do detalhe. */
+function casoEspecialDailyTotal(orgaoId: string, key: string): number {
+  const ratio = seededRatio(`casos-especiais-daily:${orgaoId}:${key}`);
+  return Math.max(0, Math.round(1 + ratio * 4));
+}
+
+function casoEspecialTotalForRange(orgaoId: string, range: DateRange): number {
+  return dayKeysBetween(range).reduce((sum, key) => sum + casoEspecialDailyTotal(orgaoId, key), 0);
+}
 
 /**
  * Totais de casos especiais por órgão/canal — fictício por ora.
@@ -394,19 +530,174 @@ const CASOS_ESPECIAIS_ORGAOS: { id: CasoEspecialEntry['id']; label: string }[] =
  */
 export async function getCasosEspeciais(query: GestaoInsightsQuery = {}): Promise<CasosEspeciaisResult> {
   const range = resolvePeriodRange(query);
-  const days = Math.max(1, Math.round((range.end.getTime() - range.start.getTime()) / 86400000) + 1);
-  const seedSuffix = `${dayKey(range.start)}:${dayKey(range.end)}`;
 
-  const items = CASOS_ESPECIAIS_ORGAOS.map((org) => {
-    const ratio = seededRatio(`casos-especiais:${org.id}:${seedSuffix}`);
-    const dailyBase = 1 + ratio * 3;
-    const total = Math.max(0, Math.round(dailyBase * days));
-    return { id: org.id, label: org.label, total };
-  });
+  const items = CASOS_ESPECIAIS_ORGAOS.map((org) => ({
+    id: org.id,
+    label: org.label,
+    total: casoEspecialTotalForRange(org.id, range),
+  }));
 
   return {
     range: { start: range.start.toISOString(), end: range.end.toISOString() },
     items,
+    mock: true,
+  };
+}
+
+const CASOS_ESPECIAIS_MOTIVOS = [
+  'Cobrança indevida',
+  'Divergência de valores',
+  'Demora no atendimento',
+  'Solicitação de cancelamento',
+  'Negativação indevida',
+  'Falha no sistema/app',
+  'Informação insuficiente',
+  'Descumprimento de prazo',
+];
+
+const DEFAULT_PRODUTOS_FALLBACK = ['Cartão', 'Empréstimo', 'Conta Digital', 'Seguros'];
+
+/** Produtos reais mais frequentes na tabulação de tickets — usados como recorte para os motivos fictícios do detalhe. */
+async function getReferenceProdutos(limit = 6): Promise<string[]> {
+  try {
+    const rows = await ChamadoN1.aggregate<{ _id: string; count: number }>([
+      { $unwind: '$tabulacao' },
+      { $match: { 'tabulacao.produto': { $nin: [null, ''] } } },
+      { $group: { _id: '$tabulacao.produto', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: limit },
+    ]);
+    const produtos = rows.map((r) => String(r._id)).filter(Boolean);
+    return produtos.length ? produtos : DEFAULT_PRODUTOS_FALLBACK;
+  } catch {
+    return DEFAULT_PRODUTOS_FALLBACK;
+  }
+}
+
+export interface CasoEspecialSeriesDay {
+  date: string;
+  label: string;
+  total: number;
+  totalAnterior?: number;
+}
+
+export interface CasoEspecialMotivoProduto {
+  produto: string;
+  total: number;
+  motivos: { motivo: string; count: number; pct: number }[];
+}
+
+export interface CasoEspecialDetailResult {
+  orgao: { id: CasoEspecialEntry['id']; label: string };
+  range: { start: string; end: string };
+  totals: { currentMonth: number; currentYear: number };
+  series: CasoEspecialSeriesDay[];
+  granularity: ChartGranularity;
+  comparison?: { mode: ComparisonMode; range: { start: string; end: string } };
+  motivosPorProduto: CasoEspecialMotivoProduto[];
+  mock: true;
+}
+
+/** Agrega a série diária de um caso especial em buckets de mês fechado (soma de casos). */
+function aggregateCasoEspecialByMonth(daily: CasoEspecialSeriesDay[]): CasoEspecialSeriesDay[] {
+  const buckets = new Map<string, { total: number; totalAnterior: number; hasAnterior: boolean }>();
+  const order: string[] = [];
+  daily.forEach((day) => {
+    const key = monthKey(new Date(`${day.date}T12:00:00`));
+    if (!buckets.has(key)) {
+      buckets.set(key, { total: 0, totalAnterior: 0, hasAnterior: false });
+      order.push(key);
+    }
+    const bucket = buckets.get(key)!;
+    bucket.total += day.total;
+    if (day.totalAnterior != null) {
+      bucket.totalAnterior += day.totalAnterior;
+      bucket.hasAnterior = true;
+    }
+  });
+  return order.map((key) => {
+    const bucket = buckets.get(key)!;
+    return {
+      date: key,
+      label: labelForMonth(key),
+      total: bucket.total,
+      ...(bucket.hasAnterior ? { totalAnterior: bucket.totalAnterior } : {}),
+    };
+  });
+}
+
+/**
+ * Detalhe (fictício) de um órgão/canal de caso especial: totais mês/ano, série do gráfico
+ * (com comparativo opcional MoM/YoY, em granularidade dia ou mês fechado) e principais motivos por produto.
+ */
+export async function getCasoEspecialDetail(
+  orgaoId: string,
+  query: GestaoInsightsQuery & { compare?: string; granularity?: string } = {},
+): Promise<CasoEspecialDetailResult | null> {
+  const org = CASOS_ESPECIAIS_ORGAOS.find((o) => o.id === orgaoId);
+  if (!org) return null;
+
+  const { range, granularity } = resolveSeriesRange(query);
+  const compareMode: ComparisonMode | undefined =
+    query.compare === 'mom' || query.compare === 'yoy' ? query.compare : undefined;
+
+  const currentMonth = casoEspecialTotalForRange(org.id, getCurrentMonthRange());
+  const currentYear = casoEspecialTotalForRange(org.id, getCurrentYearRange());
+
+  const keys = dayKeysBetween(range);
+  let comparisonRange: DateRange | undefined;
+  let comparisonKeys: string[] = [];
+  if (compareMode) {
+    comparisonRange = resolveComparisonRange(range, compareMode);
+    comparisonKeys = dayKeysBetween(comparisonRange);
+  }
+
+  const dailySeries: CasoEspecialSeriesDay[] = keys.map((key, idx) => {
+    const prevKey = comparisonKeys[idx];
+    return {
+      date: key,
+      label: labelForDay(key),
+      total: casoEspecialDailyTotal(org.id, key),
+      ...(prevKey ? { totalAnterior: casoEspecialDailyTotal(org.id, prevKey) } : {}),
+    };
+  });
+
+  const series = granularity === 'mes' ? aggregateCasoEspecialByMonth(dailySeries) : dailySeries;
+
+  const produtos = await getReferenceProdutos();
+  const motivosPorProduto: CasoEspecialMotivoProduto[] = produtos.map((produto) => {
+    const motivos = CASOS_ESPECIAIS_MOTIVOS
+      .map((motivo) => {
+        const ratio = seededRatio(`caso-motivo:${org.id}:${produto}:${motivo}`);
+        return { motivo, count: Math.max(1, Math.round(3 + ratio * 22)) };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+    const total = motivos.reduce((sum, m) => sum + m.count, 0);
+    return {
+      produto,
+      total,
+      motivos: motivos.map((m) => ({
+        ...m,
+        pct: total > 0 ? Math.round((m.count / total) * 1000) / 10 : 0,
+      })),
+    };
+  });
+
+  return {
+    orgao: { id: org.id, label: org.label },
+    range: { start: range.start.toISOString(), end: range.end.toISOString() },
+    totals: { currentMonth, currentYear },
+    series,
+    granularity,
+    comparison:
+      compareMode && comparisonRange
+        ? {
+            mode: compareMode,
+            range: { start: comparisonRange.start.toISOString(), end: comparisonRange.end.toISOString() },
+          }
+        : undefined,
+    motivosPorProduto,
     mock: true,
   };
 }

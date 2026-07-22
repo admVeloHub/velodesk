@@ -127,7 +127,15 @@ export default function GestaoPanel() {
       </div>
 
       <div className="gestao-insights-stack">
-        <GestaoVolumeStatsCard period={insightsPeriod} onOpenTicket={handleOpenEscalatedTicket} />
+        <div className="gestao-insights-row gestao-insights-row--summary">
+          <GestaoVolumeStatsCard period={insightsPeriod} onOpenTicket={handleOpenEscalatedTicket} />
+          <Workspace360EscalatedCases
+            escalated={view.escalated}
+            onViewAll={() => setEscalatedListOpen(true)}
+            onDismiss={() => showNotification('Alerta de escalonamento registrado.', 'info')}
+            onOpenTicket={handleOpenEscalatedTicket}
+          />
+        </div>
 
         {escalatedListOpen ? (
           <Workspace360EscalatedCasesList
@@ -136,21 +144,17 @@ export default function GestaoPanel() {
             onBack={() => setEscalatedListOpen(false)}
             onOpenTicket={handleOpenEscalatedTicket}
           />
-        ) : (
-          <Workspace360EscalatedCases
-            escalated={view.escalated}
-            onViewAll={() => setEscalatedListOpen(true)}
-            onDismiss={() => showNotification('Alerta de escalonamento registrado.', 'info')}
-            onOpenTicket={handleOpenEscalatedTicket}
-          />
-        )}
+        ) : null}
 
         <div className="gestao-insights-row gestao-insights-row--chart">
           <GestaoVolumeCard period={insightsPeriod} />
           <GestaoMotivosCard period={insightsPeriod} />
         </div>
-        <GestaoCasosEspeciaisCard />
-        <AiUsageCostCard />
+
+        <div className="gestao-tiles-row">
+          <GestaoCasosEspeciaisCard />
+          <AiUsageCostCard />
+        </div>
       </div>
 
       <div className="ws-grid-2">

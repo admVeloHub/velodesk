@@ -34,26 +34,26 @@ export default function GestaoVolumeStats({ period, onOpenTicket }) {
   const oldestFirst = oldest[0];
 
   return (
-    <div className="gestao-volume-stats">
-      <div className="gestao-volume-stats__tile">
+    <div className="gestao-volume-stats gestao-volume-stats--compact">
+      <div className="gestao-volume-stats__tile" title="Total de tickets abertos no período selecionado">
         <span className="gestao-volume-stats__value">{loading ? '—' : data?.totalAbertos ?? 0}</span>
-        <span className="gestao-volume-stats__label">Abertos no período</span>
+        <span className="gestao-volume-stats__label">Abertos</span>
       </div>
-      <div className="gestao-volume-stats__tile">
+      <div className="gestao-volume-stats__tile" title='Tickets com status "Novo" no período'>
         <span className="gestao-volume-stats__value">{loading ? '—' : data?.totalNovo ?? 0}</span>
-        <span className="gestao-volume-stats__label">Status "Novo"</span>
+        <span className="gestao-volume-stats__label">Novos</span>
       </div>
-      <div className="gestao-volume-stats__tile">
+      <div className="gestao-volume-stats__tile" title="Novo + Em Andamento + Pendente no período">
         <span className="gestao-volume-stats__value">{loading ? '—' : data?.totalEmAberto ?? 0}</span>
-        <span className="gestao-volume-stats__label">Em aberto (Novo + Em Andamento + Pendente)</span>
+        <span className="gestao-volume-stats__label">Em aberto</span>
       </div>
-      <div className="gestao-volume-stats__tile">
+      <div className="gestao-volume-stats__tile" title="Tempo médio de tratativa: abertura → resolvido">
         <span className="gestao-volume-stats__value">{loading ? '—' : data?.tmaMedio ?? '—'}</span>
-        <span className="gestao-volume-stats__label">TMA médio (abertura → resolvido)</span>
+        <span className="gestao-volume-stats__label">TMA</span>
       </div>
-      <div className="gestao-volume-stats__tile">
+      <div className="gestao-volume-stats__tile" title="Prazo médio de 1ª resposta: abertura → atendente">
         <span className="gestao-volume-stats__value">{loading ? '—' : data?.tmeMedio ?? '—'}</span>
-        <span className="gestao-volume-stats__label">1ª resposta (abertura → atendente)</span>
+        <span className="gestao-volume-stats__label">1ª resposta</span>
       </div>
 
       <div className={`gestao-volume-stats__tile gestao-volume-stats__tile--oldest${expanded ? ' gestao-volume-stats__tile--expanded' : ''}`}>
@@ -67,7 +67,7 @@ export default function GestaoVolumeStats({ period, onOpenTicket }) {
             {loading ? '—' : oldestFirst ? `${oldestFirst.ageDays}d` : '—'}
           </span>
           <span className="gestao-volume-stats__label">
-            Ticket em aberto mais antigo
+            Mais antigo em aberto
             {oldestFirst ? ` · #${oldestFirst.protocolo}` : ''}
           </span>
           {oldest.length ? (

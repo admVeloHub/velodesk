@@ -47,6 +47,8 @@ export interface AtendimentoInput {
   messages?: TicketAiMessageInput[];
   internalNote?: string;
   produtoHint?: string;
+  /** Id do colaborador (req.user.userId) que acionou o agente — usado no relatório de custo de IA por colaborador. */
+  userId?: string;
 }
 
 export interface AtendimentoResult {
@@ -92,6 +94,8 @@ export interface AuditoriaInput {
   mensagemOperador?: string;
   ultimaMensagemCliente?: string;
   palavrasCriticasPrecheck?: string[];
+  /** Id do colaborador (req.user.userId) que acionou o agente — usado no relatório de custo de IA por colaborador. */
+  userId?: string;
 }
 
 export type TabulacaoFonte = 'auditoria' | 'atendimento';

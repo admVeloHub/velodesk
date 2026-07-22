@@ -3,16 +3,18 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { isMongoConnected } from '../config/database';
 import { env } from '../config/env';
-import { getAiUsageDailyReport } from '../services/aiUsage.service';
+import { getAiUsageDailyReport, getAiUsageTotals } from '../services/aiUsage.service';
 import { GestaoInsightsQuery } from '../services/gestaoInsights.service';
 
 const router = Router();
 
-function parseQuery(req: Request): GestaoInsightsQuery {
+function parseQuery(req: Request): GestaoInsightsQuery & { compare?: string; granularity?: string } {
   return {
     period: typeof req.query.period === 'string' ? req.query.period : undefined,
     from: typeof req.query.from === 'string' ? req.query.from : undefined,
     to: typeof req.query.to === 'string' ? req.query.to : undefined,
+    compare: typeof req.query.compare === 'string' ? req.query.compare : undefined,
+    granularity: typeof req.query.granularity === 'string' ? req.query.granularity : undefined,
   };
 }
 
@@ -37,6 +39,19 @@ router.get('/report', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[ai-usage] GET /report falhou:', err);
     return res.status(500).json({ message: 'Erro ao carregar relatório de uso de IA' });
+  }
+});
+
+router.get('/totals', async (_req: Request, res: Response) => {
+  if (!isMongoConnected()) {
+    return res.status(503).json({ message: 'Banco indisponível' });
+  }
+  try {
+    const result = await getAiUsageTotals();
+    return res.json(result);
+  } catch (err) {
+    console.error('[ai-usage] GET /totals falhou:', err);
+    return res.status(500).json({ message: 'Erro ao carregar totais de uso de IA' });
   }
 });
 

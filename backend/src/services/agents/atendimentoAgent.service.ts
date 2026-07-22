@@ -36,7 +36,7 @@ async function callAtendimentoOpenAi(
   systemPrompt: string,
   userBlock: string,
   vectorStoreIds: string[],
-  usageContext: { ticketId?: string; protocolo?: string },
+  usageContext: { ticketId?: string; protocolo?: string; userId?: string },
 ): Promise<{ parsed: AtendimentoParsed | null; model: string }> {
   const openai = createOpenAiClient();
   const tools = vectorStoreIds.length
@@ -70,6 +70,7 @@ async function callAtendimentoOpenAi(
       outputTokens: response.usage.output_tokens,
       ticketId: usageContext.ticketId,
       protocolo: usageContext.protocolo,
+      userId: usageContext.userId,
     });
   }
 
@@ -98,7 +99,7 @@ export async function composeAtendimento(params: AtendimentoInput): Promise<Aten
       getAtendimentoPersona(),
       userBlock,
       vectorIds,
-      { ticketId: params.ticketId, protocolo: params.protocolo },
+      { ticketId: params.ticketId, protocolo: params.protocolo, userId: params.userId },
     );
 
     if (!parsed?.respostaSugerida?.trim()) {
@@ -153,7 +154,7 @@ export async function reviseAtendimento(params: RevisaoInput): Promise<Atendimen
       systemPrompt,
       userBlock,
       vectorIds,
-      { ticketId: params.ticketId, protocolo: params.protocolo },
+      { ticketId: params.ticketId, protocolo: params.protocolo, userId: params.userId },
     );
 
     if (!parsed?.respostaSugerida?.trim()) {

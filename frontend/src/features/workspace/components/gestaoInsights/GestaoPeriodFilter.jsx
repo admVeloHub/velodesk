@@ -11,7 +11,26 @@ export const GESTAO_PERIOD_OPTIONS = [
   { value: 'personalizado', label: 'Personalizado' },
 ];
 
-export default function GestaoPeriodFilter({ value, onChange, idPrefix = 'gestao-period' }) {
+export const GESTAO_COMPARE_OPTIONS = [
+  { value: '', label: 'Sem comparativo' },
+  { value: 'mom', label: 'Mês a mês' },
+  { value: 'yoy', label: 'Ano a ano' },
+];
+
+/**
+ * @param {object} props
+ * @param {boolean} [props.showCompare] — exibe o seletor secundário de comparação (MoM/YoY), usado nas páginas de detalhe.
+ * @param {string} [props.compareValue] — 'mom' | 'yoy' | '' (sem comparativo).
+ * @param {(mode: string) => void} [props.onCompareChange]
+ */
+export default function GestaoPeriodFilter({
+  value,
+  onChange,
+  idPrefix = 'gestao-period',
+  showCompare = false,
+  compareValue = '',
+  onCompareChange,
+}) {
   const { period, from, to } = value ?? {};
   const [draftFrom, setDraftFrom] = useState(from || '');
   const [draftTo, setDraftTo] = useState(to || '');
@@ -75,6 +94,24 @@ export default function GestaoPeriodFilter({ value, onChange, idPrefix = 'gestao
           >
             Aplicar
           </button>
+        </div>
+      ) : null}
+
+      {showCompare ? (
+        <div className="gestao-period-filter__compare" role="group" aria-label="Selecionar comparativo">
+          {GESTAO_COMPARE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value || 'none'}
+              type="button"
+              className={
+                'gestao-period-filter__compare-pill' +
+                ((compareValue || '') === opt.value ? ' gestao-period-filter__compare-pill--active' : '')
+              }
+              onClick={() => onCompareChange?.(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       ) : null}
     </div>

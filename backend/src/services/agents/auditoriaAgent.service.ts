@@ -190,6 +190,7 @@ export async function validateAuditoria(params: AuditoriaInput): Promise<Auditor
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
         protocolo: params.protocolo,
+        userId: params.userId,
       });
     }
 

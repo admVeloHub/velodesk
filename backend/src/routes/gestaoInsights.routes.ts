@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth';
 import { isMongoConnected } from '../config/database';
 import { env } from '../config/env';
 import {
+  getCasoEspecialDetail,
   getCasosEspeciais,
   getTopMotivosPorProduto,
   getVolumeSeries,
@@ -13,11 +14,12 @@ import {
 
 const router = Router();
 
-function parseQuery(req: Request): GestaoInsightsQuery {
+function parseQuery(req: Request): GestaoInsightsQuery & { granularity?: string } {
   return {
     period: typeof req.query.period === 'string' ? req.query.period : undefined,
     from: typeof req.query.from === 'string' ? req.query.from : undefined,
     to: typeof req.query.to === 'string' ? req.query.to : undefined,
+    granularity: typeof req.query.granularity === 'string' ? req.query.granularity : undefined,
   };
 }
 
@@ -79,6 +81,20 @@ router.get('/casos-especiais', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[gestao-insights] GET /casos-especiais falhou:', err);
     return res.status(500).json({ message: 'Erro ao carregar casos especiais' });
+  }
+});
+
+router.get('/casos-especiais/:orgao', async (req: Request, res: Response) => {
+  try {
+    const compare = typeof req.query.compare === 'string' ? req.query.compare : undefined;
+    const result = await getCasoEspecialDetail(req.params.orgao, { ...parseQuery(req), compare });
+    if (!result) {
+      return res.status(404).json({ message: 'Órgão/canal não encontrado' });
+    }
+    return res.json(result);
+  } catch (err) {
+    console.error('[gestao-insights] GET /casos-especiais/:orgao falhou:', err);
+    return res.status(500).json({ message: 'Erro ao carregar detalhe de casos especiais' });
   }
 });
 

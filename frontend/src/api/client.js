@@ -108,10 +108,13 @@ export const gestaoInsightsApi = {
   resumo: (params) => api.get('/gestao-insights/resumo', { params }).then((r) => r.data),
   motivos: (params) => api.get('/gestao-insights/motivos', { params }).then((r) => r.data),
   casosEspeciais: (params) => api.get('/gestao-insights/casos-especiais', { params }).then((r) => r.data),
+  casoEspecialDetail: (orgao, params) =>
+    api.get(`/gestao-insights/casos-especiais/${orgao}`, { params }).then((r) => r.data),
 };
 
 export const aiUsageApi = {
   report: (params) => api.get('/ai-usage/report', { params }).then((r) => r.data),
+  totals: () => api.get('/ai-usage/totals').then((r) => r.data),
 };
 
 export const usersApi = {

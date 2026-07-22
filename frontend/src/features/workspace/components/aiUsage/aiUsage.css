@@ -124,3 +124,28 @@
         display: none;
     }
 }
+
+/* ── Variante compacta — card inteiro clicável, gateway para a página de detalhe ── */
+.ai-usage-card--compact {
+    width: 100%;
+    text-align: left;
+    font-family: var(--eco-font, inherit);
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ai-usage-card--compact:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 88, 0.1);
+}
+
+.ai-usage-card__compact-chevron {
+    font-size: 1rem;
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
+.ai-usage-card__tiles--compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}

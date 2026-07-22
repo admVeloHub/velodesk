@@ -141,6 +141,7 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
     respostaSugerida: respostaAtual,
     tabulacao: tabulacaoAtual,
     confidence: atendimento.confidence,
+    userId: input.userId,
   });
 
   if (!audit.success) {
@@ -191,6 +192,7 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
       respostaSugerida: respostaAtual,
       tabulacao: tabulacaoAtual,
       confidence: atendimento.confidence,
+      userId: input.userId,
     });
 
     if (!audit.success) break;
@@ -307,6 +309,7 @@ export async function runRevisarSugestao(params: {
     respostaSugerida: revised.respostaSugerida,
     tabulacao: revised.tabulacao,
     confidence: revised.confidence,
+    userId: params.input.userId,
   });
 
   await saveAgentFeedback({

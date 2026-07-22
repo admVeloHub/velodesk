@@ -84,7 +84,7 @@ router.post('/pipeline', authMiddleware, async (req: Request, res: Response) => 
   }
 
   const pipelineModo = req.body?.pipelineModo === 'auto_envio' ? 'auto_envio' : 'desk';
-  const result = await runAgentPipeline({ ...parsed.data, pipelineModo });
+  const result = await runAgentPipeline({ ...parsed.data, pipelineModo, userId: req.user?.userId });
 
   if (!result.success) {
     return res.status(500).json({ success: false, error: result.error });
@@ -116,7 +116,7 @@ router.post('/revisar-sugestao', authMiddleware, async (req: Request, res: Respo
   }
 
   const result = await runRevisarSugestao({
-    input: parsed.data,
+    input: { ...parsed.data, userId: req.user?.userId },
     respostaAtual,
     tabulacaoAtual,
     auditScore: typeof body.auditScore === 'number' ? body.auditScore : undefined,
@@ -148,6 +148,7 @@ router.post('/auditoria', authMiddleware, supervisorMiddleware, async (req: Requ
     mensagemOperador: String(body.mensagemOperador || ''),
     ultimaMensagemCliente: String(body.ultimaMensagemCliente || ''),
     messages: Array.isArray(body.messages) ? body.messages : undefined,
+    userId: req.user?.userId,
   });
 
   if (!result.success) {
