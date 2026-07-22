@@ -25,7 +25,7 @@ function resolveOpenTicketPath(profileId, ticketId) {
   if (profileId === 'workflow') {
     return ticketId ? `/workflow?ticket=${ticketId}` : '/workflow';
   }
-  return '/tickets?desk=v2';
+  return ticketId ? `/tickets?desk=v2&ticket=${ticketId}` : '/tickets?desk=v2';
 }
 
 export function installCockpitBridge(navigate, showNotification, ticketActions = {}) {

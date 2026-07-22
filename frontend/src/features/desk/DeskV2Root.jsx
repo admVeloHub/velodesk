@@ -3,6 +3,7 @@
  * VERSION: v3.8.1 | DATE: 2026-07-21
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { isAgentForwardEscalonar } from '../../services/desk/constants';
 import {
   filterTickets,
@@ -28,7 +29,7 @@ import {
   syncTicketWorkflowOnCommit,
   statusMeta,
 } from '../../services/desk/utils';
-import { findTicketEntry, updateTicketInCache, sendTicketRegistroEntry } from '../../services/ticketsStorage';
+import { findTicketEntry, mapTicketQueueId, updateTicketInCache, sendTicketRegistroEntry } from '../../services/ticketsStorage';
 import { isDraftTicket, persistDraftTicket } from '../../services/ticketsCache';
 import { lookupClient } from '../../services/clientDb';
 import { clientsApi, colaboradoresApi, ticketsApi } from '../../api/client';
@@ -125,6 +126,7 @@ export default function DeskV2Root() {
     replaceOpenTabId,
     setActiveTabId,
   } = useTickets();
+  const [searchParams] = useSearchParams();
   const { showNotification } = useNotifications();
   const { user } = useAuth();
   const { config } = useTabulation();
@@ -156,6 +158,7 @@ export default function DeskV2Root() {
   const suppressAutoSelectRef = useRef(true);
   const pendingAdvanceTicketIdRef = useRef(null);
   const [tableQueueBrowsing, setTableQueueBrowsing] = useState(false);
+  const urlTicketHandledRef = useRef(null);
   const tabSessionsRef = useRef({});
   const prevActiveTabIdRef = useRef(null);
   const [colaboradorAtuacao, setColaboradorAtuacao] = useState([]);
@@ -181,6 +184,22 @@ export default function DeskV2Root() {
   useEffect(() => {
     setWorkflowDecision(null);
   }, [activeTabId]);
+
+  useEffect(() => {
+    const ticketId = searchParams.get('ticket');
+    if (!ticketId || ticketsLoading) return;
+
+    const id = String(ticketId);
+    if (urlTicketHandledRef.current === id && findTicketEntry(id)) return;
+
+    const entry = findTicketEntry(id);
+    if (!entry) return;
+
+    urlTicketHandledRef.current = id;
+    suppressAutoSelectRef.current = false;
+    setActiveQueue(entry.queueId || mapTicketQueueId(entry.ticket, entry.boxId));
+    openTicket(id);
+  }, [searchParams, ticketsLoading, refreshKey, openTicket]);
 
   const syncTicketViews = useCallback(async () => {
     await refreshTickets();

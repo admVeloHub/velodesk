@@ -3,9 +3,38 @@
  */
 import { ticketsApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
-import { getAllCockpitTickets } from '../ticketsStorage';
+import {
+  findTicketEntry,
+  getAllCockpitTickets,
+  getTicketColumns,
+  saveTicketColumns,
+} from '../ticketsStorage';
 import { getTicketProtocolLabel, isTicketInWorkflow, normalizeCpf } from '../desk/utils';
 import { ticketMatchesWorkflowTeam } from './workflowTeamQueues';
+
+function ensureTicketInCache(ticket) {
+  const normalized = apiTicketToCockpit(ticket);
+  const id = String(normalized.id || normalized._id || '').trim();
+  if (!id) return normalized;
+  if (findTicketEntry(id)) return normalized;
+
+  const cols = getTicketColumns();
+  const status = normalized.status || 'em-andamento';
+  const boxId = ['novos', 'em-andamento', 'em-espera', 'pendentes', 'resolvidos'].includes(status)
+    ? status
+    : 'em-andamento';
+  const box = cols.find((c) => c.id === boxId)
+    || cols.find((c) => c.id === 'em-andamento')
+    || cols[0];
+  if (!box) return normalized;
+  if (!box.tickets) box.tickets = [];
+  box.tickets.unshift(normalized);
+  saveTicketColumns(cols);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('velodesk:refresh-tickets'));
+  }
+  return normalized;
+}
 
 function normalizeQuery(rawQuery) {
   return String(rawQuery ?? '').trim().replace(/^#/, '');
@@ -87,7 +116,7 @@ export async function searchTicketsByQuery(rawQuery) {
   try {
     const byProtocol = await ticketsApi.getByProtocol(query);
     if (byProtocol) {
-      const ticket = apiTicketToCockpit(byProtocol);
+      const ticket = ensureTicketInCache(apiTicketToCockpit(byProtocol));
       return [mapSearchResult({ ticket, queueId: '' })];
     }
   } catch {
@@ -98,7 +127,7 @@ export async function searchTicketsByQuery(rawQuery) {
     try {
       const byId = await ticketsApi.get(query);
       if (byId) {
-        const ticket = apiTicketToCockpit(byId);
+        const ticket = ensureTicketInCache(apiTicketToCockpit(byId));
         return [mapSearchResult({ ticket, queueId: '' })];
       }
     } catch {

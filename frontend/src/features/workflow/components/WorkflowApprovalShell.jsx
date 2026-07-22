@@ -10,6 +10,7 @@ import { resolveWorkflowTeamQueueForUser } from '../../../services/permissions/p
 import {
   computeWorkflowTeamQueue,
   getWorkflowApprovalDetail,
+  findTicketEntryById,
 } from '../../../services/workflow/workflowApprovalData';
 import { getWorkflowTeamQueueMeta } from '../../../services/workflow/workflowTeamQueues';
 import {
@@ -27,8 +28,16 @@ const EMPTY_SUMMARY = {
   slaCriticalCount: 0,
 };
 
+function canSelectWorkflowTicket(ticketId, teamQueueId, queue) {
+  const id = String(ticketId);
+  if (queue.some((item) => item.id === id)) return true;
+  if (!teamQueueId) return false;
+  if (getWorkflowApprovalDetail(id, teamQueueId)) return true;
+  return Boolean(findTicketEntryById(id));
+}
+
 export default function WorkflowApprovalShell() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { refreshKey, refreshTickets } = useTickets();
   const { showNotification } = useNotifications();
   const [selectedId, setSelectedId] = useState(null);
@@ -44,8 +53,13 @@ export default function WorkflowApprovalShell() {
 
   useEffect(() => {
     const onDemoChange = () => setDemoRevision((v) => v + 1);
+    const onCacheRefresh = () => setDemoRevision((v) => v + 1);
     window.addEventListener('velodesk:workflow-demo-changed', onDemoChange);
-    return () => window.removeEventListener('velodesk:workflow-demo-changed', onDemoChange);
+    window.addEventListener('velodesk:refresh-tickets', onCacheRefresh);
+    return () => {
+      window.removeEventListener('velodesk:workflow-demo-changed', onDemoChange);
+      window.removeEventListener('velodesk:refresh-tickets', onCacheRefresh);
+    };
   }, []);
 
   useEffect(() => {
@@ -59,18 +73,33 @@ export default function WorkflowApprovalShell() {
     return computeWorkflowTeamQueue(teamQueueId);
   }, [teamQueueId, refreshKey, demoRevision]);
 
+  const handleSelectTicket = useCallback((ticketId) => {
+    setSelectedId(String(ticketId));
+    if (searchParams.get('ticket')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('ticket');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   useEffect(() => {
     const fromUrl = searchParams.get('ticket');
-    if (fromUrl && queueData.queue.some((q) => q.id === String(fromUrl))) {
-      setSelectedId(String(fromUrl));
-      return;
+
+    if (fromUrl && teamQueueId) {
+      const id = String(fromUrl);
+      if (canSelectWorkflowTicket(id, teamQueueId, queueData.queue)) {
+        setSelectedId(id);
+        return;
+      }
     }
-    if (!selectedId && queueData.queue.length) {
-      setSelectedId(queueData.queue[0].id);
-    } else if (selectedId && !queueData.queue.some((q) => q.id === selectedId)) {
-      setSelectedId(queueData.queue[0]?.id || null);
-    }
-  }, [queueData.queue, searchParams, selectedId]);
+
+    setSelectedId((current) => {
+      if (current && canSelectWorkflowTicket(current, teamQueueId, queueData.queue)) {
+        return current;
+      }
+      return queueData.queue[0]?.id || null;
+    });
+  }, [queueData.queue, searchParams, teamQueueId, refreshKey, demoRevision]);
 
   const detail = useMemo(
     () => (selectedId && teamQueueId ? getWorkflowApprovalDetail(selectedId, teamQueueId) : null),
@@ -147,7 +176,7 @@ export default function WorkflowApprovalShell() {
         queueLabel={teamMeta?.name || queueData.queueLabel}
         items={queueData.queue}
         selectedId={selectedId}
-        onSelect={setSelectedId}
+        onSelect={handleSelectTicket}
       />
       <WorkflowApprovalDetail
         detail={detail}
