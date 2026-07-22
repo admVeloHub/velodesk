@@ -196,23 +196,35 @@ function mapInfoRequestToRow(request) {
   };
 }
 
-function buildWorkflowSectionRows(workflowEntries) {
+function mergeWorkflowInfoRequestRows(existingRows, baseCount = 0) {
   const infoRequests = getWorkflowInfoRequests();
   const infoRows = infoRequests.map(mapInfoRequestToRow);
   const infoTicketIds = new Set(infoRows.map((row) => row.id));
 
-  const workflowRows = workflowEntries
-    .filter((entry) => !infoTicketIds.has(String(entry.ticket.id)))
-    .slice(0, 5)
-    .map((entry) => mapEntryToRow(entry, 'workflow'));
+  const workflowRows = existingRows
+    .filter((row) => !infoTicketIds.has(String(row.id)))
+    .slice(0, 5);
 
   const merged = [...infoRows, ...workflowRows].slice(0, 5);
   const unreadInfo = infoRows.filter((row) => row.unread).length;
 
   return {
     tickets: merged,
-    count: workflowEntries.length + unreadInfo,
+    count: baseCount + unreadInfo,
   };
+}
+
+function buildWorkflowSectionRows(workflowEntries) {
+  const workflowRows = workflowEntries
+    .slice(0, 5)
+    .map((entry) => mapEntryToRow(entry, 'workflow'));
+
+  return mergeWorkflowInfoRequestRows(workflowRows, workflowEntries.length);
+}
+
+export function mergeWorkflowInfoRequestsIntoSection(section, existingTickets = []) {
+  const merged = mergeWorkflowInfoRequestRows(existingTickets, section.count ?? existingTickets.length);
+  return { ...section, ...merged };
 }
 
 function classifyEntry(entry) {
@@ -620,10 +632,13 @@ export function buildAgent360View(apiPayload, agentName) {
   });
   const timeLabel = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-  const sections = (apiPayload?.sections ?? []).map((section) => ({
-    ...section,
-    tickets: (section.entries ?? []).map((entry) => mapEntryToRow(entry, section.variant)),
-  }));
+  const sections = (apiPayload?.sections ?? []).map((section) => {
+    const tickets = (section.entries ?? []).map((entry) => mapEntryToRow(entry, section.variant));
+    if (section.id === 'workflow') {
+      return mergeWorkflowInfoRequestsIntoSection(section, tickets);
+    }
+    return { ...section, tickets };
+  });
 
   return {
     greeting,

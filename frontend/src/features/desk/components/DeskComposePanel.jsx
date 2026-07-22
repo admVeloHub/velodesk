@@ -8,7 +8,7 @@ import { useComposeSpellCheck } from '../../../hooks/useComposeSpellCheck';
 import { useTabulation } from '../../../context/TabulationContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useNotifications } from '../../../context/NotificationContext';
-import { htmlToPlainText, normalizePlainToHtml } from '../../../services/desk/composeRichEditor';
+import { htmlToPlainText, normalizePlainToHtml, COMPOSE_IMAGE_MAX_BYTES } from '../../../services/desk/composeRichEditor';
 import SpellSuggestionBar, { SpellErrorsPanel } from './SpellSuggestionBar';
 import ComposeRichEditor from './ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
@@ -20,6 +20,35 @@ const MACROS = [
   { value: 'F3', label: 'F3 — Escalonamento', text: 'Encaminhei sua solicitação para a equipe especializada.' },
   { value: 'F4', label: 'F4 — Encerramento NPS', text: 'Agradecemos o contato. Por favor, avalie nosso atendimento.' },
 ];
+
+function readImageFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function attachImageToEditor(editorRef, file, showNotification) {
+  if (!file?.type?.startsWith('image/')) {
+    showNotification('Selecione um arquivo de imagem (PNG, JPG, GIF ou WebP).', 'warning');
+    return;
+  }
+  if (file.size > COMPOSE_IMAGE_MAX_BYTES) {
+    showNotification('Imagem muito grande. Tamanho máximo: 4 MB.', 'warning');
+    return;
+  }
+  try {
+    const dataUrl = await readImageFileAsDataUrl(file);
+    const inserted = editorRef.current?.insertImage?.(dataUrl, file.name);
+    if (!inserted) {
+      showNotification('Não foi possível inserir a imagem no editor.', 'warning');
+    }
+  } catch {
+    showNotification('Não foi possível anexar a imagem.', 'error');
+  }
+}
 
 export function DeskStatusCommitButton({ sendStatus, onCommitStatus, variant = 'compose', disabled = false }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -146,6 +175,8 @@ function InternalNoteFields({
   spellIgnoredWords,
   onIgnoreSpellWord,
   placeholder = 'Digite uma anotação interna...',
+  attachDisabled = false,
+  showNotification,
 }) {
   const tid = String(ticketId);
   const internalEditorRef = useRef(null);
@@ -169,6 +200,10 @@ function InternalNoteFields({
     richEditorRef: internalEditorRef,
     mode: 'rich',
   });
+
+  const handleInternalAttachImage = useCallback((file) => {
+    void attachImageToEditor(internalEditorRef, file, showNotification);
+  }, [showNotification]);
 
   const handleInternalChange = useCallback(({ html }) => {
     onInternalTextChange(html);
@@ -221,6 +256,8 @@ function InternalNoteFields({
             activeFormats={internalFormat.activeFormats}
             variant="internal"
             embedded
+            onImageSelected={handleInternalAttachImage}
+            attachDisabled={attachDisabled}
           />
         )}
       />
@@ -321,6 +358,10 @@ export default function DeskComposePanel({
     onComposeTextChange(normalizePlainToHtml(plainText));
   }, [onComposeTextChange]);
 
+  const handlePublicAttachImage = useCallback((file) => {
+    void attachImageToEditor(publicEditorRef, file, showNotification);
+  }, [showNotification]);
+
   return (
     <div className={
       'crm-ticket-compose'
@@ -392,6 +433,8 @@ export default function DeskComposePanel({
                         activeFormats={publicFormat.activeFormats}
                         variant="public"
                         embedded
+                        onImageSelected={handlePublicAttachImage}
+                        attachDisabled={publicLocked}
                       />
                     )}
                   />
@@ -415,6 +458,7 @@ export default function DeskComposePanel({
                   spellIgnoredWords={spellIgnoredWords}
                   onIgnoreSpellWord={onIgnoreSpellWord}
                   placeholder={internalPlaceholder}
+                  showNotification={showNotification}
                 />
               </div>
               ) : null}

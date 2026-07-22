@@ -15,6 +15,7 @@ import {
   getPlainOffset,
   htmlToPlainText,
   insertPlainTextInEditor,
+  insertImageInEditor,
   readComposeFormatState,
   readEditorHtml,
   replacePlainTextInEditor,
@@ -71,6 +72,11 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
     insertPlainText: (text) => {
       insertPlainTextInEditor(editorRef.current, text);
       emitChange();
+    },
+    insertImage: (src, alt) => {
+      const ok = insertImageInEditor(editorRef.current, src, alt);
+      if (ok) emitChange();
+      return ok;
     },
     getPlainText: () => htmlToPlainText(readEditorHtml(editorRef.current)),
     getHtml: () => readEditorHtml(editorRef.current),

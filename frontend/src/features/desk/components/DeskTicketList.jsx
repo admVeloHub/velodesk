@@ -1,9 +1,10 @@
 /**
  * DeskTicketList v2.0.0 — lista branca no padrão mockup
  */
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   formatTicketListTime,
+  getSlaClass,
   getTicketQueueEntryAt,
   getTicketTitle,
   isTicketInWorkflow,
@@ -11,7 +12,6 @@ import {
 } from '../../../services/desk/utils';
 
 export default function DeskTicketList({
-  queueStatuses,
   activeTicketId,
   activeSort,
   entries,
@@ -26,12 +26,6 @@ export default function DeskTicketList({
   onReload,
   refreshing = false,
 }) {
-  const queueDotById = useMemo(() => {
-    const map = new Map();
-    queueStatuses.forEach((queue) => map.set(queue.id, queue.dot));
-    return map;
-  }, [queueStatuses]);
-
   return (
     <aside className={'ticket-list-panel' + (collapsed ? ' is-collapsed' : '')} id="crmTicketListPanel">
       <div className="ticket-list-panel__inner">
@@ -105,12 +99,12 @@ export default function DeskTicketList({
             <li className="crm-empty-state" style={{ padding: 16 }}>
               {searchActive ? 'Nenhum ticket encontrado na busca' : 'Nenhum ticket nesta fila'}
             </li>
-          ) : entries.map(({ ticket: t, queueId }) => {
+          ) : entries.map(({ ticket: t }) => {
             normalizeTicketForDeskV2(t);
             const inWorkflow = isTicketInWorkflow(t);
             const isActive = String(t.id) === String(activeTicketId);
-            const queueDot = queueDotById.get(queueId) || '#9ca3af';
             const entryAt = getTicketQueueEntryAt(t);
+            const slaCritical = getSlaClass(t) === 'critical';
 
             return (
               <li
@@ -123,11 +117,13 @@ export default function DeskTicketList({
                 tabIndex={0}
                 onKeyDown={(e) => e.key === 'Enter' && onSelectTicket(t.id)}
               >
-                <span
-                  className="crm-ticket-card__dot"
-                  style={{ background: queueDot }}
-                  aria-hidden="true"
-                />
+                {slaCritical ? (
+                  <span
+                    className="crm-ticket-card__dot crm-ticket-card__dot--sla-critical"
+                    title="SLA crítico — fora do prazo"
+                    aria-label="SLA crítico — fora do prazo"
+                  />
+                ) : null}
                 <div className="crm-ticket-card__content">
                   <div className="crm-ticket-card__row-top">
                     <span className="crm-ticket-card__name">

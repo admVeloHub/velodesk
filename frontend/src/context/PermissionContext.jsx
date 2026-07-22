@@ -12,6 +12,7 @@ import {
   filterTicketForUser,
   isPortalAllowed,
   readCachedPermissions,
+  getAllowedProfilePortals,
   shouldUseMeusChamadosFila,
 } from '../services/permissions/permissionService';
 import { isRateLimitError, RATE_LIMIT_USER_MESSAGE } from '../utils/apiErrors';
@@ -48,10 +49,10 @@ export function PermissionProvider({ children }) {
 
   useEffect(() => {
     const token = localStorage.getItem('velodesk_token');
-    if (token && !permissions) {
+    if (token) {
       void reload().catch(() => {});
     }
-  }, [permissions, reload]);
+  }, [reload]);
 
   const api = useMemo(() => ({
     permissions,
@@ -66,7 +67,7 @@ export function PermissionProvider({ children }) {
     shouldUseMeusChamadosFila: () => shouldUseMeusChamadosFila(permissions),
     isPortalAllowed: (portalId) => isPortalAllowed(portalId, permissions),
     funcaoSlug: permissions?.funcaoSlug || 'atendimento',
-    portalVisivel: permissions?.portalVisivel || ['agent'],
+    portalVisivel: getAllowedProfilePortals(permissions),
   }), [permissions, loading, error, reload, clear]);
 
   return (

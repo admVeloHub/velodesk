@@ -1,4 +1,4 @@
-/** chamado.mapper v1.9.1 — meus-resolvidos global sem filtro responsável */
+/** chamado.mapper v1.9.0 — workflow top-level + lateralForm.workflow derivado */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -942,7 +942,7 @@ export function atribuidoFuncaoFilter(funcaoSlug: string) {
 export function buildChamadoQueryFilter(status: string, queue?: string, responsavelCandidates?: string[], extraFilter?: Record<string, unknown>) {
   const filters: Record<string, unknown>[] = [lastStatusFilter(status)];
 
-  if (queue === 'meus-chamados' && responsavelCandidates?.length && status !== 'resolvido') {
+  if (queue === 'meus-chamados' && responsavelCandidates?.length) {
     const responsavelFilter = status === 'novo'
       ? meusChamadosNovosResponsavelFilter(responsavelCandidates)
       : meusChamadosResponsavelFilter(responsavelCandidates);

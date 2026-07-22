@@ -1,6 +1,6 @@
 ﻿/**
  * Ponte global — navegação e ações do cockpit ↔ React Router
- * VERSION: v2.1.0 | DATE: 2026-07-13
+ * VERSION: v2.2.0 | DATE: 2026-07-22
  */
 const PAGE_ROUTES = {
   workspace: '/workspace',

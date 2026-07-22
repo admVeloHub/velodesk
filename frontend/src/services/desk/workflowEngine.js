@@ -131,7 +131,11 @@ function buildDecisionFromPasso(passoConfig, slug) {
     statusLabel: 'Aguardando decisão',
     queueLabel: 'Aguardando aprovação',
     actions: rotas.map((r) => r.variavel).filter(Boolean),
-    detailResolver: slug === 'reembolso-7dias' ? 'reembolso-7dias' : 'generic',
+    detailResolver: slug === 'reembolso-7dias'
+      ? 'reembolso-7dias'
+      : slug === 'escalonar-produtos'
+        ? 'escalonar-produtos'
+        : 'generic',
     rotas,
   };
 }

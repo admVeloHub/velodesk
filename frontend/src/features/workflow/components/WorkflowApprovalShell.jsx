@@ -6,13 +6,19 @@ import { useSearchParams } from 'react-router-dom';
 import { useTickets } from '../../../context/TicketsContext';
 import { useNotifications } from '../../../context/NotificationContext';
 import { getAgentName } from '../../../services/desk/utils';
-import { resolveWorkflowTeamQueueForUser } from '../../../services/permissions/permissionService';
 import {
-  computeWorkflowTeamQueue,
+  canAccessWorkflowApprovalConsole,
+  readCachedPermissions,
+  resolveWorkflowTeamQueueForUser,
+} from '../../../services/permissions/permissionService';
+import {
+  computeWorkflowTeamActionQueue,
   getWorkflowApprovalDetail,
   findTicketEntryById,
 } from '../../../services/workflow/workflowApprovalData';
-import { getWorkflowTeamQueueMeta } from '../../../services/workflow/workflowTeamQueues';
+import {
+  resolveEffectiveWorkflowTeamId,
+} from '../../../services/workflow/workflowTeamQueues';
 import {
   approveWorkflowDecision,
   rejectWorkflowDecision,
@@ -20,6 +26,8 @@ import {
 } from '../../../services/workflow/workflowDecisionHandlers';
 import WorkflowApprovalQueue from './WorkflowApprovalQueue';
 import WorkflowApprovalDetail from './WorkflowApprovalDetail';
+import WorkflowTeamPicker from './WorkflowTeamPicker';
+import WorkflowTeamSwitcher from './WorkflowTeamSwitcher';
 
 const EMPTY_SUMMARY = {
   pendingCount: 0,
@@ -28,11 +36,11 @@ const EMPTY_SUMMARY = {
   slaCriticalCount: 0,
 };
 
-function canSelectWorkflowTicket(ticketId, teamQueueId, queue) {
+function canSelectWorkflowTicket(ticketId, effectiveTeamId, queue) {
   const id = String(ticketId);
   if (queue.some((item) => item.id === id)) return true;
-  if (!teamQueueId) return false;
-  if (getWorkflowApprovalDetail(id, teamQueueId)) return true;
+  if (!effectiveTeamId) return false;
+  if (getWorkflowApprovalDetail(id, effectiveTeamId)) return true;
   return Boolean(findTicketEntryById(id));
 }
 
@@ -45,11 +53,17 @@ export default function WorkflowApprovalShell() {
   const [demoRevision, setDemoRevision] = useState(0);
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
 
-  const teamQueueId = useMemo(() => resolveWorkflowTeamQueueForUser(), [refreshKey, demoRevision]);
-  const teamMeta = useMemo(
-    () => (teamQueueId ? getWorkflowTeamQueueMeta(teamQueueId) : null),
-    [teamQueueId],
+  const urlTeam = searchParams.get('team');
+  const effectiveTeamId = useMemo(
+    () => resolveEffectiveWorkflowTeamId({ perm: readCachedPermissions(), urlTeam }),
+    [urlTeam, refreshKey, demoRevision],
   );
+  const canAccessConsole = useMemo(() => canAccessWorkflowApprovalConsole(), [refreshKey, demoRevision]);
+  const rbacTeamId = useMemo(
+    () => resolveWorkflowTeamQueueForUser(readCachedPermissions()),
+    [refreshKey, demoRevision],
+  );
+  const showTeamSwitcher = canAccessConsole && !rbacTeamId && Boolean(effectiveTeamId);
 
   useEffect(() => {
     const onDemoChange = () => setDemoRevision((v) => v + 1);
@@ -67,11 +81,19 @@ export default function WorkflowApprovalShell() {
   }, [selectedId]);
 
   const queueData = useMemo(() => {
-    if (!teamQueueId) {
+    if (!effectiveTeamId) {
       return { queueLabel: 'Workflow', queue: [], summary: EMPTY_SUMMARY, teamId: null };
     }
-    return computeWorkflowTeamQueue(teamQueueId);
-  }, [teamQueueId, refreshKey, demoRevision]);
+    return computeWorkflowTeamActionQueue(effectiveTeamId);
+  }, [effectiveTeamId, refreshKey, demoRevision]);
+
+  const handleSelectTeam = useCallback((teamId) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('team', teamId);
+    next.delete('ticket');
+    setSearchParams(next, { replace: true });
+    setSelectedId(null);
+  }, [searchParams, setSearchParams]);
 
   const handleSelectTicket = useCallback((ticketId) => {
     setSelectedId(String(ticketId));
@@ -83,27 +105,29 @@ export default function WorkflowApprovalShell() {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
+    if (!effectiveTeamId) return;
+
     const fromUrl = searchParams.get('ticket');
 
-    if (fromUrl && teamQueueId) {
+    if (fromUrl) {
       const id = String(fromUrl);
-      if (canSelectWorkflowTicket(id, teamQueueId, queueData.queue)) {
+      if (canSelectWorkflowTicket(id, effectiveTeamId, queueData.queue)) {
         setSelectedId(id);
         return;
       }
     }
 
     setSelectedId((current) => {
-      if (current && canSelectWorkflowTicket(current, teamQueueId, queueData.queue)) {
+      if (current && canSelectWorkflowTicket(current, effectiveTeamId, queueData.queue)) {
         return current;
       }
       return queueData.queue[0]?.id || null;
     });
-  }, [queueData.queue, searchParams, teamQueueId, refreshKey, demoRevision]);
+  }, [queueData.queue, searchParams, effectiveTeamId, refreshKey, demoRevision]);
 
   const detail = useMemo(
-    () => (selectedId && teamQueueId ? getWorkflowApprovalDetail(selectedId, teamQueueId) : null),
-    [selectedId, teamQueueId, refreshKey, demoRevision],
+    () => (selectedId && effectiveTeamId ? getWorkflowApprovalDetail(selectedId, effectiveTeamId) : null),
+    [selectedId, effectiveTeamId, refreshKey, demoRevision],
   );
 
   const runAction = useCallback(async (actionFn, successMsg) => {
@@ -120,10 +144,36 @@ export default function WorkflowApprovalShell() {
     }
   }, [busy, refreshTickets, selectedId, showNotification]);
 
-  const handleApprove = useCallback(
-    () => runAction(approveWorkflowDecision, 'Solicitação aprovada e workflow avançado.'),
-    [runAction],
-  );
+  const handleApproveConfirm = useCallback(async (payload = {}) => {
+    if (!selectedId || busy) return false;
+
+    const queueIds = queueData.queue.map((q) => q.id);
+    const currentIdx = queueIds.indexOf(String(selectedId));
+    let nextId = queueIds[currentIdx + 1] ?? queueIds[currentIdx - 1] ?? null;
+    if (nextId === String(selectedId)) nextId = null;
+
+    const isProdutosFinalize = Boolean(payload.selectedActions?.length);
+
+    setBusy(true);
+    try {
+      await approveWorkflowDecision(selectedId, payload);
+      await refreshTickets();
+
+      if (isProdutosFinalize && effectiveTeamId) {
+        const refreshed = computeWorkflowTeamActionQueue(effectiveTeamId);
+        setSelectedId(refreshed.queue[0]?.id ?? nextId ?? null);
+        showNotification('Solicitação concluída. Ticket encerrado e cliente notificado.', 'success');
+      } else {
+        showNotification('Solicitação aprovada e workflow avançado.', 'success');
+      }
+      return true;
+    } catch {
+      showNotification('Não foi possível concluir a ação.', 'error');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, effectiveTeamId, queueData.queue, refreshTickets, selectedId, showNotification]);
 
   const handleReject = useCallback(
     () => runAction(rejectWorkflowDecision, 'Solicitação reprovada.'),
@@ -155,7 +205,7 @@ export default function WorkflowApprovalShell() {
     }
   }, [busy, refreshTickets, selectedId, showNotification]);
 
-  if (!teamQueueId) {
+  if (!canAccessConsole) {
     return (
       <div className="wf-approval-shell wf-approval-shell--empty">
         <section className="wf-approval-detail wf-approval-detail--empty wf-approval-detail--full">
@@ -170,26 +220,42 @@ export default function WorkflowApprovalShell() {
     );
   }
 
+  if (!effectiveTeamId) {
+    return (
+      <div className="wf-approval-shell wf-approval-shell--gate">
+        <WorkflowTeamPicker variant="gate" onSelect={handleSelectTeam} />
+      </div>
+    );
+  }
+
+  const queueLabel = queueData.queueLabel;
+
   return (
-    <div className="wf-approval-shell">
-      <WorkflowApprovalQueue
-        queueLabel={teamMeta?.name || queueData.queueLabel}
-        items={queueData.queue}
-        selectedId={selectedId}
-        onSelect={handleSelectTicket}
-      />
-      <WorkflowApprovalDetail
-        detail={detail}
-        summary={queueData.summary}
-        busy={busy}
-        infoPanelOpen={infoPanelOpen}
-        requestedBy={getAgentName() || 'Operador Workflow'}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onRequestInfoOpen={handleRequestInfoOpen}
-        onRequestInfoSubmit={handleRequestInfoSubmit}
-        onRequestInfoCancel={handleRequestInfoCancel}
-      />
+    <div className="wf-approval-shell-wrap">
+      {showTeamSwitcher ? (
+        <WorkflowTeamSwitcher activeTeamId={effectiveTeamId} onSelect={handleSelectTeam} />
+      ) : null}
+      <div className="wf-approval-shell">
+        <WorkflowApprovalQueue
+          queueLabel={queueLabel}
+          items={queueData.queue}
+          selectedId={selectedId}
+          onSelect={handleSelectTicket}
+        />
+        <WorkflowApprovalDetail
+          detail={detail}
+          summary={queueData.summary}
+          teamId={effectiveTeamId}
+          busy={busy}
+          infoPanelOpen={infoPanelOpen}
+          requestedBy={getAgentName() || 'Operador Workflow'}
+          onApproveConfirm={handleApproveConfirm}
+          onReject={handleReject}
+          onRequestInfoOpen={handleRequestInfoOpen}
+          onRequestInfoSubmit={handleRequestInfoSubmit}
+          onRequestInfoCancel={handleRequestInfoCancel}
+        />
+      </div>
     </div>
   );
 }

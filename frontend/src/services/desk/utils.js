@@ -495,15 +495,24 @@ function getWorkflowInstanceKey(workflow) {
   return workflow?.templateId || workflow?.definicaoSlug || '';
 }
 
-export function maybeActivateWorkflowForTicket(ticket, rightFields, escalonar, author) {
+export function maybeActivateWorkflowForTicket(ticket, rightFields, escalonar, author, options = {}) {
+  const mode = options.mode || 'commit';
   const lf = ticket.lateralForm || {};
   if (getWorkflowInstanceKey(lf.workflow)) {
     return { activated: false, workflow: lf.workflow, template: getWorkflowTemplateForTicket(ticket) };
   }
 
-  let template = resolveWorkflowForTicket(ticket, rightFields);
-  if (!template && escalonar) {
+  let template = null;
+  if (mode === 'escalonar') {
+    if (!escalonar) {
+      return { activated: false, workflow: null, template: null };
+    }
     template = buildEscalonarWorkflowTemplate(escalonar);
+  } else {
+    template = resolveWorkflowForTicket(ticket, rightFields);
+    if (!template && escalonar) {
+      template = buildEscalonarWorkflowTemplate(escalonar);
+    }
   }
   if (!template) {
     return { activated: false, workflow: null, template: null };
@@ -542,7 +551,7 @@ export function syncTicketWorkflowOnCommit(ticket, rightFields, escalonar, _stat
   let activated = false;
 
   if (!getWorkflowInstanceKey(workflow)) {
-    const activation = maybeActivateWorkflowForTicket(ticket, rightFields, escalonar, author);
+    const activation = maybeActivateWorkflowForTicket(ticket, rightFields, escalonar, author, { mode: 'commit' });
     if (activation.activated && activation.workflow && activation.template) {
       workflow = activation.workflow;
       template = activation.template;
@@ -1418,11 +1427,40 @@ export function applySendStatus(entry, queueId) {
     'em-andamento': { box: 'em-andamento', status: 'em-aberto' },
     pendente: { box: 'em-espera', status: 'pendente' },
     resolvidos: { box: 'resolvidos', status: 'resolvido' },
+    cancelado: { box: 'resolvidos', status: 'cancelado' },
   };
   const cfg = statusMap[queueId] || statusMap['em-andamento'];
   entry.ticket.status = cfg.status;
-  delete entry.ticket.boxId;
-  moveTicketToBox(entry, cfg.box);
+  const targetBoxId = resolveDeskBoxColumnId(cfg.box);
+  if (targetBoxId) {
+    entry.ticket.boxId = targetBoxId;
+  } else {
+    delete entry.ticket.boxId;
+  }
+  moveTicketToBox(entry, targetBoxId || cfg.box);
+}
+
+function resolveDeskBoxColumnId(semanticBoxId) {
+  const columns = getTicketColumns();
+  const semantic = String(semanticBoxId || '').trim();
+  if (!semantic) return null;
+
+  const direct = columns.find((box) => box.id === semantic);
+  if (direct) return direct.id;
+
+  const nameMatchers = {
+    novos: ['novo', 'novos'],
+    'em-andamento': ['em andamento', 'em-aberto', 'em aberto', 'em-andamento'],
+    'em-espera': ['pendente', 'em espera', 'em-espera', 'aguardando'],
+    resolvidos: ['resolvido', 'resolvidos'],
+  };
+  const needles = nameMatchers[semantic] || [semantic];
+
+  const byName = columns.find((box) => {
+    const name = String(box.name || '').trim().toLowerCase();
+    return needles.some((needle) => name === needle || name.includes(needle));
+  });
+  return byName?.id || semantic;
 }
 
 export function moveTicketToBox(entry, targetBoxId) {
@@ -1430,16 +1468,22 @@ export function moveTicketToBox(entry, targetBoxId) {
   const columns = getTicketColumns();
   const ticket = entry.ticket;
   const ticketId = String(ticket.id);
+  const resolvedTargetId = resolveDeskBoxColumnId(targetBoxId) || targetBoxId;
+
   columns.forEach((box) => {
     if (!box.tickets) return;
     box.tickets = box.tickets.filter((t) => String(t.id) !== ticketId && String(t._id) !== ticketId);
   });
-  const target = columns.find((b) => b.id === targetBoxId);
+
+  const target = columns.find((b) => b.id === resolvedTargetId)
+    || columns.find((b) => String(b.name || '').trim().toLowerCase().includes(String(targetBoxId).toLowerCase()));
   if (!target) return;
+
   if (!target.tickets) target.tickets = [];
   target.tickets.push(ticket);
   saveTicketColumns(columns);
-  entry.boxId = targetBoxId;
+  entry.boxId = target.id;
+  ticket.boxId = target.id;
 }
 
 export { getAgentName };

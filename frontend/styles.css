@@ -24,23 +24,19 @@ body:has(.main-app[style*="grid"]) {
     max-height: 100vh;
 }
 
-/* Cores do tema — paleta oficial LAYOUT_GUIDELINES */
+/* Cores do tema */
 :root {
-    --blue-dark: #000058;
-    --blue-medium: #1634FF;
-    --blue-light: #1694FF;
-    --blue-opaque: #006AB9;
-    --primary-blue: var(--blue-dark);
-    --secondary-blue: var(--blue-medium);
-    --accent-blue: var(--blue-medium);
-    --light-blue: var(--blue-light);
+    --primary-blue: #000058;
+    --secondary-blue: #0a1560;
+    --accent-blue: #1634FF;
+    --light-blue: #1694FF;
     --white: #ffffff;
     --light-gray: #F3F7FC;
     --dark-gray: #6c757d;
     --success: #28a745;
     --warning: #ffc107;
     --danger: #dc3545;
-    --info: var(--blue-light);
+    --info: #17a2b8;
     --velo-banner-height: 0px;
     --velo-header-height: 0px;
 }
@@ -1835,7 +1831,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .status-novo {
     background: #e3f2fd;
-    color: #1634FF;
+    color: #1976d2;
 }
 
 .status-em-aberto {
@@ -2543,7 +2539,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .dropdown-btn:hover {
-    background: #000058;
+    background: #000040;
 }
 
 .dropdown-menu {
@@ -2598,7 +2594,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 /* Cores de texto para cada status */
 .dropdown-item:nth-child(1) span:not(.status-indicator) {
-    color: #1634FF; /* Novo - Azul */
+    color: #1976d2; /* Novo - Azul */
 }
 
 .dropdown-item:nth-child(2) span:not(.status-indicator) {
@@ -2625,7 +2621,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .status-indicator.novo {
-    background: #1634FF;
+    background: #1976d2;
 }
 
 .status-indicator.em-aberto {
@@ -2869,7 +2865,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .ticket-main-column::-webkit-scrollbar-thumb:hover,
 .ticket-tab-content::-webkit-scrollbar-thumb:hover {
-    background: #000058;
+    background: #000040;
 }
 
 .panel-header h3 {
@@ -3154,7 +3150,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 /* Cores personalizadas para colunas */
-.kanban-column.novo { border-top-color: #1694FF; }
+.kanban-column.novo { border-top-color: #17a2b8; }
 .kanban-column.em-aberto { border-top-color: #ffc107; }
 .kanban-column.em-espera { border-top-color: #6f42c1; }
 .kanban-column.pendente { border-top-color: #dc3545; }
@@ -3593,7 +3589,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-weight: 600;
 }
 
-.ticket-tab-main-column .meta-value.status-novo { color: #1634FF; }
+.ticket-tab-main-column .meta-value.status-novo { color: #1976d2; }
 .ticket-tab-main-column .meta-value.status-em-aberto { color: #15A237; }
 .ticket-tab-main-column .meta-value.status-em-espera,
 .ticket-tab-main-column .meta-value.status-pendente { color: #d97706; }
@@ -3749,9 +3745,14 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 .ticket-client-history-btn {
     align-self: auto;
     font-size: 0.68rem;
-    padding: 0.25rem 0.55rem;
+    width: 76.06px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0 8px;
     margin-top: 0;
     flex-shrink: 0;
+    border-radius: 12px;
+    box-sizing: border-box;
 }
 
 .ticket-op-progress {
@@ -3908,7 +3909,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-weight: 400;
 }
 
-.ticket-status-dates.status-novo { color: #1634FF; }
+.ticket-status-dates.status-novo { color: #1976d2; }
 .ticket-status-dates.status-em-aberto { color: #15A237; }
 .ticket-status-dates.status-em-espera,
 .ticket-status-dates.status-pendente { color: #d97706; }
@@ -4117,7 +4118,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     height: 40px;
     border-radius: 50%;
     background: linear-gradient(145deg, #e3f2fd 0%, #bbdefb 100%);
-    color: #1634FF;
+    color: #1565c0;
     font-weight: 700;
     font-size: 1rem;
     display: flex;
@@ -4315,7 +4316,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .octa-nav-tabs .response-tab.octa-tab-public.active {
-    color: #1634FF;
+    color: #1565c0;
     border-bottom-color: #2196f3;
     background: #fff;
 }
@@ -5379,7 +5380,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .user-access-level.usuario {
     background: #e3f2fd;
-    color: #1634FF;
+    color: #1976d2;
 }
 
 .user-access-level.administrador {
@@ -5407,7 +5408,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .edit-user-btn:hover {
-    background: #1694FF;
+    background: #0ea5e9;
 }
 
 .delete-user-btn {
@@ -5562,7 +5563,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .status-novo {
     background: #e3f2fd;
-    color: #1634FF;
+    color: #1976d2;
 }
 
 .status-em-aberto {
@@ -5713,12 +5714,12 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .status-card.novo {
-    border-left-color: #1634FF;
+    border-left-color: #1976d2;
     background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
 }
 
 .status-card.novo .stat-icon {
-    background: #1634FF;
+    background: #1976d2;
     color: var(--white);
 }
 
@@ -5849,7 +5850,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary-blue), #000058);
+    background: linear-gradient(135deg, var(--primary-blue), #000040);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -6288,7 +6289,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .file-item .btn-preview:hover {
-    background: #000058;
+    background: #0056b3;
 }
 
 .attachment-item-image {
@@ -7436,7 +7437,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .satisfaction-badge.good {
     background: #d1ecf1;
-    color: #006AB9;
+    color: #0c5460;
 }
 
 .satisfaction-badge.average {
@@ -7464,7 +7465,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .performance-badge.good {
     background: #d1ecf1;
-    color: #006AB9;
+    color: #0c5460;
 }
 
 .performance-badge.average {
@@ -8893,7 +8894,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .btn-info:hover {
-    background: #000058;
+    background: #138496;
     color: var(--white);
 }
 
@@ -9997,7 +9998,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .btn-info:hover {
-    background: #000058;
+    background: #138496;
 }
 
 .btn-success {
@@ -10242,7 +10243,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .btn-edit {
-    background: #1634FF;
+    background: #007bff;
     color: white;
 }
 
@@ -10252,7 +10253,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .btn-edit:hover {
-    background: #000058;
+    background: #0056b3;
 }
 
 .btn-delete:hover {
@@ -10428,22 +10429,22 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .form-actions .btn-primary {
-    background: linear-gradient(135deg, #1634FF 0%, #000058 100%);
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
     color: white;
 }
 
 .form-actions .btn-primary:hover {
-    background: linear-gradient(135deg, #000058 0%, #000058 100%);
+    background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
     transform: translateY(-1px);
 }
 
 .form-actions .btn-info {
-    background: linear-gradient(135deg, #1694FF 0%, #000058 100%);
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
     color: white;
 }
 
 .form-actions .btn-info:hover {
-    background: linear-gradient(135deg, #000058 0%, #117a8b 100%);
+    background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
     transform: translateY(-1px);
 }
 
@@ -10463,7 +10464,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .form-actions .btn-success:hover {
-    background: linear-gradient(135deg, #20c997 0%, #1694FF 100%);
+    background: linear-gradient(135deg, #20c997 0%, #17a2b8 100%);
     transform: translateY(-1px);
 }
 
@@ -10579,7 +10580,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .tree-explanation p {
     margin: 5px 0;
-    color: #1634FF;
+    color: #1976d2;
     font-size: 0.9rem;
 }
 
@@ -10618,13 +10619,13 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .tree-preview-item:hover {
     background: #e9ecef;
-    border-color: #1634FF;
+    border-color: #007bff;
 }
 
 .tree-preview-item.selected {
-    background: #1634FF;
+    background: #007bff;
     color: white;
-    border-color: #000058;
+    border-color: #0056b3;
 }
 
 .tree-preview-item.level-0 {
@@ -10737,7 +10738,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     margin: 0 0 10px 0;
     color: #333;
     font-size: 0.9rem;
-    border-bottom: 2px solid #1634FF;
+    border-bottom: 2px solid #007bff;
     padding-bottom: 6px;
 }
 
@@ -10777,7 +10778,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .client-fields .form-input:focus {
     outline: none;
-    border-color: #1634FF;
+    border-color: #007bff;
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
@@ -10805,7 +10806,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .btn-save-client:hover {
-    background: linear-gradient(135deg, #20c997 0%, #1694FF 100%);
+    background: linear-gradient(135deg, #20c997 0%, #17a2b8 100%);
     transform: translateY(-1px);
 }
 
@@ -10852,7 +10853,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .selected-value {
-    color: #1634FF;
+    color: #007bff;
     font-weight: 500;
 }
 
@@ -10884,7 +10885,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     margin: 0 0 15px 0;
     color: #333;
     font-size: 1.1rem;
-    border-bottom: 2px solid #1634FF;
+    border-bottom: 2px solid #007bff;
     padding-bottom: 8px;
 }
 
@@ -10919,7 +10920,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 .dynamic-form-field textarea:focus,
 .dynamic-form-field select:focus {
     outline: none;
-    border-color: #1634FF;
+    border-color: #007bff;
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
@@ -10967,7 +10968,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .tree-select-btn:hover {
-    border-color: #1634FF;
+    border-color: #007bff;
     background: #f8f9fa;
 }
 
@@ -11010,14 +11011,14 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .tree-selection-item:hover {
     background: #e9ecef;
-    border-color: #1634FF;
+    border-color: #007bff;
     transform: translateX(3px);
 }
 
 .tree-selection-item.selected {
-    background: #1634FF !important;
+    background: #007bff !important;
     color: white !important;
-    border-color: #000058 !important;
+    border-color: #0056b3 !important;
 }
 
 .tree-selection-item.level-0 {
@@ -11149,7 +11150,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .ai-message.ai-assistant .ai-avatar {
-    background: #1634FF;
+    background: #007bff;
     color: white;
 }
 
@@ -11186,7 +11187,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .ai-chat-input input:focus {
-    border-color: #1634FF;
+    border-color: #007bff;
 }
 
 .ai-chat-input button {
@@ -12142,7 +12143,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 .form-field textarea:focus,
 .form-field select:focus {
     outline: none;
-    border-color: #1634FF;
+    border-color: #007bff;
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
@@ -12274,8 +12275,8 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .response-tab.active {
-    color: #1634FF;
-    border-bottom-color: #1634FF;
+    color: #007bff;
+    border-bottom-color: #007bff;
 }
 
 .response-tab-content {
@@ -12349,7 +12350,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .status-indicator.novo {
-    background-color: #1634FF;
+    background-color: #1976d2;
 }
 
 .status-indicator.em-aberto {
@@ -12436,7 +12437,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .form-selector select:focus {
     outline: none;
-    border-color: #1634FF;
+    border-color: #007bff;
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
@@ -12469,7 +12470,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .ticket-title-input:focus {
-    border-color: #1634FF;
+    border-color: #007bff;
     box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
@@ -12485,7 +12486,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .form-textarea:focus {
     outline: none;
-    border-color: #1634FF;
+    border-color: #007bff;
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
@@ -12520,13 +12521,13 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .footer-actions .btn-primary {
-    background: #1634FF;
-    border-color: #1634FF;
+    background: #007bff;
+    border-color: #007bff;
 }
 
 .footer-actions .btn-primary:hover {
-    background: #000058;
-    border-color: #000058;
+    background: #0056b3;
+    border-color: #004085;
 }
 
 /* Estilos para campos de árvore como selects */
@@ -12548,7 +12549,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .tree-level-select:focus {
     outline: none;
-    border-color: #1634FF;
+    border-color: #007bff;
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
@@ -12593,12 +12594,12 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .tree-sequential-select:hover {
-    border-color: #1634FF;
+    border-color: #007bff;
 }
 
 .tree-sequential-select:focus {
     outline: none;
-    border-color: #1634FF;
+    border-color: #007bff;
     box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
@@ -12666,7 +12667,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .tree-selection-item.selected {
     background: #e3f2fd;
-    color: #1634FF;
+    color: #1976d2;
 }
 
 .tree-node-label {
@@ -12806,7 +12807,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 /* Estilos específicos por tipo */
 .timeline-item.creation .timeline-content {
-    border-left: 4px solid #1634FF;
+    border-left: 4px solid #1976d2;
 }
 
 .timeline-item.public .timeline-content {
@@ -13017,7 +13018,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     padding: 8.1px 12.6px;
     margin: 4.5px 9px;
     background: white;
-    border-left: 3px solid #1634FF;
+    border-left: 3px solid #1976d2;
     border-radius: 4.5px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     cursor: pointer;
@@ -13080,7 +13081,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 .ticket-item-slim[data-status="novos"] .ticket-slim-status,
 .ticket-item-slim[data-status="novo"] .ticket-slim-status {
     background: #e3f2fd;
-    color: #1634FF;
+    color: #1976d2;
 }
 
 .ticket-item-slim[data-status="em-andamento"] .ticket-slim-status,
@@ -13230,7 +13231,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 /* Cores de borda por status */
 .ticket-item-slim[data-status="novos"],
 .ticket-item-slim[data-status="novo"] {
-    border-left-color: #1634FF;
+    border-left-color: #1976d2;
 }
 
 .ticket-item-slim[data-status="em-andamento"],
@@ -13658,7 +13659,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .stat-card-info .stat-icon-info {
-    background: linear-gradient(135deg, #1694FF 0%, #000058 100%);
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
 }
 
 /* Responsividade */
@@ -13776,19 +13777,23 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .status-badge.status-novos,
 .status-badge.status-novo {
-    background: #e3f2fd;
-    color: #1634FF;
+    background: #eef1ff;
+    color: #1634ff;
 }
 
-.status-badge.status-em-andamento,
+.status-badge.status-em-andamento {
+    background: #e8f7ed;
+    color: #15a237;
+}
+
 .status-badge.status-resolvido {
-    background: #e8f5e9;
-    color: #28a745;
+    background: #f3f4f6;
+    color: #6b7280;
 }
 
 .status-badge.status-pendente {
-    background: #fff3e0;
-    color: #ff9800;
+    background: #fff8e1;
+    color: #b8860b;
 }
 
 .status-badge.status-fechado {
@@ -13879,7 +13884,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .btn-info {
-    background: #1694FF;
+    background: #17a2b8;
     color: white;
     border: none;
     padding: 10px 20px;
@@ -13894,7 +13899,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .btn-info:hover {
-    background: #000058;
+    background: #138496;
 }
 
 /* Responsividade */
@@ -15098,7 +15103,7 @@ input:checked + .slider:before {
 
 /* ============================================
    CONFIGURAÇÕES — visual moderno (V2)
-   VERSION: v2.4.7 | DATE: 2026-07-21
+   VERSION: v2.4.6 | DATE: 2026-06-30
    ============================================ */
 #config.config-page {
     --config-bg: #f0f4f8;
@@ -16601,7 +16606,7 @@ body.velodesk-dark .header {
     border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
-body.velodesk-dark .sidebar:not(.velo-nav-rail) {
+body.velodesk-dark .sidebar {
     background: #111827;
 }
 

@@ -110,4 +110,11 @@ export function ticketAssignedToCurrentAgent(ticket) {
   return candidates.includes(responsavel);
 }
 
+/** Responsável explícito diferente do agente logado (transferência para outro agente). */
+export function isResponsavelAssignedToOtherAgent(responsavel) {
+  const normalized = normalize(responsavel);
+  if (!normalized) return false;
+  return !buildResponsavelCandidates().includes(normalized);
+}
+
 export { canActOnTicket, filterTicketForUser };

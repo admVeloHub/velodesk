@@ -2,13 +2,20 @@
  * workflowApprovalData v1.2.1 — fila e detalhe do console de decisão
  */
 import { getAllCockpitTickets } from '../ticketsStorage';
-import { getSlaClass, getWorkflowProgress, isTicketInWorkflow, getTicketProtocolLabel, getAgentName } from '../desk/utils';
+import { findCadastralRequestByTicketId } from '../cadastral/cadastralRequestStore';
+import {
+  getTipoSolicitacaoLabel,
+} from '../cadastral/solicitacoesProdutosData';
+import { getSlaClass, getWorkflowProgress, isTicketInWorkflow, getTicketProtocolLabel } from '../desk/utils';
 import { resolveApprovalHeader, ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import { agentCanDecideTicket as permAgentCanDecide, canApproveWorkflow } from '../permissions/permissionService';
 import {
   getWorkflowTeamQueueMeta,
   isTeamStepActive,
+  isWorkflowActive,
+  ticketIsAwaitingTeamAction,
   ticketMatchesWorkflowTeam,
+  WORKFLOW_TEAM_QUEUES,
 } from './workflowTeamQueues';
 
 const QUEUE_LABEL = 'Aguardando aprovação';
@@ -125,21 +132,143 @@ function inferDaysSincePurchase(approval, ticket) {
   return 4;
 }
 
-function buildGenericApprovalDetail(ticket, progress, header) {
+function buildSlaDetail(progress) {
+  return {
+    slaLabel: progress.slaRemainingLabel ? `SLA: ${progress.slaRemainingLabel} restantes` : null,
+    slaPct: progress.slaTotalHours && progress.slaRemainingMs != null
+      ? Math.max(8, Math.min(92, 100 - (progress.slaRemainingMs / (progress.slaTotalHours * 3600000)) * 100))
+      : 55,
+  };
+}
+
+export function resolveSolicitacaoProdutosForTicket(ticket) {
+  if (!ticket) return null;
+
   const lf = ticket.lateralForm || {};
-  const approval = readApprovalMeta(ticket);
+  const embedded = lf.solicitacaoProdutos;
+  if (embedded?.categoria === 'solicitacoes') return embedded;
+
+  const protocol = getTicketProtocolLabel(ticket) || String(ticket.id || '');
+  return findCadastralRequestByTicketId(protocol)
+    || findCadastralRequestByTicketId(String(ticket.id || ''))
+    || null;
+}
+
+function readOctadeskTicketId(ticket) {
+  const lf = ticket?.lateralForm || {};
+  return ticket?.externalId
+    || ticket?.octadeskId
+    || lf.octadeskTicket
+    || lf.metadados?.octadeskTicket
+    || lf.metadados?.ticketOctadesk
+    || '';
+}
+
+function buildProdutosCadastralDetail(ticket, progress, header, solicitacao) {
+  const startedAt = solicitacao.createdAt || progress.workflow?.startedAt || ticket.createdAt;
+  const typeLabel = getTipoSolicitacaoLabel(solicitacao.tipoSolicitacao);
+  const cpfDigits = String(solicitacao.cpf || '').replace(/\D/g, '');
+  const cpfDisplay = cpfDigits || String(solicitacao.cpf || '').trim();
+  const { slaLabel, slaPct } = buildSlaDetail(progress);
+  const lf = ticket.lateralForm || {};
+  const rows = [];
+
+  const pushRow = (icon, label, value, options = {}) => {
+    if (options.skipEmpty && !String(value ?? '').trim() && value !== false) return;
+    rows.push({
+      icon,
+      label,
+      hideLabel: Boolean(options.hideLabel),
+      value: options.booleanValue != null
+        ? (options.booleanValue ? 'Fotos Verificadas' : 'Fotos não verificadas')
+        : String(value ?? '').trim(),
+      tone: options.tone || 'default',
+      booleanValue: options.booleanValue ?? null,
+    });
+  };
+
+  if (solicitacao.fotosVerificadas != null) {
+    pushRow(
+      solicitacao.fotosVerificadas ? 'ti-check' : 'ti-x',
+      'Fotos Verificadas',
+      solicitacao.fotosVerificadas,
+      {
+        hideLabel: true,
+        booleanValue: Boolean(solicitacao.fotosVerificadas),
+        tone: solicitacao.fotosVerificadas ? 'success' : 'muted',
+      },
+    );
+  }
+
+  if (solicitacao.analiseExcecaoDevolucao != null) {
+    pushRow('ti-x', 'Analise Excecao Devolucao', String(solicitacao.analiseExcecaoDevolucao));
+  }
+
+  const octadeskId = readOctadeskTicketId(ticket);
+  pushRow('ti-ticket', 'Ticket Octadesk', octadeskId, { skipEmpty: true });
+
+  const mensagemN1 = solicitacao.mensagemN1 || solicitacao.observacoes || '';
+  pushRow('ti-message-circle', 'Mensagem N1', mensagemN1, { skipEmpty: true });
+  pushRow('ti-user', 'Colaborador', solicitacao.colaborador || lf.responsavel || ticket.responsibleAgent, { skipEmpty: true });
+
+  return {
+    layout: 'produtos-cadastral',
+    cardTitle: solicitacao.titulo || `${cpfDisplay} · ${typeLabel}`,
+    cardSubtext: `Solicitado em ${formatDateTime(startedAt)} · aguardando há ${formatElapsedSince(startedAt)}`,
+    slaLabel,
+    slaPct,
+    typeBar: typeLabel,
+    submittedAt: solicitacao.createdAt || startedAt,
+    dadoAntigo: solicitacao.dadoAntigo || '',
+    dadoNovo: solicitacao.dadoNovo || '',
+    rows,
+    highlightCpf: cpfDisplay,
+    fields: [],
+    justificationQuote: null,
+    internalNote: null,
+  };
+}
+
+function buildProdutosGenericDetail(ticket, progress, header) {
+  const lf = ticket.lateralForm || {};
   const sla = getSlaClass(ticket);
   const startedAt = progress.workflow?.startedAt || ticket.createdAt;
+  const { slaLabel, slaPct } = buildSlaDetail(progress);
+
+  return {
+    layout: 'produtos-generic',
+    cardTitle: lf.produto && lf.motivo
+      ? `${lf.motivo} · ${lf.produto}`
+      : (ticket.title || header.title),
+    cardSubtext: `Solicitado em ${formatDateTime(startedAt)} · aguardando há ${formatElapsedSince(startedAt)}`,
+    slaLabel,
+    slaPct,
+    fields: [
+      { label: 'Cliente', value: ticket.clientName || ticket.solicitante || 'Cliente', tone: 'default' },
+      { label: 'Produto', value: lf.produto || '—', tone: 'default' },
+      { label: 'Motivo', value: lf.motivo || '—', tone: 'default' },
+      { label: 'Canal', value: channelLabel(ticket).label, tone: 'default' },
+      { label: 'Responsável', value: lf.responsavel || ticket.responsibleAgent || '—', tone: 'default' },
+      { label: 'SLA', value: progress.slaRemainingLabel || (sla === 'critical' ? 'Crítico' : 'No prazo'), tone: sla === 'critical' ? 'danger' : 'default' },
+    ],
+    justificationQuote: getFirstClientMessage(ticket),
+    internalNote: getInternalForwardingNote(ticket),
+  };
+}
+
+function buildGenericApprovalDetail(ticket, progress, header) {
+  const lf = ticket.lateralForm || {};
+  const sla = getSlaClass(ticket);
+  const startedAt = progress.workflow?.startedAt || ticket.createdAt;
+  const { slaLabel, slaPct } = buildSlaDetail(progress);
 
   return {
     cardTitle: lf.produto && lf.motivo
       ? `${lf.motivo} · ${lf.produto}`
       : (ticket.title || header.title),
     cardSubtext: `Solicitado em ${formatDateTime(startedAt)} · aguardando há ${formatElapsedSince(startedAt)}`,
-    slaLabel: progress.slaRemainingLabel ? `SLA: ${progress.slaRemainingLabel} restantes` : null,
-    slaPct: progress.slaTotalHours && progress.slaRemainingMs != null
-      ? Math.max(8, Math.min(92, 100 - (progress.slaRemainingMs / (progress.slaTotalHours * 3600000)) * 100))
-      : 55,
+    slaLabel,
+    slaPct,
     fields: [
       { label: 'Cliente', value: ticket.clientName || ticket.solicitante || 'Cliente', tone: 'default' },
       { label: 'Produto', value: lf.produto || '—', tone: 'default' },
@@ -245,11 +374,25 @@ function buildDetailView(ticket, progress) {
   const openedBy = lf.responsavel || ticket.responsibleAgent || 'Atendimento';
   const openedAt = progress.workflow?.startedAt || ticket.createdAt;
 
-  const resolver = header.detailResolver === 'reembolso-7dias'
-    ? buildReembolsoApprovalDetail
-    : buildGenericApprovalDetail;
+  const wfSlug = lf.workflow?.definicaoSlug || lf.workflow?.templateId || '';
+  const detailResolver = header.detailResolver === 'generic' && wfSlug === 'escalonar-produtos'
+    ? 'escalonar-produtos'
+    : header.detailResolver;
 
-  const detail = resolver(ticket, progress, header);
+  let resolver = buildGenericApprovalDetail;
+  let resolverArgs = [ticket, progress, header];
+
+  if (detailResolver === 'reembolso-7dias') {
+    resolver = buildReembolsoApprovalDetail;
+  } else if (detailResolver === 'escalonar-produtos') {
+    const solicitacao = resolveSolicitacaoProdutosForTicket(ticket);
+    resolver = solicitacao ? buildProdutosCadastralDetail : buildProdutosGenericDetail;
+    resolverArgs = solicitacao
+      ? [ticket, progress, header, solicitacao]
+      : [ticket, progress, header];
+  }
+
+  const detail = resolver(...resolverArgs);
 
   return {
     ticketId: String(ticket.id),
@@ -271,6 +414,32 @@ function collectTeamWorkflowEntries(teamId) {
     if (!ticketMatchesWorkflowTeam(ticket, teamId)) return;
     const progress = getWorkflowProgress(ticket);
     items.push({ entry, progress, queueItem: buildQueueItem(entry, teamId) });
+  });
+
+  return items;
+}
+
+function collectTeamActionWorkflowEntries(teamId) {
+  const items = [];
+
+  getAllCockpitTickets().forEach((entry) => {
+    const { ticket } = entry;
+    if (!ticketIsAwaitingTeamAction(ticket, teamId)) return;
+    const progress = getWorkflowProgress(ticket);
+    items.push({ entry, progress, queueItem: buildQueueItem(entry, teamId) });
+  });
+
+  return items;
+}
+
+function collectConsolidatedWorkflowEntries() {
+  const items = [];
+
+  getAllCockpitTickets().forEach((entry) => {
+    const { ticket } = entry;
+    if (!isWorkflowActive(ticket)) return;
+    const progress = getWorkflowProgress(ticket);
+    items.push({ entry, progress, queueItem: buildQueueItem(entry) });
   });
 
   return items;
@@ -355,6 +524,71 @@ export function computeWorkflowTeamQueue(teamId) {
   };
 }
 
+
+function summarizeActionEntries(entries) {
+  let slaCritical = 0;
+  let awaitingDecisionCount = 0;
+
+  entries.forEach((item) => {
+    if (item.queueItem.slaTone === 'critical' || item.queueItem.slaTone === 'warn') slaCritical += 1;
+    if (item.queueItem.awaitingDecision) awaitingDecisionCount += 1;
+  });
+
+  return { slaCritical, awaitingDecisionCount };
+}
+
+export function computeWorkflowTeamActionQueue(teamId) {
+  const meta = getWorkflowTeamQueueMeta(teamId);
+  const teamLabel = meta?.name || teamId;
+  const entries = sortTeamQueueEntries(collectTeamActionWorkflowEntries(teamId), teamId);
+  const { slaCritical, awaitingDecisionCount } = summarizeActionEntries(entries);
+
+  return {
+    teamId,
+    queueLabel: `Aguardando atuação · ${teamLabel}`,
+    queue: entries.map((item) => item.queueItem),
+    summary: {
+      pendingCount: entries.length,
+      awaitingDecisionCount,
+      approvedTodayCount: countApprovedToday(),
+      slaCriticalCount: slaCritical,
+    },
+    entries,
+  };
+}
+
+export function getWorkflowTeamActionCounts() {
+  const counts = {};
+  WORKFLOW_TEAM_QUEUES.forEach(({ id }) => {
+    counts[id] = computeWorkflowTeamActionQueue(id).queue.length;
+  });
+  return counts;
+}
+
+export function computeWorkflowConsolidatedQueue() {
+  const entries = sortTeamQueueEntries(collectConsolidatedWorkflowEntries(), null);
+  let slaCritical = 0;
+  let awaitingDecisionCount = 0;
+
+  entries.forEach((item) => {
+    if (item.queueItem.slaTone === 'critical' || item.queueItem.slaTone === 'warn') slaCritical += 1;
+    if (item.queueItem.awaitingDecision) awaitingDecisionCount += 1;
+  });
+
+  return {
+    teamId: null,
+    queueLabel: 'Fluxos em andamento',
+    queue: entries.map((item) => item.queueItem),
+    summary: {
+      pendingCount: entries.length,
+      awaitingDecisionCount,
+      approvedTodayCount: countApprovedToday(),
+      slaCriticalCount: slaCritical,
+    },
+    entries,
+  };
+}
+
 export function computeWorkflowApprovalQueue() {
   const pending = collectPendingEntries();
   let slaCritical = 0;
@@ -410,15 +644,41 @@ export function getWorkflowTeamDetail(ticketId, teamId) {
   };
 }
 
+export function getWorkflowConsolidatedDetail(ticketId) {
+  const id = String(ticketId);
+  const match = getAllCockpitTickets().find(({ ticket }) => String(ticket.id) === id);
+  if (!match || !isWorkflowActive(match.ticket)) return null;
+
+  const progress = getWorkflowProgress(match.ticket);
+  const awaitingDecision = ticketAwaitingDecision(match.ticket, progress);
+  const detail = buildDetailView(match.ticket, progress);
+  const activeStepTitle = progress?.activeStep?.title || progress?.activeStep?.label || 'etapa anterior';
+  const teamName = progress?.activeStep?.team
+    ? getWorkflowTeamQueueMeta(progress.activeStep.team)?.name || progress.activeStep.team
+    : null;
+
+  return {
+    ...detail,
+    ticket: match.ticket,
+    awaitingDecision,
+    teamStepActive: false,
+    statusBadge: awaitingDecision
+      ? detail.statusBadge
+      : progress?.workflow?.status === 'completed'
+        ? 'Concluído'
+        : 'Em andamento',
+    statusMessage: !awaitingDecision
+      ? (teamName
+        ? `Este ticket está na etapa "${activeStepTitle}" (${teamName}).`
+        : `Este ticket está na etapa "${activeStepTitle}".`)
+      : null,
+    actions: awaitingDecision ? detail.actions : [],
+  };
+}
+
 export function getWorkflowApprovalDetail(ticketId, teamId = null) {
   if (teamId) return getWorkflowTeamDetail(ticketId, teamId);
-
-  const id = String(ticketId);
-  let match = getAllCockpitTickets().find(({ ticket }) => String(ticket.id) === id);
-  if (!match) return null;
-  const progress = getWorkflowProgress(match.ticket);
-  if (!ticketAwaitingDecision(match.ticket, progress)) return null;
-  return buildDetailView(match.ticket, progress);
+  return getWorkflowConsolidatedDetail(ticketId);
 }
 
 export function findTicketEntryById(ticketId) {

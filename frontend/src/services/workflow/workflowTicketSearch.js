@@ -10,7 +10,10 @@ import {
   saveTicketColumns,
 } from '../ticketsStorage';
 import { getTicketProtocolLabel, isTicketInWorkflow, normalizeCpf } from '../desk/utils';
-import { ticketMatchesWorkflowTeam } from './workflowTeamQueues';
+import {
+  resolveWorkflowTeamForTicket,
+  ticketMatchesWorkflowTeam,
+} from './workflowTeamQueues';
 
 function ensureTicketInCache(ticket) {
   const normalized = apiTicketToCockpit(ticket);
@@ -140,7 +143,7 @@ export async function searchTicketsByQuery(rawQuery) {
 
 export function resolveOpenTarget(ticket, teamQueueId) {
   if (!isTicketInWorkflow(ticket)) return 'desk';
-  if (!teamQueueId) return 'workflow';
-  if (ticketMatchesWorkflowTeam(ticket, teamQueueId)) return 'workflow';
+  if (teamQueueId && ticketMatchesWorkflowTeam(ticket, teamQueueId)) return 'workflow';
+  if (!teamQueueId && resolveWorkflowTeamForTicket(ticket)) return 'workflow';
   return 'desk';
 }

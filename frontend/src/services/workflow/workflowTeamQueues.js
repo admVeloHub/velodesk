@@ -6,6 +6,8 @@ import {
   getWorkflowTemplateForTicket,
   isTicketInWorkflow,
 } from '../desk/utils';
+import { ticketAwaitingDecision } from '../desk/workflowDefinitions';
+import { resolveWorkflowTeamQueueForUser } from '../permissions/permissionService';
 
 export const WORKFLOW_TEAM_QUEUES = [
   { id: 'financeiro', name: 'Financeiro', dot: '#ea580c' },
@@ -51,21 +53,67 @@ export function ticketMatchesWorkflowTeam(ticket, teamId) {
 
   const lf = ticket.lateralForm || {};
   const wf = lf.workflow || {};
+  const progress = getWorkflowProgress(ticket);
+  const templateSlug = String(wf.definicaoSlug || wf.templateId || '');
 
   if (lf.escalonar === teamId) return true;
-  if (wf.definicaoSlug === `escalonar-${teamId}`) return true;
-  if (wf.templateId === `escalonar-${teamId}`) return true;
+  if (templateSlug === `escalonar-${teamId}`) return true;
+  if (templateSlug.endsWith(`-${teamId}`)) return true;
 
   const atribuido = normalizeAtribuido(lf.atribuido);
   if (atribuido === `funcao:${teamId}`) return true;
 
+  if (progress?.activeStep?.team === teamId) return true;
+
   const template = getWorkflowTemplateForTicket(ticket);
+  if (template?.id === `escalonar-${teamId}`) return true;
   if (template?.steps?.some((step) => step.team === teamId)) return true;
 
   return false;
 }
 
+export function ticketIsAwaitingTeamAction(ticket, teamId) {
+  if (!ticketMatchesWorkflowTeam(ticket, teamId)) return false;
+  const progress = getWorkflowProgress(ticket);
+  if (!progress) return false;
+  const awaitingDecision = ticketAwaitingDecision(ticket, progress);
+  return awaitingDecision || isTeamStepActive(ticket, teamId, progress);
+}
+
 export function isTeamStepActive(ticket, teamId, progress = getWorkflowProgress(ticket)) {
   if (!progress?.activeStep) return false;
   return progress.activeStep.team === teamId;
+}
+
+export function resolveEffectiveWorkflowTeamId({ perm, urlTeam } = {}) {
+  const rbacTeam = resolveWorkflowTeamQueueForUser(perm);
+  if (rbacTeam) return rbacTeam;
+  const normalized = String(urlTeam || '').trim();
+  if (isWorkflowTeamQueueId(normalized)) return normalized;
+  return null;
+}
+
+export function resolveWorkflowTeamForTicket(ticket) {
+  if (!ticket) return null;
+
+  for (const { id } of WORKFLOW_TEAM_QUEUES) {
+    if (!ticketMatchesWorkflowTeam(ticket, id)) continue;
+    const progress = getWorkflowProgress(ticket);
+    const awaitingDecision = ticketAwaitingDecision(ticket, progress);
+    if (awaitingDecision || isTeamStepActive(ticket, id, progress)) return id;
+  }
+
+  for (const { id } of WORKFLOW_TEAM_QUEUES) {
+    if (ticketMatchesWorkflowTeam(ticket, id)) return id;
+  }
+
+  return null;
+}
+
+export function buildWorkflowNavigationUrl({ teamId, ticketId } = {}) {
+  const params = new URLSearchParams();
+  if (teamId) params.set('team', teamId);
+  if (ticketId) params.set('ticket', String(ticketId));
+  const qs = params.toString();
+  return qs ? `/workflow?${qs}` : '/workflow';
 }

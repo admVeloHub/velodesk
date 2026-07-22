@@ -58,12 +58,64 @@ export function can(modulo, key, permissoes = readCachedPermissions()?.permissoe
   return hasPermission(permissoes, modulo, key);
 }
 
+const ALL_PROFILE_PORTALS = ['agent', 'gestao', 'workflow', 'especiais'];
+
+/** Portais exibidos no seletor de perfil — mescla API, cache, flags portal.* e função gestão. */
+export function getAllowedProfilePortals(perm = readCachedPermissions()) {
+  const cached = readCachedPermissions();
+  const sources = [perm, cached].filter(Boolean);
+
+  const merged = [
+    ...new Set(
+      sources.flatMap((source) => [
+        ...resolvePortalVisivel(source),
+        ...(Array.isArray(source?.portalVisivel) ? source.portalVisivel : []),
+      ]),
+    ),
+  ].filter((id) => ALL_PROFILE_PORTALS.includes(id));
+
+  const isGestaoFuncao = sources.some(
+    (source) => source?.funcaoSlug === 'gestao' || (source?.funcoes || []).includes('gestao'),
+  );
+
+  const hasGestaoPortal = merged.includes('gestao');
+
+  const hasFullPortalFlags = sources.some((source) => {
+    const portal = source?.permissoes?.portal || {};
+    return portal.gestao === true && portal.workflow === true && portal.especiais === true;
+  });
+
+  if (isGestaoFuncao || hasGestaoPortal || hasFullPortalFlags) {
+    return [...ALL_PROFILE_PORTALS];
+  }
+
+  return merged.length ? merged : ['agent'];
+}
+
 export function getPortalVisivel(perm = readCachedPermissions()) {
-  return perm?.portalVisivel || ['agent'];
+  return getAllowedProfilePortals(perm);
+}
+
+const PORTAL_KEY_TO_PROFILE = {
+  agente: 'agent',
+  gestao: 'gestao',
+  workflow: 'workflow',
+  especiais: 'especiais',
+};
+
+/** Unifica portalVisivel[] com flags permissoes.portal.* */
+export function resolvePortalVisivel(perm = readCachedPermissions()) {
+  const fromList = Array.isArray(perm?.portalVisivel) ? perm.portalVisivel : [];
+  const fromFlags = Object.entries(perm?.permissoes?.portal || {})
+    .filter(([, enabled]) => enabled === true)
+    .map(([key]) => PORTAL_KEY_TO_PROFILE[key] || key)
+    .filter(Boolean);
+  const merged = [...new Set([...fromList, ...fromFlags])];
+  return merged.length ? merged : ['agent'];
 }
 
 export function isPortalAllowed(portalId, perm = readCachedPermissions()) {
-  const allowed = getPortalVisivel(perm);
+  const allowed = getAllowedProfilePortals(perm);
   const legacyMap = { agent: 'agent', gestao: 'gestao', workflow: 'workflow', especiais: 'especiais' };
   const normalized = legacyMap[portalId] || portalId;
   return allowed.includes(normalized);
@@ -215,4 +267,10 @@ export function resolveWorkflowTeamQueueForUser(perm = readCachedPermissions()) 
     if (WORKFLOW_TEAM_QUEUE_SLUGS.includes(funcao)) return funcao;
   }
   return null;
+}
+
+/** Gestão e perfis com aprovação global enxergam o console consolidado (sem fila Financeiro/Produtos). */
+export function canAccessWorkflowApprovalConsole(perm = readCachedPermissions()) {
+  if (resolveWorkflowTeamQueueForUser(perm)) return true;
+  return canApproveWorkflow(perm) && hasPermission(perm?.permissoes, 'tickets', 'ver_todos');
 }

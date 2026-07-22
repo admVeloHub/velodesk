@@ -1,12 +1,12 @@
 /**
- * ProfileContext v1.7.0 — deskProfile gestao|agent do cadastro
- * VERSION: v1.7.0 | DATE: 2026-07-20
+ * ProfileContext v1.6.0 — portal lock por RBAC
+ * VERSION: v1.6.0 | DATE: 2026-07-17
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PROFILES, getProfileMeta, getProfileDefaultPath, normalizeProfileId } from '../config/profiles';
 import { useNotifications } from './NotificationContext';
-import { isPortalAllowed, readCachedPermissions } from '../services/permissions/permissionService';
+import { isPortalAllowed, readCachedPermissions, getAllowedProfilePortals } from '../services/permissions/permissionService';
 
 const ProfileContext = createContext(null);
 
@@ -45,7 +45,7 @@ export function ProfileProvider({ children }) {
 
   const applyDefaultPortalFromPermissions = useCallback(() => {
     const perm = readCachedPermissions();
-    const allowed = perm?.portalVisivel || ['agent'];
+    const allowed = getAllowedProfilePortals(perm);
     const preferred = allowed.includes('gestao') ? 'gestao'
       : allowed.includes('especiais') ? 'especiais'
         : allowed.includes('workflow') ? 'workflow'
@@ -70,8 +70,7 @@ export function ProfileProvider({ children }) {
 
   const applyProfileFromAccess = useCallback((deskProfile) => {
     const perm = readCachedPermissions();
-    const raw = String(deskProfile || '').trim().toLowerCase();
-    const fallback = (raw === 'supervisor' || raw === 'gestao') ? 'gestao' : 'agent';
+    const fallback = deskProfile === 'supervisor' ? 'gestao' : 'agent';
     const allowed = perm?.portalVisivel || [fallback];
     const id = allowed.includes(fallback) ? fallback : (allowed[0] || 'agent');
     const normalized = normalizeProfileId(id);

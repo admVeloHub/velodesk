@@ -2,7 +2,11 @@
  * workflowInfoNotifications v1.1.0 — pedidos de informação workflow → agente responsável
  */
 import { findTicketEntry, getAllCockpitTickets } from '../ticketsStorage';
-import { ticketMatchesAgentResponsavel, readDeskProfileId } from '../desk/responsavelSegmentation';
+import {
+  buildResponsavelCandidates,
+  ticketMatchesAgentResponsavel,
+  readDeskProfileId,
+} from '../desk/responsavelSegmentation';
 import { normalizeProfileId } from '../../config/profiles';
 
 const STORAGE_KEY = 'velodesk_workflow_info_requests';
@@ -17,6 +21,48 @@ function findAnyTicketEntry(ticketId) {
 
 function isDemoInfoRequestTicketId(ticketId) {
   return String(ticketId).startsWith('wf-demo-');
+}
+
+function normalize(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function readTicketResponsavel(ticket) {
+  return normalize(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
+}
+
+function targetAgentMatchesProfile(targetAgent, profileId = readDeskProfileId()) {
+  const target = normalize(targetAgent);
+  if (!target) return false;
+  if (buildResponsavelCandidates().includes(target)) return true;
+  const entry = getAllCockpitTickets().find(({ ticket }) => readTicketResponsavel(ticket) === target);
+  return entry ? ticketMatchesAgentResponsavel(entry.ticket, profileId) : false;
+}
+
+function findTicketsByProtocol(protocol) {
+  const normalized = String(protocol || '').trim();
+  if (!normalized) return [];
+  return getAllCockpitTickets().filter(
+    ({ ticket }) => readTicketProtocol(ticket) === normalized,
+  );
+}
+
+export function infoRequestMatchesAgent(req, profileId = readDeskProfileId()) {
+  if (!req || req.status !== 'pending') return false;
+
+  if (isDemoInfoRequestTicketId(req.ticketId)) {
+    return targetAgentMatchesProfile(req.targetAgent, profileId);
+  }
+
+  const entry = findAnyTicketEntry(req.ticketId);
+  if (entry && ticketMatchesAgentResponsavel(entry.ticket, profileId)) return true;
+
+  const protocolMatches = findTicketsByProtocol(req.protocol);
+  if (protocolMatches.some(({ ticket }) => ticketMatchesAgentResponsavel(ticket, profileId))) {
+    return true;
+  }
+
+  return targetAgentMatchesProfile(req.targetAgent, profileId);
 }
 
 function loadAll() {
@@ -70,12 +116,7 @@ export function getWorkflowInfoRequests(profileId = readDeskProfileId()) {
 
   return loadAll()
     .filter((req) => req.status === 'pending')
-    .filter((req) => {
-      if (isDemoInfoRequestTicketId(req.ticketId)) return true;
-      const entry = findAnyTicketEntry(req.ticketId);
-      if (!entry) return Boolean(req.targetAgent);
-      return ticketMatchesAgentResponsavel(entry.ticket, profileId);
-    })
+    .filter((req) => infoRequestMatchesAgent(req, profileId))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
@@ -86,16 +127,27 @@ export function getWorkflowInfoRequestsForTicket(ticket, profileId = readDeskPro
 
 export function resolveDeskTicketIdForInfoRequest(request) {
   if (!request) return '';
+
+  const target = normalize(request.targetAgent);
+  const protocolMatches = findTicketsByProtocol(request.protocol);
+
+  if (target && protocolMatches.length) {
+    const preferred = protocolMatches.find(({ ticket }) => readTicketResponsavel(ticket) === target);
+    if (preferred) return String(preferred.ticket.id || preferred.ticket._id);
+  }
+
+  if (protocolMatches.length) {
+    const agentMatch = protocolMatches.find(({ ticket }) => {
+      const responsavel = readTicketResponsavel(ticket);
+      return responsavel && buildResponsavelCandidates().includes(responsavel);
+    });
+    if (agentMatch) return String(agentMatch.ticket.id || agentMatch.ticket._id);
+    const first = protocolMatches[0];
+    return String(first.ticket.id || first.ticket._id);
+  }
+
   const direct = findTicketEntry(request.ticketId);
   if (direct) return String(direct.ticket.id || direct.ticket._id);
-
-  const protocol = String(request.protocol || '').trim();
-  if (protocol) {
-    const match = getAllCockpitTickets().find(
-      ({ ticket }) => readTicketProtocol(ticket) === protocol,
-    );
-    if (match) return String(match.ticket.id || match.ticket._id);
-  }
 
   return String(request.ticketId);
 }

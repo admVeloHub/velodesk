@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.7.0 — dedup in-flight loadBoxesFromApi
- * VERSION: v1.7.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.6.0 — cache de boxes/tickets do Desk
+ * VERSION: v1.6.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -16,7 +16,6 @@ import { getAgentName } from './clientDb';
 
 let columns = [];
 let useApi = true;
-let boxesLoadInFlight = null;
 
 const DEFAULT_BOXES = [
   { id: 'novos', name: 'Novos', tickets: [] },
@@ -99,32 +98,24 @@ function filterColumnsForAgent(columns) {
 }
 
 export async function loadBoxesFromApi() {
-  if (boxesLoadInFlight) return boxesLoadInFlight;
-
-  boxesLoadInFlight = (async () => {
-    const token = localStorage.getItem('velodesk_token');
-    if (!useApi || !isBackendJwtUsable(token)) {
-      return columns;
-    }
-    const drafts = collectDraftTickets(columns);
-    try {
-      const profileId = readDeskProfileId();
-      const params = shouldUseMeusChamadosFila(profileId) ? { fila: 'meus-chamados' } : undefined;
-      const data = await boxesApi.list(params);
-      columns = filterColumnsForAgent(
-        injectDraftTickets(adaptColumnsFromApi(data, { fila: params?.fila }), drafts)
-      );
-    } catch (err) {
-      const message = err?.response?.data?.message || err?.message || 'Erro desconhecido';
-      console.warn('ticketsCache: falha ao carregar boxes', message);
-      throw err;
-    }
+  const token = localStorage.getItem('velodesk_token');
+  if (!useApi || !isBackendJwtUsable(token)) {
     return columns;
-  })().finally(() => {
-    boxesLoadInFlight = null;
-  });
-
-  return boxesLoadInFlight;
+  }
+  const drafts = collectDraftTickets(columns);
+  try {
+    const profileId = readDeskProfileId();
+    const params = shouldUseMeusChamadosFila(profileId) ? { fila: 'meus-chamados' } : undefined;
+    const data = await boxesApi.list(params);
+    columns = filterColumnsForAgent(
+      injectDraftTickets(adaptColumnsFromApi(data, { fila: params?.fila }), drafts)
+    );
+  } catch (err) {
+    const message = err?.response?.data?.message || err?.message || 'Erro desconhecido';
+    console.warn('ticketsCache: falha ao carregar boxes', message);
+    throw err;
+  }
+  return columns;
 }
 
 export function addCustomBox(box) {

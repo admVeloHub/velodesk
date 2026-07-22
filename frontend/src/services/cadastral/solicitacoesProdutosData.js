@@ -42,6 +42,24 @@ export const ERROS_BUGS_TIPO_OPTIONS = [
   { id: 'outro', label: 'Outro' },
 ];
 
+export const PRODUTOS_APPROVE_ACTIONS = [
+  { id: 'pix', label: 'PIX' },
+  { id: 'celcoin', label: 'Celcoin' },
+  { id: 'velotax', label: 'Velotax' },
+  { id: 'nome-email', label: 'Nome/Email' },
+  { id: 'limite-pix', label: 'Limite Pix' },
+  { id: 'outros', label: 'Outros' },
+  { id: 'cancelamentos', label: 'Cancelamentos' },
+  { id: 'evidencia-chargeback', label: 'Evidência/Chargeback' },
+  { id: 'erro-desembolso', label: 'Erro de desembolso' },
+  { id: 'botao-estorno', label: 'Botão de Estorno' },
+  { id: 'aumentar-consultas', label: 'Aumentar consultas' },
+];
+
+export function getProdutosApproveActionLabel(id) {
+  return PRODUTOS_APPROVE_ACTIONS.find((o) => o.id === id)?.label || id;
+}
+
 export function getTipoSolicitacaoLabel(id) {
   return TIPO_SOLICITACAO_OPTIONS.find((o) => o.id === id)?.label || id;
 }
@@ -70,4 +88,18 @@ export function getCategoriaTitulo(categoria, payload = {}) {
   if (categoria === 'erros-bugs') return 'Erros/Bugs';
   if (categoria === 'liberacao-pix') return 'Liberação chave pix';
   return getTipoSolicitacaoLabel(payload.tipoSolicitacao || 'alteracao-dados-cadastrais');
+}
+
+export function buildProdutosConclusaoClientMessage(ticket) {
+  const nome = ticket?.clientName || ticket?.solicitante || 'cliente';
+  const lf = ticket?.lateralForm || {};
+  let tipo = 'solicitação';
+  if (lf.solicitacaoProdutos?.tipoSolicitacao) {
+    tipo = getTipoSolicitacaoLabel(lf.solicitacaoProdutos.tipoSolicitacao);
+  } else if (lf.motivo && lf.produto) {
+    tipo = `${lf.motivo} · ${lf.produto}`;
+  } else if (lf.motivo) {
+    tipo = lf.motivo;
+  }
+  return `Olá, ${nome}! Sua solicitação de ${tipo} foi analisada e concluída pelo time de Produtos. Estamos à disposição caso precise de algo mais.`;
 }

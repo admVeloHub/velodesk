@@ -6,10 +6,10 @@ export const MEUS_TICKETS_QUEUE_ID = 'meus-tickets';
 
 export const QUEUE_STATUSES = [
   { id: 'novos', name: 'Novos', dot: '#1634FF', boxes: ['novos'] },
+  { id: MEUS_TICKETS_QUEUE_ID, name: 'Meus Tickets', dot: '#1694FF', boxes: [], virtual: true },
   { id: 'em-andamento', name: 'Em andamento', dot: '#15A237', boxes: ['em-andamento', 'em-aberto'] },
   { id: 'pendente', name: 'Pendente', dot: '#FCC200', boxes: ['em-espera', 'pendentes'] },
   { id: 'resolvidos', name: 'Resolvidos', dot: '#9ca3af', boxes: ['resolvidos'] },
-  { id: MEUS_TICKETS_QUEUE_ID, name: 'Meus Tickets', dot: '#1694FF', boxes: [], virtual: true },
 ];
 
 export const SEND_STATUS_OPTIONS_AGENT = [

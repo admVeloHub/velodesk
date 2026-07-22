@@ -1,6 +1,6 @@
 /**
- * DeskConsultasPanel v1.0.0 — consulta 360° de produtos do cliente
- * VERSION: v1.0.0 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team
+ * DeskConsultasPanel v1.1.0 — consulta 360° de produtos do cliente
+ * VERSION: v1.1.0 | DATE: 2026-07-22 | AUTHOR: VeloHub Development Team
  */
 import React, { useMemo } from 'react';
 import { useTabulation } from '../../../context/TabulationContext';
@@ -52,7 +52,7 @@ function ProductCard({ produto, meta, motivos, isTicketProduct }) {
   );
 }
 
-export default function DeskConsultasPanel({ ticket, client }) {
+export default function DeskConsultasPanel({ ticket, client, onReload, refreshing = false }) {
   const { config } = useTabulation();
   const contact = getClientContactFields(ticket, client);
   const products = getClientProducts(ticket, client);
@@ -69,7 +69,19 @@ export default function DeskConsultasPanel({ ticket, client }) {
     <div className="crm-consultas" id="deskConsultasPanel" aria-label="Consultas do cliente">
       <header className="crm-consultas__header">
         <div>
-          <h2 className="crm-consultas__title">Consultas</h2>
+          <div className="crm-consultas__title-row">
+            <h2 className="crm-consultas__title">Consultas</h2>
+            <button
+              type="button"
+              className={'crm-icon-btn crm-consultas__refresh' + (refreshing ? ' is-refreshing' : '')}
+              onClick={() => onReload?.()}
+              title="Atualizar consultas"
+              aria-label="Atualizar consultas"
+              disabled={refreshing || !onReload}
+            >
+              <i className="ti ti-refresh" aria-hidden="true" />
+            </button>
+          </div>
           <p className="crm-consultas__subtitle">
             Informações de produtos vinculados a {contact.name || 'cliente'}
           </p>

@@ -1,6 +1,8 @@
 /**
  * cadastralRequestStore — solicitações ao time de Produtos (local v1)
  */
+import { getAgentName } from '../desk/utils';
+import { updateTicketInCache } from '../ticketsStorage';
 import {
   getCategoriaTitulo,
   getTipoInformacaoLabel,
@@ -220,6 +222,40 @@ export function markSolicitacaoFeita(id) {
 
 export function getCadastroFieldLabel(fieldId) {
   return getTipoInformacaoLabel(fieldId);
+}
+
+function normalizeTicketLookupKey(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+export function findCadastralRequestByTicketId(ticketId) {
+  const key = normalizeTicketLookupKey(ticketId);
+  if (!key) return null;
+
+  return getAllNormalized().find((item) => {
+    const itemKey = normalizeTicketLookupKey(item.ticketId);
+    if (!itemKey) return false;
+    return itemKey === key || itemKey.includes(key) || key.includes(itemKey);
+  }) || null;
+}
+
+export async function persistSolicitacaoProdutosOnTicket(ticketId, request) {
+  const id = String(ticketId || '').trim();
+  if (!id || !request) return null;
+
+  const snapshot = {
+    ...request,
+    colaborador: request.colaborador || getAgentName() || '',
+  };
+
+  await updateTicketInCache(id, (ticket) => {
+    ticket.lateralForm = {
+      ...(ticket.lateralForm || {}),
+      solicitacaoProdutos: snapshot,
+    };
+  });
+
+  return snapshot;
 }
 
 /** Metadados de arquivo para persistência local (sem blob) */

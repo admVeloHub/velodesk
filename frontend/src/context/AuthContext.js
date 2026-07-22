@@ -1,8 +1,9 @@
 /**
- * AuthContext v1.8.0 — presença offline no logout
- * VERSION: v1.8.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team
+ * AuthContext v1.6.0 — valida exp do JWT + limpa sessão inválida no boot
+ * VERSION: v1.6.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
+import { resolveDeskAccessRole } from '../config/deskAccessAllowlist';
 import { isGoogleDeskAuthMode, isGoogleDeskSession } from '../config/deskAuthMode';
 import { isLocalDevBypass } from '../config/devAuth';
 import { isHubSessionActive, readHubSession } from '../config/hubSession';
@@ -10,7 +11,6 @@ import { setApiMode } from '../services/ticketsCache';
 import { getDeskDisplayName, isLegacyDeskUser } from '../utils/userDisplayName';
 import { clearDeskAuthSession, isBackendJwtUsable } from '../utils/backendJwt';
 import { clearCachedPermissions } from '../services/permissions/permissionService';
-import { notifyAgentOfflineAndStop } from '../services/agentPresence';
 
 const AuthContext = createContext(null);
 
@@ -37,10 +37,10 @@ function clearStoredAuthSession() {
   clearCachedPermissions();
 }
 
-function colaboradorHasDeskAccess(colaborador) {
-  if (!colaborador || typeof colaborador !== 'object') return false;
-  if (colaborador.desligado === true || colaborador.afastado === true) return false;
-  return colaborador.acessos?.Desk === true || colaborador.acessos?.desk === true;
+function isAllowedGoogleUser(user) {
+  if (!user?.email) return false;
+  if (isLegacyDeskUser(user)) return false;
+  return Boolean(resolveDeskAccessRole(user.email));
 }
 
 function readInitialAuth() {
@@ -48,40 +48,37 @@ function readInitialAuth() {
   const user = readStoredUser();
   const token = localStorage.getItem('velodesk_token');
   const session = readHubSession();
-  const colaborador = readStoredColaborador();
 
   if (gateOk && user) {
-    if (isLegacyDeskUser(user)) {
+    if (isLegacyDeskUser(user) || (isGoogleDeskAuthMode() && !isAllowedGoogleUser(user))) {
       clearStoredAuthSession();
       return { authStatus: 'pending', user: null, colaborador: null, token: null };
     }
 
-    if (isGoogleDeskSession(user) || user.source === 'cadastro-desk') {
-      if (!isBackendJwtUsable(token) || !colaboradorHasDeskAccess(colaborador)) {
+    if (isGoogleDeskSession(user)) {
+      if (!isBackendJwtUsable(token) || !isAllowedGoogleUser(user)) {
         clearStoredAuthSession();
         return { authStatus: 'pending', user: null, colaborador: null, token: null };
       }
-      const displayName = user.name || getDeskDisplayName(user) || user.email;
+      const displayName = getDeskDisplayName(user);
       const normalizedUser = { ...user, name: displayName };
       return {
         authStatus: 'authorized',
         user: normalizedUser,
-        colaborador,
+        colaborador: readStoredColaborador(),
         token,
       };
-    }
-
-    // Modo Google: não aceita sessão legada sem cadastro Desk
-    if (isGoogleDeskAuthMode()) {
-      clearStoredAuthSession();
-      return { authStatus: 'pending', user: null, colaborador: null, token: null };
     }
 
     if (!isLocalDevBypass() && session && !isHubSessionActive(session)) {
       return { authStatus: 'pending', user: null, colaborador: null, token: null };
     }
 
-    if (!isBackendJwtUsable(token)) {
+    if (isLocalDevBypass() && !isBackendJwtUsable(token)) {
+      return { authStatus: 'pending', user: null, colaborador: null, token: null };
+    }
+
+    if (!isLocalDevBypass() && !isBackendJwtUsable(token)) {
       clearStoredAuthSession();
       return { authStatus: 'pending', user: null, colaborador: null, token: null };
     }
@@ -89,7 +86,7 @@ function readInitialAuth() {
     return {
       authStatus: 'authorized',
       user,
-      colaborador,
+      colaborador: readStoredColaborador(),
       token,
     };
   }
@@ -118,28 +115,17 @@ export function AuthProvider({ children }) {
   }, []);
 
   const bootstrapFromGoogleLogin = useCallback(async (result) => {
-    const colaboradorPayload = result.colaborador || null;
-    const displayName = result.user?.name
-      || colaboradorPayload?.colaboradorNome
-      || getDeskDisplayName(result.user?.email);
+    const displayName = getDeskDisplayName(result.user?.email);
     const enrichedUser = {
       ...result.user,
       name: displayName,
-      source: result.user?.source || 'google-desk',
+      source: 'google-desk',
     };
     setUser(enrichedUser);
-    setColaborador(colaboradorPayload);
+    setColaborador(null);
     setToken(result.token);
     localStorage.setItem('velodesk_user', JSON.stringify(enrichedUser));
-    if (colaboradorPayload) {
-      localStorage.setItem('velodesk_colaborador', JSON.stringify(colaboradorPayload));
-      localStorage.setItem('velodesk_colaborador_meta', JSON.stringify({
-        atuacao: colaboradorPayload.atuacao || [],
-        departamento: colaboradorPayload.departamento || '',
-      }));
-    } else {
-      localStorage.removeItem('velodesk_colaborador');
-    }
+    localStorage.removeItem('velodesk_colaborador');
     localStorage.setItem('velodesk_token', result.token);
     localStorage.setItem('velodesk_gate_authorized', '1');
     localStorage.setItem('velodesk_auth_mode', 'google');
@@ -153,7 +139,6 @@ export function AuthProvider({ children }) {
     } catch {
       /* noop */
     }
-    void notifyAgentOfflineAndStop();
     clearStoredAuthSession();
     setAuthStatus('pending');
     setUser(null);

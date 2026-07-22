@@ -1,13 +1,10 @@
 /**
- * Workspace360Header v1.4.0 — seletor de visão oculto em produção
- * VERSION: v1.4.0 | DATE: 2026-07-20
+ * Workspace360Header v1.3.0 — cabeçalho do Painel 360° + tags de produtos
  */
 import React from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import ProfileRoleSwitcher from '../../../../components/ProfileRoleSwitcher';
 import Workspace360ServiceStatus from './Workspace360ServiceStatus';
-
-const showVisionSwitcher = !import.meta.env.PROD;
 
 export default function Workspace360Header({ greeting, agentName, dateTimeLabel }) {
   const { darkMode, toggleDarkMode } = useTheme();
@@ -31,13 +28,11 @@ export default function Workspace360Header({ greeting, agentName, dateTimeLabel 
         >
           <i className={`fas ${darkMode ? 'fa-sun' : 'fa-moon'}`} />
         </button>
-        {showVisionSwitcher ? (
-          <ProfileRoleSwitcher
-            variant="badge"
-            className="ws360-header__profile"
-            badgeId="ws360ProfileRoleBadge"
-          />
-        ) : null}
+        <ProfileRoleSwitcher
+          variant="badge"
+          className="ws360-header__profile"
+          badgeId="ws360ProfileRoleBadge"
+        />
       </div>
     </header>
   );

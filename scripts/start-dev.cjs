@@ -18,6 +18,7 @@ function start(label, cwd) {
     cwd,
     stdio: 'inherit',
     env: process.env,
+    shell: isWin,
   });
 
   child.on('exit', (code, signal) => {

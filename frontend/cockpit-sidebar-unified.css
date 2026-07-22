@@ -10,9 +10,9 @@
     --velo-sidebar-expanded: 52px;
     --velo-sidebar-pinned: 220px;
     --velo-sidebar-bg: #1634FF;
-    --velo-sidebar-accent: #000058;
+    --velo-sidebar-accent: #1634FF;
     --velo-sidebar-icon-muted: rgba(255, 255, 255, 0.72);
-    --velo-sidebar-icon-active-bg: rgba(0, 0, 88, 0.28);
+    --velo-sidebar-icon-active-bg: rgba(255, 255, 255, 0.18);
     --velo-sidebar-avatar-bg: #1694FF;
 }
 
@@ -30,7 +30,7 @@
 .velo-nav-rail-wrap:not(.is-open):not(.is-pinned),
 .velo-nav-rail-wrap.is-open:not(.is-pinned),
 .velo-nav-rail-wrap.is-pinned {
-    background: #1634FF;
+    background: var(--velo-sidebar-bg);
 }
 
 .velo-nav-rail-wrap.is-open:not(.is-pinned) {
@@ -49,7 +49,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: #1634FF;
+    background: var(--velo-sidebar-bg);
     border-radius: 0 4px 4px 0;
     opacity: 1;
     pointer-events: none;
@@ -194,7 +194,7 @@
     background: var(--velo-sidebar-icon-active-bg);
     color: #fff;
     border-right: none;
-    box-shadow: inset 3px 0 0 var(--velo-sidebar-accent);
+    box-shadow: inset 3px 0 0 #fff;
 }
 
 #mainSidebar.velo-nav-rail .nav-item i {

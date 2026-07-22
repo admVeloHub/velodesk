@@ -1,8 +1,8 @@
 /**
- * DeskRightPanel v1.6.2 — termômetro oculto temporariamente no front
- * VERSION: v1.6.2 | DATE: 2026-07-21
+ * DeskRightPanel v1.7.0 — campo Responsável acima de Canal
+ * VERSION: v1.7.0 | DATE: 2026-07-22
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DEFAULT_TIPO, hasApplyableTabulation, parseTabulationDisplay } from '../../../services/tabulationConfig';
 import { useTabulation } from '../../../context/TabulationContext';
@@ -100,7 +100,7 @@ export default function DeskRightPanel({
   onWorkflowDecisionChange,
 }) {
   const { loading, getMotivos, getDetalhes, getProdutoNames, getTipoChamadoOptions, getCanalContatoOptions } = useTabulation();
-  const { currentAgentValue } = useDeskAgents();
+  const { currentAgentValue, agentOptions, loading: agentsLoading } = useDeskAgents();
   const [processosOpen, setProcessosOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [autoCloseOnSave, setAutoCloseOnSaveState] = useState(() => getAutoCloseOnSave());
@@ -131,6 +131,13 @@ export default function DeskRightPanel({
 
   const tipoOptions = getTipoChamadoOptions();
   const canalOptions = getCanalContatoOptions();
+  const responsavelOptions = useMemo(() => {
+    const options = agentOptions.length ? [...agentOptions] : [];
+    const current = String(rightFields.responsavel || '').trim();
+    if (current && !options.includes(current)) options.unshift(current);
+    if (!options.length && currentAgentValue) options.push(currentAgentValue);
+    return options;
+  }, [agentOptions, rightFields.responsavel, currentAgentValue]);
 
   const thermo = client?.termometro ?? 38;
   const thermoLabel = client?.termometroLabel || (thermo >= 55 ? 'Crítico' : thermo >= 45 ? 'Atenção' : 'Estável');
@@ -195,6 +202,19 @@ export default function DeskRightPanel({
           {loading && (
             <p className="rp-field-hint">Carregando opções de tabulação…</p>
           )}
+          {agentsLoading && !responsavelOptions.length ? (
+            <p className="rp-field-hint">Carregando agentes…</p>
+          ) : null}
+          <SelectField
+            id="selResponsavel"
+            label="Responsável"
+            fieldKey="responsavel"
+            value={rightFields.responsavel}
+            options={responsavelOptions}
+            showPlaceholder
+            readonly={inWorkflow}
+            onFieldChange={onFieldChange}
+          />
           <SelectField
             id="selCanal"
             label="Canal"

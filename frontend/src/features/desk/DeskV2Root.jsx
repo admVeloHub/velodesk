@@ -37,6 +37,7 @@ import { persistClienteContact } from '../../api/adapters/clienteAdapter';
 import { useTickets } from '../../context/TicketsContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
+import { isResponsavelAssignedToOtherAgent } from '../../services/desk/responsavelSegmentation';
 import { hasAtendimentoFuncao } from '../../services/desk/atuacaoVision';
 import { getAllQueueStatuses, restoreCustomBoxes } from '../../services/desk/customQueueBoxes';
 import CreateTicketPanel from './components/CreateTicketPanel';
@@ -275,6 +276,7 @@ export default function DeskV2Root() {
 
   useEffect(() => {
     if (appliedSearch.trim()) return;
+    if (isDeskTableQueue(activeQueue)) return;
     if (countByQueue(activeQueue) > 0) return;
     const nextQueue = pickDefaultQueueId(activeQueue);
     if (nextQueue !== activeQueue) setActiveQueue(nextQueue);
@@ -386,8 +388,8 @@ export default function DeskV2Root() {
     closeTicketTab(id);
   };
 
-  const advanceAfterSaveIfEnabled = useCallback((savedTicketId, plannedNextId, listAnchorId = savedTicketId) => {
-    if (!getAutoCloseOnSave() || !savedTicketId) return;
+  const advanceAfterSaveIfEnabled = useCallback((savedTicketId, plannedNextId, listAnchorId = savedTicketId, force = false) => {
+    if ((!force && !getAutoCloseOnSave()) || !savedTicketId) return;
 
     let nextId = plannedNextId;
     if (!nextId) {
@@ -530,18 +532,21 @@ export default function DeskV2Root() {
     }
     setComposeSpellErrors([]);
 
+    const mergedRightFields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
+    const transferredToOtherAgent = isResponsavelAssignedToOtherAgent(mergedRightFields.responsavel);
+
     try {
       if (isDraftTicket(ticket)) {
         const draftId = String(ticket.id);
         const session = tabSessionsRef.current[draftId];
         let prepared = applyRightFieldsToTicket(
           { ...ticket },
-          mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
+          mergedRightFields,
           escalonar,
         );
         const wfDraft = syncTicketWorkflowOnCommit(
           prepared,
-          mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
+          mergedRightFields,
           escalonar,
           status,
           getAgentName(),
@@ -596,11 +601,13 @@ export default function DeskV2Root() {
         if (messageText) setComposeText('');
         if (internalNoteText) setInternalText('');
         showNotification(
-          messageText || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
+          transferredToOtherAgent
+            ? `Ticket atribuído a ${mergedRightFields.responsavel}.`
+            : messageText || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
           'success',
         );
         await syncTicketViews();
-        advanceAfterSaveIfEnabled(newId, plannedNextId, draftId);
+        advanceAfterSaveIfEnabled(newId, plannedNextId, draftId, transferredToOtherAgent);
         return newId;
       }
 
@@ -615,12 +622,12 @@ export default function DeskV2Root() {
       await updateTicketInCache(ticket.id, (t) => {
         applyRightFieldsToTicket(
           t,
-          mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
+          mergedRightFields,
           escalonar,
         );
         const wfResult = syncTicketWorkflowOnCommit(
           t,
-          mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
+          mergedRightFields,
           escalonar,
           status,
           getAgentName(),
@@ -647,11 +654,13 @@ export default function DeskV2Root() {
         }
       }
       showNotification(
-        messageText || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
+        transferredToOtherAgent
+          ? `Ticket atribuído a ${mergedRightFields.responsavel}.`
+          : messageText || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
         'success',
       );
       await syncTicketViews();
-      advanceAfterSaveIfEnabled(ticket.id, plannedNextId, savedListTicketId);
+      advanceAfterSaveIfEnabled(ticket.id, plannedNextId, savedListTicketId, transferredToOtherAgent);
       return ticket.id;
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Erro ao salvar ticket.';
@@ -707,24 +716,18 @@ export default function DeskV2Root() {
       return undefined;
     }
 
-    const fields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
-    const isAgentForward = isAgentForwardEscalonar(escalonar);
-
+    if (!escalonar || !isAgentForwardEscalonar(escalonar)) return undefined;
     if (escalonar === 'produtos' && !produtosSolicitacaoSubmitted) return undefined;
 
-    if (isAgentForward) {
-      if (!fields.produto || !fields.motivo || !fields.detalhe) return undefined;
-    } else {
-      const isSolicitacao = String(fields.tipo || '').trim() === 'Solicitação';
-      if (!isSolicitacao && !escalonar) return undefined;
-      if (!fields.produto && !escalonar) return undefined;
-    }
+    const fields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
+    if (!fields.produto || !fields.motivo || !fields.detalhe) return undefined;
 
     const { activated, workflow, template } = maybeActivateWorkflowForTicket(
       ticket,
       fields,
       escalonar,
       getAgentName(),
+      { mode: 'escalonar' },
     );
     if (!activated || !workflow || !template) return undefined;
 
@@ -739,16 +742,14 @@ export default function DeskV2Root() {
           t.lateralForm = {
             ...(t.lateralForm || {}),
             workflow,
-            ...(isAgentForward ? { agentRetainsTicket: true } : {}),
+            agentRetainsTicket: true,
           };
           injectWorkflowSystemMessage(t, template, escalonar);
           return t;
         });
         if (!cancelled) {
           showNotification(
-            isAgentForward
-              ? 'Solicitação encaminhada para análise. Ticket permanece com você.'
-              : 'Workflow ativado para este ticket.',
+            'Solicitação encaminhada para análise. Ticket permanece com você.',
             'success',
           );
           syncTicketViews();
@@ -766,7 +767,6 @@ export default function DeskV2Root() {
     rightFields.produto,
     rightFields.motivo,
     rightFields.detalhe,
-    rightFields.tipo,
     escalonar,
     produtosSolicitacaoSubmitted,
     showNotification,
@@ -1004,7 +1004,6 @@ export default function DeskV2Root() {
 
       {!isTableQueueView ? (
         <DeskTicketList
-          queueStatuses={queueStatuses}
           activeTicketId={activeTabId}
           activeSort={activeSort}
           entries={entries}
@@ -1168,6 +1167,8 @@ export default function DeskV2Root() {
                     <DeskConsultasPanel
                       ticket={ticket}
                       client={client}
+                      onReload={reload}
+                      refreshing={ticketsLoading}
                     />
                   )}
                 </div>

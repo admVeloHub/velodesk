@@ -1,16 +1,22 @@
 /**
  * workflowDecisionHandlers v1.1.0 — aprovar / reprovar / pedir informação
  */
-import { updateTicketInCache, getAllCockpitTickets } from '../ticketsStorage';
+import { updateTicketInCache, getAllCockpitTickets, findTicketEntry, sendTicketMessage } from '../ticketsStorage';
 import {
   advanceTicketWorkflow,
   advanceTicketWorkflowByDecision,
+  applySendStatus,
   getAgentName,
   getTicketProtocolLabel,
   getWorkflowProgress,
   getWorkflowTemplateForTicket,
 } from '../desk/utils';
 import { buildWorkflowAdvanceMessage, ticketAwaitingDecision } from '../desk/workflowDefinitions';
+import {
+  buildProdutosConclusaoClientMessage,
+  getProdutosApproveActionLabel,
+} from '../cadastral/solicitacoesProdutosData';
+import { markSolicitacaoFeita } from '../cadastral/cadastralRequestStore';
 import { createWorkflowInfoRequest } from './workflowInfoNotifications';
 
 function pushSystemMessage(ticket, text) {
@@ -27,12 +33,73 @@ function pushSystemMessage(ticket, text) {
   });
 }
 
-function applyApprove(ticket) {
+function finalizeProdutosTicket(ticket) {
+  const now = new Date().toISOString();
+  const lf = ticket.lateralForm || {};
+  const wf = lf.workflow || {};
+
+  ticket.status = 'resolvido';
+  ticket.updatedAt = now;
+  ticket.lateralForm = {
+    ...lf,
+    workflow: {
+      ...wf,
+      status: 'completed',
+      completedAt: wf.completedAt || now,
+    },
+    ...(lf.solicitacaoProdutos
+      ? {
+        solicitacaoProdutos: {
+          ...lf.solicitacaoProdutos,
+          status: 'feito',
+        },
+      }
+      : {}),
+  };
+
+  return ticket;
+}
+
+function applyApprove(ticket, options = {}) {
   const author = getAgentName() || 'Operador';
+  const { selectedActions = [] } = options;
+  const now = new Date().toISOString();
+  const lf = ticket.lateralForm || {};
+
+  if (selectedActions.length) {
+    const aprovacaoProdutos = {
+      acoes: selectedActions,
+      aprovadoEm: now,
+      aprovadoPor: author,
+    };
+    ticket.lateralForm = {
+      ...lf,
+      aprovacaoProdutos,
+      ...(lf.solicitacaoProdutos
+        ? {
+          solicitacaoProdutos: {
+            ...lf.solicitacaoProdutos,
+            acoesAprovacao: selectedActions,
+          },
+        }
+        : {}),
+    };
+  }
+
   const result = advanceTicketWorkflowByDecision(ticket, 'approve', author);
   if (!result.advanced) {
     advanceTicketWorkflow(ticket, author);
   }
+
+  if (selectedActions.length) {
+    const labels = selectedActions.map((id) => getProdutosApproveActionLabel(id)).join(', ');
+    pushSystemMessage(
+      ticket,
+      `[Workflow] Aprovação Produtos por ${author} — ações: ${labels}.`,
+    );
+    finalizeProdutosTicket(ticket);
+  }
+
   return ticket;
 }
 
@@ -245,8 +312,31 @@ function applyRequestInfo(ticket, message = '') {
   return ticket;
 }
 
-export async function approveWorkflowDecision(ticketId) {
-  return updateTicketInCache(ticketId, (ticket) => applyApprove(ticket));
+export async function approveWorkflowDecision(ticketId, options = {}) {
+  const isProdutosFinalize = Boolean(options.selectedActions?.length);
+
+  const ticket = await updateTicketInCache(ticketId, (t) => applyApprove(t, options));
+
+  if (!isProdutosFinalize || !ticket) return ticket;
+
+  const clientText = buildProdutosConclusaoClientMessage(ticket);
+  await sendTicketMessage(ticketId, clientText, getAgentName() || 'Operador Produtos');
+
+  const entry = findTicketEntry(ticketId);
+  if (entry) {
+    applySendStatus(entry, 'resolvidos');
+    await updateTicketInCache(ticketId, (t) => {
+      t.status = 'resolvido';
+      return t;
+    });
+  }
+
+  const solic = ticket.lateralForm?.solicitacaoProdutos;
+  if (solic?.id) {
+    markSolicitacaoFeita(solic.id);
+  }
+
+  return ticket;
 }
 
 export async function rejectWorkflowDecision(ticketId, reason = '') {
@@ -254,5 +344,7 @@ export async function rejectWorkflowDecision(ticketId, reason = '') {
 }
 
 export async function requestWorkflowInfo(ticketId, message = '') {
-  return updateTicketInCache(ticketId, (ticket) => applyRequestInfo(ticket, message));
+  const ticket = await updateTicketInCache(ticketId, (ticket) => applyRequestInfo(ticket, message));
+  if (ticket) await syncInfoRequestToTickets(ticket);
+  return ticket;
 }
