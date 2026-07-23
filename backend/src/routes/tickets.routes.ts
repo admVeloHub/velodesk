@@ -29,6 +29,10 @@ import {
   assertCanActOnTicket,
   PermissionDeniedError,
 } from '../services/permission.service';
+import {
+  mergeTicketInto,
+  TicketMergeError,
+} from '../services/ticketMerge.service';
 
 const router = Router();
 
@@ -65,6 +69,28 @@ router.get('/by-protocol/:protocolo', authMiddleware, async (req, res: Response)
 
   const boxes = await loadBoxes();
   res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+});
+
+router.post('/:sourceId/merge-into/:targetId', authMiddleware, async (req, res: Response) => {
+  try {
+    const result = await mergeTicketInto(
+      String(req.params.sourceId),
+      String(req.params.targetId),
+      req.user!,
+    );
+    res.json(result);
+  } catch (err) {
+    if (err instanceof TicketMergeError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    if (err instanceof PermissionDeniedError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    if (err instanceof TabulacaoValidationError) {
+      return res.status(400).json({ message: err.message });
+    }
+    throw err;
+  }
 });
 
 router.get('/:id', authMiddleware, async (req, res: Response) => {

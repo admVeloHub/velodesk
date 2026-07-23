@@ -110,6 +110,25 @@ export function resolveWorkflowTeamForTicket(ticket) {
   return null;
 }
 
+const CLIENT360_WORKFLOW_ICON = {
+  financeiro: {
+    icon: 'ti-currency-dollar',
+    title: 'Workflow Financeiro ativo',
+    modifier: 'financeiro',
+  },
+  produtos: {
+    icon: 'ti-device-desktop',
+    title: 'Workflow Produtos ativo',
+    modifier: 'produtos',
+  },
+};
+
+export function getClient360WorkflowIconMeta(ticket) {
+  if (!isWorkflowActive(ticket)) return null;
+  const teamId = resolveWorkflowTeamForTicket(ticket);
+  return CLIENT360_WORKFLOW_ICON[teamId] || null;
+}
+
 export function buildWorkflowNavigationUrl({ teamId, ticketId } = {}) {
   const params = new URLSearchParams();
   if (teamId) params.set('team', teamId);

@@ -29,6 +29,7 @@ import {
   syncTicketWorkflowOnCommit,
   statusMeta,
 } from '../../services/desk/utils';
+import { mergeTicketInto } from '../../services/desk/ticketMergeService';
 import { findTicketEntry, mapTicketQueueId, updateTicketInCache, sendTicketRegistroEntry } from '../../services/ticketsStorage';
 import { isDraftTicket, persistDraftTicket } from '../../services/ticketsCache';
 import { lookupClient } from '../../services/clientDb';
@@ -151,6 +152,7 @@ export default function DeskV2Root() {
   const [produtosSolicitacaoSubmitted, setProdutosSolicitacaoSubmitted] = useState(false);
   const [waChatOpen, setWaChatOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [mergeInProgress, setMergeInProgress] = useState(false);
   const [aiRevisionOpen, setAiRevisionOpen] = useState(false);
   const [aiRevisionSubmitting, setAiRevisionSubmitting] = useState(false);
   const [composeSpellErrors, setComposeSpellErrors] = useState([]);
@@ -387,6 +389,40 @@ export default function DeskV2Root() {
     if (isLastTab) suppressAutoSelectRef.current = true;
     closeTicketTab(id);
   };
+
+  const handleMergeTickets = useCallback(async (targetId) => {
+    if (!ticket?.id || mergeInProgress) return;
+    const sourceId = String(ticket.id);
+    if (isDraftTicket(ticket)) {
+      showNotification('Salve o ticket antes de mesclar.', 'warning');
+      return;
+    }
+    setMergeInProgress(true);
+    try {
+      await mergeTicketInto(sourceId, targetId);
+      await syncTicketViews();
+      setHistoryOpen(false);
+      selectTicket(targetId);
+      setMainTab('notas');
+      if (openTabs.some((tab) => String(tab.id) === sourceId)) {
+        closeTicketTabHandler(sourceId);
+      }
+      showNotification('Tickets mesclados com sucesso.', 'success');
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Não foi possível mesclar os tickets.';
+      showNotification(msg, 'error');
+    } finally {
+      setMergeInProgress(false);
+    }
+  }, [
+    ticket,
+    mergeInProgress,
+    syncTicketViews,
+    selectTicket,
+    openTabs,
+    closeTicketTabHandler,
+    showNotification,
+  ]);
 
   const advanceAfterSaveIfEnabled = useCallback((savedTicketId, plannedNextId, listAnchorId = savedTicketId, force = false) => {
     if ((!force && !getAutoCloseOnSave()) || !savedTicketId) return;
@@ -1097,6 +1133,9 @@ export default function DeskV2Root() {
               ticket={ticket}
               client={client}
               onSelectTicket={selectTicket}
+              sourceTicketId={ticket?.id || ticket?._id}
+              onMergeTickets={handleMergeTickets}
+              merging={mergeInProgress}
             />
             <div className={'crm-conversation-wrap' + (waChatOpen ? ' crm-conversation-wrap--wa' : '')}>
               {mainTab === 'conversa' && waChatOpen ? (
@@ -1180,7 +1219,7 @@ export default function DeskV2Root() {
         )}
       </main>
 
-      {ticket && !createOpen && (
+      {ticket && !createOpen && !(isMyTicketsQueue && showTableQueueMain) && (
         <DeskRightPanel
           ticket={ticket}
           client={client}

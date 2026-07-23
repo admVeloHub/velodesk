@@ -779,6 +779,62 @@ body:has(.eco-prototype-banner) {
 .client360-table td { padding: 0.75rem 0.9rem; border-bottom: 1px solid #f1f5f9; }
 .client360-row--clickable { cursor: pointer; transition: background 0.15s ease; }
 .client360-row--clickable:hover { background: #f0f4ff; }
+.client360-row--merge-selected { background: #eef6ff; }
+.client360-row--merge-selected:hover { background: #e3efff; }
+.client360-merge-hint {
+    margin: 0 0 0.65rem;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+.client360-table__th-check,
+.client360-table__td-check {
+    width: 32px;
+    padding-left: 0.65rem !important;
+    padding-right: 0.35rem !important;
+    text-align: center;
+    vertical-align: middle;
+}
+.client360-merge-check {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: #1634FF;
+}
+.client360-merge-check:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+}
+.client360-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.65rem;
+}
+.client360-ticket-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.client360-workflow-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: rgba(22, 52, 255, 0.1);
+    color: #1634FF;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+.client360-workflow-icon--financeiro {
+    background: rgba(21, 162, 55, 0.12);
+    color: #15A237;
+}
+.client360-workflow-icon--produtos {
+    background: rgba(22, 52, 255, 0.1);
+    color: #1634FF;
+}
 .client360-empty { text-align: center; color: #64748b; padding: 1rem !important; }
 .client360-analise { font-size: 0.9rem; color: #475569; margin: 0.85rem 0 1.15rem; line-height: 1.5; }
 .client360-section-title { margin: 1.25rem 0 0.65rem; font-size: 0.95rem; color: var(--eco-navy); }

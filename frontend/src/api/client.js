@@ -75,6 +75,8 @@ export const ticketsApi = {
     api.post(`/tickets/${id}/messages`, data).then((r) => r.data),
   advanceWorkflow: (id, body = {}) =>
     api.post(`/tickets/${id}/workflow/advance`, body).then((r) => r.data),
+  mergeInto: (sourceId, targetId) =>
+    api.post(`/tickets/${sourceId}/merge-into/${targetId}`).then((r) => r.data),
 };
 
 export const uploadsApi = {

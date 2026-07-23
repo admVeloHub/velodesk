@@ -379,6 +379,12 @@ export function isTicketInWorkflow(ticket) {
   return Boolean(wf?.templateId || wf?.definicaoSlug);
 }
 
+export function isTicketWorkflowActive(ticket) {
+  const wf = ticket?.lateralForm?.workflow;
+  if (!wf?.templateId && !wf?.definicaoSlug) return false;
+  return wf.status !== 'completed';
+}
+
 export function getWorkflowTemplateForTicket(ticket) {
   const wf = ticket?.lateralForm?.workflow;
   const templateKey = wf?.templateId || wf?.definicaoSlug;
@@ -1129,6 +1135,91 @@ export function getTicketStatusLabel(status) {
   return map[status] || status || '—';
 }
 
+const TERMINAL_TICKET_STATUSES = new Set(['resolvido', 'resolvidos', 'cancelado', 'fechado']);
+
+export function isTicketTerminalStatus(ticket) {
+  const status = String(ticket?.status || '').trim().toLowerCase();
+  return TERMINAL_TICKET_STATUSES.has(status);
+}
+
+export function getTicketCpfDigits(ticket) {
+  const lf = ticket?.lateralForm || {};
+  return normalizeCpf(lf.clienteCpf || lf.cpf || ticket?.clientCPF || '');
+}
+
+function normalizeClientNameKey(ticket) {
+  const lf = ticket?.lateralForm || {};
+  return String(lf.clienteNome || ticket?.clientName || ticket?.solicitante || '')
+    .trim()
+    .toLowerCase();
+}
+
+export function ticketsBelongToSameClient(source, target, context = {}) {
+  const sourceCpf = getTicketCpfDigits(source);
+  const targetCpf = getTicketCpfDigits(target);
+  const contextCpf = normalizeCpf(context.clientCpfDigits || context.cpf || '');
+
+  if (sourceCpf && targetCpf) return sourceCpf === targetCpf;
+
+  if (contextCpf.length === 11) {
+    const sourceMatchesContext = !sourceCpf || sourceCpf === contextCpf;
+    const targetMatchesContext = !targetCpf || targetCpf === contextCpf;
+    if (sourceMatchesContext && targetMatchesContext) return true;
+  }
+
+  const contextName = String(context.clientName || '').trim().toLowerCase();
+  const sourceName = normalizeClientNameKey(source) || contextName;
+  const targetName = normalizeClientNameKey(target);
+  return Boolean(sourceName && targetName && sourceName === targetName);
+}
+
+export function isTicketAlreadyMergedSource(ticket) {
+  const lf = ticket?.lateralForm || {};
+  if (lf.mergedIntoTicketId) return true;
+  const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
+  return historico.some((entry) => entry?.metadados?.merge?.role === 'source');
+}
+
+export function isTicketMergeTargetEligible(source, target, context = {}) {
+  if (!source || !target) return false;
+  const sourceId = String(source.id || source._id);
+  const targetId = String(target.id || target._id);
+  if (sourceId === targetId) return false;
+  if (isTicketTerminalStatus(target)) return false;
+  if (isTicketAlreadyMergedSource(target)) return false;
+  if (!ticketsBelongToSameClient(source, target, context)) return false;
+  return true;
+}
+
+export function buildTicketMergeNote(source, target) {
+  const sourceProto = getTicketProtocolLabel(source) || source.id || source._id;
+  const targetProto = getTicketProtocolLabel(target) || target.id || target._id;
+  return `O ticket #${sourceProto} foi mesclado ao chamado #${targetProto}.`;
+}
+
+export function copyTabulationFromTicket(source, target) {
+  const targetLf = target?.lateralForm || {};
+  const sourceLf = source?.lateralForm || {};
+  const tabFields = {
+    tipoChamado: targetLf.tipoChamado || targetLf.classificacaoTipo || targetLf.tipo || '',
+    classificacaoTipo: targetLf.classificacaoTipo || targetLf.tipoChamado || targetLf.tipo || '',
+    tipo: targetLf.tipo || targetLf.classificacaoTipo || targetLf.tipoChamado || '',
+    produto: targetLf.produto || '',
+    motivo: targetLf.motivo || '',
+    detalhe: targetLf.detalhe || '',
+    responsavel: targetLf.responsavel || target.responsibleAgent || '',
+    atribuido: targetLf.atribuido || '',
+  };
+  return {
+    ...source,
+    responsibleAgent: tabFields.responsavel,
+    lateralForm: {
+      ...sourceLf,
+      ...tabFields,
+    },
+  };
+}
+
 export function collectClientTickets(cpf, clientName) {
   const cpfDigits = normalizeCpf(cpf);
   const nameKey = (clientName || '').toLowerCase().trim();
@@ -1138,7 +1229,7 @@ export function collectClientTickets(cpf, clientName) {
   getAllCockpitTickets().forEach(({ ticket: t }) => {
     const id = String(t.id || t._id);
     if (seen.has(id)) return;
-    const tCpf = normalizeCpf(t.lateralForm?.cpf || t.clientCPF || '');
+    const tCpf = normalizeCpf(t.lateralForm?.clienteCpf || t.lateralForm?.cpf || t.clientCPF || '');
     const tName = (t.clientName || t.solicitante || '').toLowerCase();
     const titleMatch = nameKey && (t.title || '').toLowerCase().includes(nameKey);
     if ((cpfDigits && tCpf === cpfDigits) || (nameKey && (tName === nameKey || titleMatch))) {
