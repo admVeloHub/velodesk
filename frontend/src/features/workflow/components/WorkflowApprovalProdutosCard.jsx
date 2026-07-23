@@ -1,4 +1,5 @@
 import React from 'react';
+import WorkflowApprovalAttachments from './WorkflowApprovalAttachments';
 
 function formatSubmittedAt(iso) {
   if (!iso) return '';
@@ -43,7 +44,21 @@ function renderRowValue(row) {
 }
 
 export default function WorkflowApprovalProdutosCard({ detail }) {
-  const { typeBar, submittedAt, dadoAntigo, dadoNovo, rows, highlightCpf } = detail;
+  const {
+    typeBar,
+    submittedAt,
+    dadoAntigo,
+    dadoNovo,
+    descricao,
+    rows,
+    highlightCpf,
+    attachments,
+    layout,
+  } = detail;
+
+  const isErrosBugs = layout === 'produtos-erros-bugs';
+  const showDiff = !isErrosBugs && (dadoAntigo || dadoNovo);
+  const descriptionText = descricao || (isErrosBugs ? dadoNovo : '');
 
   return (
     <div className="wf-approval-produtos">
@@ -61,7 +76,7 @@ export default function WorkflowApprovalProdutosCard({ detail }) {
         <p className="wf-approval-produtos-highlight">CPF: {highlightCpf}</p>
       ) : null}
 
-      {(dadoAntigo || dadoNovo) ? (
+      {showDiff ? (
         <div className="wf-approval-produtos-diff">
           {dadoAntigo ? (
             <div className="wf-approval-produtos-diff__item">
@@ -76,6 +91,17 @@ export default function WorkflowApprovalProdutosCard({ detail }) {
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {isErrosBugs && descriptionText ? (
+        <div className="wf-approval-produtos-descricao">
+          <span className="wf-approval-produtos-descricao__label">Descrição:</span>
+          <p className="wf-approval-produtos-descricao__text">{descriptionText}</p>
+        </div>
+      ) : null}
+
+      {attachments ? (
+        <WorkflowApprovalAttachments attachments={attachments} />
       ) : null}
 
       {rows?.length ? (

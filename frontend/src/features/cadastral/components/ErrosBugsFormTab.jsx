@@ -1,14 +1,19 @@
 /**
- * ErrosBugsFormTab — solicitação de erros/bugs ao time de Produtos
+ * ErrosBugsFormTab v1.1.0 — anexos IndexedDB + embed no ticket
+ * VERSION: v1.1.0 | DATE: 2026-07-23
  */
 import React, { useEffect, useState } from 'react';
 import { useNotifications } from '../../../context/NotificationContext';
-import { saveCadastralRequest } from '../../../services/cadastral/cadastralRequestStore';
+import {
+  persistSolicitacaoProdutosOnTicket,
+  saveCadastralRequest,
+} from '../../../services/cadastral/cadastralRequestStore';
+import { persistAttachmentEntries } from '../../../services/cadastral/cadastralAttachmentStore';
+import { findTicketEntry } from '../../../services/ticketsStorage';
 import { ERROS_BUGS_TIPO_OPTIONS } from '../../../services/cadastral/solicitacoesProdutosData';
 import { useProdSolicTicketPrefill, validateCpfTicket } from './useProdSolicTicketPrefill';
 import ProdSolicAttachments, {
   revokeAttachmentPreviews,
-  stripAttachmentsForSave,
 } from './ProdSolicAttachments';
 
 const EMPTY_FORM = {
@@ -34,7 +39,7 @@ export default function ErrosBugsFormTab({
   clientOverride,
 }) {
   const { showNotification } = useNotifications();
-  const { prefill, formatCpf } = useProdSolicTicketPrefill({ ticketOverride, clientOverride });
+  const { prefill, activeTabId, formatCpf } = useProdSolicTicketPrefill({ ticketOverride, clientOverride });
   const [form, setForm] = useState(EMPTY_FORM);
   const [attachments, setAttachments] = useState(EMPTY_ATTACHMENTS);
   const [submitting, setSubmitting] = useState(false);
@@ -51,7 +56,7 @@ export default function ErrosBugsFormTab({
     revokeAttachmentPreviews(attachments.imagens, attachments.videos);
   }, [attachments.imagens, attachments.videos]);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (!validateCpfTicket(form, showNotification)) return;
     if (!String(form.descricaoErro || '').trim()) {
@@ -67,12 +72,11 @@ export default function ErrosBugsFormTab({
 
     setSubmitting(true);
     try {
-      const { anexosImagens, anexosVideos } = stripAttachmentsForSave(
-        attachments.imagens,
-        attachments.videos,
-      );
+      const { anexosImagens, anexosVideos } = hasAnexos
+        ? await persistAttachmentEntries(attachments.imagens, attachments.videos)
+        : { anexosImagens: [], anexosVideos: [] };
 
-      saveCadastralRequest({
+      const request = saveCadastralRequest({
         categoria: 'erros-bugs',
         cpf: form.cpf,
         ticketId: form.ticketId,
@@ -87,12 +91,22 @@ export default function ErrosBugsFormTab({
         urgente: form.urgente,
       });
 
+      const ticketRef = ticketOverride?.id
+        || findTicketEntry(activeTabId)?.ticket?.id
+        || findTicketEntry(form.ticketId)?.ticket?.id;
+
+      if (ticketRef) {
+        await persistSolicitacaoProdutosOnTicket(ticketRef, request);
+      }
+
       revokeAttachmentPreviews(attachments.imagens, attachments.videos);
       showNotification('Erro/bug registrado e enviado ao time de Produtos.', 'success');
       setForm({ ...EMPTY_FORM, cpf: form.cpf, ticketId: form.ticketId });
       setAttachments(EMPTY_ATTACHMENTS);
       onSaved?.();
       onSubmitted?.();
+    } catch (err) {
+      showNotification(err?.message || 'Não foi possível enviar a solicitação.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -171,6 +185,7 @@ export default function ErrosBugsFormTab({
         videos={attachments.videos}
         recusouEvidencias={attachments.recusouEvidencias}
         onChange={setAttachments}
+        showNotification={showNotification}
       />
 
       <div className="prod-solic-form__actions">

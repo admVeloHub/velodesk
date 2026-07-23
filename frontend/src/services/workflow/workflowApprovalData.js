@@ -4,6 +4,7 @@
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { findCadastralRequestByTicketId } from '../cadastral/cadastralRequestStore';
 import {
+  getErrosBugsTipoLabel,
   getTipoSolicitacaoLabel,
 } from '../cadastral/solicitacoesProdutosData';
 import { getSlaClass, getWorkflowProgress, isTicketInWorkflow, getTicketProtocolLabel } from '../desk/utils';
@@ -146,7 +147,7 @@ export function resolveSolicitacaoProdutosForTicket(ticket) {
 
   const lf = ticket.lateralForm || {};
   const embedded = lf.solicitacaoProdutos;
-  if (embedded?.categoria === 'solicitacoes') return embedded;
+  if (embedded?.categoria === 'solicitacoes' || embedded?.categoria === 'erros-bugs') return embedded;
 
   const protocol = getTicketProtocolLabel(ticket) || String(ticket.id || '');
   return findCadastralRequestByTicketId(protocol)
@@ -223,6 +224,71 @@ function buildProdutosCadastralDetail(ticket, progress, header, solicitacao) {
     dadoNovo: solicitacao.dadoNovo || '',
     rows,
     highlightCpf: cpfDisplay,
+    fields: [],
+    justificationQuote: null,
+    internalNote: null,
+  };
+}
+
+function buildAttachmentPayload(solicitacao) {
+  return {
+    imagens: Array.isArray(solicitacao.anexosImagens) ? solicitacao.anexosImagens : [],
+    videos: Array.isArray(solicitacao.anexosVideos) ? solicitacao.anexosVideos : [],
+    recusouEvidencias: Boolean(solicitacao.clienteRecusouEvidencias),
+  };
+}
+
+function buildProdutosErrosBugsDetail(ticket, progress, header, solicitacao) {
+  const startedAt = solicitacao.createdAt || progress.workflow?.startedAt || ticket.createdAt;
+  const tipoLabel = getErrosBugsTipoLabel(solicitacao.tipoErro || 'app');
+  const cpfDigits = String(solicitacao.cpf || '').replace(/\D/g, '');
+  const cpfDisplay = cpfDigits || String(solicitacao.cpf || '').trim();
+  const { slaLabel, slaPct } = buildSlaDetail(progress);
+  const lf = ticket.lateralForm || {};
+  const rows = [];
+
+  const pushRow = (icon, label, value, options = {}) => {
+    if (options.skipEmpty && !String(value ?? '').trim()) return;
+    rows.push({
+      icon,
+      label,
+      hideLabel: Boolean(options.hideLabel),
+      value: String(value ?? '').trim(),
+      tone: options.tone || 'default',
+      booleanValue: null,
+    });
+  };
+
+  if (solicitacao.clienteRecusouEvidencias) {
+    pushRow('ti-alert-circle', 'Evidências', 'Cliente recusou enviar evidências', { hideLabel: true, tone: 'muted' });
+  }
+
+  pushRow('ti-tag', 'Marca', solicitacao.marca, { skipEmpty: true });
+  pushRow('ti-device-mobile', 'Modelo', solicitacao.modelo, { skipEmpty: true });
+
+  const octadeskId = readOctadeskTicketId(ticket);
+  pushRow('ti-ticket', 'Ticket Octadesk', octadeskId, { skipEmpty: true });
+
+  const mensagemN1 = solicitacao.mensagemN1 || solicitacao.observacoes || '';
+  pushRow('ti-message-circle', 'Mensagem N1', mensagemN1, { skipEmpty: true });
+  pushRow('ti-user', 'Colaborador', solicitacao.colaborador || lf.responsavel || ticket.responsibleAgent, { skipEmpty: true });
+
+  const descricao = solicitacao.observacoes || solicitacao.dadoNovo || '';
+
+  return {
+    layout: 'produtos-erros-bugs',
+    cardTitle: solicitacao.titulo || `${cpfDisplay} · Erros/Bugs`,
+    cardSubtext: `Solicitado em ${formatDateTime(startedAt)} · aguardando há ${formatElapsedSince(startedAt)}`,
+    slaLabel,
+    slaPct,
+    typeBar: `Erros/Bugs · ${tipoLabel}`,
+    submittedAt: solicitacao.createdAt || startedAt,
+    dadoAntigo: '',
+    dadoNovo: descricao,
+    descricao,
+    rows,
+    highlightCpf: cpfDisplay,
+    attachments: buildAttachmentPayload(solicitacao),
     fields: [],
     justificationQuote: null,
     internalNote: null,
@@ -386,10 +452,16 @@ function buildDetailView(ticket, progress) {
     resolver = buildReembolsoApprovalDetail;
   } else if (detailResolver === 'escalonar-produtos') {
     const solicitacao = resolveSolicitacaoProdutosForTicket(ticket);
-    resolver = solicitacao ? buildProdutosCadastralDetail : buildProdutosGenericDetail;
-    resolverArgs = solicitacao
-      ? [ticket, progress, header, solicitacao]
-      : [ticket, progress, header];
+    if (solicitacao?.categoria === 'erros-bugs') {
+      resolver = buildProdutosErrosBugsDetail;
+      resolverArgs = [ticket, progress, header, solicitacao];
+    } else if (solicitacao) {
+      resolver = buildProdutosCadastralDetail;
+      resolverArgs = [ticket, progress, header, solicitacao];
+    } else {
+      resolver = buildProdutosGenericDetail;
+      resolverArgs = [ticket, progress, header];
+    }
   }
 
   const detail = resolver(...resolverArgs);

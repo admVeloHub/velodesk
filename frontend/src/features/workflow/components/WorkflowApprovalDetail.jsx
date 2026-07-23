@@ -80,7 +80,7 @@ export default function WorkflowApprovalDetail({
 
       <div className="wf-approval-card-wrap">
         <article className="wf-approval-card">
-          {detail.layout !== 'produtos-cadastral' ? (
+          {detail.layout !== 'produtos-cadastral' && detail.layout !== 'produtos-erros-bugs' ? (
             <>
               <h3>{detail.cardTitle}</h3>
               <p className="wf-approval-card__sub">{detail.cardSubtext}</p>
@@ -93,7 +93,7 @@ export default function WorkflowApprovalDetail({
             <WorkflowApprovalSlaBar label={detail.slaLabel} pct={detail.slaPct} />
           ) : null}
 
-          {detail.layout === 'produtos-cadastral' ? (
+          {detail.layout === 'produtos-cadastral' || detail.layout === 'produtos-erros-bugs' ? (
             <WorkflowApprovalProdutosCard detail={detail} />
           ) : (
             <>
