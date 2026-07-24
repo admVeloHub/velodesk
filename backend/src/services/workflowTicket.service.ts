@@ -1,4 +1,4 @@
-/** workflowTicket.service v1.4.0 — startWorkflow com slug explícito; sem escalonar legado */
+/** workflowTicket.service v1.4.1 — ticketCtx só tabulacao (IChamadoN1 sem lateralForm) */
 import { isAutomaticaStep, resolveAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
@@ -252,7 +252,6 @@ export async function startWorkflowForChamado(
 
   const ticketCtx = {
     tabulacao: chamado.tabulacao as unknown as Array<Record<string, string>>,
-    lateralForm: chamado.lateralForm as Record<string, unknown> | undefined,
   };
   const fields = buildTabulationFieldsFromTicket(ticketCtx);
   const grupos = await getActiveGrupos();
