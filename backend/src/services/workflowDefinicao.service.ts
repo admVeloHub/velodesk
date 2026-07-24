@@ -1,4 +1,4 @@
-/** workflowDefinicao.service v1.7.0 — getWorkflowsByIds batch para listagem */
+/** workflowDefinicao.service v1.7.1 — resolveWorkflowForTicket lateralForm unknown */
 import { migratePassoAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import { normalizeRequisicaoConfig } from '../config/workflowRequisicaoDefaults';
@@ -186,7 +186,7 @@ export async function deleteWorkflow(id: string): Promise<boolean> {
 
 export async function resolveWorkflowForTicket(ticket: {
   tabulacao?: Array<Record<string, string>>;
-  lateralForm?: Record<string, string>;
+  lateralForm?: Record<string, unknown>;
 }): Promise<IWorkflowDefinicao | null> {
   const fields = buildTabulationFieldsFromTicket(ticket);
   const grupos = await getActiveGrupos();

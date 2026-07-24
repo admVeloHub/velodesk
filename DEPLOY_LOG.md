@@ -1,10 +1,28 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.46.0 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.46.1 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — fix build TypeScript (GCP Cloud Build)
+
+- **Data/Hora**: 2026-07-24
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.46.1
+  - workflowTicket.service v1.4.1, workflowDefinicao.service v1.7.1, funcaoPermissao.service v1.1.1
+- **Arquivos modificados**:
+  - `backend/src/services/workflowTicket.service.ts` — ticketCtx usa só `tabulacao` (IChamadoN1 sem lateralForm)
+  - `backend/src/services/workflowDefinicao.service.ts` — `resolveWorkflowForTicket` aceita `lateralForm?: Record<string, unknown>`
+  - `backend/src/services/funcaoPermissao.service.ts` — merge lean com `satisfies Pick<>` em vez de `IDeskFuncaoPermissao` Document
+- **Descrição**: Corrige falha do `tsc` no Cloud Build (TS2345, TS2339, TS2740) que impedia deploy Docker.
+- **Status**: Concluído (push dev + main)
+
+---
 
 ### GitHub Push — Workflow RBAC, requisição, filas e comunicação
 

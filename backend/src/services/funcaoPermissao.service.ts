@@ -1,4 +1,4 @@
-/** funcaoPermissao.service v1.1.0 — CRUD desk_funcoes_permissoes + seed */
+/** funcaoPermissao.service v1.1.1 — merge lean sem exigir Document no replace */
 import {
   DEFAULT_FUNCOES_PERMISSOES,
   derivePortalVisivelFromPermissoes,
@@ -120,7 +120,7 @@ export async function replaceFuncaoPermissao(
   if (payload.permissoes !== undefined) $set.permissoes = payload.permissoes;
 
   const existing = await Model.findOne({ slug }).lean() as unknown as IDeskFuncaoPermissao | null;
-  const mergedForPortal: IDeskFuncaoPermissao = {
+  const mergedForPortal = {
     slug,
     nome: payload.nome ?? existing?.nome ?? slug,
     nivel: payload.nivel ?? existing?.nivel ?? 1,
@@ -129,11 +129,14 @@ export async function replaceFuncaoPermissao(
     permissoes: payload.permissoes ?? existing?.permissoes ?? buildEmptyPermissoes(),
     canalOrigem: payload.canalOrigem ?? existing?.canalOrigem,
     updatedBy,
-  };
+  } satisfies Pick<
+    IDeskFuncaoPermissao,
+    'slug' | 'nome' | 'nivel' | 'herdaDe' | 'portalVisivel' | 'permissoes' | 'canalOrigem' | 'updatedBy'
+  >;
 
   const all = await listFuncoesPermissoes(true);
   const map = new Map(all.map((f) => [f.slug, f]));
-  map.set(slug, mergedForPortal);
+  map.set(slug, mergedForPortal as IDeskFuncaoPermissao);
   const effectivePermissoes = resolveEffectivePermissoes(mergedForPortal, map);
   $set.portalVisivel = derivePortalVisivelFromPermissoes(
     effectivePermissoes,
