@@ -1,10 +1,38 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.46.1 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.46.2 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: Meus Tickets, resolvidos globais e visão gestão
+
+- **Data/Hora**: 2026-07-24
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.46.2
+  - chamado.mapper v2.3.1, permission.service v1.6.1, workspace360.routes v1.2.1
+  - responsavelSegmentation v1.5.0, desk/utils v3.3.9, ticketsCache v1.9.4
+  - permissionService (FE) v1.5.1, TicketsContext v1.6.1
+  - DeskV2Root v3.14.1, DeskMyTicketsTable v1.2.1
+- **Arquivos modificados**:
+  - `backend/src/services/chamado.mapper.ts` — resolvidos em `meus-chamados` sem filtro de responsável (visão global na sidebar)
+  - `backend/src/services/permission.service.ts` — função gestão não usa fila `meus-chamados`; `canViewTicket` libera todos os tickets
+  - `backend/src/routes/workspace360.routes.ts` — gestão com `ver_todos` usa visão equipe no Painel 360°
+  - `frontend/src/services/desk/responsavelSegmentation.js` — `shouldViewAllDeskTickets` para gestão/supervisor/ver_todos
+  - `frontend/src/services/desk/utils.js` — Meus Tickets confia backend (sem double-filter); em andamento restaurado; gestão vê todas categorias
+  - `frontend/src/services/ticketsCache.js` — não re-filtra novos/em andamento após API meus-chamados
+  - `frontend/src/services/permissions/permissionService.js` — gestão não usa meus-chamados; evento recarrega filas
+  - `frontend/src/context/TicketsContext.js` — recarrega boxes ao carregar permissões
+  - `frontend/src/features/desk/DeskV2Root.jsx` — fila vazia permanece selecionada (sem redirect automático)
+  - `frontend/src/features/desk/components/DeskMyTicketsTable.jsx` — seção Em andamento com cabeçalho retrátil
+- **Descrição**: Corrige regressões de filas do Desk: agentes voltam a ver em andamento em Meus Tickets (fim do double-filter), resolvidos globais na sidebar, gestão vê todos os tickets em todas as categorias, e Painel 360° de gestão usa visão equipe com `ver_todos`.
+- **Status**: Concluído (push dev + main)
+
+---
 
 ### GitHub Push — fix build TypeScript (GCP Cloud Build)
 

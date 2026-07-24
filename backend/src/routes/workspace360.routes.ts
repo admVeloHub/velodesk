@@ -1,4 +1,4 @@
-/** workspace360.routes v1.2.0 — RBAC por função */
+/** workspace360.routes v1.2.1 — gestão com ver_todos usa visão equipe */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { isMongoConnected } from '../config/database';
@@ -26,12 +26,16 @@ function parseQuery(req: { query: Record<string, unknown> }): Workspace360Query 
 
 function wantsSupervisorPayload(
   req: { query: Record<string, unknown> },
-  hasEquipe: boolean,
+  resolved: Awaited<ReturnType<typeof resolveUserPermissions>>,
 ): boolean {
   const profile = String(req.query.profile ?? '').trim().toLowerCase();
-  if (profile === 'gestao' || profile === 'supervisor') return hasEquipe;
+  const hasEquipe = hasPermission(resolved.permissoes, 'workspace', 'painel_360_equipe');
+  const hasVerTodos = hasPermission(resolved.permissoes, 'tickets', 'ver_todos');
+  const canViewTeam = hasEquipe || hasVerTodos;
+
+  if (profile === 'gestao' || profile === 'supervisor') return canViewTeam;
   if (profile === 'agent') return false;
-  return hasEquipe;
+  return canViewTeam;
 }
 
 router.get('/', authMiddleware, async (req, res: Response) => {
@@ -43,7 +47,7 @@ router.get('/', authMiddleware, async (req, res: Response) => {
     const resolved = await resolveUserPermissions(req.user!);
     const hasEquipe = hasPermission(resolved.permissoes, 'workspace', 'painel_360_equipe');
     const query = parseQuery(req);
-    const supervisorView = wantsSupervisorPayload(req, hasEquipe);
+    const supervisorView = wantsSupervisorPayload(req, resolved);
 
     if (query.report && supervisorView) {
       const report = await buildReportPayload(req.user!, query);

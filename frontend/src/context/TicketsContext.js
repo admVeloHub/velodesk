@@ -1,6 +1,6 @@
 /**
- * TicketsContext v1.6.0 — deskLog diagnóstico
- * VERSION: v1.6.0 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.6.1 — recarrega filas ao carregar permissões (gestão vê todos)
+ * VERSION: v1.6.1 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi } from '../services/ticketsStorage';
@@ -81,6 +81,16 @@ export function TicketsProvider({ children }) {
     }
     refreshTickets();
   }, [isAuthenticated, refreshTickets, user?.email, user?.role]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    const reloadOnPermissions = () => {
+      deskLog.tickets('TicketsContext: permissões atualizadas → recarregar filas');
+      void refreshTickets();
+    };
+    window.addEventListener('velodesk:permissions', reloadOnPermissions);
+    return () => window.removeEventListener('velodesk:permissions', reloadOnPermissions);
+  }, [isAuthenticated, refreshTickets]);
 
   useEffect(() => {
     setOpenTabs((prev) =>

@@ -1,4 +1,4 @@
-/** permission.service v1.6.0 — escopo WF também por definição escalonar-{funcao} */
+/** permission.service v1.6.1 — função gestão vê todas as categorias de tickets */
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { findColaboradorByEmail } from './colaboradoresCadastro.service';
@@ -329,6 +329,7 @@ export function canViewTicket(
   chamado: IChamadoN1,
 ): boolean {
   if (hasPermission(resolved.permissoes, 'tickets', 'ver_todos')) return true;
+  if (isGestaoFuncao(resolved)) return true;
 
   if (funcaoSlugCanal(resolved) && ticketCanalMatches(chamado, funcaoSlugCanal(resolved)!)) {
     return true;
@@ -355,8 +356,13 @@ function funcaoSlugCanal(resolved: ResolvedUserPermissions): string | null {
   return resolved.canalOrigem || null;
 }
 
+function isGestaoFuncao(resolved: ResolvedUserPermissions): boolean {
+  return resolved.funcaoSlug === 'gestao' || resolved.funcoes.includes('gestao');
+}
+
 export function shouldUseMeusChamadosFilter(resolved: ResolvedUserPermissions): boolean {
   if (hasPermission(resolved.permissoes, 'tickets', 'ver_todos')) return false;
+  if (isGestaoFuncao(resolved)) return false;
   if (shouldUseAtribuidoFuncaoQueue(resolved)) return false;
   return hasPermission(resolved.permissoes, 'tickets', 'ver_meus');
 }

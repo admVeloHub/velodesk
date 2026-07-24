@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.9.2 — merge lateralForm.workflow.requisicao.comunicacaoWorkflow
- * VERSION: v1.9.2 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.9.4 — não re-filtra em andamento após meus-chamados API
+ * VERSION: v1.9.4 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -248,10 +248,13 @@ function assertApiReady(action = 'salvar ticket') {
 
 function filterColumnsForAgent(columns) {
   if (!shouldUseMeusChamadosFila()) return columns;
-  const profileId = readDeskProfileId();
   return (columns || []).map((box) => ({
     ...box,
-    tickets: (box.tickets || []).filter((ticket) => ticketMatchesAgentResponsavel(ticket, profileId)),
+    tickets: (box.tickets || []).filter((ticket) => {
+      if (box.id === 'resolvidos') return true;
+      // Novos / Em andamento / Pendente: backend meus-chamados já aplicou responsável
+      return true;
+    }),
   }));
 }
 
