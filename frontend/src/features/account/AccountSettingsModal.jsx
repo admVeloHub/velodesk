@@ -1,22 +1,21 @@
 /**
  * Modal — configurações de conta do usuário
- * VERSION: v1.1.0 | DATE: 2026-07-20
+ * VERSION: v1.2.0 | DATE: 2026-07-23
  */
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { useProfile } from '../../context/ProfileContext';
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 import { getInitials } from '../../services/desk/utils';
-import ProfileRoleSwitcher from '../../components/ProfileRoleSwitcher';
-
-const showVisionSwitcher = !import.meta.env.PROD;
 
 export default function AccountSettingsModal({ open, onClose }) {
   const { user, updateUser } = useAuth();
   const { darkMode, toggleDarkMode } = useTheme();
   const { showNotification } = useNotifications();
+  const { profile } = useProfile();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -140,15 +139,12 @@ export default function AccountSettingsModal({ open, onClose }) {
             </div>
           </section>
 
-          {showVisionSwitcher ? (
-            <section className="account-modal__section">
-              <h3 className="account-modal__section-title">Perfil operacional</h3>
-              <p className="account-modal__section-desc">
-                Alterne a visão do portal entre Agente e Supervisor.
-              </p>
-              <ProfileRoleSwitcher variant="menu" className="account-modal__role-switcher" />
-            </section>
-          ) : null}
+          <section className="account-modal__section">
+            <h3 className="account-modal__section-title">Visão do portal</h3>
+            <p className="account-modal__section-desc">
+              Definida automaticamente pela sua função: <strong>{profile.label}</strong>
+            </p>
+          </section>
 
           <section className="account-modal__section">
             <h3 className="account-modal__section-title">Preferências</h3>

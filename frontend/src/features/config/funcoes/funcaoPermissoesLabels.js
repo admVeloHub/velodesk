@@ -1,4 +1,5 @@
-/** Labels do catálogo RBAC por função */
+/** Labels do catálogo RBAC por função — v1.1.0 */
+import { derivePortalVisivelFromPermissoes } from '../../../services/permissions/permissionService';
 export const MODULO_ORDER = ['portal', 'tickets', 'workspace', 'workflow', 'config', 'especiais'];
 
 export const MODULO_LABELS = {
@@ -39,6 +40,15 @@ export const SUB_LABELS = {
   procon_gerenciar: 'Procon — gerenciar',
   consumidor_gov_gerenciar: 'Consumidor .GOV — gerenciar',
 };
+
+export function syncDraftPortalVisivel(draft) {
+  if (!draft) return draft;
+  const portalVisivel = derivePortalVisivelFromPermissoes(
+    draft.permissoes,
+    draft.portalVisivel || ['agent'],
+  );
+  return { ...draft, portalVisivel };
+}
 
 export function buildDraftFromFuncao(funcao) {
   if (!funcao) return null;

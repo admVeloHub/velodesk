@@ -1,10 +1,46 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.43.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.46.0 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Workflow RBAC, requisição, filas e comunicação
+
+- **Data/Hora**: 2026-07-24
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.46.0
+  - permission.service v1.6.0, chamado.mapper v2.3.0, boxes.routes v1.7.0, agenteDesk.service v1.3.0
+  - workflowRequisicao.service v1.2.0, workflowTicket.service v1.3.0, workflowRequisicaoDefaults v1.0.0
+  - permissionService (FE) v1.2.0, workflowApprovalData v1.4.0, workflowDecisionHandlers v2.2.0
+  - WorkflowApprovalShell v1.2.0, WorkflowComunicacaoModal v1.2.0, WorkflowCriteriaEditor v2.3.0
+  - TabulationContext v1.4.0, workflowConfigData v2.8.0, WorkflowStepEditor v1.3.0
+  - DeskV2Root v3.10.0, ticketsCache v1.3.0, FuncoesPermissoesSection v2.5.0
+- **Arquivos modificados (principais)**:
+  - `backend/src/services/permission.service.ts` — atuação WF por overrides (`portal.workflow` + `tickets.atuar_atribuido`); escopo por `funcao:{func}` ou definição `escalonar-{func}`
+  - `backend/src/services/chamado.mapper.ts` — fila workflow: `atribuido` OU `workflowId` da definição do time
+  - `backend/src/routes/boxes.routes.ts` — filtro de boxes alinhado ao escopo de workflow por função
+  - `backend/src/services/agenteDesk.service.ts` — GET agentes lê VeloHub ao vivo; upsert sem conflito `$set/$setOnInsert`
+  - `backend/src/services/workflowRequisicao.service.ts` — form de requisição + comunicação workflow (`markModified`)
+  - `backend/src/config/workflowRequisicaoDefaults.ts` — defaults de campos de requisição por gatilho
+  - `backend/src/routes/tickets.routes.ts` — `POST /workflow/start`; endpoints de comunicação/requisição
+  - `frontend/src/features/desk/DeskV2Root.jsx` — Iniciar Workflow manual com drawer de requisição; sem auto-ativação
+  - `frontend/src/features/desk/components/WorkflowRequisicaoForm.jsx` — form dinâmico ao iniciar workflow
+  - `frontend/src/features/config/workflow/` — editor de requisição, gatilho com opções de tabulação em cascata
+  - `frontend/src/features/workflow/components/WorkflowComunicacaoModal.jsx` — thread “pedir informação” com carga otimista
+  - `frontend/src/features/workflow/components/WorkflowApprovalShell.jsx` — fila/decisões por permissão; comunicação integrada
+  - `frontend/src/context/TabulationContext.jsx` — `resolveMotivoOptions`/`resolveDetalheOptions` para gatilhos
+  - `frontend/src/services/ticketsCache.js` — merge preserva `comunicacaoWorkflow`
+  - `frontend/src/features/config/funcoes/` — lista de agentes ao abrir seção; removido botão sync manual
+  - `frontend/velodesk-crm.css`, `velodesk-ecosystem.css`, `velodesk-dark-theme.css` — estilos workflow/requisição/comunicação
+- **Descrição**: Pacote consolidado de workflow: RBAC por permissões (sem hardcode financeiro/produtos), fila de atuação corrigida para times com `escalonar-{func}`, form de requisição configurável no gatilho, Iniciar Workflow manual no Desk, comunicação “pedir informação” persistida e exibida no modal, agentes desk sincronizados do VeloHub, e gatilhos de ativação populados via tabulação.
+- **Status**: Concluído (push dev + main)
+
+---
 
 ### GitHub Push — Desk UX: Meus Tickets, preferência ao salvar e seleção manual
 
@@ -27,7 +63,7 @@
   - `frontend/velodesk-crm.css` — estilos Meus Tickets, popover config agente, fila tabular
   - `frontend/src/components/Sidebar.jsx`, CSS cockpit/ecosystem — faixa retrátil 10px e ajustes visuais
 - **Descrição**: Melhorias de UX no Desk v2 — seleção manual de tickets, fila Meus Tickets, comportamento configurável ao salvar, prioridade de tabela em Resolvidos/Meus Tickets sem fechar tabs.
-- **Status**: Pendente push
+- **Status**: Concluído (`2b8b3e5` em `dev`, push 11 commits `4518589..2b8b3e5`)
 
 ---
 

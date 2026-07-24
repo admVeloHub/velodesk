@@ -3199,10 +3199,41 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
 
 .ws360-production__head {
     display: flex;
-    align-items: baseline;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 0.75rem;
     margin-bottom: 0.75rem;
+}
+
+.ws360-production__head-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+}
+
+.ws360-production__total-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.125rem;
+    flex-shrink: 0;
+    min-width: 3.5rem;
+}
+
+.ws360-production__total-label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.ws360-production__total-value {
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: var(--eco-navy);
+    line-height: 1;
 }
 
 .ws360-production__title {
@@ -6495,7 +6526,7 @@ body.desk-v2-mode #aiChatbotModal {
 
 .wf-approval-fields {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
     margin: 0 0 16px;
 }
@@ -6994,6 +7025,185 @@ body.desk-v2-mode #aiChatbotModal {
     border-color: #1634FF;
 }
 
+.wf-comunicacao-modal__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.wf-comunicacao-modal {
+    width: min(560px, 100%);
+    max-height: min(80vh, 720px);
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22);
+    overflow: hidden;
+}
+
+.wf-comunicacao-modal__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.wf-comunicacao-modal__head h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: #111827;
+}
+
+.wf-comunicacao-modal__head p {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.wf-comunicacao-modal__close {
+    border: 0;
+    background: transparent;
+    color: #6b7280;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.wf-comunicacao-modal__close:hover {
+    background: #f3f4f6;
+    color: #111827;
+}
+
+.wf-comunicacao-modal__thread {
+    flex: 1;
+    min-height: 180px;
+    max-height: 360px;
+    overflow: auto;
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #f8fafc;
+}
+
+.wf-comunicacao-modal__empty {
+    margin: auto;
+    color: #9ca3af;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.wf-comunicacao-modal__msg {
+    max-width: 88%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+}
+
+.wf-comunicacao-modal__msg.is-wf {
+    align-self: flex-start;
+    border-color: #bfdbfe;
+    background: #eff6ff;
+}
+
+.wf-comunicacao-modal__msg.is-resp {
+    align-self: flex-end;
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+}
+
+.wf-comunicacao-modal__msg.is-pending {
+    opacity: 0.72;
+}
+
+.wf-comunicacao-modal__msg header {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.wf-comunicacao-modal__msg header strong {
+    color: #111827;
+}
+
+.wf-comunicacao-modal__msg p {
+    margin: 0;
+    font-size: 0.92rem;
+    color: #1f2937;
+    white-space: pre-wrap;
+}
+
+.wf-comunicacao-modal__form {
+    padding: 14px 18px 16px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.wf-comunicacao-modal__form label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.wf-comunicacao-modal__form textarea {
+    width: 100%;
+    resize: vertical;
+    min-height: 72px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font: inherit;
+}
+
+.wf-comunicacao-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.wf-comunicacao-modal__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    padding: 8px 14px;
+    font: inherit;
+    cursor: pointer;
+}
+
+.wf-comunicacao-modal__btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.wf-comunicacao-modal__btn--ghost {
+    background: #fff;
+    color: #374151;
+}
+
+.wf-comunicacao-modal__btn--primary {
+    background: #1634FF;
+    color: #fff;
+    border-color: #1634FF;
+}
+
 .wf-approval-action:not(:disabled):hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 88, 0.08);
@@ -7028,9 +7238,15 @@ body.desk-v2-mode #aiChatbotModal {
     min-height: 0;
 }
 
+#config .config-content:has(.wf-config-shell) > .config-content-header {
+    flex-shrink: 0;
+    padding: 1.25rem 1.5rem 0.5rem;
+    margin-bottom: 0;
+}
+
 .wf-config-shell {
-    display: grid;
-    grid-template-columns: 240px minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
     flex: 1 1 0;
     min-height: 0;
     max-height: 100%;
@@ -7040,82 +7256,10 @@ body.desk-v2-mode #aiChatbotModal {
     border: 1px solid var(--wf-border, #e5e7eb);
 }
 
-.wf-config-sidebar {
-    padding: 20px 0;
-    background: #fff;
-    border-right: 1px solid var(--wf-border, #e5e7eb);
-    overflow-y: auto;
-}
-
-.wf-config-sidebar__section + .wf-config-sidebar__section {
-    margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid var(--wf-border, #e5e7eb);
-}
-
-.wf-config-sidebar__heading {
-    margin: 0 0 10px;
-    padding: 0 16px;
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #9ca3af;
-}
-
-.wf-config-sidebar__nav {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.wf-config-sidebar__item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 10px 16px;
-    border: none;
-    background: transparent;
-    text-align: left;
-    font-size: 0.88rem;
-    font-weight: 500;
-    color: #374151;
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
-}
-
-.wf-config-sidebar__item i {
-    font-size: 1rem;
-    color: #6b7280;
-}
-
-.wf-config-sidebar__item:hover {
-    background: #f9fafb;
-}
-
-.wf-config-sidebar__item.is-active {
-    background: #eff6ff;
-    color: #1634ff;
-    font-weight: 600;
-}
-
-.wf-config-sidebar__item.is-active i {
-    color: #1634ff;
-}
-
-.wf-config-sidebar__item--workflow {
-    font-weight: 500;
-}
-
-.wf-config-sidebar__item--new {
-    color: #1634ff;
-    font-weight: 600;
-}
-
 .wf-config-main {
     display: flex;
     flex-direction: column;
+    flex: 1 1 0;
     min-width: 0;
     min-height: 0;
     overflow: hidden;
@@ -7214,10 +7358,20 @@ body.desk-v2-mode #aiChatbotModal {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0 1.5rem 1rem;
+}
+
+#config .config-workflow-editor .forms-editor-back {
+    flex-shrink: 0;
+    margin-top: 0.25rem;
 }
 
 #config .config-workflow-editor .wf-config-shell {
-    min-height: calc(100vh - 180px);
+    flex: 1 1 0;
+    min-height: 0;
 }
 
 .wf-config-header__badge {
@@ -7323,7 +7477,7 @@ body.desk-v2-mode #aiChatbotModal {
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 24px;
+    padding: 24px 24px 16px;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
 }
@@ -7401,9 +7555,14 @@ body.desk-v2-mode #aiChatbotModal {
     padding: 0;
 }
 
-.wf-criteria-editor--gatilho .wf-float-field:not(.is-filled):not(:focus-within) .wf-float-field__control {
+.wf-criteria-editor--gatilho .wf-float-field:not(.is-filled):not(:focus-within) input.wf-float-field__control {
     padding-top: 12px;
     color: transparent;
+}
+
+.wf-criteria-editor--gatilho .wf-float-field:not(.is-filled):not(:focus-within) select.wf-float-field__control {
+    padding-top: 22px;
+    color: #6b7280;
 }
 
 .wf-criteria-editor--gatilho .wf-float-field.is-filled .wf-float-field__control,
@@ -7487,6 +7646,192 @@ body.desk-v2-mode #aiChatbotModal {
 
 .wf-config-trigger__quadro .wf-criteria-editor__empty {
     padding: 4px 0 0;
+}
+
+.wf-config-requisicao-section {
+    margin-bottom: 28px;
+}
+
+.wf-config-requisicao__quadro {
+    padding: 14px 16px;
+    background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%);
+    border: 1px solid #93c5fd;
+    border-radius: 10px;
+}
+
+.wf-config-requisicao__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.wf-config-requisicao__title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.wf-config-requisicao__add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #93c5fd;
+    border-radius: 8px;
+    background: #fff;
+    color: #2563eb;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.wf-config-requisicao__add:hover {
+    background: #eff6ff;
+    border-color: #2563eb;
+}
+
+.wf-config-requisicao__hint {
+    margin: 0 0 12px;
+    font-size: 0.82rem;
+    color: #4b5563;
+    line-height: 1.45;
+}
+
+.wf-config-requisicao__empty {
+    margin: 0 0 8px;
+    font-size: 0.82rem;
+    color: #6b7280;
+}
+
+.wf-config-requisicao__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.wf-config-requisicao__item {
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+}
+
+.wf-config-requisicao__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.wf-config-requisicao__row--meta {
+    margin-top: 10px;
+}
+
+.wf-config-requisicao__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 140px;
+}
+
+.wf-config-requisicao__field--full {
+    margin-top: 10px;
+    min-width: 100%;
+}
+
+.wf-config-requisicao__field span {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.wf-config-requisicao__field input,
+.wf-config-requisicao__field select {
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.wf-config-requisicao__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: #374151;
+    padding-bottom: 8px;
+}
+
+.wf-config-requisicao__remove {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    background: #fff;
+    color: #dc2626;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.wf-config-requisicao__warn {
+    margin: 8px 0 0;
+    font-size: 0.78rem;
+    color: #b45309;
+}
+
+.wf-config-requisicao__opcoes {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #bfdbfe;
+}
+
+.wf-config-requisicao__opcoes-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.wf-config-requisicao__add-opcao {
+    border: 0;
+    background: none;
+    color: #2563eb;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.wf-config-requisicao__opcao-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.wf-config-requisicao__opcao-row input {
+    flex: 1;
+    padding: 6px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.82rem;
+}
+
+.wf-config-requisicao__opcao-row button {
+    width: 28px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
 }
 
 .wf-config-trigger__banner {
@@ -7803,13 +8148,7 @@ body.desk-v2-mode #aiChatbotModal {
 
 @media (max-width: 900px) {
     .wf-config-shell {
-        grid-template-columns: 1fr;
         min-height: auto;
-    }
-
-    .wf-config-sidebar {
-        border-right: none;
-        border-bottom: 1px solid var(--wf-border, #e5e7eb);
     }
 
     .wf-config-header {

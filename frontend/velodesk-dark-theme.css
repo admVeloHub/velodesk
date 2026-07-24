@@ -191,8 +191,13 @@ body.velodesk-dark .ws360-kpi__label,
 body.velodesk-dark .ws360-production__label,
 body.velodesk-dark .ws360-production__value,
 body.velodesk-dark .ws360-production__subtitle,
+body.velodesk-dark .ws360-production__total-label,
 body.velodesk-dark .ws360-ticket-row__meta {
     color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ws360-production__total-value {
+    color: var(--velo-dark-text);
 }
 
 body.velodesk-dark .ws360-link {

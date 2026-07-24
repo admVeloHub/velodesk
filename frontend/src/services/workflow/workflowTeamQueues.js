@@ -1,10 +1,12 @@
 /**
- * workflowTeamQueues — filas Financeiro e Produtos (perfil Workflow)
+ * workflowTeamQueues v1.2.0 — match por atribuido, slug escalonar-{time} ou step.team
+ * VERSION: v1.2.0 | DATE: 2026-07-24
  */
 import {
   getWorkflowProgress,
   getWorkflowTemplateForTicket,
   isTicketInWorkflow,
+  isTicketWorkflowActive,
 } from '../desk/utils';
 import { ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import { resolveWorkflowTeamQueueForUser } from '../permissions/permissionService';
@@ -33,6 +35,15 @@ function normalizeAtribuido(value) {
   return raw;
 }
 
+function normalizeTeamSlug(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-');
+}
+
 export function isWorkflowTeamQueueId(teamId) {
   return WORKFLOW_TEAM_QUEUE_IDS.has(teamId);
 }
@@ -42,6 +53,7 @@ export function getWorkflowTeamQueueMeta(teamId) {
 }
 
 export function isWorkflowActive(ticket) {
+  if (isTicketWorkflowActive(ticket)) return true;
   if (!isTicketInWorkflow(ticket)) return false;
   const progress = getWorkflowProgress(ticket);
   if (!progress) return true;
@@ -49,25 +61,34 @@ export function isWorkflowActive(ticket) {
 }
 
 export function ticketMatchesWorkflowTeam(ticket, teamId) {
-  if (!teamId || !isWorkflowActive(ticket)) return false;
+  const team = normalizeTeamSlug(teamId);
+  if (!team || !isWorkflowActive(ticket)) return false;
 
   const lf = ticket.lateralForm || {};
   const wf = lf.workflow || {};
+  const persisted = ticket.workflow || {};
   const progress = getWorkflowProgress(ticket);
-  const templateSlug = String(wf.definicaoSlug || wf.templateId || '');
+  const templateSlug = normalizeTeamSlug(
+    wf.definicaoSlug || wf.templateId || '',
+  );
 
-  if (lf.escalonar === teamId) return true;
-  if (templateSlug === `escalonar-${teamId}`) return true;
-  if (templateSlug.endsWith(`-${teamId}`)) return true;
+  if (normalizeTeamSlug(lf.escalonar) === team) return true;
+  if (templateSlug === `escalonar-${team}`) return true;
+  if (templateSlug === team) return true;
+  if (templateSlug.endsWith(`-${team}`)) return true;
 
   const atribuido = normalizeAtribuido(lf.atribuido);
-  if (atribuido === `funcao:${teamId}`) return true;
+  if (atribuido === `funcao:${team}`) return true;
 
-  if (progress?.activeStep?.team === teamId) return true;
+  if (normalizeTeamSlug(progress?.activeStep?.team) === team) return true;
 
   const template = getWorkflowTemplateForTicket(ticket);
-  if (template?.id === `escalonar-${teamId}`) return true;
-  if (template?.steps?.some((step) => step.team === teamId)) return true;
+  const templateId = normalizeTeamSlug(template?.id);
+  if (templateId === `escalonar-${team}` || templateId === team) return true;
+  if (template?.steps?.some((step) => normalizeTeamSlug(step.team) === team)) return true;
+
+  // Fallback: workflowId resolvido para template do time (quando configs já hidrataram)
+  if (persisted.active && persisted.workflowId && templateId.includes(team)) return true;
 
   return false;
 }
@@ -82,7 +103,7 @@ export function ticketIsAwaitingTeamAction(ticket, teamId) {
 
 export function isTeamStepActive(ticket, teamId, progress = getWorkflowProgress(ticket)) {
   if (!progress?.activeStep) return false;
-  return progress.activeStep.team === teamId;
+  return normalizeTeamSlug(progress.activeStep.team) === normalizeTeamSlug(teamId);
 }
 
 export function resolveEffectiveWorkflowTeamId({ perm, urlTeam } = {}) {

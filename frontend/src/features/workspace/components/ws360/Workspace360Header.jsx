@@ -1,5 +1,6 @@
 /**
- * Workspace360Header v1.3.0 — cabeçalho do Painel 360° + tags de produtos
+ * Workspace360Header v1.4.0 — visão read-only no header (RBAC)
+ * VERSION: v1.4.0 | DATE: 2026-07-23
  */
 import React from 'react';
 import { useTheme } from '../../../../context/ThemeContext';

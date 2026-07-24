@@ -1,6 +1,6 @@
 /**
- * workflowEngine v1.6.0 — ícones por acao.tipo; step index; sem criterios por passo
- * VERSION: v1.6.0 | DATE: 2026-07-16
+ * workflowEngine v1.8.0 — exclui escalonar-* legado; só workflows configurados
+ * VERSION: v1.8.0 | DATE: 2026-07-23
  */
 import { getRuntimeGrupos, getRuntimeWorkflows } from './workflowRuntimeStore';
 
@@ -122,6 +122,10 @@ export function evaluateGatilhoCriterios(criterios = [], fields, grupos = getRun
   return evaluateCriterios(criterios, fields, grupos);
 }
 
+export function isLegacyEscalonarWorkflowSlug(slug) {
+  return String(slug || '').trim().toLowerCase().startsWith('escalonar-');
+}
+
 function buildDecisionFromPasso(passoConfig, slug) {
   if (passoConfig?.acao?.tipo !== 'aprovacao') return null;
   const rotas = passoConfig.acao.rotas || [];
@@ -131,11 +135,7 @@ function buildDecisionFromPasso(passoConfig, slug) {
     statusLabel: 'Aguardando decisão',
     queueLabel: 'Aguardando aprovação',
     actions: rotas.map((r) => r.variavel).filter(Boolean),
-    detailResolver: slug === 'reembolso-7dias'
-      ? 'reembolso-7dias'
-      : slug === 'escalonar-produtos'
-        ? 'escalonar-produtos'
-        : 'generic',
+    detailResolver: slug === 'reembolso-7dias' ? 'reembolso-7dias' : 'generic',
     rotas,
   };
 }
@@ -180,6 +180,7 @@ export function normalizeWorkflowDef(definicao) {
     title: definicao.titulo || definicao.slug,
     description: definicao.descricao || '',
     gatilho: definicao.gatilho,
+    requisicao: definicao.requisicao,
     passosEnvelope: passos,
     steps,
     defaultActiveStepId,
@@ -201,7 +202,10 @@ export function getWorkflowTemplateById(templateId, definitions = getRuntimeWork
 
 export function resolveWorkflowForTicket(ticket, rightFields = {}, definitions = getRuntimeWorkflows()) {
   const fields = readFields(ticket, rightFields);
-  const match = definitions.find((def) => evaluateGatilhoCriterios(def.gatilho?.criterios || [], fields));
+  const match = definitions.find(
+    (def) => !isLegacyEscalonarWorkflowSlug(def.slug)
+      && evaluateGatilhoCriterios(def.gatilho?.criterios || [], fields),
+  );
   return match ? normalizeWorkflowDef(match) : null;
 }
 

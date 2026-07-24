@@ -1,5 +1,6 @@
 /**
- * workflowApprovalData v1.2.1 — fila e detalhe do console de decisão
+ * workflowApprovalData v1.5.2 — valores via resolveRequisicaoValor
+ * VERSION: v1.5.2 | DATE: 2026-07-24
  */
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { findCadastralRequestByTicketId } from '../cadastral/cadastralRequestStore';
@@ -7,17 +8,26 @@ import {
   getErrosBugsTipoLabel,
   getTipoSolicitacaoLabel,
 } from '../cadastral/solicitacoesProdutosData';
-import { getSlaClass, getWorkflowProgress, isTicketInWorkflow, getTicketProtocolLabel } from '../desk/utils';
+import { getSlaClass, getWorkflowProgress, isTicketInWorkflow, getTicketProtocolLabel, getWorkflowTemplateForTicket } from '../desk/utils';
 import { resolveApprovalHeader, ticketAwaitingDecision } from '../desk/workflowDefinitions';
-import { agentCanDecideTicket as permAgentCanDecide, canApproveWorkflow } from '../permissions/permissionService';
+import {
+  agentCanDecideTicket as permAgentCanDecide,
+  canActOnTicket,
+  canApproveWorkflow,
+} from '../permissions/permissionService';
 import {
   getWorkflowTeamQueueMeta,
   isTeamStepActive,
-  isWorkflowActive,
-  ticketIsAwaitingTeamAction,
   ticketMatchesWorkflowTeam,
-  WORKFLOW_TEAM_QUEUES,
 } from './workflowTeamQueues';
+import {
+  buildTicketContextFields,
+  formatRequisicaoDisplayValue,
+  resolveRequisicaoCamposForApproval,
+  resolveRequisicaoValor,
+  readTicketRequisicaoValores,
+} from './workflowRequisicao';
+import deskLog from '../../utils/deskDebugLog';
 
 const QUEUE_LABEL = 'Aguardando aprovação';
 
@@ -112,13 +122,68 @@ function getInternalForwardingNote(ticket) {
   });
   if (internal?.text) return internal.text;
 
-  return 'Atendimento confirmou elegibilidade e encaminhou para aprovação.';
+  return '';
 }
 
 function formatCurrency(value) {
   const num = Number(value);
   if (Number.isNaN(num)) return String(value || '—');
   return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function readRequisicaoValores(ticket) {
+  return readTicketRequisicaoValores(ticket);
+}
+
+function buildDynamicApprovalDetail(ticket, progress, header) {
+  const lf = ticket.lateralForm || {};
+  const template = getWorkflowTemplateForTicket(ticket);
+  const workflowDef = template?.raw || template;
+  const campos = resolveRequisicaoCamposForApproval(workflowDef);
+  const valores = readRequisicaoValores(ticket);
+  const sla = getSlaClass(ticket);
+  const startedAt = progress.workflow?.startedAt || ticket.createdAt;
+
+  const contextFields = [
+    { label: 'Protocolo', value: getTicketProtocolLabel(ticket) || '—', tone: 'default' },
+    ...buildTicketContextFields(ticket).map((field) => ({
+      ...field,
+      tone: 'default',
+    })),
+  ];
+
+  const requisicaoFields = campos.map((campo) => {
+    const raw = resolveRequisicaoValor(valores, campo);
+    const value = formatRequisicaoDisplayValue(campo, raw);
+    deskLog.requisicao('campo aprovação', {
+      ticketId: String(ticket?.id || ''),
+      label: campo.label,
+      campoId: campo.id,
+      raw,
+      display: value,
+      valorKeys: Object.keys(valores),
+    });
+    return { label: campo.label, value, tone: 'default' };
+  });
+
+  return {
+    cardTitle: lf.produto && lf.motivo
+      ? `${lf.motivo} · ${lf.produto}`
+      : (ticket.title || header.title),
+    cardSubtext: `Solicitado em ${formatDateTime(startedAt)} · aguardando há ${formatElapsedSince(startedAt)}`,
+    slaLabel: progress.slaRemainingLabel ? `SLA: ${progress.slaRemainingLabel} restantes` : null,
+    slaPct: progress.slaTotalHours && progress.slaRemainingMs != null
+      ? Math.max(8, Math.min(92, 100 - (progress.slaRemainingMs / (progress.slaTotalHours * 3600000)) * 100))
+      : 55,
+    fieldSections: [
+      { title: 'Contexto do ticket', fields: contextFields },
+      ...(requisicaoFields.length ? [{ title: 'Dados da requisição', fields: requisicaoFields }] : []),
+    ],
+    fields: [...contextFields, ...requisicaoFields],
+    justificationQuote: getFirstClientMessage(ticket),
+    internalNote: getInternalForwardingNote(ticket),
+    slaTone: sla === 'critical' ? 'danger' : 'default',
+  };
 }
 
 function inferDaysSincePurchase(approval, ticket) {
@@ -379,13 +444,37 @@ function buildReembolsoApprovalDetail(ticket, progress, header) {
 function buildQueueItem(entry, teamId = null) {
   const { ticket } = entry;
   const progress = getWorkflowProgress(ticket);
-  const header = resolveApprovalHeader(ticket, progress);
-  const sla = getSlaClass(ticket);
+  const lf = ticket.lateralForm || {};
   const approval = readApprovalMeta(ticket);
   const channel = approval.canal
     ? channelLabel({ lateralForm: { canal: approval.canal } })
     : channelLabel(ticket);
-  const lf = ticket.lateralForm || {};
+  const sla = getSlaClass(ticket);
+
+  if (!progress) {
+    const baseSubject = `${lf.motivo || 'Workflow'} ${lf.produto || ''}`.trim();
+    const amountLabel = approval.valor != null ? formatCurrency(approval.valor) : null;
+    const subject = amountLabel ? `${baseSubject} · ${amountLabel}` : baseSubject;
+    return {
+      id: String(ticket.id),
+      clientName: ticket.clientName || ticket.solicitante || 'Cliente',
+      elapsedLabel: formatRelativeTime(ticket.updatedAt),
+      timeLabel: formatRelativeTime(ticket.updatedAt),
+      timeCritical: sla === 'critical',
+      subject,
+      amountLabel,
+      channel,
+      slaTone: sla === 'critical' ? 'critical' : sla === 'warning' ? 'warn' : 'ok',
+      urgencyBadge: sla === 'critical' ? { text: 'Urgente', tone: 'critical' } : null,
+      slaBadge: { text: 'SLA', tone: sla === 'critical' ? 'critical' : 'warn' },
+      queueLabel: QUEUE_LABEL,
+      awaitingDecision: false,
+      teamStepActive: false,
+      queueStatus: 'aguardando',
+    };
+  }
+
+  const header = resolveApprovalHeader(ticket, progress);
   const stepStarted = progress.workflow?.stepHistory?.find((h) => h.stepId === progress.activeStep?.id && h.status === 'active');
   const awaitingDecision = ticketAwaitingDecision(ticket, progress);
   const teamStepActive = teamId ? isTeamStepActive(ticket, teamId, progress) : false;
@@ -438,33 +527,43 @@ function buildDetailView(ticket, progress) {
   const protocol = getTicketProtocolLabel(ticket) || ticket.id;
   const lf = ticket.lateralForm || {};
   const openedBy = lf.responsavel || ticket.responsibleAgent || 'Atendimento';
-  const openedAt = progress.workflow?.startedAt || ticket.createdAt;
+  const openedAt = progress?.workflow?.startedAt || ticket.workflow?.startedAt || ticket.createdAt;
 
-  const wfSlug = lf.workflow?.definicaoSlug || lf.workflow?.templateId || '';
-  const detailResolver = header.detailResolver === 'generic' && wfSlug === 'escalonar-produtos'
-    ? 'escalonar-produtos'
-    : header.detailResolver;
+  if (!progress) {
+    const template = getWorkflowTemplateForTicket(ticket);
+    const workflowDef = template?.raw || template;
+    const campos = resolveRequisicaoCamposForApproval(workflowDef);
+    const valores = readRequisicaoValores(ticket);
+    const contextFields = [
+      { label: 'Protocolo', value: getTicketProtocolLabel(ticket) || '—', tone: 'default' },
+      ...buildTicketContextFields(ticket).map((field) => ({ ...field, tone: 'default' })),
+    ];
+    const requisicaoFields = campos.map((campo) => {
+      const raw = resolveRequisicaoValor(valores, campo);
+      return {
+        label: campo.label,
+        value: formatRequisicaoDisplayValue(campo, raw),
+        tone: 'default',
+      };
+    });
 
-  let resolver = buildGenericApprovalDetail;
-  let resolverArgs = [ticket, progress, header];
-
-  if (detailResolver === 'reembolso-7dias') {
-    resolver = buildReembolsoApprovalDetail;
-  } else if (detailResolver === 'escalonar-produtos') {
-    const solicitacao = resolveSolicitacaoProdutosForTicket(ticket);
-    if (solicitacao?.categoria === 'erros-bugs') {
-      resolver = buildProdutosErrosBugsDetail;
-      resolverArgs = [ticket, progress, header, solicitacao];
-    } else if (solicitacao) {
-      resolver = buildProdutosCadastralDetail;
-      resolverArgs = [ticket, progress, header, solicitacao];
-    } else {
-      resolver = buildProdutosGenericDetail;
-      resolverArgs = [ticket, progress, header];
-    }
+    return {
+      ticketId: String(ticket.id),
+      title: header.title,
+      statusBadge: header.statusLabel,
+      metaLine: `Ticket #${protocol} · ${ticket.clientName || ticket.solicitante || 'Cliente'} · aberto por ${openedBy} em ${formatDateTime(openedAt)}`,
+      responsibleAgent: openedBy,
+      actions: [],
+      actionLabels: {},
+      cardTitle: ticket.title || lf.motivo || 'Workflow',
+      cardSubtext: `Atualizado ${formatRelativeTime(ticket.updatedAt)}`,
+      fields: [...contextFields, ...requisicaoFields],
+      justificationQuote: getFirstClientMessage(ticket),
+      internalNote: getInternalForwardingNote(ticket),
+    };
   }
 
-  const detail = resolver(...resolverArgs);
+  const detail = buildDynamicApprovalDetail(ticket, progress, header);
 
   return {
     ticketId: String(ticket.id),
@@ -478,6 +577,66 @@ function buildDetailView(ticket, progress) {
   };
 }
 
+function collectAssigneeWorkflowEntries() {
+  const items = [];
+
+  getAllCockpitTickets().forEach((entry) => {
+    const { ticket } = entry;
+    if (!isTicketInWorkflow(ticket)) return;
+    if (!canActOnTicket(ticket)) return;
+    const progress = getWorkflowProgress(ticket);
+    items.push({ entry, progress, queueItem: buildQueueItem(entry) });
+  });
+
+  return items;
+}
+
+function sortAssigneeQueueEntries(items) {
+  return [...items].sort((a, b) => {
+    const rank = (item) => {
+      const { queueItem } = item;
+      if (queueItem.awaitingDecision) return 0;
+      if (queueItem.queueStatus === 'etapa-ativa') return 1;
+      if (queueItem.queueStatus === 'aguardando') return 2;
+      return 3;
+    };
+    const rankDiff = rank(a) - rank(b);
+    if (rankDiff !== 0) return rankDiff;
+
+    const prio = { critical: 0, warn: 1, ok: 2 };
+    const slaDiff = (prio[a.queueItem.slaTone] || 9) - (prio[b.queueItem.slaTone] || 9);
+    if (slaDiff !== 0) return slaDiff;
+
+    const aTime = new Date(a.entry.ticket.updatedAt || a.entry.ticket.createdAt || 0).getTime();
+    const bTime = new Date(b.entry.ticket.updatedAt || b.entry.ticket.createdAt || 0).getTime();
+    return bTime - aTime;
+  });
+}
+
+export function computeWorkflowAssigneeQueue() {
+  const entries = sortAssigneeQueueEntries(collectAssigneeWorkflowEntries());
+  let slaCritical = 0;
+  let awaitingDecisionCount = 0;
+
+  entries.forEach((item) => {
+    if (item.queueItem.slaTone === 'critical' || item.queueItem.slaTone === 'warn') slaCritical += 1;
+    if (item.queueItem.awaitingDecision) awaitingDecisionCount += 1;
+  });
+
+  return {
+    teamId: null,
+    queueLabel: 'Minha fila de workflow',
+    queue: entries.map((item) => item.queueItem),
+    summary: {
+      pendingCount: entries.length,
+      awaitingDecisionCount,
+      approvedTodayCount: countApprovedToday(),
+      slaCriticalCount: slaCritical,
+    },
+    entries,
+  };
+}
+
 function collectTeamWorkflowEntries(teamId) {
   const items = [];
 
@@ -486,32 +645,6 @@ function collectTeamWorkflowEntries(teamId) {
     if (!ticketMatchesWorkflowTeam(ticket, teamId)) return;
     const progress = getWorkflowProgress(ticket);
     items.push({ entry, progress, queueItem: buildQueueItem(entry, teamId) });
-  });
-
-  return items;
-}
-
-function collectTeamActionWorkflowEntries(teamId) {
-  const items = [];
-
-  getAllCockpitTickets().forEach((entry) => {
-    const { ticket } = entry;
-    if (!ticketIsAwaitingTeamAction(ticket, teamId)) return;
-    const progress = getWorkflowProgress(ticket);
-    items.push({ entry, progress, queueItem: buildQueueItem(entry, teamId) });
-  });
-
-  return items;
-}
-
-function collectConsolidatedWorkflowEntries() {
-  const items = [];
-
-  getAllCockpitTickets().forEach((entry) => {
-    const { ticket } = entry;
-    if (!isWorkflowActive(ticket)) return;
-    const progress = getWorkflowProgress(ticket);
-    items.push({ entry, progress, queueItem: buildQueueItem(entry) });
   });
 
   return items;
@@ -596,71 +729,6 @@ export function computeWorkflowTeamQueue(teamId) {
   };
 }
 
-
-function summarizeActionEntries(entries) {
-  let slaCritical = 0;
-  let awaitingDecisionCount = 0;
-
-  entries.forEach((item) => {
-    if (item.queueItem.slaTone === 'critical' || item.queueItem.slaTone === 'warn') slaCritical += 1;
-    if (item.queueItem.awaitingDecision) awaitingDecisionCount += 1;
-  });
-
-  return { slaCritical, awaitingDecisionCount };
-}
-
-export function computeWorkflowTeamActionQueue(teamId) {
-  const meta = getWorkflowTeamQueueMeta(teamId);
-  const teamLabel = meta?.name || teamId;
-  const entries = sortTeamQueueEntries(collectTeamActionWorkflowEntries(teamId), teamId);
-  const { slaCritical, awaitingDecisionCount } = summarizeActionEntries(entries);
-
-  return {
-    teamId,
-    queueLabel: `Aguardando atuação · ${teamLabel}`,
-    queue: entries.map((item) => item.queueItem),
-    summary: {
-      pendingCount: entries.length,
-      awaitingDecisionCount,
-      approvedTodayCount: countApprovedToday(),
-      slaCriticalCount: slaCritical,
-    },
-    entries,
-  };
-}
-
-export function getWorkflowTeamActionCounts() {
-  const counts = {};
-  WORKFLOW_TEAM_QUEUES.forEach(({ id }) => {
-    counts[id] = computeWorkflowTeamActionQueue(id).queue.length;
-  });
-  return counts;
-}
-
-export function computeWorkflowConsolidatedQueue() {
-  const entries = sortTeamQueueEntries(collectConsolidatedWorkflowEntries(), null);
-  let slaCritical = 0;
-  let awaitingDecisionCount = 0;
-
-  entries.forEach((item) => {
-    if (item.queueItem.slaTone === 'critical' || item.queueItem.slaTone === 'warn') slaCritical += 1;
-    if (item.queueItem.awaitingDecision) awaitingDecisionCount += 1;
-  });
-
-  return {
-    teamId: null,
-    queueLabel: 'Fluxos em andamento',
-    queue: entries.map((item) => item.queueItem),
-    summary: {
-      pendingCount: entries.length,
-      awaitingDecisionCount,
-      approvedTodayCount: countApprovedToday(),
-      slaCriticalCount: slaCritical,
-    },
-    entries,
-  };
-}
-
 export function computeWorkflowApprovalQueue() {
   const pending = collectPendingEntries();
   let slaCritical = 0;
@@ -716,33 +784,24 @@ export function getWorkflowTeamDetail(ticketId, teamId) {
   };
 }
 
-export function getWorkflowConsolidatedDetail(ticketId) {
+export function getWorkflowAssigneeDetail(ticketId) {
   const id = String(ticketId);
   const match = getAllCockpitTickets().find(({ ticket }) => String(ticket.id) === id);
-  if (!match || !isWorkflowActive(match.ticket)) return null;
+  if (!match || !canActOnTicket(match.ticket)) return null;
 
   const progress = getWorkflowProgress(match.ticket);
   const awaitingDecision = ticketAwaitingDecision(match.ticket, progress);
   const detail = buildDetailView(match.ticket, progress);
   const activeStepTitle = progress?.activeStep?.title || progress?.activeStep?.label || 'etapa anterior';
-  const teamName = progress?.activeStep?.team
-    ? getWorkflowTeamQueueMeta(progress.activeStep.team)?.name || progress.activeStep.team
-    : null;
 
   return {
     ...detail,
     ticket: match.ticket,
     awaitingDecision,
-    teamStepActive: false,
-    statusBadge: awaitingDecision
-      ? detail.statusBadge
-      : progress?.workflow?.status === 'completed'
-        ? 'Concluído'
-        : 'Em andamento',
+    teamStepActive: !awaitingDecision,
+    statusBadge: awaitingDecision ? detail.statusBadge : 'Etapa atribuída',
     statusMessage: !awaitingDecision
-      ? (teamName
-        ? `Este ticket está na etapa "${activeStepTitle}" (${teamName}).`
-        : `Este ticket está na etapa "${activeStepTitle}".`)
+      ? `Este ticket está na etapa "${activeStepTitle}" atribuída a você ou ao seu grupo.`
       : null,
     actions: awaitingDecision ? detail.actions : [],
   };
@@ -750,7 +809,16 @@ export function getWorkflowConsolidatedDetail(ticketId) {
 
 export function getWorkflowApprovalDetail(ticketId, teamId = null) {
   if (teamId) return getWorkflowTeamDetail(ticketId, teamId);
-  return getWorkflowConsolidatedDetail(ticketId);
+
+  const assigneeDetail = getWorkflowAssigneeDetail(ticketId);
+  if (assigneeDetail) return assigneeDetail;
+
+  const id = String(ticketId);
+  let match = getAllCockpitTickets().find(({ ticket }) => String(ticket.id) === id);
+  if (!match) return null;
+  const progress = getWorkflowProgress(match.ticket);
+  if (!ticketAwaitingDecision(match.ticket, progress)) return null;
+  return buildDetailView(match.ticket, progress);
 }
 
 export function findTicketEntryById(ticketId) {

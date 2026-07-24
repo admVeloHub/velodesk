@@ -1,4 +1,4 @@
-/* Velodesk CRM v1.8.5 — Meus Tickets seções retráteis */
+/* Velodesk CRM v1.8.8 — busca CPF/Ticket na fila */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -301,6 +301,31 @@
 }
 
 #velodeskDeskV2Root .queue-search input::placeholder { color: rgba(255, 255, 255, 0.35); }
+
+#velodeskDeskV2Root .queue-search__mode {
+    flex-shrink: 0;
+    border: 0.5px solid rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    padding: 4px 6px;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+#velodeskDeskV2Root .queue-search__mode:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+#velodeskDeskV2Root .queue-search__mode[aria-pressed="true"] {
+    background: rgba(22, 52, 255, 0.55);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #fff;
+}
 
 #velodeskDeskV2Root .queue-status-list {
     flex: 1;
@@ -765,6 +790,43 @@
     border-left: none;
     border-right: none;
     border-top: none;
+}
+
+#velodeskDeskV2Root .crm-ticket-card--skeleton {
+    cursor: default;
+    pointer-events: none;
+}
+
+#velodeskDeskV2Root .desk-skeleton {
+    display: block;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #eef0f4 25%, #f8f9fb 50%, #eef0f4 75%);
+    background-size: 200% 100%;
+    animation: desk-skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+#velodeskDeskV2Root .desk-skeleton--text {
+    height: 12px;
+}
+
+#velodeskDeskV2Root .desk-skeleton--name {
+    width: 42%;
+    max-width: 140px;
+}
+
+#velodeskDeskV2Root .desk-skeleton--time {
+    width: 36px;
+    margin-left: auto;
+}
+
+#velodeskDeskV2Root .desk-skeleton--subject {
+    width: 72%;
+    margin-top: 8px;
+}
+
+@keyframes desk-skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
 #velodeskDeskV2Root .crm-ticket-card:not(:last-child)::after {
@@ -4286,9 +4348,47 @@
     cursor: not-allowed;
 }
 
-#velodeskDeskV2Root .ia-tabulation__btn--processos.is-active {
-    filter: brightness(1.12);
-    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+#velodeskDeskV2Root .rp-tabulation-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 0.5px solid #E4E6EA;
+}
+
+#velodeskDeskV2Root .rp-tabulation-actions__btn {
+    width: 100%;
+    min-height: 32px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.25;
+    text-align: center;
+    cursor: pointer;
+    font-family: inherit;
+    background: transparent;
+    border: 1.5px solid #000058;
+    color: #000058;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    box-sizing: border-box;
+}
+
+#velodeskDeskV2Root .rp-tabulation-actions__btn:hover:not(:disabled) {
+    background: rgba(0, 106, 185, 0.08);
+}
+
+#velodeskDeskV2Root .rp-tabulation-actions__btn.is-active,
+#velodeskDeskV2Root .rp-tabulation-actions__btn--start-workflow.is-active {
+    background: #006AB9;
+    border-color: #006AB9;
+    color: #fff;
+}
+
+#velodeskDeskV2Root .rp-tabulation-actions__btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
 }
 
 /* Processos drawer ? portal fixed ? esquerda do painel direito */
@@ -4654,24 +4754,20 @@
     align-items: stretch;
 }
 
+.produtos-forward-popover__workspace .prod-solic-layout--form-only {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
+}
+
 .produtos-forward-popover__workspace .prod-solic-main {
     min-height: 0;
     overflow: auto;
+    flex: 1;
 }
 
 .produtos-forward-popover__workspace .prod-solic-main__card {
     min-height: min-content;
-}
-
-.produtos-forward-popover__workspace .prod-solic-track {
-    min-height: 0;
-    max-height: none;
-    height: auto;
-    overflow: hidden;
-}
-
-.produtos-forward-popover__workspace .prod-solic-track__list {
-    min-height: 0;
 }
 
 .produtos-forward-popover__header {
@@ -4731,6 +4827,148 @@
     background: #fff;
     padding-top: 8px;
     margin-top: 8px;
+}
+
+.produtos-forward-popover__workspace--requisicao {
+    padding: 20px 22px 16px;
+    overflow-y: auto;
+}
+
+.wf-requisicao-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 100%;
+}
+
+.wf-requisicao-form__head {
+    padding-right: 36px;
+}
+
+.wf-requisicao-form__eyebrow {
+    margin: 0 0 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+
+.wf-requisicao-form__title {
+    margin: 0 0 8px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.wf-requisicao-form__hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #6b7280;
+    line-height: 1.45;
+}
+
+.wf-requisicao-form__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.wf-requisicao-form__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.wf-requisicao-form__label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.wf-requisicao-form__label em {
+    color: #dc2626;
+    font-style: normal;
+}
+
+.wf-requisicao-form__help {
+    font-size: 0.78rem;
+    color: #6b7280;
+}
+
+.wf-requisicao-form__input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: #fff;
+}
+
+.wf-requisicao-form__input.is-error {
+    border-color: #f87171;
+}
+
+.wf-requisicao-form__boolean {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    color: #374151;
+}
+
+.wf-requisicao-form__error {
+    font-size: 0.78rem;
+    color: #dc2626;
+}
+
+.wf-requisicao-form__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: auto;
+    padding-top: 8px;
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+}
+
+.wf-requisicao-form__btn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.wf-requisicao-form__btn--ghost {
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #374151;
+}
+
+.wf-requisicao-form__btn--primary {
+    border: 0;
+    background: #7c3aed;
+    color: #fff;
+}
+
+.wf-requisicao-form__btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.wf-approval-section {
+    margin-top: 16px;
+}
+
+.wf-approval-section__title {
+    margin: 0 0 10px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #6b7280;
 }
 
 #velodeskDeskV2Root .crm-right-panel__footer {
@@ -5895,35 +6133,6 @@ body.desk-v2-mode #cockpitFocusContext {
     text-align: center;
     padding: 10px 14px;
     border-radius: 8px;
-}
-
-#velodeskDeskV2Root .rp-workflow-decision-toggles {
-    display: flex;
-    gap: 8px;
-    margin-top: 6px;
-}
-
-#velodeskDeskV2Root .rp-workflow-decision-btn {
-    flex: 1;
-    border: 1px solid #d8dbe8;
-    background: #fff;
-    border-radius: 6px;
-    padding: 8px 10px;
-    font-size: var(--desk-fs-sm);
-    cursor: pointer;
-}
-
-#velodeskDeskV2Root .rp-workflow-decision-btn.is-active {
-    border-color: #1694ff;
-    background: rgba(22, 148, 255, 0.08);
-    color: #000058;
-    font-weight: 600;
-}
-
-#velodeskDeskV2Root .rp-workflow-decision-btn--reject.is-active {
-    border-color: #e05252;
-    background: rgba(224, 82, 82, 0.08);
-    color: #8b1a1a;
 }
 
 .ws-workflow-cta-hint {

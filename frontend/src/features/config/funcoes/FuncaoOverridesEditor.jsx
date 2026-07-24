@@ -1,5 +1,5 @@
 /**
- * FuncaoOverridesEditor v1.0.0 — editor reutilizável de permissões por módulo
+ * FuncaoOverridesEditor v1.1.0 — editor reutilizável de permissões por módulo
  */
 import React, { useState } from 'react';
 import {
@@ -7,6 +7,7 @@ import {
   SUB_LABELS,
   countActivePerms,
   sortCatalogEntries,
+  syncDraftPortalVisivel,
 } from './funcaoPermissoesLabels';
 
 export default function FuncaoOverridesEditor({ catalog, draft, setDraft, className = '' }) {
@@ -23,7 +24,7 @@ export default function FuncaoOverridesEditor({ catalog, draft, setDraft, classN
       if (!next.permissoes[modulo]) next.permissoes[modulo] = {};
       next.permissoes[modulo] = { ...next.permissoes[modulo] };
       next.permissoes[modulo][key] = !next.permissoes[modulo][key];
-      return next;
+      return modulo === 'portal' ? syncDraftPortalVisivel(next) : next;
     });
   };
 

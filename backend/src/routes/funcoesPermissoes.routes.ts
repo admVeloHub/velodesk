@@ -1,4 +1,4 @@
-/** funcoesPermissoes.routes v1.0.0 — CRUD matriz de permissões por função */
+/** funcoesPermissoes.routes v1.0.1 — lista garante seed se coleção vazia */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { requireGestaoOrPermission } from '../middleware/permission';
@@ -8,6 +8,7 @@ import {
   listFuncoesPermissoes,
   replaceFuncaoPermissao,
   resolveEffectivePermissoes,
+  seedFuncoesPermissoes,
 } from '../services/funcaoPermissao.service';
 import { listAtuacoesVelohub, isAtuacoesAvailable } from '../services/atuacoesVelohub.service';
 import { invalidatePermissionCache } from '../services/permission.service';
@@ -39,6 +40,7 @@ router.get(
   requireGestaoOrPermission('config', 'visualizar'),
   async (_req, res: Response) => {
     try {
+      await seedFuncoesPermissoes();
       const funcoes = await listFuncoesPermissoes(true);
       const map = new Map(funcoes.map((f) => [f.slug, f]));
       const payload = funcoes.map((f) => ({

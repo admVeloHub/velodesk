@@ -1,4 +1,4 @@
-/** funcaoPermissaoDefaults v1.0.0 — seed RBAC por função Desk */
+/** funcaoPermissaoDefaults v1.1.0 — seed RBAC por função Desk */
 
 export type PermissoesMap = Record<string, Record<string, boolean>>;
 
@@ -248,6 +248,34 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
     }),
   },
 ];
+
+/** Chaves permissoes.portal → id do perfil operacional */
+export const PORTAL_PERM_TO_PORTAL_ID: Record<string, string> = {
+  agente: 'agent',
+  gestao: 'gestao',
+  workflow: 'workflow',
+  especiais: 'especiais',
+};
+
+/** Deriva portalVisivel a partir das permissões efetivas de portal */
+export function derivePortalVisivelFromPermissoes(
+  permissoes: PermissoesMap,
+  fallback: string[] = ['agent'],
+): string[] {
+  const portalPerms = permissoes?.portal;
+  if (!portalPerms || typeof portalPerms !== 'object') return fallback;
+
+  const hasExplicitPortal = Object.keys(PORTAL_PERM_TO_PORTAL_ID).some(
+    (key) => typeof portalPerms[key] === 'boolean',
+  );
+  if (!hasExplicitPortal) return fallback;
+
+  const derived = Object.entries(PORTAL_PERM_TO_PORTAL_ID)
+    .filter(([key]) => portalPerms[key] === true)
+    .map(([, id]) => id);
+
+  return derived.length ? derived : fallback;
+}
 
 /** Mapeia slug de grupo legado → slug de função */
 export const GRUPO_TO_FUNCAO_MAP: Record<string, string> = {

@@ -1,7 +1,7 @@
-/** normalizeFuncao v1.0.0 — slug de função VeloHub → Desk RBAC */
+/** normalizeFuncao v1.3.0 — atuacao objeto/array + aliases produto */
 
 export function normalizeFuncao(value: unknown): string {
-  return String(value ?? '')
+  const base = String(value ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
@@ -9,20 +9,43 @@ export function normalizeFuncao(value: unknown): string {
     .replace(/\s+/g, ' ')
     .replace(/\./g, '')
     .replace(/\s/g, '-');
+
+  const aliases: Record<string, string> = {
+    produto: 'produtos',
+    produtos: 'produtos',
+    'time-produto': 'produtos',
+    'time-produtos': 'produtos',
+    'time-de-produto': 'produtos',
+    'time-de-produtos': 'produtos',
+  };
+  if (aliases[base]) return aliases[base];
+  if (base.includes('produto') && !base.includes('atendimento')) return 'produtos';
+  return base;
+}
+
+function readFuncaoFromAtuacaoItem(item: unknown): string {
+  if (typeof item === 'string') return item;
+  if (!item || typeof item !== 'object') return '';
+  const obj = item as Record<string, unknown>;
+  const raw = obj.funcao ?? obj.slug ?? obj.id ?? obj.nome ?? obj.label ?? obj.value ?? '';
+  return String(raw || '').trim();
 }
 
 export function extractFuncoes(atuacao: unknown): string[] {
-  if (!Array.isArray(atuacao)) return [];
-  return atuacao
-    .map((item) => {
-      if (typeof item === 'string') return item;
-      if (item && typeof item === 'object' && 'funcao' in item) {
-        return (item as { funcao?: string }).funcao;
-      }
-      return '';
-    })
-    .map(normalizeFuncao)
-    .filter(Boolean);
+  if (Array.isArray(atuacao)) {
+    return atuacao
+      .map(readFuncaoFromAtuacaoItem)
+      .map(normalizeFuncao)
+      .filter(Boolean);
+  }
+  if (typeof atuacao === 'string' && atuacao.trim()) {
+    return [normalizeFuncao(atuacao)];
+  }
+  if (atuacao && typeof atuacao === 'object') {
+    const single = readFuncaoFromAtuacaoItem(atuacao);
+    if (single) return [normalizeFuncao(single)];
+  }
+  return [];
 }
 
 /** Resolve função primária — maior nível entre as atribuídas */

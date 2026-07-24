@@ -1,5 +1,6 @@
 /**
- * FuncoesAgentesAccordion v1.0.0 — lista read-only de agentes Velotax
+ * FuncoesAgentesAccordion v1.2.0 — lista read-only; atualização via GET ao abrir a seção
+ * VERSION: v1.2.0 | DATE: 2026-07-24
  */
 import React, { useMemo, useState } from 'react';
 import { formatAtuacaoLabels } from '../../../services/desk/atuacaoVision';
@@ -8,8 +9,6 @@ export default function FuncoesAgentesAccordion({
   open,
   onToggle,
   agentes,
-  onSyncRequest,
-  syncing,
 }) {
   const [search, setSearch] = useState('');
 
@@ -44,17 +43,10 @@ export default function FuncoesAgentesAccordion({
         <div className="fp-accordion__panel fp-agentes-panel">
           {(agentes || []).length === 0 ? (
             <div className="fp-agentes-empty">
-              <p>Nenhum agente importado. Use &quot;Importar agentes do VeloHub&quot; acima.</p>
-              {onSyncRequest ? (
-                <button
-                  type="button"
-                  className="config-action-btn config-action-btn--create"
-                  onClick={onSyncRequest}
-                  disabled={syncing}
-                >
-                  {syncing ? 'Importando…' : 'Importar agentes do VeloHub'}
-                </button>
-              ) : null}
+              <p>
+                Nenhum colaborador com acesso Desk encontrado no VeloHub
+                (empresa Velotax, acessos.Desk).
+              </p>
             </div>
           ) : (
             <>

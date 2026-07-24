@@ -1,6 +1,6 @@
 /**
  * Velodesk Cockpit — entry React 18
- * VERSION: v2.1.0 | DATE: 2026-06-18 | AUTHOR: VeloHub Development Team
+ * VERSION: v2.2.0 | DATE: 2026-07-24
  */
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -8,11 +8,13 @@ import { BrowserRouter } from 'react-router-dom';
 import Chart from 'chart.js/auto';
 import * as XLSX from 'xlsx';
 import App from './app/App';
+import { initDeskDebug } from './utils/deskDebugLog';
 import './styles/cockpit/index.css';
 import './styles/app.css';
 
 window.Chart = Chart;
 window.XLSX = XLSX;
+initDeskDebug();
 
 if (location.protocol === 'file:') {
   document.documentElement.innerHTML =
@@ -37,7 +39,12 @@ if (location.protocol === 'file:') {
       null,
       React.createElement(
         BrowserRouter,
-        null,
+        {
+          future: {
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          },
+        },
         React.createElement(App)
       )
     )

@@ -1,4 +1,4 @@
-/** workflowMatcher v1.4.0 — atribuicao funcao + grupo legado */
+/** workflowMatcher v1.5.0 — exclui workflows escalonar-* legados */
 import { GRUPO_TO_FUNCAO_MAP } from '../config/funcaoPermissaoDefaults';
 import type { IGrupoResponsabilidade } from '../models/GrupoResponsabilidade';
 import type { IWorkflowCriterio } from '../models/WorkflowDefinicao';
@@ -97,6 +97,10 @@ export function evaluateCriterios(
     const actual = readTabulationField(fields, criterio.campo);
     return evaluateOperator(actual, criterio.operador, criterio.valor);
   });
+}
+
+export function isLegacyEscalonarWorkflowSlug(slug: unknown): boolean {
+  return String(slug || '').trim().toLowerCase().startsWith('escalonar-');
 }
 
 /** Gatilho sem critérios nunca ativa o workflow */

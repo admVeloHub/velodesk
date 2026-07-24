@@ -1,8 +1,9 @@
 /**
- * permissionService v1.0.0 — RBAC cliente (espelha backend)
- * VERSION: v1.0.0 | DATE: 2026-07-17
+ * permissionService v1.5.0 — escopo WF também por definicaoSlug escalonar-{funcao}
+ * VERSION: v1.5.0 | DATE: 2026-07-24
  */
 import api from '../../api/client';
+import { normalizeProfileId } from '../../config/profiles';
 
 const STORAGE_KEY = 'velodesk_permissions';
 
@@ -60,8 +61,30 @@ export function can(modulo, key, permissoes = readCachedPermissions()?.permissoe
 
 const ALL_PROFILE_PORTALS = ['agent', 'gestao', 'workflow', 'especiais'];
 
+/** Portal Workflow sem Agente/Gestão — definido pelos overrides `portal.*`. */
+export function isWorkflowOnlyPermissions(perm = readCachedPermissions()) {
+  if (!perm) return false;
+  const portal = perm.permissoes?.portal || {};
+  return portal.workflow === true && portal.agente !== true && portal.gestao !== true;
+}
+
+/** Capacidade de atuar no Workflow (portal ou decisões explícitas). */
+export function hasWorkflowActingCapability(perm = readCachedPermissions()) {
+  const p = perm?.permissoes;
+  return (
+    hasPermission(p, 'portal', 'workflow')
+    || hasPermission(p, 'workflow', 'aprovar')
+    || hasPermission(p, 'workflow', 'avancar')
+    || hasPermission(p, 'workflow', 'rejeitar')
+  );
+}
+
 /** Portais exibidos no seletor de perfil — mescla API, cache, flags portal.* e função gestão. */
 export function getAllowedProfilePortals(perm = readCachedPermissions()) {
+  if (isWorkflowOnlyPermissions(perm)) {
+    return ['workflow'];
+  }
+
   const cached = readCachedPermissions();
   const sources = [perm, cached].filter(Boolean);
 
@@ -89,7 +112,38 @@ export function getAllowedProfilePortals(perm = readCachedPermissions()) {
     return [...ALL_PROFILE_PORTALS];
   }
 
-  return merged.length ? merged : ['agent'];
+  if (merged.length) return merged;
+  if (perm?.portalVisivel?.includes('workflow') || perm?.permissoes?.portal?.workflow === true) {
+    return ['workflow'];
+  }
+  return ['agent'];
+}
+
+/** Portal padrão quando o usuário não escolheu perfil manualmente. */
+export function resolvePreferredProfilePortal(allowed = []) {
+  const list = allowed.filter((id) => ALL_PROFILE_PORTALS.includes(id));
+  if (list.includes('gestao')) return 'gestao';
+  if (list.includes('especiais')) return 'especiais';
+  if (list.includes('workflow')) return 'workflow';
+  return 'agent';
+}
+
+/** Ajusta profileId quando o portal salvo não é permitido pelas permissões atuais. */
+export function resolveProfilePortalForPermissions(perm, currentProfileId = 'agent') {
+  if (!perm) return normalizeProfileId(currentProfileId);
+  const allowed = getAllowedProfilePortals(perm);
+  const preferred = resolvePreferredProfilePortal(allowed);
+  const current = normalizeProfileId(currentProfileId);
+
+  if (isWorkflowOnlyPermissions(perm) && allowed.includes('workflow')) {
+    return 'workflow';
+  }
+  if (!allowed.includes(current)) return preferred;
+  if (current === 'agent' && !allowed.includes('agent')) return preferred;
+  if (current === 'agent' && allowed.includes('workflow') && !allowed.includes('agent')) {
+    return 'workflow';
+  }
+  return current;
 }
 
 export function getPortalVisivel(perm = readCachedPermissions()) {
@@ -102,6 +156,23 @@ const PORTAL_KEY_TO_PROFILE = {
   workflow: 'workflow',
   especiais: 'especiais',
 };
+
+/** Deriva portalVisivel[] a partir de permissoes.portal.* (editor de funções). */
+export function derivePortalVisivelFromPermissoes(permissoes, fallback = ['agent']) {
+  const portalPerms = permissoes?.portal;
+  if (!portalPerms || typeof portalPerms !== 'object') return fallback;
+
+  const hasExplicitPortal = Object.keys(PORTAL_KEY_TO_PROFILE).some(
+    (key) => typeof portalPerms[key] === 'boolean',
+  );
+  if (!hasExplicitPortal) return fallback;
+
+  const derived = Object.entries(PORTAL_KEY_TO_PROFILE)
+    .filter(([key]) => portalPerms[key] === true)
+    .map(([, id]) => id);
+
+  return derived.length ? derived : fallback;
+}
 
 /** Unifica portalVisivel[] com flags permissoes.portal.* */
 export function resolvePortalVisivel(perm = readCachedPermissions()) {
@@ -121,10 +192,19 @@ export function isPortalAllowed(portalId, perm = readCachedPermissions()) {
   return allowed.includes(normalized);
 }
 
+export function hasWorkflowPortalAccess(perm = readCachedPermissions()) {
+  return isPortalAllowed('workflow', perm) || can('portal', 'workflow', perm?.permissoes);
+}
+
 export function shouldUseMeusChamadosFila(perm = readCachedPermissions()) {
   if (!perm) return true;
   if (hasPermission(perm.permissoes, 'tickets', 'ver_todos')) return false;
-  if (perm.funcaoSlug === 'financeiro' || perm.funcaoSlug === 'produtos') return false;
+  if (
+    hasPermission(perm.permissoes, 'tickets', 'atuar_atribuido')
+    && hasPermission(perm.permissoes, 'portal', 'workflow')
+  ) {
+    return false;
+  }
   return hasPermission(perm.permissoes, 'tickets', 'ver_meus');
 }
 
@@ -174,21 +254,44 @@ function ticketCanalMatches(ticket, funcaoSlug) {
   return patterns.some((p) => text.includes(normalizeText(p)));
 }
 
+function userFuncaoSlugs(perm) {
+  return [
+    ...new Set(
+      [perm?.funcaoSlug, ...(perm?.funcoes || [])]
+        .map((s) => String(s || '').trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+function matchesAtribuidoAnyUserFuncao(ticket, perm) {
+  const atribuido = normalizeAtribuido(ticket?.lateralForm?.atribuido);
+  if (!atribuido.startsWith('funcao:')) return false;
+  const slug = atribuido.slice(7).toLowerCase();
+  return userFuncaoSlugs(perm).includes(slug);
+}
+
+function matchesWorkflowDefinitionTeam(ticket, perm) {
+  const lf = ticket?.lateralForm || {};
+  const wf = lf.workflow || {};
+  const slug = String(wf.definicaoSlug || wf.templateId || lf.escalonar || '')
+    .trim()
+    .toLowerCase();
+  if (!slug) return false;
+  const team = slug.startsWith('escalonar-') ? slug.slice('escalonar-'.length) : slug;
+  return userFuncaoSlugs(perm).includes(team);
+}
+
+function matchesWorkflowScope(ticket, perm) {
+  return matchesAtribuidoAnyUserFuncao(ticket, perm)
+    || matchesWorkflowDefinitionTeam(ticket, perm);
+}
+
 export function canActOnTicket(ticket, perm = readCachedPermissions()) {
   if (!perm) return false;
-  const { permissoes, funcaoSlug, funcoes = [] } = perm;
+  const { permissoes, funcoes = [] } = perm;
 
   if (hasPermission(permissoes, 'tickets', 'ver_todos')) return true;
-
-  if (funcaoSlug === 'financeiro' || funcoes.includes('financeiro')) {
-    const atribuido = normalizeAtribuido(ticket?.lateralForm?.atribuido);
-    return atribuido === 'funcao:financeiro';
-  }
-
-  if (funcaoSlug === 'produtos' || funcoes.includes('produtos')) {
-    const atribuido = normalizeAtribuido(ticket?.lateralForm?.atribuido);
-    return atribuido === 'funcao:produtos';
-  }
 
   for (const cf of funcoes) {
     if (CANAL_ORIGEM_BY_FUNCAO[cf] && hasPermission(permissoes, 'tickets', 'atuar_canal_especial')) {
@@ -208,12 +311,18 @@ export function canActOnTicket(ticket, perm = readCachedPermissions()) {
     return true;
   }
 
-  const wf = ticket?.workflow || ticket?.lateralForm?.workflow;
-  if ((wf?.active || ticket?.lateralForm?.workflowActive) && hasPermission(permissoes, 'tickets', 'atuar_atribuido')) {
-    const atribuido = normalizeAtribuido(ticket?.lateralForm?.atribuido);
-    for (const f of funcoes) {
-      if (atribuido === `funcao:${f}`) return true;
-    }
+  if (
+    hasPermission(permissoes, 'tickets', 'atuar_atribuido')
+    && matchesWorkflowScope(ticket, perm)
+  ) {
+    return true;
+  }
+
+  if (
+    hasPermission(permissoes, 'portal', 'workflow')
+    && matchesWorkflowScope(ticket, perm)
+  ) {
+    return true;
   }
 
   return false;
@@ -258,18 +367,25 @@ export function filterTicketForUser(ticket, perm = readCachedPermissions()) {
   return ticketMatchesAgentResponsavel(ticket, perm);
 }
 
-const WORKFLOW_TEAM_QUEUE_SLUGS = ['financeiro', 'produtos'];
-
+/**
+ * Fila de time do usuário no Workflow = função efetiva com atuar_atribuido + portal.workflow.
+ * Gestão (ver_todos + aprovar) usa console consolidado (retorna null).
+ */
 export function resolveWorkflowTeamQueueForUser(perm = readCachedPermissions()) {
   if (!perm) return null;
-  if (WORKFLOW_TEAM_QUEUE_SLUGS.includes(perm.funcaoSlug)) return perm.funcaoSlug;
-  for (const funcao of perm.funcoes || []) {
-    if (WORKFLOW_TEAM_QUEUE_SLUGS.includes(funcao)) return funcao;
+  if (
+    hasPermission(perm.permissoes, 'tickets', 'ver_todos')
+    && canApproveWorkflow(perm)
+  ) {
+    return null;
   }
-  return null;
+  if (!hasPermission(perm.permissoes, 'portal', 'workflow')) return null;
+  if (!hasPermission(perm.permissoes, 'tickets', 'atuar_atribuido')) return null;
+  const slugs = userFuncaoSlugs(perm);
+  return slugs[0] || null;
 }
 
-/** Gestão e perfis com aprovação global enxergam o console consolidado (sem fila Financeiro/Produtos). */
+/** Gestão (ver_todos) ou perfil com fila de atribuição no Workflow. */
 export function canAccessWorkflowApprovalConsole(perm = readCachedPermissions()) {
   if (resolveWorkflowTeamQueueForUser(perm)) return true;
   return canApproveWorkflow(perm) && hasPermission(perm?.permissoes, 'tickets', 'ver_todos');

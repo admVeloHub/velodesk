@@ -1,8 +1,10 @@
 /**
- * PermissionContext v1.1.0 — permissões RBAC + tratamento 429
- * VERSION: v1.1.0 | DATE: 2026-07-21
+ * PermissionContext v1.4.0 — deskLog diagnóstico
+ * VERSION: v1.4.0 | DATE: 2026-07-24
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useAuth } from './AuthContext';
+import deskLog from '../utils/deskDebugLog';
 import {
   can,
   canActOnTicket,
@@ -10,9 +12,9 @@ import {
   clearCachedPermissions,
   fetchMyPermissions,
   filterTicketForUser,
+  getPortalVisivel,
   isPortalAllowed,
   readCachedPermissions,
-  getAllowedProfilePortals,
   shouldUseMeusChamadosFila,
 } from '../services/permissions/permissionService';
 import { isRateLimitError, RATE_LIMIT_USER_MESSAGE } from '../utils/apiErrors';
@@ -20,6 +22,7 @@ import { isRateLimitError, RATE_LIMIT_USER_MESSAGE } from '../utils/apiErrors';
 const PermissionContext = createContext(null);
 
 export function PermissionProvider({ children }) {
+  const { isAuthenticated, user } = useAuth();
   const [permissions, setPermissions] = useState(() => readCachedPermissions());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -28,13 +31,22 @@ export function PermissionProvider({ children }) {
     setLoading(true);
     setError(null);
     try {
+      deskLog.perm('reload → início');
       const data = await fetchMyPermissions();
       setPermissions(data);
+      deskLog.perm('reload → ok', {
+        funcaoSlug: data?.funcaoSlug,
+        portalVisivel: data?.portalVisivel,
+      });
       return data;
     } catch (err) {
       const message = isRateLimitError(err)
         ? RATE_LIMIT_USER_MESSAGE
         : (err?.message || 'Erro ao carregar permissões');
+      deskLog.error('PERMISSOES', 'reload → falhou', {
+        status: err?.response?.status,
+        message: err?.response?.data?.message || message,
+      });
       setError(message);
       throw err;
     } finally {
@@ -48,11 +60,12 @@ export function PermissionProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('velodesk_token');
-    if (token) {
-      void reload().catch(() => {});
+    if (!isAuthenticated) {
+      clear();
+      return;
     }
-  }, [reload]);
+    void reload().catch(() => {});
+  }, [isAuthenticated, user?.email, reload, clear]);
 
   const api = useMemo(() => ({
     permissions,
@@ -67,7 +80,7 @@ export function PermissionProvider({ children }) {
     shouldUseMeusChamadosFila: () => shouldUseMeusChamadosFila(permissions),
     isPortalAllowed: (portalId) => isPortalAllowed(portalId, permissions),
     funcaoSlug: permissions?.funcaoSlug || 'atendimento',
-    portalVisivel: getAllowedProfilePortals(permissions),
+    portalVisivel: getPortalVisivel(permissions),
   }), [permissions, loading, error, reload, clear]);
 
   return (

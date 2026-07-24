@@ -1,4 +1,4 @@
-/** permission.service v1.0.0 — RBAC por função do agente */
+/** permission.service v1.6.0 — escopo WF também por definição escalonar-{funcao} */
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { findColaboradorByEmail } from './colaboradoresCadastro.service';
@@ -10,7 +10,10 @@ import {
   resolveEffectivePermissoes,
 } from './funcaoPermissao.service';
 import { buildResponsavelCandidates, readTabulacaoSnapshot } from './chamado.mapper';
-import { CANAL_ORIGEM_BY_FUNCAO } from '../config/funcaoPermissaoDefaults';
+import {
+  CANAL_ORIGEM_BY_FUNCAO,
+  derivePortalVisivelFromPermissoes,
+} from '../config/funcaoPermissaoDefaults';
 import type { PermissoesMap } from '../config/funcaoPermissaoDefaults';
 import {
   extractFuncoes,
@@ -18,6 +21,7 @@ import {
   normalizeFuncao,
   resolvePrimaryFuncao,
 } from '../utils/normalizeFuncao';
+import { getWorkflowById } from './workflowDefinicao.service';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
 
@@ -61,24 +65,23 @@ async function resolveDbUser(userId?: string) {
 
 export async function resolveUserFuncoes(authUser: AuthPayload): Promise<string[]> {
   const normalizedEmail = String(authUser.email || '').trim().toLowerCase();
-  let atuacao: unknown = null;
+  const colaborador = await findColaboradorByEmail(authUser.email);
+  const colabFuncoes = extractFuncoes(colaborador?.atuacao);
 
-  if (normalizedEmail) {
+  let funcoesCollected: string[] = [];
+
+  // Cadastro VeloHub é fonte da verdade; deskAgente só se colaborador não tiver atuação
+  if (colabFuncoes.length) {
+    funcoesCollected = colabFuncoes;
+  } else if (normalizedEmail) {
     const deskAgente = await getDeskAgenteModel()
       .findOne({ email: normalizedEmail })
       .select('atuacao')
       .lean();
-    if (Array.isArray(deskAgente?.atuacao) && deskAgente.atuacao.length) {
-      atuacao = deskAgente.atuacao;
-    }
+    funcoesCollected = extractFuncoes(deskAgente?.atuacao);
   }
 
-  if (!atuacao) {
-    const colaborador = await findColaboradorByEmail(authUser.email);
-    atuacao = colaborador?.atuacao;
-  }
-
-  const funcoes = extractFuncoes(atuacao);
+  const funcoes = [...new Set(funcoesCollected.filter(Boolean))];
 
   if (String(authUser.role || '').toLowerCase() === 'supervisor' && !funcoes.includes('gestao')) {
     funcoes.push('gestao');
@@ -100,7 +103,6 @@ export async function resolveUserPermissions(authUser: AuthPayload): Promise<Res
   const map = new Map(all.map((f) => [f.slug, f]));
 
   let permissoes = effective?.permissoes || {};
-  let portalVisivel = effective?.portalVisivel || ['agent'];
   let nivel = effective?.nivel ?? 1;
   let canalOrigem = effective?.canalOrigem;
 
@@ -111,10 +113,14 @@ export async function resolveUserPermissions(authUser: AuthPayload): Promise<Res
       if (!doc) continue;
       const eff = resolveEffectivePermissoes(doc, map);
       permissoes = mergePermissoesMax(permissoes, eff);
-      portalVisivel = [...new Set([...portalVisivel, ...(doc.portalVisivel || [])])];
       if (doc.canalOrigem) canalOrigem = doc.canalOrigem;
     }
   }
+
+  const portalVisivel = derivePortalVisivelFromPermissoes(
+    permissoes,
+    effective?.portalVisivel || ['agent'],
+  );
 
   const candidates = buildResponsavelCandidates(authUser, dbUser);
 
@@ -198,21 +204,95 @@ function matchesAtribuidoFuncao(
   return atribuido === expected;
 }
 
+function userFuncaoSlugs(resolved: ResolvedUserPermissions): string[] {
+  return [
+    ...new Set(
+      [resolved.funcaoSlug, ...(resolved.funcoes || [])]
+        .map((s) => normalizeFuncao(s))
+        .filter(Boolean),
+    ),
+  ];
+}
+
+function matchesAtribuidoAnyUserFuncao(
+  resolved: ResolvedUserPermissions,
+  chamado: IChamadoN1,
+): boolean {
+  return userFuncaoSlugs(resolved).some((slug) => matchesAtribuidoFuncao(chamado, slug));
+}
+
+/** Extrai time da definição (`escalonar-produtos` → `produtos`). */
+function teamSlugFromWorkflowDefinicaoSlug(definicaoSlug: string): string {
+  const slug = normalizeFuncao(definicaoSlug);
+  if (slug.startsWith('escalonar-')) return slug.slice('escalonar-'.length);
+  return slug;
+}
+
+/** Workflow ativo cuja definição pertence a uma das funções do usuário. */
+export async function matchesWorkflowDefinitionTeam(
+  resolved: ResolvedUserPermissions,
+  chamado: IChamadoN1,
+): Promise<boolean> {
+  if (!chamado.workflow?.active || !chamado.workflow.workflowId) return false;
+  if (
+    !hasPermission(resolved.permissoes, 'tickets', 'atuar_atribuido')
+    && !hasPermission(resolved.permissoes, 'portal', 'workflow')
+  ) {
+    return false;
+  }
+  try {
+    const def = await getWorkflowById(String(chamado.workflow.workflowId));
+    if (!def?.slug) return false;
+    const team = teamSlugFromWorkflowDefinicaoSlug(def.slug);
+    return Boolean(team) && userFuncaoSlugs(resolved).includes(team);
+  } catch {
+    return false;
+  }
+}
+
+/** Acesso ao portal Workflow ou capacidade explícita de decisão/avanço. */
+export function hasWorkflowActingCapability(resolved: ResolvedUserPermissions): boolean {
+  const { permissoes } = resolved;
+  return (
+    hasPermission(permissoes, 'portal', 'workflow')
+    || hasPermission(permissoes, 'workflow', 'aprovar')
+    || hasPermission(permissoes, 'workflow', 'avancar')
+    || hasPermission(permissoes, 'workflow', 'rejeitar')
+  );
+}
+
+/** Fila por atribuição/função (visão Workflow personalizada via overrides). */
+export function shouldUseAtribuidoFuncaoQueue(resolved: ResolvedUserPermissions): boolean {
+  if (hasPermission(resolved.permissoes, 'tickets', 'ver_todos')) return false;
+  return (
+    hasPermission(resolved.permissoes, 'tickets', 'atuar_atribuido')
+    && hasPermission(resolved.permissoes, 'portal', 'workflow')
+  );
+}
+
+function matchesWorkflowScope(
+  resolved: ResolvedUserPermissions,
+  chamado: IChamadoN1,
+): boolean {
+  return matchesAtribuidoAnyUserFuncao(resolved, chamado);
+}
+
+async function canActOnTicketAsync(
+  resolved: ResolvedUserPermissions,
+  chamado: IChamadoN1,
+): Promise<boolean> {
+  if (canActOnTicket(resolved, chamado)) return true;
+  return matchesWorkflowDefinitionTeam(resolved, chamado);
+}
+
 export function canActOnTicket(
   resolved: ResolvedUserPermissions,
   chamado: IChamadoN1,
 ): boolean {
-  const { permissoes, funcaoSlug, funcoes, responsavelCandidates } = resolved;
+  const { permissoes, funcoes, responsavelCandidates } = resolved;
 
   if (hasPermission(permissoes, 'tickets', 'ver_todos')) {
-    if (!hasPermission(permissoes, 'workflow', 'aprovar')) {
-      /* suporte — ok exceto aprovação tratada separadamente */
-    }
     return true;
-  }
-
-  if (funcaoSlug === 'financeiro' || funcoes.includes('financeiro')) {
-    return matchesAtribuidoFuncao(chamado, 'financeiro');
   }
 
   const canalFuncs = funcoes.filter((f) => CANAL_ORIGEM_BY_FUNCAO[f]);
@@ -226,11 +306,19 @@ export function canActOnTicket(
     return hasPermission(permissoes, 'tickets', 'atuar_responsavel');
   }
 
-  const wf = chamado.workflow;
-  if (wf?.active && hasPermission(permissoes, 'tickets', 'atuar_atribuido')) {
-    for (const f of funcoes) {
-      if (matchesAtribuidoFuncao(chamado, f)) return true;
-    }
+  // Atuação por atribuição / time do passo — guiada por overrides, não por slug fixo
+  if (
+    hasPermission(permissoes, 'tickets', 'atuar_atribuido')
+    && matchesWorkflowScope(resolved, chamado)
+  ) {
+    return true;
+  }
+
+  if (
+    hasPermission(permissoes, 'portal', 'workflow')
+    && matchesWorkflowScope(resolved, chamado)
+  ) {
+    return true;
   }
 
   return false;
@@ -246,8 +334,11 @@ export function canViewTicket(
     return true;
   }
 
-  if (resolved.funcaoSlug === 'financeiro' || resolved.funcoes.includes('financeiro')) {
-    return matchesAtribuidoFuncao(chamado, 'financeiro');
+  if (
+    shouldUseAtribuidoFuncaoQueue(resolved)
+    && matchesWorkflowScope(resolved, chamado)
+  ) {
+    return true;
   }
 
   if (hasPermission(resolved.permissoes, 'tickets', 'ver_meus')) {
@@ -266,7 +357,7 @@ function funcaoSlugCanal(resolved: ResolvedUserPermissions): string | null {
 
 export function shouldUseMeusChamadosFilter(resolved: ResolvedUserPermissions): boolean {
   if (hasPermission(resolved.permissoes, 'tickets', 'ver_todos')) return false;
-  if (resolved.funcaoSlug === 'financeiro') return false;
+  if (shouldUseAtribuidoFuncaoQueue(resolved)) return false;
   return hasPermission(resolved.permissoes, 'tickets', 'ver_meus');
 }
 
@@ -274,13 +365,48 @@ export function canApproveWorkflow(resolved: ResolvedUserPermissions): boolean {
   return hasPermission(resolved.permissoes, 'workflow', 'aprovar');
 }
 
+/** Pedir informação (WF) ou Responder Solicitação (responsável). */
+export async function canWorkflowComunicacao(
+  resolved: ResolvedUserPermissions,
+  chamado: IChamadoN1,
+  origem: 'workflow' | 'responsavel',
+): Promise<boolean> {
+  if (!chamado.workflow?.active) return false;
+
+  if (origem === 'responsavel') {
+    return matchesResponsavel(chamado, resolved.responsavelCandidates)
+      || canActOnTicketAsync(resolved, chamado);
+  }
+
+  if (await canActOnTicketAsync(resolved, chamado)) return true;
+  if (
+    canApproveWorkflow(resolved)
+    && hasPermission(resolved.permissoes, 'tickets', 'ver_todos')
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export async function assertCanActOnTicket(
   authUser: AuthPayload,
   chamado: IChamadoN1,
 ): Promise<ResolvedUserPermissions> {
   const resolved = await resolveUserPermissions(authUser);
-  if (!canActOnTicket(resolved, chamado)) {
+  if (!(await canActOnTicketAsync(resolved, chamado))) {
     throw new PermissionDeniedError('Sem permissão para atuar neste ticket');
+  }
+  return resolved;
+}
+
+export async function assertCanWorkflowComunicacao(
+  authUser: AuthPayload,
+  chamado: IChamadoN1,
+  origem: 'workflow' | 'responsavel',
+): Promise<ResolvedUserPermissions> {
+  const resolved = await resolveUserPermissions(authUser);
+  if (!(await canWorkflowComunicacao(resolved, chamado, origem))) {
+    throw new PermissionDeniedError('Sem permissão para comunicar neste workflow');
   }
   return resolved;
 }
@@ -308,5 +434,5 @@ export async function canUserActOnWorkflowStep(
     return false;
   }
 
-  return canActOnTicket(resolved, chamado);
+  return canActOnTicketAsync(resolved, chamado);
 }

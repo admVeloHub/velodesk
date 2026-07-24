@@ -9,7 +9,10 @@ import { formatCpf, normalizeCpf, resolveDeskSearchEntries } from '../desk/utils
 export { ESCALONAR_OPTIONS };
 
 export function searchTicketsForEscalation(query) {
-  return resolveDeskSearchEntries(query, 'data')
+  const trimmed = String(query || '').trim();
+  const digits = normalizeCpf(trimmed);
+  const mode = digits.length === 11 ? 'cpf' : 'ticket';
+  return resolveDeskSearchEntries(trimmed, 'data', false, mode)
     .filter((entry) => entry.queueId !== 'resolvidos')
     .map(mapTicketSearchResult);
 }

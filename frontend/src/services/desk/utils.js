@@ -1,11 +1,18 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.1.0 | DATE: 2026-07-21
+ * VERSION: v3.3.5 | DATE: 2026-07-24
+ * — busca global por CPF ou protocolo (modo selecionável na fila)
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
 import { ticketAssignedToCurrentAgent, ticketMatchesAgentResponsavel } from './responsavelSegmentation';
-import { MEUS_TICKETS_QUEUE_ID, QUEUE_STATUSES, isAgentForwardEscalonar } from './constants';
+import {
+  MEUS_TICKETS_QUEUE_ID,
+  QUEUE_STATUSES,
+  isAgentForwardEscalonar,
+  DESK_SEARCH_MODE_CPF,
+  DESK_SEARCH_MODE_TICKET,
+} from './constants';
 import { lookupClient, getAgentName } from '../clientDb';
 import {
   advanceWorkflowStep,
@@ -179,6 +186,7 @@ export function getTicketResolvedAt(ticket) {
 /** Data de entrada na caixa/fila atual (último registro de status). */
 export function getTicketQueueEntryAt(ticket) {
   if (!ticket) return null;
+  if (ticket.queueEntryAt) return ticket.queueEntryAt;
   const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
   if (historico.length) {
     const last = historico[historico.length - 1];
@@ -338,14 +346,19 @@ function resolveWorkflowArea(escalonar, group, lastWorkflow) {
   return null;
 }
 
-export function getTicketOperationProgress(ticket, queueId, liveEscalonar) {
+export function getTicketOperationProgress(ticket, queueId) {
   const lf = ticket?.lateralForm || {};
-  const escalonar = liveEscalonar !== undefined ? liveEscalonar : lf.escalonar;
   const group = String(ticket?.group || '').toLowerCase();
   const resolved = queueId === 'resolvidos' || ticket?.status === 'resolvido';
-  const workflowArea = resolveWorkflowArea(escalonar, group, lf.lastWorkflow);
-  const inWorkflow = Boolean(escalonar);
-  const retornoN1 = lf.retornoN1 === true || (lf.wasEscalated && !escalonar && !resolved);
+  const inWorkflow = isTicketInWorkflow(ticket);
+  let workflowArea = null;
+  if (inWorkflow) {
+    const progress = getWorkflowProgress(ticket);
+    workflowArea = progress?.awaitingTeamLabel || null;
+  } else {
+    workflowArea = resolveWorkflowArea(null, group, lf.lastWorkflow);
+  }
+  const retornoN1 = lf.retornoN1 === true || (lf.wasEscalated && !inWorkflow && !resolved);
 
   let activeStep = 1;
   if (resolved) {
@@ -374,20 +387,64 @@ export function getTicketOperationAreaLabel(ticket) {
   return 'N1';
 }
 
+function readTicketLateralWorkflow(ticket) {
+  const lateral = ticket?.lateralForm?.workflow;
+  if (lateral?.templateId || lateral?.definicaoSlug) {
+    return lateral;
+  }
+
+  const persisted = ticket?.workflow;
+  if (!persisted?.active) {
+    return lateral || null;
+  }
+
+  const workflowKey = persisted.workflowId
+    || lateral?.templateId
+    || lateral?.definicaoSlug;
+  if (!workflowKey) {
+    return lateral || null;
+  }
+
+  const template = getWorkflowTemplateById(workflowKey);
+  const templateSlug = template?.id || null;
+
+  return {
+    ...(lateral || {}),
+    templateId: templateSlug || lateral?.templateId,
+    definicaoSlug: templateSlug || lateral?.definicaoSlug,
+    step: persisted.step ?? lateral?.step ?? 0,
+    passoId: persisted.passoId ?? lateral?.passoId,
+    startedAt: persisted.startedAt ?? lateral?.startedAt,
+    completedAt: persisted.completedAt ?? lateral?.completedAt,
+    status: persisted.completedAt
+      ? 'completed'
+      : (lateral?.status || 'active'),
+    pendingDecision: persisted.pendingDecision ?? lateral?.pendingDecision ?? null,
+    currentStepId: lateral?.currentStepId,
+    stepHistory: lateral?.stepHistory || [],
+  };
+}
+
 export function isTicketInWorkflow(ticket) {
-  const wf = ticket?.lateralForm?.workflow;
-  return Boolean(wf?.templateId || wf?.definicaoSlug);
+  if (ticket?.workflow?.active === true) return true;
+  const wf = readTicketLateralWorkflow(ticket);
+  return Boolean(wf?.templateId || wf?.definicaoSlug || ticket?.workflow?.workflowId);
 }
 
 export function isTicketWorkflowActive(ticket) {
-  const wf = ticket?.lateralForm?.workflow;
-  if (!wf?.templateId && !wf?.definicaoSlug) return false;
-  return wf.status !== 'completed';
+  if (ticket?.workflow?.active === true && !ticket?.workflow?.completedAt) {
+    const wf = readTicketLateralWorkflow(ticket);
+    if (wf?.status === 'completed') return false;
+    return true;
+  }
+  const wf = readTicketLateralWorkflow(ticket);
+  if (!wf?.templateId && !wf?.definicaoSlug && !ticket?.workflow?.workflowId) return false;
+  return wf?.status !== 'completed';
 }
 
 export function getWorkflowTemplateForTicket(ticket) {
-  const wf = ticket?.lateralForm?.workflow;
-  const templateKey = wf?.templateId || wf?.definicaoSlug;
+  const wf = readTicketLateralWorkflow(ticket);
+  const templateKey = wf?.templateId || wf?.definicaoSlug || ticket?.workflow?.workflowId;
   if (!templateKey) return null;
   return getWorkflowTemplateById(templateKey)
     || (String(templateKey).startsWith('escalonar-') ? buildEscalonarWorkflowTemplate(String(templateKey).replace('escalonar-', '')) : null);
@@ -408,7 +465,7 @@ function getStepStartedAt(workflow, stepId) {
 }
 
 export function getWorkflowProgress(ticket) {
-  const workflow = ticket?.lateralForm?.workflow;
+  const workflow = readTicketLateralWorkflow(ticket);
   const template = getWorkflowTemplateForTicket(ticket);
   if (!workflow || !template) return null;
 
@@ -490,11 +547,8 @@ export function getWorkflowProgress(ticket) {
   };
 }
 
-export function buildWorkflowSystemMessage(template, escalonar) {
-  if (escalonar) {
-    return `Workflow **${template.title}** iniciado após encaminhamento do ticket.`;
-  }
-  return `Workflow **${template.title}** iniciado automaticamente com base na classificação do ticket.`;
+export function buildWorkflowSystemMessage(template) {
+  return `Workflow **${template.title}** iniciado pelo agente.`;
 }
 
 function getWorkflowInstanceKey(workflow) {
@@ -547,36 +601,26 @@ function pushWorkflowSystemMessage(ticket, text) {
   });
 }
 
-/** Ativa workflow no encaminhamento/commit — avanço de etapa só via botão/API */
-export function syncTicketWorkflowOnCommit(ticket, rightFields, escalonar, _statusId, author) {
+/** Preserva workflow existente no commit — ativação só via botão Iniciar Workflow */
+export function syncTicketWorkflowOnCommit(ticket) {
   if (!ticket) return { activated: false, advanced: false };
-
   const lf = ticket.lateralForm || {};
-  let workflow = lf.workflow;
-  let template = getWorkflowTemplateForTicket(ticket);
-  let activated = false;
-
-  if (!getWorkflowInstanceKey(workflow)) {
-    const activation = maybeActivateWorkflowForTicket(ticket, rightFields, escalonar, author, { mode: 'commit' });
-    if (activation.activated && activation.workflow && activation.template) {
-      workflow = activation.workflow;
-      template = activation.template;
-      activated = true;
-      if (activation.atribuido) {
-        ticket.lateralForm = { ...lf, atribuido: activation.atribuido };
-      }
-    }
-  }
+  const workflow = lf.workflow;
 
   if (workflow) {
-    ticket.lateralForm = { ...(ticket.lateralForm || lf), workflow, escalonar: escalonar || lf.escalonar };
+    const { escalonar: _legacyEscalonar, ...lfRest } = lf;
+    ticket.lateralForm = { ...lfRest, workflow };
+  } else if (lf.escalonar) {
+    const { escalonar: _legacyEscalonar, ...lfRest } = lf;
+    ticket.lateralForm = lfRest;
   }
 
-  if (activated && template) {
-    injectWorkflowSystemMessage(ticket, template, escalonar);
-  }
-
-  return { activated, advanced: false, workflow, template };
+  return {
+    activated: false,
+    advanced: false,
+    workflow: workflow || null,
+    template: workflow ? getWorkflowTemplateForTicket(ticket) : null,
+  };
 }
 
 export function advanceTicketWorkflowByDecision(ticket, variavel, author) {
@@ -650,12 +694,12 @@ export function advanceTicketWorkflow(ticket, author) {
   };
 }
 
-export function injectWorkflowSystemMessage(ticket, template, escalonar) {
+export function injectWorkflowSystemMessage(ticket, template) {
   if (!ticket || !template) return ticket;
   const lf = ticket.lateralForm || {};
   if (lf.workflow?.systemMessageInjected) return ticket;
 
-  const text = buildWorkflowSystemMessage(template, escalonar);
+  const text = buildWorkflowSystemMessage(template);
   const ts = new Date().toISOString();
   if (!ticket.messages) ticket.messages = [];
   ticket.messages.push({
@@ -809,12 +853,33 @@ export const MY_TICKETS_STATUS_SECTIONS = [
   { id: 'resolvidos', label: 'Resolvidos', dot: '#9ca3af' },
 ];
 
-function matchesTicketSearch(entry, q) {
+function matchesTicketByCpf(ticket, rawQuery) {
+  const digits = normalizeCpf(String(rawQuery || '').trim());
+  if (digits.length !== 11) return false;
+  const ticketCpf = normalizeCpf(ticket.lateralForm?.cpf || ticket.clientCPF || '');
+  return ticketCpf === digits;
+}
+
+function matchesTicketByProtocol(ticket, rawQuery) {
+  const protocol = getTicketProtocolLabel(ticket);
+  if (!protocol) return false;
+  const query = String(rawQuery || '').trim().replace(/^#/, '');
+  if (!query) return false;
+  const queryDigits = normalizeCpf(query);
+  const protocolDigits = normalizeCpf(protocol);
+  if (protocol.toLowerCase() === query.toLowerCase()) return true;
+  if (queryDigits.length >= 4 && protocolDigits.includes(queryDigits)) return true;
+  if (query.length >= 3 && protocol.toLowerCase().includes(query.toLowerCase())) return true;
+  return false;
+}
+
+function matchesTicketSearch(entry, q, searchMode = DESK_SEARCH_MODE_CPF) {
   if (!q) return true;
   const t = entry.ticket;
-  const cpf = normalizeCpf(t.lateralForm?.cpf || t.clientCPF || '');
-  const hay = [t.id, t.title, t.description, t.clientName, t.solicitante, cpf, formatCpf(cpf)].join(' ').toLowerCase();
-  return hay.indexOf(q) >= 0;
+  if (searchMode === DESK_SEARCH_MODE_TICKET) {
+    return matchesTicketByProtocol(t, q);
+  }
+  return matchesTicketByCpf(t, q);
 }
 
 function filterMyTicketsEntries(searchQuery) {
@@ -862,50 +927,27 @@ export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOld
   return sortTicketEntries(filtered, activeSort, 'desc', entrySortOldestFirst);
 }
 
-/** Busca global por Enter: número do ticket ou todos os tickets do CPF. */
-export function resolveDeskSearchEntries(rawQuery, activeSort, entrySortOldestFirst = false) {
+/** Busca global por Enter: CPF (modo cpf) ou protocolo (modo ticket). */
+export function resolveDeskSearchEntries(
+  rawQuery,
+  activeSort,
+  entrySortOldestFirst = false,
+  searchMode = DESK_SEARCH_MODE_CPF,
+) {
   const trimmed = String(rawQuery || '').trim();
   if (!trimmed) return [];
 
-  const digits = normalizeCpf(trimmed.replace(/^#/, ''));
   const all = getAllCockpitTickets();
+  const mode = searchMode === DESK_SEARCH_MODE_TICKET ? DESK_SEARCH_MODE_TICKET : DESK_SEARCH_MODE_CPF;
 
-  if (digits.length === 11) {
-    const byCpf = all.filter(({ ticket: t }) => {
-      if (!ticketMatchesAgentResponsavel(t)) return false;
-      const tCpf = normalizeCpf(t.lateralForm?.cpf || t.clientCPF || '');
-      return tCpf === digits;
-    });
-    return sortTicketEntries(byCpf, activeSort, 'desc', entrySortOldestFirst);
-  }
+  const filtered = all.filter(({ ticket: t }) => {
+    if (!ticketMatchesAgentResponsavel(t)) return false;
+    return mode === DESK_SEARCH_MODE_TICKET
+      ? matchesTicketByProtocol(t, trimmed)
+      : matchesTicketByCpf(t, trimmed);
+  });
 
-  const idQuery = trimmed.replace(/^#/, '').trim();
-  const idDigits = digits;
-
-  if (idDigits.length >= 4) {
-    const exact = all.filter(({ ticket: t }) => {
-      if (!ticketMatchesAgentResponsavel(t)) return false;
-      return String(t.id) === idQuery || String(t.id) === idDigits;
-    });
-    if (exact.length) return sortTicketEntries(exact, activeSort, 'desc', entrySortOldestFirst);
-
-    const partial = all.filter(({ ticket: t }) => {
-      if (!ticketMatchesAgentResponsavel(t)) return false;
-      return String(t.id).includes(idDigits);
-    });
-    if (partial.length) return sortTicketEntries(partial, activeSort, 'desc', entrySortOldestFirst);
-  }
-
-  if (idQuery.length >= 3) {
-    const loose = all.filter(({ ticket: t }) => {
-      if (!ticketMatchesAgentResponsavel(t)) return false;
-      const hay = [t.id, t.title, t.clientName, t.solicitante].join(' ').toLowerCase();
-      return hay.includes(idQuery.toLowerCase());
-    });
-    if (loose.length) return sortTicketEntries(loose, activeSort, 'desc', entrySortOldestFirst);
-  }
-
-  return [];
+  return sortTicketEntries(filtered, activeSort, 'desc', entrySortOldestFirst);
 }
 
 export function countByQueue(queueId) {
@@ -941,10 +983,16 @@ export function getEntryTicketId(entry) {
 }
 
 /** Lista visível no Desk (fila ativa ou busca aplicada). */
-export function resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst = false) {
+export function resolveDeskWorkingEntries(
+  activeQueue,
+  appliedSearch,
+  activeSort,
+  entrySortOldestFirst = false,
+  searchMode = DESK_SEARCH_MODE_CPF,
+) {
   const search = String(appliedSearch || '').trim();
   return search
-    ? resolveDeskSearchEntries(search, activeSort, entrySortOldestFirst)
+    ? resolveDeskSearchEntries(search, activeSort, entrySortOldestFirst, searchMode)
     : filterTickets(activeQueue, '', activeSort, entrySortOldestFirst);
 }
 
@@ -1402,29 +1450,6 @@ function buildAgentInternalNotesFeed(ticket) {
   const seen = new Set();
 
   normalizeTicketForDeskV2(ticket);
-  const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
-  historico.forEach((entry) => {
-    if (!isAgentRegistroEntry(entry)) return;
-    const text = String(entry.anotacaoInterna ?? '').trim();
-    if (!text) return;
-
-    const mapped = {
-      id: `${ticket.id || ticket._id}:${entry.id}`,
-      kind: 'agent',
-      author: resolveRegistroAutorLabel(entry, ticket, null),
-      initials: getInitials(resolveRegistroAutorLabel(entry, ticket, null)),
-      badge: 'Interna',
-      timestamp: entry.time || entry.timestamp || ticket.updatedAt,
-      body: text,
-      tags: [],
-      ticketId: String(ticket.id || ticket._id),
-      ticketTitle: getTicketTitle(ticket),
-      boldSegments: [],
-    };
-    if (seen.has(mapped.id)) return;
-    seen.add(mapped.id);
-    merged.push(mapped);
-  });
 
   (ticket.internalNotes || []).forEach((note) => {
     const mappedNote = mapAgentInternalNote(note, ticket);
@@ -1476,6 +1501,7 @@ function resolveRegistroAutorLabel(entry, ticket, client) {
 function buildSupervisorRegistroFeed(ticket, client) {
   const merged = [];
   const seen = new Set();
+  const seenInternalOnly = new Set();
 
   normalizeTicketForDeskV2(ticket);
   const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
@@ -1490,9 +1516,24 @@ function buildSupervisorRegistroFeed(ticket, client) {
       previousTabulationState,
       prevStatus,
     );
-    if (mapped && !seen.has(mapped.id)) {
-      seen.add(mapped.id);
-      merged.push(mapped);
+    if (mapped) {
+      const internalOnly = Boolean(mapped.internalExcerpt)
+        && !mapped.tabulationChanges?.length
+        && !mapped.statusChanged;
+      if (internalOnly) {
+        const ts = Math.floor(new Date(mapped.timestamp || 0).getTime() / 1000);
+        const dedupeKey = `${ts}:${mapped.internalExcerpt}`;
+        if (seenInternalOnly.has(dedupeKey)) {
+          applyAlteracoesToTabulationState(tabulationState, entry.alteracoes);
+          if (entry.status) prevStatus = entry.status;
+          return;
+        }
+        seenInternalOnly.add(dedupeKey);
+      }
+      if (!seen.has(mapped.id)) {
+        seen.add(mapped.id);
+        merged.push(mapped);
+      }
     }
     applyAlteracoesToTabulationState(tabulationState, entry.alteracoes);
     if (entry.status) prevStatus = entry.status;

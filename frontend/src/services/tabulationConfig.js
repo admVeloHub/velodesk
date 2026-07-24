@@ -1,6 +1,6 @@
 /**
- * tabulationConfig v1.4.1 — responsavel preenchido pela sessão, sem validação manual
- * VERSION: v1.4.1 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team
+ * tabulationConfig v1.6.0 — opções agregadas para gatilho sem bloqueio de cascata
+ * VERSION: v1.6.0 | DATE: 2026-07-23 | AUTHOR: VeloHub Development Team
  */
 
 export const EMPTY_TABULATION = {
@@ -30,7 +30,9 @@ export function getProdutoNames(config) {
 }
 
 export function findProduto(config, produtoName) {
-  return getActiveProdutos(config).find((p) => p.produto === produtoName) || null;
+  const name = String(produtoName || '').trim();
+  if (!name) return null;
+  return getActiveProdutos(config).find((p) => String(p.produto || '').trim() === name) || null;
 }
 
 export function getMotivos(config, produtoName) {
@@ -51,6 +53,71 @@ export function getDetalhes(config, produtoName, motivoName) {
     .filter((d) => d.ativo !== false)
     .sort((a, b) => (a.ordem || 0) - (b.ordem || 0))
     .map((d) => d.detalhe);
+}
+
+function uniqueSorted(values) {
+  return [...new Set(values.filter(Boolean).map((v) => String(v).trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
+/** Todos os motivos ativos — agregado de todos os produtos */
+export function getAllMotivos(config) {
+  const values = [];
+  for (const produto of getActiveProdutos(config)) {
+    for (const motivo of produto.motivos || []) {
+      if (motivo.ativo === false) continue;
+      values.push(motivo.motivo);
+    }
+  }
+  return uniqueSorted(values);
+}
+
+/** Todos os detalhes ativos — agregado de toda a árvore */
+export function getAllDetalhes(config) {
+  const values = [];
+  for (const produto of getActiveProdutos(config)) {
+    for (const motivo of produto.motivos || []) {
+      if (motivo.ativo === false) continue;
+      for (const detalhe of motivo.detalhes || []) {
+        if (detalhe.ativo === false) continue;
+        values.push(detalhe.detalhe);
+      }
+    }
+  }
+  return uniqueSorted(values);
+}
+
+/**
+ * Opções de motivo para gatilho: filtra por produto quando informado;
+ * senão retorna todos os motivos cadastrados.
+ */
+export function resolveMotivoOptions(config, produtoName) {
+  const produto = String(produtoName || '').trim();
+  if (produto) {
+    const scoped = getMotivos(config, produto);
+    if (scoped.length) return scoped;
+  }
+  return getAllMotivos(config);
+}
+
+/**
+ * Opções de detalhe para gatilho: filtra por produto/motivo quando informados;
+ * senão retorna todos os detalhes cadastrados.
+ */
+export function resolveDetalheOptions(config, produtoName, motivoName) {
+  const produto = String(produtoName || '').trim();
+  const motivo = String(motivoName || '').trim();
+  if (produto && motivo) {
+    const scoped = getDetalhes(config, produto, motivo);
+    if (scoped.length) return scoped;
+  }
+  if (produto) {
+    const fromProduto = uniqueSorted(
+      getMotivos(config, produto).flatMap((m) => getDetalhes(config, produto, m)),
+    );
+    if (fromProduto.length) return fromProduto;
+  }
+  return getAllDetalhes(config);
 }
 
 export function getTipoChamadoOptions(config) {
@@ -238,4 +305,9 @@ export function validateTabulationForSendStatus(statusId, rightFields, config) {
       ? `Preencha a tabulação antes de enviar: ${missing.join(', ')}.`
       : '',
   };
+}
+
+/** Tabulação completa (tipo, produto, motivo/detalhe quando existirem opções) */
+export function isTabulationComplete(rightFields, config) {
+  return validateTabulationForSendStatus('em-andamento', rightFields, config).ok;
 }

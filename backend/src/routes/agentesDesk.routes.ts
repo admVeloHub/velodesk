@@ -1,10 +1,11 @@
-/** agentesDesk.routes v1.1.0 — agentes Desk importados do VeloHub */
+/** agentesDesk.routes v1.3.0 — GET lê VeloHub ao vivo (espelho é secundário) */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { requireGestaoOrPermission } from '../middleware/permission';
 import {
-  listAgentesDesk,
+  listAgentesDeskFresh,
   syncAgentesFromVelohub,
+  listAgentesDesk,
 } from '../services/agenteDesk.service';
 
 const router = Router();
@@ -13,10 +14,11 @@ router.get(
   '/',
   authMiddleware,
   requireGestaoOrPermission('config', 'visualizar'),
-  async (_req, res: Response) => {
+  async (req, res: Response) => {
     try {
-      const agentes = await listAgentesDesk();
-      res.json(agentes);
+      const updatedBy = req.user?.email || req.user?.name || 'auto';
+      const result = await listAgentesDeskFresh(updatedBy);
+      res.json(result.agentes);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (/indisponível|unavailable/i.test(message)) {
@@ -30,7 +32,7 @@ router.get(
 router.post(
   '/sync',
   authMiddleware,
-  requireGestaoOrPermission('config', 'workflows_editar'),
+  requireGestaoOrPermission('config', 'visualizar'),
   async (req, res: Response) => {
     try {
       const updatedBy = req.user?.email || req.user?.name || 'system';
@@ -40,7 +42,7 @@ router.post(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (/indisponível|unavailable|console_funcionarios/i.test(message)) {
-        return res.status(503).json({ message: 'VeloHub indisponível para importação.' });
+        return res.status(503).json({ message: 'VeloHub indisponível para sincronização.' });
       }
       res.status(500).json({ message });
     }

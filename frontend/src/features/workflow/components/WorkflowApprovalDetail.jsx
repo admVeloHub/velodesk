@@ -1,11 +1,14 @@
+/**
+ * WorkflowApprovalDetail v1.5.1 — modal comunicacao com thread imediata
+ * VERSION: v1.5.0 | DATE: 2026-07-24
+ */
 import React, { useCallback, useEffect, useState } from 'react';
 import WorkflowApprovalKpis from './WorkflowApprovalKpis';
 import WorkflowApprovalFieldGrid from './WorkflowApprovalFieldGrid';
 import WorkflowApprovalSlaBar from './WorkflowApprovalSlaBar';
 import WorkflowApprovalActions from './WorkflowApprovalActions';
-import WorkflowApprovalRequestInfoPanel from './WorkflowApprovalRequestInfoPanel';
-import WorkflowApprovalProdutosCard from './WorkflowApprovalProdutosCard';
 import WorkflowApprovalProdutosApprovePanel from './WorkflowApprovalProdutosApprovePanel';
+import WorkflowComunicacaoModal from './WorkflowComunicacaoModal';
 
 export default function WorkflowApprovalDetail({
   detail,
@@ -13,8 +16,7 @@ export default function WorkflowApprovalDetail({
   teamId,
   busy,
   infoPanelOpen,
-  requestedBy,
-  onApproveConfirm,
+  onApprove,
   onReject,
   onRequestInfoOpen,
   onRequestInfoSubmit,
@@ -34,8 +36,8 @@ export default function WorkflowApprovalDetail({
       setApprovePanelOpen(true);
       return;
     }
-    onApproveConfirm?.();
-  }, [busy, isProdutosTeam, onApproveConfirm, onRequestInfoCancel]);
+    onApprove?.();
+  }, [busy, isProdutosTeam, onApprove, onRequestInfoCancel]);
 
   const handleApprovePanelClose = useCallback(() => {
     if (busy) return;
@@ -43,9 +45,9 @@ export default function WorkflowApprovalDetail({
   }, [busy]);
 
   const handleApprovePanelConfirm = useCallback(async (selectedActions) => {
-    const ok = await onApproveConfirm?.({ selectedActions });
-    if (ok) setApprovePanelOpen(false);
-  }, [onApproveConfirm]);
+    const ok = await onApprove?.({ selectedActions });
+    if (ok !== false) setApprovePanelOpen(false);
+  }, [onApprove]);
 
   if (!detail) {
     return (
@@ -80,53 +82,41 @@ export default function WorkflowApprovalDetail({
 
       <div className="wf-approval-card-wrap">
         <article className="wf-approval-card">
-          {detail.layout !== 'produtos-cadastral' && detail.layout !== 'produtos-erros-bugs' ? (
-            <>
-              <h3>{detail.cardTitle}</h3>
-              <p className="wf-approval-card__sub">{detail.cardSubtext}</p>
-            </>
-          ) : (
-            <p className="wf-approval-card__sub wf-approval-card__sub--compact">{detail.cardSubtext}</p>
-          )}
+          <h3>{detail.cardTitle}</h3>
+          <p className="wf-approval-card__sub">{detail.cardSubtext}</p>
 
           {detail.slaLabel ? (
             <WorkflowApprovalSlaBar label={detail.slaLabel} pct={detail.slaPct} />
           ) : null}
 
-          {detail.layout === 'produtos-cadastral' || detail.layout === 'produtos-erros-bugs' ? (
-            <WorkflowApprovalProdutosCard detail={detail} />
+          {detail.fieldSections?.length ? (
+            detail.fieldSections.map((section) => (
+              <div key={section.title} className="wf-approval-section">
+                <h4 className="wf-approval-section__title">{section.title}</h4>
+                <WorkflowApprovalFieldGrid fields={section.fields} />
+              </div>
+            ))
           ) : (
-            <>
-              <WorkflowApprovalFieldGrid fields={detail.fields} />
-
-              {detail.justificationQuote || detail.internalNote ? (
-                <blockquote className="wf-approval-quote">
-                  {detail.justificationQuote ? (
-                    <p className="wf-approval-quote__text">
-                      &ldquo;{detail.justificationQuote}&rdquo;
-                    </p>
-                  ) : null}
-                  {detail.internalNote ? (
-                    <p className="wf-approval-quote__note">
-                      — {detail.internalNote}
-                    </p>
-                  ) : null}
-                </blockquote>
-              ) : null}
-            </>
+            <WorkflowApprovalFieldGrid fields={detail.fields} />
           )}
+
+          {detail.justificationQuote || detail.internalNote ? (
+            <blockquote className="wf-approval-quote">
+              {detail.justificationQuote ? (
+                <p className="wf-approval-quote__text">
+                  &ldquo;{detail.justificationQuote}&rdquo;
+                </p>
+              ) : null}
+              {detail.internalNote ? (
+                <p className="wf-approval-quote__note">
+                  — {detail.internalNote}
+                </p>
+              ) : null}
+            </blockquote>
+          ) : null}
 
           {detail.awaitingDecision ? (
             <>
-              <WorkflowApprovalRequestInfoPanel
-                open={infoPanelOpen}
-                busy={busy}
-                responsibleAgent={detail.responsibleAgent}
-                requestedBy={requestedBy}
-                onSubmit={onRequestInfoSubmit}
-                onCancel={onRequestInfoCancel}
-              />
-
               <WorkflowApprovalActions
                 actions={detail.actions}
                 actionLabels={detail.actionLabels}
@@ -137,19 +127,30 @@ export default function WorkflowApprovalDetail({
                 onReject={onReject}
                 onRequestInfoOpen={onRequestInfoOpen}
               />
+
+              {isProdutosTeam ? (
+                <WorkflowApprovalProdutosApprovePanel
+                  open={approvePanelOpen}
+                  busy={busy}
+                  onClose={handleApprovePanelClose}
+                  onConfirm={handleApprovePanelConfirm}
+                />
+              ) : null}
             </>
           ) : null}
         </article>
-
-        {isProdutosTeam && detail.awaitingDecision ? (
-          <WorkflowApprovalProdutosApprovePanel
-            open={approvePanelOpen}
-            busy={busy}
-            onConfirm={handleApprovePanelConfirm}
-            onClose={handleApprovePanelClose}
-          />
-        ) : null}
       </div>
+
+      <WorkflowComunicacaoModal
+        open={infoPanelOpen}
+        busy={busy}
+        ticket={detail.ticket}
+        origem="workflow"
+        title="Pedir informação"
+        subtitle={`Thread com ${detail.responsibleAgent || 'o responsável do ticket'}`}
+        onClose={onRequestInfoCancel}
+        onSubmit={onRequestInfoSubmit}
+      />
     </section>
   );
 }

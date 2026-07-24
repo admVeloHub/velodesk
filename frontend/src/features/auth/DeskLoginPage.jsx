@@ -1,6 +1,6 @@
 /**
- * DeskLoginPage v1.3.1 — aviso sessão expirada (?session=expired)
- * VERSION: v1.3.1 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * DeskLoginPage v1.5.2 — email/senha + Google SSO + aviso sessão expirada
+ * VERSION: v1.5.2 | DATE: 2026-07-22 | AUTHOR: VeloHub Development Team
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -49,7 +49,7 @@ function resolveLoginError(err) {
     return apiMsg;
   }
   if (apiMsg) return apiMsg;
-  return err?.message || 'Não foi possível entrar com Google.';
+  return err?.message || 'Não foi possível entrar. Verifique email e senha.';
 }
 
 function getPostLoginPath(location, profileId) {
@@ -65,9 +65,11 @@ export default function DeskLoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { authStatus, bootstrapFromGoogleLogin, isAuthenticated } = useAuth();
-  const { applyProfileFromAccess, profileId, applyDefaultPortalFromPermissions } = useProfile();
+  const { applyProfileFromAccess, profileId, applyDefaultPortalFromPermissions, applyGateProfile } = useProfile();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [gsiReady, setGsiReady] = useState(false);
   const buttonRef = useRef(null);
   const initializedRef = useRef(false);
@@ -86,13 +88,16 @@ export default function DeskLoginPage() {
       throw new Error('Resposta de autenticação inválida.');
     }
     await bootstrapFromGoogleLogin(data);
+    if (data.colaborador) {
+      applyGateProfile(data.colaborador);
+    }
     await fetchMyPermissions().catch(() => null);
     const deskProfile = data.user.deskProfile || data.user.role;
     applyProfileFromAccess(deskProfile);
     applyDefaultPortalFromPermissions();
     const profile = normalizeProfileId(localStorage.getItem('velodeskProfile') || 'agent');
     navigate(getPostLoginPath(location, profile), { replace: true });
-  }, [applyProfileFromAccess, applyDefaultPortalFromPermissions, bootstrapFromGoogleLogin, location, navigate]);
+  }, [applyGateProfile, applyProfileFromAccess, applyDefaultPortalFromPermissions, bootstrapFromGoogleLogin, location, navigate]);
 
   const handleCredential = useCallback(async (response) => {
     setLoading(true);
@@ -106,6 +111,26 @@ export default function DeskLoginPage() {
       setLoading(false);
     }
   }, [completeLogin]);
+
+  const handleEmailLogin = useCallback(async (event) => {
+    event.preventDefault();
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setError('Informe email e senha.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const data = await authApi.login(trimmedEmail, password);
+      await completeLogin(data);
+    } catch (err) {
+      setError(resolveLoginError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [completeLogin, email, password]);
 
   const mountGoogleButton = useCallback(() => {
     if (!window.google?.accounts?.id || !buttonRef.current || !clientId) return;
@@ -244,6 +269,44 @@ export default function DeskLoginPage() {
             <span>{error}</span>
           </div>
         ) : null}
+
+        <form className="desk-login-form" onSubmit={handleEmailLogin} noValidate>
+          <label className="desk-login-field">
+            <span className="desk-login-field__label">Email</span>
+            <input
+              type="email"
+              name="email"
+              autoComplete="username"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="seu.email@empresa.com"
+              disabled={loading}
+              required
+            />
+          </label>
+
+          <label className="desk-login-field">
+            <span className="desk-login-field__label">Senha</span>
+            <input
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Sua senha de acesso"
+              disabled={loading}
+              required
+            />
+          </label>
+
+          <button type="submit" className="desk-login-submit" disabled={loading}>
+            {loading ? 'Validando acesso…' : 'Entrar'}
+          </button>
+        </form>
+
+        <div className="desk-login-divider" aria-hidden="true">
+          <span>ou</span>
+        </div>
 
         <div className="desk-login-google-wrap">
           <div ref={buttonRef} id="desk-google-signin-button" />

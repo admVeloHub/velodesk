@@ -1,6 +1,6 @@
 /**
- * WorkflowCriteriaEditor v2.1.1 — floating labels gatilho corrigidos
- * VERSION: v2.1.1 | DATE: 2026-07-14
+ * WorkflowCriteriaEditor v2.3.0 — valores sempre populados, sem bloqueio de cascata
+ * VERSION: v2.3.0 | DATE: 2026-07-23
  */
 import React, { useMemo } from 'react';
 import { useTabulation } from '../../../context/TabulationContext';
@@ -29,20 +29,8 @@ function defaultCampoForFonte(fonte, grupos) {
   return 'produto';
 }
 
-function clearDependentTabulationValues(rows, campo) {
-  if (campo === 'produto') {
-    return rows.map((row) => (
-      row.fonte === 'tabulacao' && (row.campo === 'motivo' || row.campo === 'detalhe')
-        ? { ...row, valor: '' }
-        : row
-    ));
-  }
-  if (campo === 'motivo') {
-    return rows.map((row) => (
-      row.fonte === 'tabulacao' && row.campo === 'detalhe' ? { ...row, valor: '' } : row
-    ));
-  }
-  return rows;
+function isTabulacaoRow(row) {
+  return !row?.fonte || row.fonte === 'tabulacao';
 }
 
 function FloatingField({
@@ -67,32 +55,41 @@ export default function WorkflowCriteriaEditor({
   mode = 'step',
   hideAddButton = false,
 }) {
-  const tabulation = useTabulation();
+  const {
+    getProdutoNames,
+    getTipoChamadoOptions,
+    resolveMotivoOptions,
+    resolveDetalheOptions,
+  } = useTabulation();
   const list = criterios.length ? criterios : [];
   const cascade = useMemo(() => resolveGatilhoCascadeContext(list), [list]);
   const isGatilho = mode === 'gatilho';
 
+  const getTabulationValueOptions = (campo) => {
+    switch (campo) {
+      case 'tipoChamado':
+        return (getTipoChamadoOptions?.() || []).map((value) => ({ value, label: value }));
+      case 'produto':
+        return (getProdutoNames?.() || []).map((value) => ({ value, label: value }));
+      case 'motivo':
+        return (resolveMotivoOptions?.(cascade.produto) || []).map((value) => ({ value, label: value }));
+      case 'detalhe':
+        return (resolveDetalheOptions?.(cascade.produto, cascade.motivo) || []).map((value) => ({
+          value,
+          label: value,
+        }));
+      default:
+        return [];
+    }
+  };
+
   const updateRow = (index, patch) => {
-    let next = list.map((row, i) => {
+    const next = list.map((row, i) => {
       if (i !== index) return row;
       const merged = { ...row, ...patch };
       if (isGatilho) merged.operador = 'equals';
       return merged;
     });
-    const updated = next[index];
-
-    if (isGatilho && updated?.fonte === 'tabulacao') {
-      if (patch.campo !== undefined && patch.campo !== list[index]?.campo) {
-        next = clearDependentTabulationValues(next, patch.campo);
-      }
-      if (patch.valor !== undefined && updated.campo === 'produto') {
-        next = clearDependentTabulationValues(next, 'produto');
-      }
-      if (patch.valor !== undefined && updated.campo === 'motivo') {
-        next = clearDependentTabulationValues(next, 'motivo');
-      }
-    }
-
     onChange?.(next);
   };
 
@@ -102,24 +99,6 @@ export default function WorkflowCriteriaEditor({
 
   const addRow = () => {
     onChange?.([...list, emptyCriterio(mode)]);
-  };
-
-  const getTabulationValueOptions = (campo) => {
-    switch (campo) {
-      case 'tipoChamado':
-        return (tabulation?.getTipoChamadoOptions?.() || []).map((value) => ({ value, label: value }));
-      case 'produto':
-        return (tabulation?.getProdutoNames?.() || []).map((value) => ({ value, label: value }));
-      case 'motivo':
-        return (tabulation?.getMotivos?.(cascade.produto) || []).map((value) => ({ value, label: value }));
-      case 'detalhe':
-        return (tabulation?.getDetalhes?.(cascade.produto, cascade.motivo) || []).map((value) => ({
-          value,
-          label: value,
-        }));
-      default:
-        return [];
-    }
   };
 
   const renderGatilhoCampoSelect = (row, index) => {
@@ -150,15 +129,14 @@ export default function WorkflowCriteriaEditor({
     );
   };
 
-  const renderGatilhoValorSelect = (row, index, options, disabled = false) => (
+  const renderGatilhoValorSelect = (row, index, options, emptyLabel = 'Selecione…') => (
     <FloatingField label="Valor" filled={Boolean(row.valor)}>
       <select
         className="wf-float-field__control"
         value={row.valor || ''}
-        disabled={disabled}
         onChange={(e) => updateRow(index, { valor: e.target.value, operador: 'equals' })}
       >
-        <option value="" disabled hidden />
+        <option value="">{emptyLabel}</option>
         {options.map((item) => (
           <option key={item.value} value={item.value}>{item.label}</option>
         ))}
@@ -168,23 +146,23 @@ export default function WorkflowCriteriaEditor({
 
   const renderGatilhoValorField = (row, index) => {
     if (!row.campo) {
-      return renderGatilhoValorSelect(row, index, [], true);
+      return renderGatilhoValorSelect(row, index, [], 'Selecione um campo');
     }
 
     if (row.fonte === 'integracao') {
       const options = getIntegracaoValoresForCampo(row.campo);
-      if (options.length) return renderGatilhoValorSelect(row, index, options);
+      if (options.length) {
+        return renderGatilhoValorSelect(
+          row,
+          index,
+          options.map((item) => ({ value: item.value, label: item.label })),
+        );
+      }
     }
 
-    if (row.fonte === 'tabulacao') {
-      if (row.campo === 'motivo' && !cascade.produto) {
-        return renderGatilhoValorSelect(row, index, [], true);
-      }
-      if (row.campo === 'detalhe' && (!cascade.produto || !cascade.motivo)) {
-        return renderGatilhoValorSelect(row, index, [], true);
-      }
+    if (isTabulacaoRow(row)) {
       const options = getTabulationValueOptions(row.campo);
-      if (options.length || ['tipoChamado', 'produto', 'motivo', 'detalhe'].includes(row.campo)) {
+      if (['tipoChamado', 'produto', 'motivo', 'detalhe'].includes(row.campo)) {
         return renderGatilhoValorSelect(row, index, options);
       }
     }
@@ -214,27 +192,18 @@ export default function WorkflowCriteriaEditor({
     </select>
   );
 
-  const renderTabulationValorSelect = (row, index, options, hint) => {
-    if (hint) {
-      return (
-        <select disabled aria-label="Valor" title={hint}>
-          <option value="">{hint}</option>
-        </select>
-      );
-    }
-    return (
-      <select
-        value={row.valor || ''}
-        onChange={(e) => updateRow(index, { valor: e.target.value })}
-        aria-label="Valor"
-      >
-        <option value="">Selecione…</option>
-        {options.map((item) => (
-          <option key={item.value} value={item.value}>{item.label}</option>
-        ))}
-      </select>
-    );
-  };
+  const renderTabulationValorSelect = (row, index, options) => (
+    <select
+      value={row.valor || ''}
+      onChange={(e) => updateRow(index, { valor: e.target.value })}
+      aria-label="Valor"
+    >
+      <option value="">Selecione…</option>
+      {options.map((item) => (
+        <option key={item.value} value={item.value}>{item.label}</option>
+      ))}
+    </select>
+  );
 
   const renderValorInput = (row, index) => {
     if (row.fonte === 'grupo_responsabilidade' || row.operador === 'not_empty') {
@@ -248,18 +217,9 @@ export default function WorkflowCriteriaEditor({
       }
     }
 
-    if (isGatilho && row.fonte === 'tabulacao') {
-      if (row.campo === 'motivo' && !cascade.produto) {
-        return renderTabulationValorSelect(row, index, [], 'Selecione um produto primeiro');
-      }
-      if (row.campo === 'detalhe' && !cascade.produto) {
-        return renderTabulationValorSelect(row, index, [], 'Selecione um produto primeiro');
-      }
-      if (row.campo === 'detalhe' && !cascade.motivo) {
-        return renderTabulationValorSelect(row, index, [], 'Selecione um motivo primeiro');
-      }
+    if (isTabulacaoRow(row)) {
       const options = getTabulationValueOptions(row.campo);
-      if (options.length || ['tipoChamado', 'produto', 'motivo', 'detalhe'].includes(row.campo)) {
+      if (['tipoChamado', 'produto', 'motivo', 'detalhe'].includes(row.campo)) {
         return renderTabulationValorSelect(row, index, options);
       }
     }

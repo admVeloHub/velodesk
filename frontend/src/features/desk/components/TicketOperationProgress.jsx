@@ -1,5 +1,6 @@
 /**
- * TicketOperationProgress v1.0.0 — indicador de nível operacional (3 etapas)
+ * TicketOperationProgress v1.1.0 — progresso sem prop escalonar
+ * VERSION: v1.1.0 | DATE: 2026-07-22
  */
 import React from 'react';
 import { getTicketOperationProgress } from '../../../services/desk/utils';
@@ -28,11 +29,10 @@ function ProgressStep({ step, state, subtitle }) {
   );
 }
 
-export default function TicketOperationProgress({ ticket, queueId, escalonar }) {
+export default function TicketOperationProgress({ ticket, queueId }) {
   const { activeStep, workflowArea, resolved, steps } = getTicketOperationProgress(
     ticket,
     queueId,
-    escalonar,
   );
 
   const stepState = (stepId) => {

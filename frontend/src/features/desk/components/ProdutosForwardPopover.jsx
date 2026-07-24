@@ -1,9 +1,10 @@
 /**
- * ProdutosForwardPopover — solicitação ao time de Produtos ao encaminhar ticket
+ * ProdutosForwardPopover v2.0.0 — drawer de requisição dinâmica ao iniciar workflow
+ * VERSION: v2.0.0 | DATE: 2026-07-23
  */
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import ProdSolicWorkspace from '../../cadastral/ProdSolicWorkspace';
+import WorkflowRequisicaoForm from './WorkflowRequisicaoForm';
 
 const RIGHT_PANEL_ID = 'crmRightPanel';
 const DRAWER_MAX_WIDTH = 1120;
@@ -67,8 +68,8 @@ function useProdutosForwardDrawerPosition(open) {
 
 export default function ProdutosForwardPopover({
   open,
-  ticket,
-  client,
+  workflowDef,
+  submitting = false,
   onClose,
   onSubmitted,
 }) {
@@ -94,11 +95,7 @@ export default function ProdutosForwardPopover({
     };
   }, [open, onClose]);
 
-  const handleSubmitted = () => {
-    onSubmitted?.();
-  };
-
-  if (!open || !layout) return null;
+  if (!open || !layout || !workflowDef) return null;
 
   return createPortal(
     <div className="produtos-forward-popover" id="produtosForwardPopover">
@@ -106,7 +103,7 @@ export default function ProdutosForwardPopover({
         type="button"
         className={`produtos-forward-popover__backdrop${visible ? ' is-visible' : ''}`}
         style={layout.backdrop}
-        aria-label="Fechar solicitação ao time de Produtos"
+        aria-label="Fechar formulário de requisição"
         onClick={onClose}
       />
 
@@ -114,7 +111,7 @@ export default function ProdutosForwardPopover({
         className={`produtos-forward-popover__panel${visible ? ' is-visible' : ''}`}
         style={layout.panel}
         role="dialog"
-        aria-label="Solicitações ao time de Produtos"
+        aria-label="Formulário de requisição do workflow"
         aria-modal="true"
       >
         <button
@@ -126,12 +123,12 @@ export default function ProdutosForwardPopover({
           <i className="ti ti-x" aria-hidden="true" />
         </button>
 
-        <div className="produtos-forward-popover__workspace">
-          <ProdSolicWorkspace
-            className="prod-solic-page--embed"
-            ticketOverride={ticket}
-            clientOverride={client}
-            onSubmitted={handleSubmitted}
+        <div className="produtos-forward-popover__workspace produtos-forward-popover__workspace--requisicao">
+          <WorkflowRequisicaoForm
+            workflowDef={workflowDef}
+            submitting={submitting}
+            onCancel={onClose}
+            onSubmit={onSubmitted}
           />
         </div>
       </aside>

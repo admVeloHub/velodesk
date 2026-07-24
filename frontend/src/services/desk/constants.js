@@ -1,8 +1,13 @@
 /**
  * Desk CRM — constantes de filas e classificação
- * VERSION: v2.3.1 | DATE: 2026-07-21
+ * VERSION: v2.3.2 | DATE: 2026-07-24
  */
 export const MEUS_TICKETS_QUEUE_ID = 'meus-tickets';
+
+/** Modos da busca global do Desk (Enter na fila). */
+export const DESK_SEARCH_MODE_CPF = 'cpf';
+export const DESK_SEARCH_MODE_TICKET = 'ticket';
+export const DESK_SEARCH_MODES = [DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET];
 
 export const QUEUE_STATUSES = [
   { id: 'novos', name: 'Novos', dot: '#1634FF', boxes: ['novos'] },

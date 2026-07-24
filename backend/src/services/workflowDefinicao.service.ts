@@ -1,13 +1,14 @@
-/** workflowDefinicao.service v1.4.0 — migra acao.automatica e remove legado */
+/** workflowDefinicao.service v1.7.0 — getWorkflowsByIds batch para listagem */
 import { migratePassoAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
+import { normalizeRequisicaoConfig } from '../config/workflowRequisicaoDefaults';
 import {
   getWorkflowDefinicaoModel,
   IWorkflowDefinicao,
   IWorkflowGatilho,
   IWorkflowPassoEnvelope,
 } from '../models/WorkflowDefinicao';
-import { evaluateGatilhoCriterios, buildTabulationFieldsFromTicket } from './workflowMatcher.service';
+import { evaluateGatilhoCriterios, buildTabulationFieldsFromTicket, isLegacyEscalonarWorkflowSlug } from './workflowMatcher.service';
 import { getActiveGrupos } from './grupoResponsabilidade.service';
 
 let cachedActive: IWorkflowDefinicao[] | null = null;
@@ -74,9 +75,29 @@ export async function getWorkflowById(id: string): Promise<IWorkflowDefinicao | 
   return Model.findById(id).lean() as Promise<IWorkflowDefinicao | null>;
 }
 
+export async function getWorkflowsByIds(ids: string[]): Promise<Map<string, IWorkflowDefinicao>> {
+  const unique = [...new Set(ids.map((id) => String(id).trim()).filter(Boolean))];
+  const map = new Map<string, IWorkflowDefinicao>();
+  if (!unique.length) return map;
+
+  const Model = getWorkflowDefinicaoModel();
+  const docs = await Model.find({ _id: { $in: unique } }).lean();
+  docs.forEach((doc) => {
+    map.set(String(doc._id), doc as unknown as IWorkflowDefinicao);
+  });
+  return map;
+}
+
 export async function getWorkflowBySlug(slug: string): Promise<IWorkflowDefinicao | null> {
   const Model = getWorkflowDefinicaoModel();
   return Model.findOne({ slug: String(slug).trim().toLowerCase() }).lean() as Promise<IWorkflowDefinicao | null>;
+}
+
+function normalizeRequisicaoForSave(
+  requisicao: Partial<IWorkflowDefinicao>['requisicao'],
+  gatilho?: IWorkflowGatilho | null,
+) {
+  return normalizeRequisicaoConfig(requisicao, gatilho);
 }
 
 export async function createWorkflow(
@@ -91,6 +112,7 @@ export async function createWorkflow(
 
   const passos = ensurePassoIds(payload.passos || []);
   const passoInicialId = normalizePassoInicialId(passos, payload.passoInicialId);
+  const gatilho = normalizeGatilho(payload.gatilho);
 
   const doc = await Model.create({
     slug,
@@ -98,7 +120,8 @@ export async function createWorkflow(
     descricao: String(payload.descricao || '').trim(),
     ordem: payload.ordem ?? 0,
     ativo: payload.ativo !== false,
-    gatilho: normalizeGatilho(payload.gatilho),
+    gatilho,
+    requisicao: normalizeRequisicaoForSave(payload.requisicao, gatilho),
     passos,
     passoInicialId,
     updatedBy,
@@ -115,6 +138,7 @@ export async function replaceWorkflow(
   const Model = getWorkflowDefinicaoModel();
   const passos = ensurePassoIds(payload.passos || []);
   const passoInicialId = normalizePassoInicialId(passos, payload.passoInicialId);
+  const gatilho = normalizeGatilho(payload.gatilho);
 
   const doc = await Model.findByIdAndUpdate(
     id,
@@ -124,7 +148,8 @@ export async function replaceWorkflow(
       descricao: String(payload.descricao || '').trim(),
       ordem: payload.ordem ?? 0,
       ativo: payload.ativo !== false,
-      gatilho: normalizeGatilho(payload.gatilho),
+      gatilho,
+      requisicao: normalizeRequisicaoForSave(payload.requisicao, gatilho),
       passos,
       passoInicialId,
       updatedBy,
@@ -167,5 +192,8 @@ export async function resolveWorkflowForTicket(ticket: {
   const grupos = await getActiveGrupos();
   const workflows = await getActiveWorkflows();
 
-  return workflows.find((wf) => evaluateGatilhoCriterios(wf.gatilho?.criterios || [], fields, grupos)) || null;
+  return workflows.find(
+    (wf) => !isLegacyEscalonarWorkflowSlug(wf.slug)
+      && evaluateGatilhoCriterios(wf.gatilho?.criterios || [], fields, grupos),
+  ) || null;
 }

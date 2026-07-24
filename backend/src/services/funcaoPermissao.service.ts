@@ -1,6 +1,7 @@
-/** funcaoPermissao.service v1.0.0 — CRUD desk_funcoes_permissoes + seed */
+/** funcaoPermissao.service v1.1.0 — CRUD desk_funcoes_permissoes + seed */
 import {
   DEFAULT_FUNCOES_PERMISSOES,
+  derivePortalVisivelFromPermissoes,
   PERMISSION_CATALOG,
   type PermissoesMap,
 } from '../config/funcaoPermissaoDefaults';
@@ -80,10 +81,11 @@ export async function getEffectivePermissionsForSlug(slug: string): Promise<{
   const doc = map.get(slug);
   if (!doc) return null;
 
+  const permissoes = resolveEffectivePermissoes(doc, map);
   return {
     slug: doc.slug,
-    permissoes: resolveEffectivePermissoes(doc, map),
-    portalVisivel: doc.portalVisivel || ['agent'],
+    permissoes,
+    portalVisivel: derivePortalVisivelFromPermissoes(permissoes, doc.portalVisivel || ['agent']),
     nivel: doc.nivel ?? 1,
     canalOrigem: doc.canalOrigem || undefined,
   };
@@ -114,16 +116,36 @@ export async function replaceFuncaoPermissao(
   if (payload.nome !== undefined) $set.nome = payload.nome;
   if (payload.nivel !== undefined) $set.nivel = payload.nivel;
   if (payload.herdaDe !== undefined) $set.herdaDe = payload.herdaDe;
-  if (payload.portalVisivel !== undefined) $set.portalVisivel = payload.portalVisivel;
   if (payload.canalOrigem !== undefined) $set.canalOrigem = payload.canalOrigem;
   if (payload.permissoes !== undefined) $set.permissoes = payload.permissoes;
+
+  const existing = await Model.findOne({ slug }).lean() as unknown as IDeskFuncaoPermissao | null;
+  const mergedForPortal: IDeskFuncaoPermissao = {
+    slug,
+    nome: payload.nome ?? existing?.nome ?? slug,
+    nivel: payload.nivel ?? existing?.nivel ?? 1,
+    herdaDe: payload.herdaDe ?? existing?.herdaDe ?? [],
+    portalVisivel: payload.portalVisivel ?? existing?.portalVisivel ?? ['agent'],
+    permissoes: payload.permissoes ?? existing?.permissoes ?? buildEmptyPermissoes(),
+    canalOrigem: payload.canalOrigem ?? existing?.canalOrigem,
+    updatedBy,
+  };
+
+  const all = await listFuncoesPermissoes(true);
+  const map = new Map(all.map((f) => [f.slug, f]));
+  map.set(slug, mergedForPortal);
+  const effectivePermissoes = resolveEffectivePermissoes(mergedForPortal, map);
+  $set.portalVisivel = derivePortalVisivelFromPermissoes(
+    effectivePermissoes,
+    mergedForPortal.portalVisivel || ['agent'],
+  );
 
   const $setOnInsert: Record<string, unknown> = {
     slug,
     nome: payload.nome || slug,
     nivel: payload.nivel ?? 1,
     herdaDe: payload.herdaDe ?? [],
-    portalVisivel: payload.portalVisivel ?? ['agent'],
+    portalVisivel: $set.portalVisivel ?? ['agent'],
     permissoes: payload.permissoes ?? buildEmptyPermissoes(),
   };
 

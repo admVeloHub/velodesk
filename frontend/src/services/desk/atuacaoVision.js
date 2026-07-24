@@ -1,6 +1,6 @@
 /**
- * atuacaoVision v1.1.1 — aliases suporte-supervisao
- * VERSION: v1.1.1 | DATE: 2026-07-20
+ * atuacaoVision v1.3.0 — parse atuacao objeto/array + aliases produto
+ * VERSION: v1.3.0 | DATE: 2026-07-24
  */
 
 export const DESK_VISION = {
@@ -22,25 +22,52 @@ const SUPERVISION_FUNCOES = new Set([
 
 const AGENT_FUNCOES = new Set(['atendimento']);
 
+const FUNCAO_ALIASES = {
+  produto: 'produtos',
+  produtos: 'produtos',
+  'time-produto': 'produtos',
+  'time-produtos': 'produtos',
+  'time-de-produto': 'produtos',
+  'time-de-produtos': 'produtos',
+};
+
+function readFuncaoFromAtuacaoItem(item) {
+  if (typeof item === 'string') return item;
+  if (item && typeof item === 'object') {
+    return item.funcao || item.slug || item.id || item.nome || item.label || item.value || '';
+  }
+  return '';
+}
+
 export function normalizeFuncao(value) {
-  return String(value || '')
+  const base = String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/g, ' ')
+    .replace(/\./g, '');
+  const slug = base.replace(/\s/g, '-');
+  if (FUNCAO_ALIASES[slug]) return FUNCAO_ALIASES[slug];
+  if (slug.includes('produto') && !slug.includes('atendimento')) return 'produtos';
+  return slug;
 }
 
 export function extractFuncoes(atuacao) {
-  if (!Array.isArray(atuacao)) return [];
-  return atuacao
-    .map((item) => {
-      if (typeof item === 'string') return item;
-      if (item && typeof item === 'object') return item.funcao;
-      return '';
-    })
-    .map(normalizeFuncao)
-    .filter(Boolean);
+  if (Array.isArray(atuacao)) {
+    return atuacao
+      .map(readFuncaoFromAtuacaoItem)
+      .map(normalizeFuncao)
+      .filter(Boolean);
+  }
+  if (typeof atuacao === 'string' && atuacao.trim()) {
+    return [normalizeFuncao(atuacao)];
+  }
+  if (atuacao && typeof atuacao === 'object') {
+    const single = readFuncaoFromAtuacaoItem(atuacao);
+    if (single) return [normalizeFuncao(single)];
+  }
+  return [];
 }
 
 /**

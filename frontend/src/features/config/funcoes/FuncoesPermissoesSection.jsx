@@ -1,6 +1,6 @@
 /**
- * FuncoesPermissoesSection v2.2.0 — funções RBAC + acordeão agentes VeloHub
- * VERSION: v2.2.0 | DATE: 2026-07-20
+ * FuncoesPermissoesSection v2.5.0 — agentes atualizados no GET ao abrir (sem botão sync)
+ * VERSION: v2.5.0 | DATE: 2026-07-24
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../../api/client';
@@ -11,7 +11,7 @@ import FuncoesDeskAccordion from './FuncoesDeskAccordion';
 import FuncoesAgentesAccordion from './FuncoesAgentesAccordion';
 import FuncaoOverridesModal from './FuncaoOverridesModal';
 import FuncaoConfigurarModal from './FuncaoConfigurarModal';
-import { buildDraftFromFuncao, listFuncoesPendentes } from './funcaoPermissoesLabels';
+import { buildDraftFromFuncao, listFuncoesPendentes, syncDraftPortalVisivel } from './funcaoPermissoesLabels';
 import './funcoes-permissoes.css';
 
 export default function FuncoesPermissoesSection() {
@@ -22,14 +22,13 @@ export default function FuncoesPermissoesSection() {
   const [catalog, setCatalog] = useState({});
   const [velohub, setVelohub] = useState([]);
   const [accordionDeskOpen, setAccordionDeskOpen] = useState(true);
-  const [accordionAgentesOpen, setAccordionAgentesOpen] = useState(false);
+  const [accordionAgentesOpen, setAccordionAgentesOpen] = useState(true);
   const [configurarModalOpen, setConfigurarModalOpen] = useState(false);
   const [selectedVelohub, setSelectedVelohub] = useState(null);
   const [configDraft, setConfigDraft] = useState(null);
   const [modalFuncaoSlug, setModalFuncaoSlug] = useState(null);
   const [draft, setDraft] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [syncingAgentes, setSyncingAgentes] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
   const [error, setError] = useState(null);
@@ -38,17 +37,20 @@ export default function FuncoesPermissoesSection() {
     setLoading(true);
     setError(null);
     try {
+      // GET /agentes-desk lê VeloHub ao vivo e atualiza o espelho
       const [listRes, catalogRes, agentesRes] = await Promise.all([
         api.get('/funcoes-permissoes'),
         api.get('/funcoes-permissoes/catalog'),
-        agentesDeskApi.list().catch(() => []),
+        agentesDeskApi.list(),
       ]);
       setFuncoes(listRes.data || []);
       setCatalog(catalogRes.data?.catalog || {});
       setVelohub(catalogRes.data?.velohub || []);
       setAgentes(Array.isArray(agentesRes) ? agentesRes : []);
+      setAccordionDeskOpen(true);
+      setAccordionAgentesOpen(true);
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Erro ao carregar funções');
+      setError(err?.response?.data?.message || err?.message || 'Erro ao carregar funções e agentes');
     } finally {
       setLoading(false);
     }
@@ -92,33 +94,13 @@ export default function FuncoesPermissoesSection() {
     setConfigDraft(null);
   };
 
-  const syncAgentes = async () => {
-    setSyncingAgentes(true);
-    setError(null);
-    try {
-      const result = await agentesDeskApi.sync();
-      setAgentes(Array.isArray(result?.agentes) ? result.agentes : []);
-      await reloadSessionPerms();
-      showNotification(
-        `${result.synced} agente(s) importado(s) do VeloHub.`,
-        'success',
-      );
-      setAccordionAgentesOpen(true);
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Erro ao importar agentes';
-      setError(msg);
-      showNotification(msg, 'error');
-    } finally {
-      setSyncingAgentes(false);
-    }
-  };
-
   const save = async () => {
     if (!modalFuncaoSlug || !draft) return;
     setSaving(true);
     setError(null);
     try {
-      const { data } = await api.put(`/funcoes-permissoes/${modalFuncaoSlug}`, draft);
+      const payload = syncDraftPortalVisivel(draft);
+      const { data } = await api.put(`/funcoes-permissoes/${modalFuncaoSlug}`, payload);
       setFuncoes((prev) => prev.map((f) => (f.slug === modalFuncaoSlug ? { ...f, ...data } : f)));
       await reloadSessionPerms();
       showNotification('Overrides salvos com sucesso.', 'success');
@@ -138,7 +120,7 @@ export default function FuncoesPermissoesSection() {
     setSavingConfig(true);
     setError(null);
     try {
-      const payload = { ...configDraft, nome: selectedVelohub.funcao };
+      const payload = syncDraftPortalVisivel({ ...configDraft, nome: selectedVelohub.funcao });
       await api.put(`/funcoes-permissoes/${slug}`, payload);
       await reloadSessionPerms();
       showNotification(`Função "${selectedVelohub.funcao}" configurada com sucesso.`, 'success');
@@ -157,7 +139,7 @@ export default function FuncoesPermissoesSection() {
     return (
       <div className="config-loading" role="status">
         <i className="ti ti-loader-2 config-loading__icon" aria-hidden="true" />
-        <span>Carregando funções…</span>
+        <span>Carregando funções e agentes…</span>
       </div>
     );
   }
@@ -173,17 +155,9 @@ export default function FuncoesPermissoesSection() {
       <div className="fp-toolbar">
         <p className="fp-intro">
           Configure overrides RBAC por função em <strong>Funções Desk</strong>.
-          Agentes recebem função e cargo automaticamente do VeloHub (atuação).
+          Agentes são atualizados automaticamente do VeloHub ao abrir esta seção.
         </p>
         <div className="fp-toolbar__actions">
-          <button
-            type="button"
-            className="config-action-btn"
-            onClick={syncAgentes}
-            disabled={syncingAgentes}
-          >
-            {syncingAgentes ? 'Importando…' : 'Importar agentes do VeloHub'}
-          </button>
           <button
             type="button"
             className="config-action-btn config-action-btn--create"
@@ -213,8 +187,6 @@ export default function FuncoesPermissoesSection() {
           open={accordionAgentesOpen}
           onToggle={() => setAccordionAgentesOpen((v) => !v)}
           agentes={agentes}
-          onSyncRequest={syncAgentes}
-          syncing={syncingAgentes}
         />
       </div>
 

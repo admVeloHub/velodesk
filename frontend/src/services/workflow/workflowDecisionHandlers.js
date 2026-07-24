@@ -1,322 +1,43 @@
 /**
- * workflowDecisionHandlers v1.1.0 — aprovar / reprovar / pedir informação
+ * workflowDecisionHandlers v2.2.0 — loadComunicacaoWorkflowForTicket (GET detalhe)
+ * VERSION: v2.2.0 | DATE: 2026-07-24
  */
-import { updateTicketInCache, getAllCockpitTickets, findTicketEntry, sendTicketMessage } from '../ticketsStorage';
+import { ticketsApi } from '../../api/client';
+import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
 import {
-  advanceTicketWorkflow,
-  advanceTicketWorkflowByDecision,
+  findTicketEntry,
+  loadTicketDetailFromApi,
+  patchTicketInCache,
+  sendTicketMessage,
+  updateTicketInCache,
+} from '../ticketsStorage';
+import {
   applySendStatus,
   getAgentName,
-  getTicketProtocolLabel,
-  getWorkflowProgress,
-  getWorkflowTemplateForTicket,
 } from '../desk/utils';
-import { buildWorkflowAdvanceMessage, ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import {
   buildProdutosConclusaoClientMessage,
-  getProdutosApproveActionLabel,
 } from '../cadastral/solicitacoesProdutosData';
 import { markSolicitacaoFeita } from '../cadastral/cadastralRequestStore';
-import { createWorkflowInfoRequest } from './workflowInfoNotifications';
+import deskLog from '../../utils/deskDebugLog';
 
-function pushSystemMessage(ticket, text) {
-  const ts = new Date().toISOString();
-  if (!ticket.messages) ticket.messages = [];
-  ticket.messages.push({
-    id: `wf-decision-${Date.now()}`,
-    type: 'system',
-    fromClient: false,
-    origin: 'sistema',
-    text,
-    timestamp: ts,
-    author: 'Sistema',
-  });
-}
-
-function finalizeProdutosTicket(ticket) {
-  const now = new Date().toISOString();
-  const lf = ticket.lateralForm || {};
-  const wf = lf.workflow || {};
-
-  ticket.status = 'resolvido';
-  ticket.updatedAt = now;
-  ticket.lateralForm = {
-    ...lf,
-    workflow: {
-      ...wf,
-      status: 'completed',
-      completedAt: wf.completedAt || now,
-    },
-    ...(lf.solicitacaoProdutos
-      ? {
-        solicitacaoProdutos: {
-          ...lf.solicitacaoProdutos,
-          status: 'feito',
-        },
-      }
-      : {}),
-  };
-
-  return ticket;
-}
-
-function applyApprove(ticket, options = {}) {
-  const author = getAgentName() || 'Operador';
-  const { selectedActions = [] } = options;
-  const now = new Date().toISOString();
-  const lf = ticket.lateralForm || {};
-
-  if (selectedActions.length) {
-    const aprovacaoProdutos = {
-      acoes: selectedActions,
-      aprovadoEm: now,
-      aprovadoPor: author,
-    };
-    ticket.lateralForm = {
-      ...lf,
-      aprovacaoProdutos,
-      ...(lf.solicitacaoProdutos
-        ? {
-          solicitacaoProdutos: {
-            ...lf.solicitacaoProdutos,
-            acoesAprovacao: selectedActions,
-          },
-        }
-        : {}),
-    };
+async function persistTicketFromApi(ticketId, apiTicket) {
+  const full = apiTicketToCockpit(apiTicket);
+  full.listOnly = false;
+  full._detailLoaded = true;
+  const patched = patchTicketInCache(ticketId, full);
+  if (!patched) {
+    deskLog.warn('WORKFLOW', 'patchTicketInCache falhou — ticket fora das colunas', { ticketId });
   }
-
-  const result = advanceTicketWorkflowByDecision(ticket, 'approve', author);
-  if (!result.advanced) {
-    advanceTicketWorkflow(ticket, author);
-  }
-
-  if (selectedActions.length) {
-    const labels = selectedActions.map((id) => getProdutosApproveActionLabel(id)).join(', ');
-    pushSystemMessage(
-      ticket,
-      `[Workflow] Aprovação Produtos por ${author} — ações: ${labels}.`,
-    );
-    finalizeProdutosTicket(ticket);
-  }
-
-  return ticket;
-}
-
-function applyReject(ticket, reason = '') {
-  const author = getAgentName() || 'Operador';
-  const note = reason.trim() || 'Solicitação reprovada na etapa de decisão.';
-  const lf = ticket.lateralForm || {};
-  const wf = lf.workflow || {};
-  const template = getWorkflowTemplateForTicket(ticket);
-  const progress = getWorkflowProgress(ticket);
-  const stepId = progress?.activeStep?.id || wf.currentStepId;
-  const stepLabel = progress?.activeStep?.label || stepId;
-  const history = [...(wf.stepHistory || [])];
-  const now = new Date().toISOString();
-
-  const activeIdx = history.findIndex((h) => h.status === 'active' && h.stepId === stepId);
-  if (activeIdx >= 0) {
-    history[activeIdx] = {
-      ...history[activeIdx],
-      status: 'completed',
-      decision: 'rejected',
-      trigger: 'decision-reject',
-      at: now,
-      by: author,
-      note,
-    };
-  } else {
-    history.push({
-      stepId,
-      status: 'completed',
-      decision: 'rejected',
-      trigger: 'decision-reject',
-      at: now,
-      by: author,
-      note,
-    });
-  }
-
-  ticket.lateralForm = {
-    ...lf,
-    workflow: {
-      ...wf,
-      stepHistory: history,
-      status: 'rejected',
-      rejectedAt: now,
-      rejectedBy: author,
-      rejectionReason: note,
-    },
-  };
-  const rejectRota = progress?.activeStep?.acao?.rotas?.find((r) => r.variavel === 'reject')
-    || progress?.activeStep?.decision?.rotas?.find((r) => r.variavel === 'reject');
-  ticket.status = rejectRota?.statusTicket || 'pendente';
-
-  if (!ticket.internalNotes) ticket.internalNotes = [];
-  ticket.internalNotes.push({
-    id: `wf-reject-${Date.now()}`,
-    type: 'internal',
-    text: `[Workflow] Reprovado por ${author}: ${note}`,
-    timestamp: now,
-    author,
-  });
-
-  pushSystemMessage(
-    ticket,
-    `Workflow **${template?.title || 'ativo'}** reprovado por ${author} na etapa "${stepLabel}".`,
-  );
-  return ticket;
-}
-
-function extractForwardingNote(ticket) {
-  const lf = ticket?.lateralForm || {};
-  const approval = lf.approval || {};
-  if (approval.forwardingNote) return approval.forwardingNote;
-  if (approval.notaEncaminhamento) return approval.notaEncaminhamento;
-
-  const notes = ticket?.internalNotes || [];
-  const note = [...notes].reverse().find((n) => {
-    const text = String(n.text || '').trim();
-    return text && !/^\[Workflow\]/i.test(text);
-  });
-  return note?.text || null;
-}
-
-function buildInfoRequestSystemText(author, stepLabel, note) {
-  return `[Workflow] Pedido de informação — ${author} (${stepLabel}): ${note}`;
-}
-
-function mirrorInfoRequestFromSource(target, source) {
-  const sourceWf = source.lateralForm?.workflow || {};
-  const sourceLf = source.lateralForm || {};
-  const note = String(sourceWf.infoRequestNote || '').trim();
-  if (!note) return target;
-
-  const author = sourceWf.infoRequestedBy || 'Operador Workflow';
-  const now = sourceWf.infoRequestedAt || new Date().toISOString();
-  const progress = getWorkflowProgress(source);
-  const stepLabel = progress?.activeStep?.label || 'decisão';
-  const noteId = `wf-info-${now}`;
-  const systemText = buildInfoRequestSystemText(author, stepLabel, note);
-
-  const alreadyMirrored = (target.internalNotes || []).some((n) => n.id === noteId)
-    || (target.messages || []).some((m) => m.id === noteId);
-
-  if (alreadyMirrored) return target;
-
-  target.status = 'pendente';
-
-  if (!target.internalNotes) target.internalNotes = [];
-  target.internalNotes.push({
-    id: noteId,
-    type: 'internal',
-    text: `[Workflow] Pedido de informação por ${author} (${stepLabel}): ${note}`,
-    timestamp: now,
-    author,
-  });
-
-  target.lateralForm = {
-    ...(target.lateralForm || {}),
-    approval: {
-      ...((target.lateralForm || {}).approval || {}),
-      forwardingNote: sourceLf.approval?.forwardingNote || extractForwardingNote(target),
-    },
-    workflow: {
-      ...((target.lateralForm || {}).workflow || {}),
-      infoRequestedAt: now,
-      infoRequestedBy: author,
-      infoRequestNote: note,
-    },
-  };
-
-  if (!target.messages) target.messages = [];
-  target.messages.push({
-    id: noteId,
-    type: 'system',
-    fromClient: false,
-    origin: 'sistema',
-    text: systemText,
-    timestamp: now,
-    author: 'Workflow',
-  });
-
-  return target;
-}
-
-async function syncInfoRequestToTickets(sourceTicket) {
-  const protocol = getTicketProtocolLabel(sourceTicket);
-  if (!protocol) return;
-
-  const matches = getAllCockpitTickets().filter(
-    ({ ticket }) => String(ticket.id) !== String(sourceTicket.id)
-      && getTicketProtocolLabel(ticket) === protocol,
-  );
-
-  await Promise.all(
-    matches.map(({ ticket }) => updateTicketInCache(ticket.id, (t) => mirrorInfoRequestFromSource(t, sourceTicket))),
-  );
-}
-
-function applyRequestInfo(ticket, message = '') {
-  const author = getAgentName() || 'Operador';
-  const note = message.trim() || 'Informações adicionais solicitadas antes da decisão.';
-  const lf = ticket.lateralForm || {};
-  const wf = lf.workflow || {};
-  const progress = getWorkflowProgress(ticket);
-  const stepLabel = progress?.activeStep?.label || 'decisão';
-  const now = new Date().toISOString();
-  const noteId = `wf-info-${now}`;
-
-  ticket.status = 'pendente';
-
-  if (!ticket.internalNotes) ticket.internalNotes = [];
-  ticket.internalNotes.push({
-    id: noteId,
-    type: 'internal',
-    text: `[Workflow] Pedido de informação por ${author} (${stepLabel}): ${note}`,
-    timestamp: now,
-    author,
-  });
-
-  ticket.lateralForm = {
-    ...lf,
-    approval: {
-      ...(lf.approval || {}),
-      forwardingNote: lf.approval?.forwardingNote || extractForwardingNote(ticket),
-    },
-    workflow: {
-      ...wf,
-      infoRequestedAt: now,
-      infoRequestedBy: author,
-      infoRequestNote: note,
-    },
-  };
-
-  pushSystemMessage(
-    ticket,
-    buildInfoRequestSystemText(author, stepLabel, note),
-  );
-
-  createWorkflowInfoRequest({
-    ticketId: ticket.id,
-    clientName: ticket.clientName || ticket.solicitante,
-    ticketSubject: ticket.title || ticket.chamadoTitulo,
-    message: note,
-    requestedBy: author,
-    targetAgent: lf.responsavel || ticket.responsibleAgent || '',
-    stepLabel,
-    protocol: getTicketProtocolLabel(ticket) || String(ticket.id),
-  });
-
-  return ticket;
+  return full;
 }
 
 export async function approveWorkflowDecision(ticketId, options = {}) {
+  deskLog.workflow('approve → API', { ticketId, options });
+  const apiTicket = await ticketsApi.advanceWorkflow(ticketId, { decision: 'approve' });
+  const ticket = await persistTicketFromApi(ticketId, apiTicket);
+
   const isProdutosFinalize = Boolean(options.selectedActions?.length);
-
-  const ticket = await updateTicketInCache(ticketId, (t) => applyApprove(t, options));
-
   if (!isProdutosFinalize || !ticket) return ticket;
 
   const clientText = buildProdutosConclusaoClientMessage(ticket);
@@ -339,12 +60,67 @@ export async function approveWorkflowDecision(ticketId, options = {}) {
   return ticket;
 }
 
-export async function rejectWorkflowDecision(ticketId, reason = '') {
-  return updateTicketInCache(ticketId, (ticket) => applyReject(ticket, reason));
+export async function rejectWorkflowDecision(ticketId) {
+  deskLog.workflow('reject → API', { ticketId });
+  const apiTicket = await ticketsApi.advanceWorkflow(ticketId, { decision: 'reject' });
+  return persistTicketFromApi(ticketId, apiTicket);
 }
 
-export async function requestWorkflowInfo(ticketId, message = '') {
-  const ticket = await updateTicketInCache(ticketId, (ticket) => applyRequestInfo(ticket, message));
-  if (ticket) await syncInfoRequestToTickets(ticket);
-  return ticket;
+export async function requestWorkflowInfo(ticketId, message = '', origem = 'workflow') {
+  const texto = String(message || '').trim();
+  if (!texto) throw new Error('Mensagem obrigatória');
+  deskLog.workflow('comunicacao → API', { ticketId, origem });
+  const apiTicket = await ticketsApi.postWorkflowComunicacao(ticketId, {
+    mensagem: texto,
+    origem,
+  });
+  const full = await persistTicketFromApi(ticketId, apiTicket);
+  deskLog.workflow('comunicacao → ok', {
+    ticketId,
+    mensagens: full?.workflow?.requisicao?.comunicacaoWorkflow?.length || 0,
+  });
+  return full;
+}
+
+export async function replyWorkflowComunicacao(ticketId, message = '') {
+  return requestWorkflowInfo(ticketId, message, 'responsavel');
+}
+
+function readComunicacaoFromRegistro(ticket) {
+  const rows = ticket?.registroHistorico || ticket?.registro || [];
+  if (!Array.isArray(rows) || !rows.length) return [];
+  return rows
+    .map((row) => row?.metadados?.comunicacaoWorkflow)
+    .filter((item) => item && String(item.mensagem || '').trim())
+    .map((item, index) => ({
+      mensagem: String(item.mensagem || ''),
+      autor: String(item.autor || ''),
+      data: rows.find((r) => r?.metadados?.comunicacaoWorkflow === item)?.data
+        || rows[index]?.data
+        || null,
+    }));
+}
+
+export function readTicketComunicacaoWorkflow(ticket) {
+  const list = ticket?.workflow?.requisicao?.comunicacaoWorkflow
+    || ticket?.lateralForm?.workflow?.requisicao?.comunicacaoWorkflow
+    || [];
+  if (Array.isArray(list) && list.length) return list;
+  return readComunicacaoFromRegistro(ticket);
+}
+
+export function ticketHasComunicacaoWorkflow(ticket) {
+  if (ticket?.workflow?.requisicao?.comunicacaoPendente === true) return true;
+  return readTicketComunicacaoWorkflow(ticket).length > 0;
+}
+
+/** Busca detalhe completo e devolve a thread (fonte da verdade no modal). */
+export async function loadComunicacaoWorkflowForTicket(ticketId) {
+  const full = await loadTicketDetailFromApi(ticketId);
+  const thread = readTicketComunicacaoWorkflow(full);
+  deskLog.workflow('comunicacao thread hidratada', {
+    ticketId,
+    mensagens: thread.length,
+  });
+  return { ticket: full, thread };
 }

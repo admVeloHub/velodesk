@@ -1,5 +1,6 @@
 /**
- * useAgentesDesk v1.1.0 — agentes importados do VeloHub (read-only)
+ * useAgentesDesk v1.3.0 — lista via GET (VeloHub ao vivo); sem sync manual
+ * VERSION: v1.3.0 | DATE: 2026-07-24
  */
 import { useCallback, useEffect, useState } from 'react';
 import { agentesDeskApi } from '../api/client';
@@ -9,7 +10,6 @@ export function useAgentesDesk() {
   const { isAuthenticated } = useAuth();
   const [agentes, setAgentes] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
 
   const reload = useCallback(async () => {
@@ -36,28 +36,10 @@ export function useAgentesDesk() {
     void reload();
   }, [reload]);
 
-  const syncFromVelohub = useCallback(async () => {
-    setSyncing(true);
-    setError(null);
-    try {
-      const result = await agentesDeskApi.sync();
-      setAgentes(Array.isArray(result?.agentes) ? result.agentes : []);
-      return result;
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Falha ao importar do VeloHub';
-      setError(msg);
-      throw err;
-    } finally {
-      setSyncing(false);
-    }
-  }, []);
-
   return {
     agentes,
     loading,
-    syncing,
     error,
     reload,
-    syncFromVelohub,
   };
 }

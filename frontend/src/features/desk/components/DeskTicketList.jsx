@@ -1,5 +1,5 @@
 /**
- * DeskTicketList v2.0.0 — lista branca no padrão mockup
+ * DeskTicketList v2.1.0 — skeleton durante carregamento inicial
  */
 import React from 'react';
 import {
@@ -25,7 +25,9 @@ export default function DeskTicketList({
   onExpand,
   onReload,
   refreshing = false,
+  showSkeleton = false,
 }) {
+  const skeletonItems = [1, 2, 3, 4, 5, 6];
   return (
     <aside className={'ticket-list-panel' + (collapsed ? ' is-collapsed' : '')} id="crmTicketListPanel">
       <div className="ticket-list-panel__inner">
@@ -95,7 +97,21 @@ export default function DeskTicketList({
         </header>
 
         <ul className="ticket-cards" id="ticketCards">
-          {entries.length === 0 ? (
+          {showSkeleton ? (
+            skeletonItems.map((key) => (
+              <li key={`sk-${key}`} className="crm-ticket-card crm-ticket-card--skeleton" aria-hidden="true">
+                <div className="crm-ticket-card__content">
+                  <div className="crm-ticket-card__row-top">
+                    <span className="desk-skeleton desk-skeleton--text desk-skeleton--name" />
+                    <span className="desk-skeleton desk-skeleton--text desk-skeleton--time" />
+                  </div>
+                  <div className="crm-ticket-card__row-bottom">
+                    <span className="desk-skeleton desk-skeleton--text desk-skeleton--subject" />
+                  </div>
+                </div>
+              </li>
+            ))
+          ) : entries.length === 0 ? (
             <li className="crm-empty-state" style={{ padding: 16 }}>
               {searchActive ? 'Nenhum ticket encontrado na busca' : 'Nenhum ticket nesta fila'}
             </li>

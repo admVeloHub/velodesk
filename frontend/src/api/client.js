@@ -1,10 +1,11 @@
 /**
- * API client v1.8.0 — interceptor 401 (sessão expirada / token inválido)
- * VERSION: v1.8.0 | DATE: 2026-07-17 | AUTHOR: VeloHub Development Team
+ * API client v1.14.0 — agentesDesk só via GET (sem sync manual)
+ * VERSION: v1.14.0 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
 import { isPublicAuthApiPath } from '../utils/authSession';
+import deskLog, { isDeskDebugEnabled } from '../utils/deskDebugLog';
 
 const api = axios.create({
   baseURL: '/api',
@@ -16,14 +17,40 @@ let handling401 = false;
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('velodesk_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (isDeskDebugEnabled()) {
+    config.metadata = { startedAt: Date.now() };
+    deskLog.api(config.method, config.url, {
+      params: config.params,
+      hasBody: Boolean(config.data),
+    });
+  }
   return config;
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (isDeskDebugEnabled()) {
+      const startedAt = response.config?.metadata?.startedAt;
+      deskLog.api(response.config?.method, response.config?.url, {
+        status: response.status,
+        ms: startedAt ? Date.now() - startedAt : undefined,
+        size: JSON.stringify(response.data || '').length,
+      });
+    }
+    return response;
+  },
   (error) => {
     const status = error?.response?.status;
     const requestUrl = String(error?.config?.url || '');
+    if (isDeskDebugEnabled()) {
+      const startedAt = error?.config?.metadata?.startedAt;
+      deskLog.apiError(error?.config?.method, requestUrl, {
+        status,
+        ms: startedAt ? Date.now() - startedAt : undefined,
+        message: error?.response?.data?.message || error?.message,
+        data: error?.response?.data,
+      });
+    }
     if (status === 401 && !isPublicAuthApiPath(requestUrl) && !handling401) {
       handling401 = true;
       clearDeskAuthSession();
@@ -50,8 +77,8 @@ export const funcoesPermissoesApi = {
 };
 
 export const agentesDeskApi = {
+  /** GET sincroniza e devolve lista fresca do VeloHub */
   list: () => api.get('/agentes-desk').then((r) => r.data),
-  sync: () => api.post('/agentes-desk/sync').then((r) => r.data),
 };
 
 export const authApi = {
@@ -75,8 +102,12 @@ export const ticketsApi = {
     api.post(`/tickets/${id}/messages`, data).then((r) => r.data),
   advanceWorkflow: (id, body = {}) =>
     api.post(`/tickets/${id}/workflow/advance`, body).then((r) => r.data),
+  postWorkflowComunicacao: (id, body) =>
+    api.post(`/tickets/${id}/workflow/comunicacao`, body).then((r) => r.data),
   mergeInto: (sourceId, targetId) =>
     api.post(`/tickets/${sourceId}/merge-into/${targetId}`).then((r) => r.data),
+  startWorkflow: (id, body) =>
+    api.post(`/tickets/${id}/workflow/start`, body).then((r) => r.data),
 };
 
 export const uploadsApi = {

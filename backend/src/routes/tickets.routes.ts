@@ -1,4 +1,4 @@
-/** tickets.routes v1.6.0 — adoção manual órfão PUT/messages (P3b) */
+/** tickets.routes v1.10.0 — POST workflow/comunicacao */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -22,11 +22,16 @@ import {
   advanceWorkflowManual,
   advanceWorkflowWithDecision,
   setWorkflowPendingDecision,
-  tryActivateWorkflowOnTabulation,
+  startWorkflowForChamado,
   WorkflowAdvanceError,
 } from '../services/workflowTicket.service';
 import {
+  appendComunicacaoWorkflow,
+  WorkflowRequisicaoError,
+} from '../services/workflowRequisicao.service';
+import {
   assertCanActOnTicket,
+  assertCanWorkflowComunicacao,
   PermissionDeniedError,
 } from '../services/permission.service';
 import {
@@ -161,10 +166,6 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
   try {
     applyManualResponsavelClaim(chamado, req.user);
     await applyBodyToChamado(chamado, req.body, req.user);
-    await tryActivateWorkflowOnTabulation(
-      chamado,
-      String(req.body.author ?? req.user?.name ?? req.user?.email ?? 'Sistema'),
-    );
     await chamado.save();
 
     const boxes = await loadBoxes();
@@ -237,6 +238,29 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
   });
 });
 
+router.post('/:id/workflow/start', authMiddleware, async (req, res: Response) => {
+  const chamado = await ChamadoN1.findById(req.params.id);
+  if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+
+  try {
+    await assertCanActOnTicket(req.user!, chamado);
+    const requisicaoValores = req.body?.requisicao?.valores as Record<string, unknown> | undefined;
+    const definicaoSlug = req.body?.definicaoSlug as string | undefined;
+    await startWorkflowForChamado(chamado, req.user, requisicaoValores, definicaoSlug);
+    await chamado.save();
+    const boxes = await loadBoxes();
+    res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  } catch (err) {
+    if (err instanceof WorkflowAdvanceError || err instanceof WorkflowRequisicaoError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    if (err instanceof PermissionDeniedError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    throw err;
+  }
+});
+
 router.post('/:id/workflow/advance', authMiddleware, async (req, res: Response) => {
   const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
@@ -256,6 +280,30 @@ router.post('/:id/workflow/advance', authMiddleware, async (req, res: Response) 
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
   } catch (err) {
     if (err instanceof WorkflowAdvanceError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    if (err instanceof PermissionDeniedError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    throw err;
+  }
+});
+
+router.post('/:id/workflow/comunicacao', authMiddleware, async (req, res: Response) => {
+  const chamado = await ChamadoN1.findById(req.params.id);
+  if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+
+  const origem = req.body?.origem === 'responsavel' ? 'responsavel' : 'workflow';
+  const mensagem = String(req.body?.mensagem ?? '');
+
+  try {
+    await assertCanWorkflowComunicacao(req.user!, chamado, origem);
+    appendComunicacaoWorkflow(chamado, { mensagem, origem }, req.user);
+    await chamado.save();
+    const boxes = await loadBoxes();
+    res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  } catch (err) {
+    if (err instanceof WorkflowRequisicaoError || err instanceof PermissionDeniedError) {
       return res.status(err.status).json({ message: err.message });
     }
     throw err;
