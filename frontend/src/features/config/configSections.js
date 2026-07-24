@@ -18,11 +18,11 @@ export const CONFIG_SECTIONS = [
     icon: 'ti-hierarchy-2',
   },
   {
-    id: 'grupos-atribuicoes',
-    label: 'Grupos e Atribuições',
-    menuDesc: 'Lista de agentes e grupos de atuação',
-    cardDesc: 'Pool Desk e grupos de atuação para as etapas',
-    icon: 'ti-users-group',
+    id: 'funcoes-permissoes',
+    label: 'Funções e Permissões',
+    menuDesc: 'RBAC, funções Desk e agentes VeloHub',
+    cardDesc: 'Overrides por função e lista de agentes',
+    icon: 'ti-shield-lock',
   },
   {
     id: 'automations',

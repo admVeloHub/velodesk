@@ -1,6 +1,6 @@
 ﻿/**
- * Sidebar rail unificada â€” 3 estados: 5px | hover 52px | chevron fixa 220px
- * VERSION: v1.10.0 | DATE: 2026-06-30
+ * Sidebar rail unificada — 3 estados: 10px | hover 52px | chevron fixa 220px
+ * VERSION: v1.10.2 | DATE: 2026-07-21
  * Perfil: VeloHub (sem botÃ£o local na barra)
  */
 import React, { useCallback, useRef, useState } from 'react';

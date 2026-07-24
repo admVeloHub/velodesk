@@ -1,10 +1,11 @@
 /**
- * WorkflowConfigContext v1.1.0 — tratamento 429
- * VERSION: v1.1.0 | DATE: 2026-07-21
+ * WorkflowConfigContext v1.2.0 — deskLog diagnóstico
+ * VERSION: v1.2.0 | DATE: 2026-07-24
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { workflowApi } from '../api/client';
 import { isRateLimitError, RATE_LIMIT_USER_MESSAGE } from '../utils/apiErrors';
+import deskLog from '../utils/deskDebugLog';
 import { useAuth } from './AuthContext';
 import { setWorkflowRuntimeConfig, clearWorkflowRuntimeConfig } from '../services/desk/workflowRuntimeStore';
 
@@ -28,6 +29,7 @@ export function WorkflowConfigProvider({ children }) {
 
     setLoading(true);
     setError(null);
+    deskLog.workflow('WorkflowConfig.reload → início');
     const maxAttempts = 4;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
@@ -38,10 +40,19 @@ export function WorkflowConfigProvider({ children }) {
         };
         setConfig(next);
         setWorkflowRuntimeConfig(next);
+        deskLog.workflow('WorkflowConfig.reload → ok', {
+          workflows: next.workflows.length,
+          grupos: next.grupos.length,
+        });
         setLoading(false);
         return;
       } catch (err) {
         const status = err?.response?.status;
+        deskLog.error('WORKFLOW', 'WorkflowConfig.reload → falha tentativa', {
+          attempt,
+          status,
+          message: err?.response?.data?.message || err?.message,
+        });
         if (isRateLimitError(err)) {
           setError(RATE_LIMIT_USER_MESSAGE);
           setConfig(EMPTY_CONFIG);

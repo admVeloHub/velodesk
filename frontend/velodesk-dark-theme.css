@@ -191,8 +191,13 @@ body.velodesk-dark .ws360-kpi__label,
 body.velodesk-dark .ws360-production__label,
 body.velodesk-dark .ws360-production__value,
 body.velodesk-dark .ws360-production__subtitle,
+body.velodesk-dark .ws360-production__total-label,
 body.velodesk-dark .ws360-ticket-row__meta {
     color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .ws360-production__total-value {
+    color: var(--velo-dark-text);
 }
 
 body.velodesk-dark .ws360-link {
@@ -829,6 +834,18 @@ body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor:empty::before {
 body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor-wrap--has-errors .compose-rich-editor {
     border-color: rgba(248, 113, 113, 0.55);
     box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.18);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor__expand-btn {
+    background: rgba(15, 23, 42, 0.92);
+    border-color: rgba(148, 163, 184, 0.35);
+    color: #94a3b8;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor__expand-btn:hover {
+    background: rgba(30, 41, 59, 0.95);
+    border-color: rgba(148, 163, 184, 0.55);
+    color: #93c5fd;
 }
 
 body.velodesk-dark #velodeskDeskV2Root .crm-compose-toolbar__btn--active {

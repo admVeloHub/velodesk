@@ -4,8 +4,6 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  getClientContactFields,
-  getInitials,
   formatWaTime,
   formatWaDateSeparator,
 } from '../../../services/desk/utils';
@@ -28,7 +26,6 @@ export default function DeskWhatsAppChat({
   const [iaVisible, setIaVisible] = useState(true);
   const inputRef = useRef(null);
   const lastIaReplyRef = useRef('');
-  const contact = getClientContactFields(ticket, client);
   const chatMessages = messages || [];
   const dateIso = chatMessages[0]?.timestamp || ticket.createdAt;
 
@@ -72,26 +69,6 @@ export default function DeskWhatsAppChat({
 
   return (
     <div className="wa-chat" id="waChatView">
-      <header className="wa-chat__header">
-        <div className="wa-chat__header-main">
-          <div className="wa-chat__avatar">{getInitials(contact.name)}</div>
-          <div className="wa-chat__header-info">
-            <strong className="wa-chat__name">{contact.name}</strong>
-            <span className="wa-chat__status">
-              online{contact.phone ? ' - ' + contact.phone : ''}
-            </span>
-          </div>
-        </div>
-        <div className="wa-chat__header-actions">
-          <button type="button" className="wa-chat__header-btn" aria-label="Ligar">
-            <i className="fas fa-phone" />
-          </button>
-          <button type="button" className="wa-chat__header-btn" aria-label="Menu">
-            <i className="fas fa-ellipsis-v" />
-          </button>
-        </div>
-      </header>
-
       <div className="conversation wa-chat__body" id="conversation">
         {dateIso && chatMessages.length > 0 && (
           <div className="wa-chat__date-sep">{formatWaDateSeparator(dateIso)}</div>

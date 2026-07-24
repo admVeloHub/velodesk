@@ -23,6 +23,7 @@ export default function WorkflowApprovalActions({
   actionLabels = {},
   busy,
   infoPanelOpen,
+  approvePanelOpen = false,
   onApprove,
   onReject,
   onRequestInfoOpen,
@@ -48,7 +49,7 @@ export default function WorkflowApprovalActions({
           <button
             key={id}
             type="button"
-            className={cfg.className + (id === 'request_info' && infoPanelOpen ? ' is-active' : '')}
+            className={cfg.className + (id === 'request_info' && infoPanelOpen ? ' is-active' : '') + (id === 'approve' && approvePanelOpen ? ' is-active' : '')}
             disabled={busy}
             onClick={handlers[id]}
             aria-expanded={id === 'request_info' ? infoPanelOpen : undefined}

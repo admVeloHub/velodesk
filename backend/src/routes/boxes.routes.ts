@@ -1,4 +1,4 @@
-/** boxes.routes v1.3.8 — novos sem responsavel na fila do agente */
+/** boxes.routes v1.7.0 — fila workflow: atribuido OU definição escalonar-{funcao} */
 import { Router, Response } from 'express';
 import mongoose from 'mongoose';
 import { authMiddleware } from '../middleware/auth';
@@ -7,12 +7,21 @@ import { Box } from '../models/Box';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { User } from '../models/User';
 import {
-  buildChamadoQueryFilter,
+  buildBoxListFindOptions,
+  buildChamadoMapContext,
   buildResponsavelCandidates,
-  chamadoToTicket,
+  chamadoToTicketListItem,
   MEUS_CHAMADOS_COLUMNS,
   statusFromBoxName,
+  workflowActorQueueFilter,
 } from '../services/chamado.mapper';
+import {
+  hasPermission,
+  resolveUserPermissions,
+  shouldUseAtribuidoFuncaoQueue,
+  shouldUseMeusChamadosFilter,
+} from '../services/permission.service';
+import { listWorkflows } from '../services/workflowDefinicao.service';
 
 const router = Router();
 
@@ -21,10 +30,90 @@ async function resolveDbUser(userId?: string) {
   return User.findById(userId).select('name email');
 }
 
+async function resolveWorkflowDefinitionIdsForFuncoes(funcaoSlugs: string[]) {
+  const slugs = [
+    ...new Set(
+      (funcaoSlugs || [])
+        .map((s) => String(s || '').trim().toLowerCase())
+        .filter(Boolean)
+        .flatMap((s) => [`escalonar-${s}`, s]),
+    ),
+  ];
+  if (!slugs.length) return [] as string[];
+
+  try {
+    const all = await listWorkflows(true);
+    return all
+      .filter((w) => slugs.includes(String(w.slug || '').trim().toLowerCase()))
+      .map((w) => String(w._id));
+  } catch (err) {
+    console.warn(
+      '[boxes] não foi possível carregar definições de workflow para filtro de fila:',
+      err instanceof Error ? err.message : err,
+    );
+    return [];
+  }
+}
+
+async function resolveQueueMode(
+  resolved: Awaited<ReturnType<typeof resolveUserPermissions>>,
+  queueParam?: string,
+) {
+  if (hasPermission(resolved.permissoes, 'tickets', 'ver_todos')) {
+    return { queue: queueParam, extraFilter: undefined as Record<string, unknown> | undefined };
+  }
+  if (shouldUseAtribuidoFuncaoQueue(resolved)) {
+    const slugs = [
+      ...new Set(
+        [resolved.funcaoSlug, ...(resolved.funcoes || [])]
+          .map((s) => String(s || '').trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    ];
+    const workflowIds = await resolveWorkflowDefinitionIdsForFuncoes(slugs);
+    return {
+      queue: 'funcao-atribuido',
+      extraFilter: workflowActorQueueFilter(slugs, workflowIds),
+    };
+  }
+  if (shouldUseMeusChamadosFilter(resolved)) {
+    return { queue: 'meus-chamados', extraFilter: undefined };
+  }
+  return { queue: queueParam, extraFilter: undefined };
+}
+
+async function loadBoxesWithListTickets(
+  columns: Array<{ id: string; name: string; order: number; status: string }>,
+  queue: string | undefined,
+  responsavelCandidates: string[],
+  extraFilter?: Record<string, unknown>,
+) {
+  const loaded = await Promise.all(
+    columns.map(async (column) => {
+      const { filter, limit, sort } = buildBoxListFindOptions(
+        column.status,
+        queue,
+        responsavelCandidates,
+        extraFilter,
+      );
+      const chamados = await ChamadoN1.find(filter).sort(sort).limit(limit);
+      return { column, chamados };
+    }),
+  );
+
+  const allChamados = loaded.flatMap((entry) => entry.chamados);
+  const ctx = await buildChamadoMapContext(allChamados, 'list');
+
+  return loaded.map(({ column, chamados }) => ({
+    id: column.id,
+    name: column.name,
+    order: column.order,
+    tickets: chamados.map((chamado) => chamadoToTicketListItem(chamado, column.id, ctx)),
+  }));
+}
+
 router.get('/', authMiddleware, async (req, res: Response) => {
   const queueParam = typeof req.query.fila === 'string' ? req.query.fila : undefined;
-  const authRole = String(req.user?.role ?? '').trim().toLowerCase();
-  const queue = authRole === 'agent' ? 'meus-chamados' : queueParam;
   const userId = req.user?.userId;
 
   try {
@@ -32,41 +121,36 @@ router.get('/', authMiddleware, async (req, res: Response) => {
       return res.status(503).json({ message: 'Banco de chamados indisponível' });
     }
     const dbUser = await resolveDbUser(userId);
+    const resolved = await resolveUserPermissions(req.user!);
     const responsavelCandidates = buildResponsavelCandidates(req.user!, dbUser);
+    const { queue, extraFilter } = await resolveQueueMode(resolved, queueParam);
 
     if (queue === 'meus-chamados') {
-      const result = await Promise.all(
-        MEUS_CHAMADOS_COLUMNS.map(async (column) => {
-          const filter = buildChamadoQueryFilter(column.status, queue, responsavelCandidates);
-          const chamados = await ChamadoN1.find(filter).sort({ updatedAt: -1 });
-          return {
-            id: column.id,
-            name: column.name,
-            order: column.order,
-            tickets: await Promise.all(
-              chamados.map((chamado) => chamadoToTicket(chamado, column.id))
-            ),
-          };
-        })
+      const result = await loadBoxesWithListTickets(
+        MEUS_CHAMADOS_COLUMNS.map((column) => ({
+          id: column.id,
+          name: column.name,
+          order: column.order,
+          status: column.status,
+        })),
+        queue,
+        responsavelCandidates,
       );
       return res.json(result);
     }
 
     const boxes = await Box.find().sort({ order: 1 });
-    const result = await Promise.all(
-      boxes.map(async (box) => {
-        const status = statusFromBoxName(box.name);
-        const filter = buildChamadoQueryFilter(status, queue, responsavelCandidates);
-        const chamados = await ChamadoN1.find(filter).sort({ updatedAt: -1 });
-        return {
-          id: box.id,
-          name: box.name,
-          order: box.order,
-          tickets: await Promise.all(
-            chamados.map((chamado) => chamadoToTicket(chamado, box._id.toString()))
-          ),
-        };
-      })
+    const columns = boxes.map((box) => ({
+      id: box.id,
+      name: box.name,
+      order: box.order,
+      status: statusFromBoxName(box.name),
+    }));
+    const result = await loadBoxesWithListTickets(
+      columns,
+      queue,
+      responsavelCandidates,
+      extraFilter,
     );
     res.json(result);
   } catch (err) {

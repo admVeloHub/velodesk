@@ -1,6 +1,10 @@
-/** WorkflowDefinicao v1.4.0 — acao.automatica (webhook/IA/CTA); atribuicao.sistema legado */
+/** WorkflowDefinicao v1.5.0 — requisicao.campos (form complementar ao iniciar workflow) */
 import { Schema, Document, Model, Types } from 'mongoose';
 import { getDeskConfigConnection } from '../config/database';
+import type {
+  IWorkflowRequisicaoCampo,
+  IWorkflowRequisicaoConfig,
+} from '../config/workflowRequisicaoDefaults';
 
 export interface IWorkflowCriterio {
   _id?: Types.ObjectId;
@@ -28,7 +32,8 @@ export interface IWorkflowAutomaticaConfig {
 export type IWorkflowSistemaConfig = IWorkflowAutomaticaConfig;
 
 export interface IWorkflowAtribuicao {
-  tipo: 'grupo' | 'colaborador' | 'responsavel_ticket' | 'sistema';
+  tipo: 'funcao' | 'grupo' | 'colaborador' | 'responsavel_ticket' | 'sistema';
+  funcaoSlug: string;
   grupoSlug: string;
   colaborador: string;
   sistema?: IWorkflowSistemaConfig;
@@ -65,6 +70,8 @@ export interface IWorkflowGatilho {
   criterios: IWorkflowCriterio[];
 }
 
+export type { IWorkflowRequisicaoCampo, IWorkflowRequisicaoConfig };
+
 export interface IWorkflowDefinicao extends Document {
   _id: Types.ObjectId;
   slug: string;
@@ -73,6 +80,7 @@ export interface IWorkflowDefinicao extends Document {
   ordem: number;
   ativo: boolean;
   gatilho: IWorkflowGatilho;
+  requisicao?: IWorkflowRequisicaoConfig;
   passos: IWorkflowPassoEnvelope[];
   passoInicialId: Types.ObjectId | null;
   updatedBy: string;
@@ -109,7 +117,8 @@ const AutomaticaConfigSchema = new Schema<IWorkflowAutomaticaConfig>(
 
 const AtribuicaoSchema = new Schema<IWorkflowAtribuicao>(
   {
-    tipo: { type: String, required: true, enum: ['grupo', 'colaborador', 'responsavel_ticket', 'sistema'] },
+    tipo: { type: String, required: true, enum: ['funcao', 'grupo', 'colaborador', 'responsavel_ticket', 'sistema'] },
+    funcaoSlug: { type: String, default: '' },
     grupoSlug: { type: String, default: '' },
     colaborador: { type: String, default: '' },
     sistema: { type: AutomaticaConfigSchema, default: undefined },
@@ -132,7 +141,7 @@ const PassoConfigSchema = new Schema<IWorkflowPassoConfig>(
     nome: { type: String, required: true },
     descricao: { type: String, default: '' },
     slaHoras: { type: Number, default: null },
-    atribuicao: { type: AtribuicaoSchema, default: () => ({ tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }) },
+    atribuicao: { type: AtribuicaoSchema, default: () => ({ tipo: 'funcao', funcaoSlug: 'atendimento', grupoSlug: '', colaborador: '' }) },
     acao: {
       tipo: { type: String, enum: ['manual', 'aprovacao', 'automatica'], default: 'manual' },
       rotas: { type: [RotaSchema], default: [] },
@@ -150,6 +159,32 @@ const PassoEnvelopeSchema = new Schema<IWorkflowPassoEnvelope>(
   { _id: true },
 );
 
+const RequisicaoCampoOpcaoSchema = new Schema(
+  {
+    valor: { type: String, default: '' },
+    label: { type: String, default: '' },
+  },
+  { _id: false },
+);
+
+const RequisicaoCampoSchema = new Schema<IWorkflowRequisicaoCampo>(
+  {
+    id: { type: String, required: true },
+    label: { type: String, required: true },
+    tipo: {
+      type: String,
+      enum: ['text', 'textarea', 'number', 'date', 'select', 'boolean', 'currency'],
+      default: 'text',
+    },
+    obrigatorio: { type: Boolean, default: false },
+    ordem: { type: Number, default: 0 },
+    opcoes: { type: [RequisicaoCampoOpcaoSchema], default: undefined },
+    placeholder: { type: String, default: '' },
+    ajuda: { type: String, default: '' },
+  },
+  { _id: false },
+);
+
 const WorkflowDefinicaoSchema = new Schema<IWorkflowDefinicao>(
   {
     slug: { type: String, required: true },
@@ -160,6 +195,9 @@ const WorkflowDefinicaoSchema = new Schema<IWorkflowDefinicao>(
     gatilho: {
       tipo: { type: String, default: 'tabulacao' },
       criterios: { type: [CriterioSchema], default: [] },
+    },
+    requisicao: {
+      campos: { type: [RequisicaoCampoSchema], default: [] },
     },
     passos: { type: [PassoEnvelopeSchema], default: [] },
     passoInicialId: { type: Schema.Types.ObjectId, default: null },

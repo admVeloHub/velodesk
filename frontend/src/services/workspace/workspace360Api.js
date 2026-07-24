@@ -20,3 +20,16 @@ export async function fetchWorkspace360Agents() {
   const { data } = await api.get('/workspace360/agents');
   return data;
 }
+
+/** Leaderboard operacional com período próprio (Hoje/Ontem/Mês/Personalizado), independente do resto do painel. */
+export async function fetchWorkspace360Leaderboard({ period, from, to } = {}) {
+  const { data } = await api.get('/workspace360', {
+    params: {
+      profile: 'gestao',
+      leaderboardPeriod: period,
+      leaderboardFrom: from,
+      leaderboardTo: to,
+    },
+  });
+  return data?.leaderboard ?? { resolvedRanking: [], interactionRanking: [] };
+}

@@ -1,4 +1,4 @@
-/** tickets.routes v1.6.0 — adoção manual órfão PUT/messages (P3b) */
+/** tickets.routes v1.10.0 — POST workflow/comunicacao */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -22,9 +22,22 @@ import {
   advanceWorkflowManual,
   advanceWorkflowWithDecision,
   setWorkflowPendingDecision,
-  tryActivateWorkflowOnTabulation,
+  startWorkflowForChamado,
   WorkflowAdvanceError,
 } from '../services/workflowTicket.service';
+import {
+  appendComunicacaoWorkflow,
+  WorkflowRequisicaoError,
+} from '../services/workflowRequisicao.service';
+import {
+  assertCanActOnTicket,
+  assertCanWorkflowComunicacao,
+  PermissionDeniedError,
+} from '../services/permission.service';
+import {
+  mergeTicketInto,
+  TicketMergeError,
+} from '../services/ticketMerge.service';
 
 const router = Router();
 
@@ -61,6 +74,28 @@ router.get('/by-protocol/:protocolo', authMiddleware, async (req, res: Response)
 
   const boxes = await loadBoxes();
   res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+});
+
+router.post('/:sourceId/merge-into/:targetId', authMiddleware, async (req, res: Response) => {
+  try {
+    const result = await mergeTicketInto(
+      String(req.params.sourceId),
+      String(req.params.targetId),
+      req.user!,
+    );
+    res.json(result);
+  } catch (err) {
+    if (err instanceof TicketMergeError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    if (err instanceof PermissionDeniedError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    if (err instanceof TabulacaoValidationError) {
+      return res.status(400).json({ message: err.message });
+    }
+    throw err;
+  }
 });
 
 router.get('/:id', authMiddleware, async (req, res: Response) => {
@@ -110,6 +145,15 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
   const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
 
+  try {
+    await assertCanActOnTicket(req.user!, chamado);
+  } catch (err) {
+    if (err instanceof PermissionDeniedError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    throw err;
+  }
+
   if (req.body.boxId && (req.body.status === undefined || String(req.body.status).trim() === '')) {
     const box = await Box.findById(req.body.boxId);
     if (box) req.body.status = statusFromBoxName(box.name);
@@ -122,10 +166,6 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
   try {
     applyManualResponsavelClaim(chamado, req.user);
     await applyBodyToChamado(chamado, req.body, req.user);
-    await tryActivateWorkflowOnTabulation(
-      chamado,
-      String(req.body.author ?? req.user?.name ?? req.user?.email ?? 'Sistema'),
-    );
     await chamado.save();
 
     const boxes = await loadBoxes();
@@ -148,6 +188,15 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
   const { text, sender, internal, attachments, internalText, anotacaoInterna, author } = req.body;
   const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+
+  try {
+    await assertCanActOnTicket(req.user!, chamado);
+  } catch (err) {
+    if (err instanceof PermissionDeniedError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    throw err;
+  }
 
   const attachmentList = Array.isArray(attachments)
     ? attachments.map((item: unknown) => String(item ?? '').trim()).filter(Boolean)
@@ -189,6 +238,29 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
   });
 });
 
+router.post('/:id/workflow/start', authMiddleware, async (req, res: Response) => {
+  const chamado = await ChamadoN1.findById(req.params.id);
+  if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+
+  try {
+    await assertCanActOnTicket(req.user!, chamado);
+    const requisicaoValores = req.body?.requisicao?.valores as Record<string, unknown> | undefined;
+    const definicaoSlug = req.body?.definicaoSlug as string | undefined;
+    await startWorkflowForChamado(chamado, req.user, requisicaoValores, definicaoSlug);
+    await chamado.save();
+    const boxes = await loadBoxes();
+    res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  } catch (err) {
+    if (err instanceof WorkflowAdvanceError || err instanceof WorkflowRequisicaoError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    if (err instanceof PermissionDeniedError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    throw err;
+  }
+});
+
 router.post('/:id/workflow/advance', authMiddleware, async (req, res: Response) => {
   const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
@@ -208,6 +280,30 @@ router.post('/:id/workflow/advance', authMiddleware, async (req, res: Response) 
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
   } catch (err) {
     if (err instanceof WorkflowAdvanceError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    if (err instanceof PermissionDeniedError) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    throw err;
+  }
+});
+
+router.post('/:id/workflow/comunicacao', authMiddleware, async (req, res: Response) => {
+  const chamado = await ChamadoN1.findById(req.params.id);
+  if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+
+  const origem = req.body?.origem === 'responsavel' ? 'responsavel' : 'workflow';
+  const mensagem = String(req.body?.mensagem ?? '');
+
+  try {
+    await assertCanWorkflowComunicacao(req.user!, chamado, origem);
+    appendComunicacaoWorkflow(chamado, { mensagem, origem }, req.user);
+    await chamado.save();
+    const boxes = await loadBoxes();
+    res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  } catch (err) {
+    if (err instanceof WorkflowRequisicaoError || err instanceof PermissionDeniedError) {
       return res.status(err.status).json({ message: err.message });
     }
     throw err;

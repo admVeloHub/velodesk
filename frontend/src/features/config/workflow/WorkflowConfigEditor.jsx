@@ -1,30 +1,34 @@
 /**
- * WorkflowConfigEditor v2.5.1 — gatilho sem descricao
- * VERSION: v2.5.1 | DATE: 2026-07-15
+ * WorkflowConfigEditor v2.7.1 — clientKey estável nos campos de requisição
+ * VERSION: v2.7.1 | DATE: 2026-07-23
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useWorkflowConfig } from '../../../context/WorkflowConfigContext';
 import WorkflowConfigHeader from './WorkflowConfigHeader';
-import WorkflowConfigSidebar from './WorkflowConfigSidebar';
 import WorkflowConfigStepsTimeline from './WorkflowConfigStepsTimeline';
 import WorkflowCriteriaEditor from './WorkflowCriteriaEditor';
+import WorkflowRequisicaoFieldsEditor from './WorkflowRequisicaoFieldsEditor';
 import {
   createEmptyGatilhoCriterio,
   createEmptyPassoEnvelope,
+  createEmptyRequisicaoCampo,
   normalizeGatilho,
   normalizePassosOrdem,
+  normalizeRequisicao,
 } from './workflowConfigData';
-
-const PLACEHOLDER_TABS = {
-  slas: 'Editor de SLAs e prazos — em breve.',
-  notifications: 'Editor de notificações — em breve.',
-  automations: 'Editor de automações — em breve.',
-};
+import { createRequisicaoCampoClientKey } from '../../../services/workflow/workflowRequisicao';
 
 function cloneDoc(doc) {
   if (!doc) return null;
-  return JSON.parse(JSON.stringify(doc));
+  const cloned = JSON.parse(JSON.stringify(doc));
+  const campos = cloned?.requisicao?.campos;
+  if (Array.isArray(campos)) {
+    cloned.requisicao.campos = campos.map((campo) => (
+      campo._clientKey ? campo : { ...campo, _clientKey: createRequisicaoCampoClientKey() }
+    ));
+  }
+  return cloned;
 }
 
 export default function WorkflowConfigEditor({
@@ -36,12 +40,10 @@ export default function WorkflowConfigEditor({
   const { showNotification } = useNotifications();
   const { grupos } = useWorkflowConfig();
   const [draft, setDraft] = useState(() => cloneDoc(initialWorkflow));
-  const [activeTab, setActiveTab] = useState('steps');
   const [expandStepId, setExpandStepId] = useState(null);
 
   useEffect(() => {
     setDraft(cloneDoc(initialWorkflow));
-    setActiveTab('steps');
     setExpandStepId(null);
   }, [initialWorkflow]);
 
@@ -60,6 +62,22 @@ export default function WorkflowConfigEditor({
     handleGatilhoCriteriosChange([...criterios, createEmptyGatilhoCriterio()]);
   }, [draft?.gatilho?.criterios, handleGatilhoCriteriosChange]);
 
+  const handleRequisicaoCamposChange = useCallback((campos) => {
+    setDraft((prev) => ({ ...prev, requisicao: { campos } }));
+  }, []);
+
+  const handleAddRequisicaoCampo = useCallback(() => {
+    setDraft((prev) => {
+      const campos = prev.requisicao?.campos || [];
+      return {
+        ...prev,
+        requisicao: {
+          campos: [...campos, createEmptyRequisicaoCampo(prev.gatilho, campos)],
+        },
+      };
+    });
+  }, []);
+
   const handleSave = useCallback(async () => {
     const titulo = String(draft?.titulo || '').trim();
     if (!titulo) {
@@ -76,6 +94,7 @@ export default function WorkflowConfigEditor({
         ...draft,
         titulo,
         gatilho: normalizeGatilho(draft.gatilho),
+        requisicao: normalizeRequisicao(draft.requisicao, draft.gatilho),
         passos: normalizePassosOrdem(draft.passos || []),
       });
       showNotification(isNew ? 'Workflow criado.' : 'Workflow salvo.', 'success');
@@ -111,8 +130,6 @@ export default function WorkflowConfigEditor({
       </button>
 
       <div className="wf-config-shell">
-        <WorkflowConfigSidebar activeTab={activeTab} onTabChange={setActiveTab} />
-
         <div className="wf-config-main">
           <WorkflowConfigHeader
             title={draft.titulo || 'Workflow'}
@@ -129,45 +146,59 @@ export default function WorkflowConfigEditor({
           />
 
           <div className="wf-config-panel">
-            {activeTab === 'steps' ? (
-              <>
-                <section className="wf-config-trigger">
-                  <div className="wf-config-trigger__quadro">
-                    <div className="wf-config-trigger__head">
-                      <h3 className="wf-config-trigger__title">Gatilho de ativação</h3>
-                      <button
-                        type="button"
-                        className="wf-config-trigger__add"
-                        onClick={handleAddGatilhoCriterio}
-                        aria-label="Adicionar critério"
-                        title="Adicionar critério"
-                      >
-                        <i className="ti ti-plus" aria-hidden="true" />
-                      </button>
-                    </div>
-                    <WorkflowCriteriaEditor
-                      mode="gatilho"
-                      hideAddButton
-                      criterios={draft.gatilho?.criterios || []}
-                      onChange={handleGatilhoCriteriosChange}
-                    />
-                  </div>
-                </section>
-                <WorkflowConfigStepsTimeline
-                  passos={draft.passos || []}
-                  grupos={grupos}
-                  onPassosChange={handlePassosChange}
-                  onAddStep={handleAddStep}
-                  expandStepId={expandStepId}
-                  onExpandHandled={handleExpandHandled}
+            <section className="wf-config-trigger">
+              <div className="wf-config-trigger__quadro">
+                <div className="wf-config-trigger__head">
+                  <h3 className="wf-config-trigger__title">Gatilho de ativação</h3>
+                  <button
+                    type="button"
+                    className="wf-config-trigger__add"
+                    onClick={handleAddGatilhoCriterio}
+                    aria-label="Adicionar critério"
+                    title="Adicionar critério"
+                  >
+                    <i className="ti ti-plus" aria-hidden="true" />
+                  </button>
+                </div>
+                <WorkflowCriteriaEditor
+                  mode="gatilho"
+                  hideAddButton
+                  criterios={draft.gatilho?.criterios || []}
+                  onChange={handleGatilhoCriteriosChange}
                 />
-              </>
-            ) : (
-              <div className="wf-config-placeholder">
-                <i className="ti ti-tool" aria-hidden="true" />
-                <p>{PLACEHOLDER_TABS[activeTab] || 'Em breve.'}</p>
               </div>
-            )}
+            </section>
+
+            <section className="wf-config-requisicao-section">
+              <div className="wf-config-requisicao__quadro">
+                <div className="wf-config-requisicao__head">
+                  <h3 className="wf-config-requisicao__title">Form de requisição</h3>
+                  <button
+                    type="button"
+                    className="wf-config-requisicao__add"
+                    onClick={handleAddRequisicaoCampo}
+                    aria-label="Adicionar campo"
+                    title="Adicionar campo complementar"
+                  >
+                    <i className="ti ti-plus" aria-hidden="true" />
+                  </button>
+                </div>
+                <WorkflowRequisicaoFieldsEditor
+                  campos={draft.requisicao?.campos || []}
+                  gatilho={draft.gatilho}
+                  onChange={handleRequisicaoCamposChange}
+                />
+              </div>
+            </section>
+
+            <WorkflowConfigStepsTimeline
+              passos={draft.passos || []}
+              grupos={grupos}
+              onPassosChange={handlePassosChange}
+              onAddStep={handleAddStep}
+              expandStepId={expandStepId}
+              onExpandHandled={handleExpandHandled}
+            />
           </div>
         </div>
       </div>

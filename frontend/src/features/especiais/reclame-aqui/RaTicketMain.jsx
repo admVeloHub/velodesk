@@ -1,13 +1,16 @@
 /**
  * RaTicketMain — coluna central do ticket RA (header + thread + compose)
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import DeskConsultasPanel from '../../desk/components/DeskConsultasPanel';
 import DeskWhatsAppChat from '../../desk/components/DeskWhatsAppChat';
 import ClientTicketHistoryModal from '../../desk/components/ClientTicketHistoryModal';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useTicketAiSuggestions } from '../../../hooks/useTicketAiSuggestions';
 import { lookupClient } from '../../../services/clientDb';
 import { buildRegistroThread } from '../../../services/desk/utils';
+import { mergeTicketInto } from '../../../services/desk/ticketMergeService';
+import { isDraftTicket } from '../../../services/ticketsCache';
 import { getStatusLabel } from '../../../services/especiais/reclameAquiData';
 import {
   formatRaDeadlineLabel,
@@ -32,6 +35,8 @@ export default function RaTicketMain({
   const [composeText, setComposeText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [mergeInProgress, setMergeInProgress] = useState(false);
+  const [consultasOpen, setConsultasOpen] = useState(false);
 
   const rightFields = useMemo(() => ({
     canal: ticket?.lateralForm?.canal || 'Reclame Aqui',
@@ -76,6 +81,33 @@ export default function RaTicketMain({
     }
     showNotification('Abra o Desk para visualizar o ticket selecionado.', 'info');
   }, [showNotification]);
+
+  const handleMergeTickets = useCallback(async (targetId) => {
+    if (!ticket?.id || mergeInProgress) return;
+    if (isDraftTicket(ticket)) {
+      showNotification('Salve o ticket antes de mesclar.', 'warning');
+      return;
+    }
+    setMergeInProgress(true);
+    try {
+      const result = await mergeTicketInto(ticket.id, targetId);
+      setHistoryOpen(false);
+      onTicketUpdated?.(result.target);
+      if (typeof window.openTicket === 'function') {
+        window.openTicket(targetId);
+      }
+      showNotification('Tickets mesclados com sucesso.', 'success');
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Não foi possível mesclar os tickets.';
+      showNotification(msg, 'error');
+    } finally {
+      setMergeInProgress(false);
+    }
+  }, [ticket, mergeInProgress, onTicketUpdated, showNotification]);
+
+  useEffect(() => {
+    setConsultasOpen(false);
+  }, [raItem?.ticketId]);
 
   if (loading) {
     return (
@@ -192,6 +224,15 @@ export default function RaTicketMain({
                   <div className="ra-ticket__profile-actions">
                     <button
                       type="button"
+                      className={'tab-btn' + (consultasOpen ? ' is-active' : '')}
+                      onClick={() => setConsultasOpen((open) => !open)}
+                      disabled={!ticket}
+                    >
+                      <i className="ti ti-search" aria-hidden="true" />
+                      Consultas
+                    </button>
+                    <button
+                      type="button"
                       className="btn-secondary btn-sm ticket-client-history-btn"
                       id="btnClientHistory"
                       onClick={() => setHistoryOpen(true)}
@@ -200,13 +241,15 @@ export default function RaTicketMain({
                       <i className="fas fa-history" aria-hidden="true" />
                       Histórico
                     </button>
-                    <span className="ra-ticket__channel-badge">
-                      <i className="ti ti-star" aria-hidden="true" />
-                      Reclame Aqui
-                    </span>
                   </div>
                 </section>
 
+                {consultasOpen ? (
+                  <div className="ra-ticket__consultas-panel">
+                    <DeskConsultasPanel ticket={ticket} client={client} />
+                  </div>
+                ) : (
+                  <>
                 <section className="ra-ticket__complaint">
                   <i className="ti ti-quote ra-ticket__complaint-icon" aria-hidden="true" />
                   <p>{raItem.descricao || 'Sem descrição da reclamação.'}</p>
@@ -252,8 +295,11 @@ export default function RaTicketMain({
                     })
                   )}
                 </section>
+                  </>
+                )}
               </div>
 
+              {!consultasOpen ? (
               <section className="ra-ticket__compose" aria-label="Compositor de resposta">
                 <div className="ra-ticket__compose-tabs">
                   <button
@@ -307,6 +353,7 @@ export default function RaTicketMain({
                   </button>
                 </div>
               </section>
+              ) : null}
             </>
           )}
         </div>
@@ -317,6 +364,9 @@ export default function RaTicketMain({
         ticket={ticket}
         client={client}
         onSelectTicket={handleSelectHistoryTicket}
+        sourceTicketId={ticket?.id || ticket?._id}
+        onMergeTickets={handleMergeTickets}
+        merging={mergeInProgress}
       />
     </div>
   );

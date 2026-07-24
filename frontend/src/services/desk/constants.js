@@ -1,12 +1,20 @@
 /**
  * Desk CRM — constantes de filas e classificação
- * VERSION: v2.2.0 | DATE: 2026-07-10
+ * VERSION: v2.3.2 | DATE: 2026-07-24
  */
+export const MEUS_TICKETS_QUEUE_ID = 'meus-tickets';
+
+/** Modos da busca global do Desk (Enter na fila). */
+export const DESK_SEARCH_MODE_CPF = 'cpf';
+export const DESK_SEARCH_MODE_TICKET = 'ticket';
+export const DESK_SEARCH_MODES = [DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET];
+
 export const QUEUE_STATUSES = [
   { id: 'novos', name: 'Novos', dot: '#1634FF', boxes: ['novos'] },
+  { id: MEUS_TICKETS_QUEUE_ID, name: 'Meus Tickets', dot: '#1694FF', boxes: [], virtual: true },
   { id: 'em-andamento', name: 'Em andamento', dot: '#15A237', boxes: ['em-andamento', 'em-aberto'] },
   { id: 'pendente', name: 'Pendente', dot: '#FCC200', boxes: ['em-espera', 'pendentes'] },
-  { id: 'resolvidos', name: 'Resolvidos', dot: '#9ca3af', boxes: ['resolvidos'] }
+  { id: 'resolvidos', name: 'Resolvidos', dot: '#9ca3af', boxes: ['resolvidos'] },
 ];
 
 export const SEND_STATUS_OPTIONS_AGENT = [
@@ -80,3 +88,6 @@ export const SLA_SHORT_LABELS = {
 
 /** Corretor ortográfico do compose — desativado enquanto revisão IA for obrigatória */
 export const COMPOSE_SPELLCHECK_ENABLED = false;
+
+/** Termômetro do cliente no painel direito — oculto temporariamente no front. */
+export const DESK_THERMOMETER_UI_ENABLED = false;

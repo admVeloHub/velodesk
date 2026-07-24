@@ -1,5 +1,6 @@
 /**
- * ProdSolicWorkspace — painel compartilhado de solicitações ao time de Produtos
+ * ProdSolicWorkspace v1.1.0 — painel de solicitações (com ou sem acompanhamento)
+ * VERSION: v1.1.0 | DATE: 2026-07-23
  */
 import React, { useCallback, useState } from 'react';
 import {
@@ -15,10 +16,12 @@ import SolicitacoesFormTab from './components/SolicitacoesFormTab';
 import ErrosBugsFormTab from './components/ErrosBugsFormTab';
 import LiberacaoPixFormTab from './components/LiberacaoPixFormTab';
 
-function loadViewState(activeTab, searchCpf = '') {
-  const items = searchCpf
-    ? searchSolicitacoesByCpf(searchCpf, activeTab)
-    : loadSolicitacoes(activeTab);
+function loadViewState(activeTab, searchCpf = '', withTracking = true) {
+  const items = withTracking
+    ? (searchCpf
+      ? searchSolicitacoesByCpf(searchCpf, activeTab)
+      : loadSolicitacoes(activeTab))
+    : [];
   return {
     items,
     stats: getSolicitacoesStats(activeTab),
@@ -32,24 +35,25 @@ export default function ProdSolicWorkspace({
   ticketOverride,
   clientOverride,
   onSubmitted,
+  showTracking = true,
 }) {
   const [activeTab, setActiveTab] = useState('solicitacoes');
   const [searchCpf, setSearchCpf] = useState('');
-  const [view, setView] = useState(() => loadViewState('solicitacoes'));
+  const [view, setView] = useState(() => loadViewState('solicitacoes', '', showTracking));
 
   const refresh = useCallback((tab = activeTab, cpf = searchCpf) => {
-    setView(loadViewState(tab, cpf));
-  }, [activeTab, searchCpf]);
+    setView(loadViewState(tab, cpf, showTracking));
+  }, [activeTab, searchCpf, showTracking]);
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
     setSearchCpf('');
-    setView(loadViewState(tabId));
+    setView(loadViewState(tabId, '', showTracking));
   };
 
   const handleSearch = (cpf) => {
     setSearchCpf(cpf);
-    setView(loadViewState(activeTab, cpf));
+    setView(loadViewState(activeTab, cpf, showTracking));
   };
 
   const handleSaved = () => {
@@ -64,19 +68,25 @@ export default function ProdSolicWorkspace({
   };
 
   const rootClass = ['prod-solic-page', className].filter(Boolean).join(' ');
+  const layoutClass = [
+    'prod-solic-layout',
+    showTracking ? '' : 'prod-solic-layout--form-only',
+  ].filter(Boolean).join(' ');
 
   return (
     <div className={rootClass} id={id}>
       <ProdSolicTabs activeTab={activeTab} onChange={handleTabChange} />
 
-      <div className="prod-solic-layout">
+      <div className={layoutClass}>
         <section className="prod-solic-main">
           <div className="prod-solic-main__card">
-            <ProdSolicStatsBar
-              stats={view.stats}
-              updatedAt={view.updatedAt}
-              onRefresh={() => refresh()}
-            />
+            {showTracking ? (
+              <ProdSolicStatsBar
+                stats={view.stats}
+                updatedAt={view.updatedAt}
+                onRefresh={() => refresh()}
+              />
+            ) : null}
 
             {activeTab === 'solicitacoes' ? (
               <SolicitacoesFormTab {...formProps} />
@@ -90,11 +100,13 @@ export default function ProdSolicWorkspace({
           </div>
         </section>
 
-        <ProdSolicTrackingSidebar
-          items={view.items}
-          onSearch={handleSearch}
-          onRefresh={() => refresh()}
-        />
+        {showTracking ? (
+          <ProdSolicTrackingSidebar
+            items={view.items}
+            onSearch={handleSearch}
+            onRefresh={() => refresh()}
+          />
+        ) : null}
       </div>
     </div>
   );

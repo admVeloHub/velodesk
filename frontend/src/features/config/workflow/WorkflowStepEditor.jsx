@@ -1,6 +1,6 @@
 /**
- * WorkflowStepEditor v1.2.1 — ação automática → atribuição sistema
- * VERSION: v1.2.1 | DATE: 2026-07-16
+ * WorkflowStepEditor v1.3.0 — lista Atuação dinâmica (Desk + VeloHub, incl. Produto)
+ * VERSION: v1.3.0 | DATE: 2026-07-24
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import WorkflowRoutesEditor from './WorkflowRoutesEditor';
@@ -8,6 +8,8 @@ import {
   ACAO_TIPOS,
   ATRIBUICAO_SISTEMA,
   ATRIBUICAO_TIPOS,
+  buildFuncaoAtribuicaoOpcoes,
+  FUNCAO_ATRIBUICAO_OPCOES,
   CTA_ALVOS,
   resolveAutomaticaConfig,
   SISTEMA_MODOS,
@@ -31,12 +33,34 @@ export default function WorkflowStepEditor({
 }) {
   const cfg = envelope?.passo || {};
   const [internalHooks, setInternalHooks] = useState(DEFAULT_INTERNAL_HOOKS);
+  const [atuacaoOpcoes, setAtuacaoOpcoes] = useState(FUNCAO_ATRIBUICAO_OPCOES);
   const { colaboradores, loading: colaboradoresLoading, error: colaboradoresError } = useDeskColaboradores();
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      api.get('/funcoes-permissoes').then((r) => r.data).catch(() => []),
+      api.get('/funcoes-permissoes/catalog').then((r) => r.data).catch(() => ({})),
+    ]).then(([funcoes, catalog]) => {
+      if (cancelled) return;
+      setAtuacaoOpcoes(buildFuncaoAtribuicaoOpcoes(
+        Array.isArray(funcoes) ? funcoes : [],
+        Array.isArray(catalog?.velohub) ? catalog.velohub : [],
+      ));
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const colaboradoresValidos = useMemo(
     () => colaboradores.filter((c) => !c.desligado),
     [colaboradores],
   );
+
+  const atuacaoSelectOptions = useMemo(() => {
+    const slug = String(cfg.atribuicao?.funcaoSlug || '').trim();
+    if (!slug || atuacaoOpcoes.some((o) => o.value === slug)) return atuacaoOpcoes;
+    return [...atuacaoOpcoes, { value: slug, label: slug }];
+  }, [atuacaoOpcoes, cfg.atribuicao?.funcaoSlug]);
 
   const colaboradorSelecionado = String(cfg.atribuicao?.colaborador || '').trim();
   const colaboradorNaLista = useMemo(
@@ -119,12 +143,12 @@ export default function WorkflowStepEditor({
 
     nextAcao.automatica = undefined;
     const nextAtribuicao = cfg.atribuicao?.tipo === 'sistema'
-      ? { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }
-      : (cfg.atribuicao || { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' });
+      ? { tipo: 'funcao', funcaoSlug: 'atendimento', grupoSlug: '', colaborador: '' }
+      : (cfg.atribuicao || { tipo: 'funcao', funcaoSlug: 'atendimento', grupoSlug: '', colaborador: '' });
     patchPasso({ acao: nextAcao, atribuicao: nextAtribuicao });
   };
 
-  const atribuicaoTipo = isAutomatica ? 'sistema' : (cfg.atribuicao?.tipo || 'grupo');
+  const atribuicaoTipo = isAutomatica ? 'sistema' : (cfg.atribuicao?.tipo || 'funcao');
 
   useEffect(() => {
     if (isAutomatica && cfg.atribuicao?.tipo !== 'sistema') {
@@ -332,6 +356,20 @@ export default function WorkflowStepEditor({
               </select>
             )}
           </label>
+          {!isAutomatica && atribuicaoTipo === 'funcao' ? (
+            <label className="wf-step-editor__field">
+              <span>Atuação</span>
+              <select
+                value={cfg.atribuicao?.funcaoSlug || ''}
+                onChange={(e) => patchAtribuicao({ funcaoSlug: e.target.value, tipo: 'funcao' })}
+              >
+                <option value="">Selecione…</option>
+                {atuacaoSelectOptions.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {!isAutomatica && atribuicaoTipo === 'grupo' ? (
             <label className="wf-step-editor__field">
               <span>Grupo</span>

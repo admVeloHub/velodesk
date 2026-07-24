@@ -1,11 +1,12 @@
 /**
- * TicketsContext v1.5.0 — tratamento 429 + recarga quando sessão/papel muda
- * VERSION: v1.5.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.6.0 — deskLog diagnóstico
+ * VERSION: v1.6.0 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team
  */
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi } from '../services/ticketsStorage';
+import { hydrateColumnsFromStorage, patchTicketInCache } from '../services/ticketsCache';
 import { getTicketProtocolLabel } from '../services/desk/utils';
-import { isRateLimitError, RATE_LIMIT_USER_MESSAGE } from '../utils/apiErrors';
+import deskLog from '../utils/deskDebugLog';
 import { useAuth } from './AuthContext';
 
 const TicketsContext = createContext(null);
@@ -29,19 +30,30 @@ export function TicketsProvider({ children }) {
   const [activeTabId, setActiveTabId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [loading, setLoading] = useState(false);
+  const hydratedRef = useRef(false);
+
+  const patchTicket = useCallback((ticketId, ticket) => {
+    if (patchTicketInCache(ticketId, ticket)) {
+      setRefreshKey((k) => k + 1);
+    }
+  }, []);
 
   const refreshTickets = useCallback(async () => {
     if (isAuthenticated) {
       setLoading(true);
+      deskLog.tickets('TicketsContext.refreshTickets → início');
       try {
-        await refreshTicketsFromApi();
+        await refreshTicketsFromApi(user?.email);
+        deskLog.tickets('TicketsContext.refreshTickets → ok');
       } catch (err) {
         const status = err?.response?.status;
         const apiMsg = String(err?.response?.data?.message || '').trim();
+        deskLog.error('TICKETS', 'TicketsContext.refreshTickets → falhou', {
+          status,
+          message: apiMsg || err?.message,
+        });
         if (status === 401 || status === 403) {
           console.warn('TicketsContext: sessão inválida ao carregar tickets — faça login novamente.');
-        } else if (isRateLimitError(err)) {
-          console.warn('TicketsContext: rate limit ao carregar tickets.', RATE_LIMIT_USER_MESSAGE);
         } else if (status === 503 || /mongodb|banco/i.test(apiMsg)) {
           console.warn('TicketsContext: backend/Mongo indisponível ao carregar tickets.');
         } else {
@@ -53,10 +65,21 @@ export function TicketsProvider({ children }) {
     }
     setRefreshKey((k) => k + 1);
     return getTicketColumns();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.email]);
 
   useEffect(() => {
-    if (isAuthenticated) refreshTickets();
+    if (!isAuthenticated) {
+      hydratedRef.current = false;
+      return;
+    }
+    if (!hydratedRef.current) {
+      hydratedRef.current = true;
+      if (hydrateColumnsFromStorage(user?.email)) {
+        deskLog.tickets('TicketsContext: cache local hidratado');
+        setRefreshKey((k) => k + 1);
+      }
+    }
+    refreshTickets();
   }, [isAuthenticated, refreshTickets, user?.email, user?.role]);
 
   useEffect(() => {
@@ -127,6 +150,7 @@ export function TicketsProvider({ children }) {
       refreshTickets,
       selectTicketFromModal,
       getTicketColumns,
+      patchTicket,
     }}>
       {children}
     </TicketsContext.Provider>

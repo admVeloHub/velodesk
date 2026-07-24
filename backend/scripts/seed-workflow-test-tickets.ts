@@ -49,9 +49,13 @@ async function main() {
   console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}004 — Gustavo Lima — ticket normal (sem workflow)`);
   console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}005 — Patricia Nunes — Solicitação + Encaminhar para N2`);
   console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}006 — Bruno Carvalho — dúvida simples (sem workflow)`);
-  console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}007 — Maria Oliveira — fila de aprovação (/workflow)`);
-  console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}008 — Roberto Alves — fila de aprovação (/workflow)`);
-  console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}009 — Fernanda Lima — SLA crítico (/workflow)`);
+  console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}007 — Maria Oliveira — fila Financeiro (/workflow)`);
+  console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}008 — Roberto Alves — fila Financeiro (/workflow)`);
+  console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}009 — Fernanda Lima — SLA crítico, fila Financeiro (/workflow)`);
+  console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}010 — Lucas Ferreira — escalonar financeiro, aguardando aprovação`);
+  console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}011 — Juliana Costa — escalonar financeiro, estorno em processamento`);
+  console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}012 — Diego Martins — escalonar produtos, aguardando análise`);
+  console.log(`  ${WORKFLOW_TEST_PROTOCOL_PREFIX}013 — Amanda Ribeiro — escalonar produtos, aguardando retorno`);
 
   await disconnectDatabase();
 }

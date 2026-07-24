@@ -1,5 +1,6 @@
-/** ChamadoN1 v1.5.1 — chamadoProtocolo opcional até atribuição pelo Desk */
+/** ChamadoN1 v1.7.0 — requisicao.comunicacaoWorkflow (thread Pedir informação) */
 import mongoose, { Schema, Document, Types } from 'mongoose';
+import type { IChamadoWorkflowRequisicao } from '../config/workflowRequisicaoDefaults';
 
 export interface IChamadoWorkflow {
   active: boolean;
@@ -9,6 +10,7 @@ export interface IChamadoWorkflow {
   startedAt: Date | null;
   completedAt: Date | null;
   pendingDecision?: 'approve' | 'reject' | null;
+  requisicao?: IChamadoWorkflowRequisicao;
 }
 
 export interface IClienteRef {
@@ -87,6 +89,25 @@ const RegistroSchema = new Schema<IRegistro>(
   { _id: false }
 );
 
+const ComunicacaoWorkflowSchema = new Schema(
+  {
+    mensagem: { type: String, default: '' },
+    data: { type: Date, default: Date.now },
+    autor: { type: String, default: '' },
+  },
+  { _id: false },
+);
+
+const ChamadoWorkflowRequisicaoSchema = new Schema(
+  {
+    preenchidaEm: { type: Date, default: null },
+    preenchidaPor: { type: String, default: '' },
+    valores: { type: Schema.Types.Mixed, default: {} },
+    comunicacaoWorkflow: { type: [ComunicacaoWorkflowSchema], default: [] },
+  },
+  { _id: false },
+);
+
 const ChamadoWorkflowSchema = new Schema<IChamadoWorkflow>(
   {
     active: { type: Boolean, default: false },
@@ -96,6 +117,7 @@ const ChamadoWorkflowSchema = new Schema<IChamadoWorkflow>(
     startedAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
     pendingDecision: { type: String, enum: ['approve', 'reject'], default: null },
+    requisicao: { type: ChamadoWorkflowRequisicaoSchema, default: undefined },
   },
   { _id: false },
 );

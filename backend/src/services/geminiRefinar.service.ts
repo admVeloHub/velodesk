@@ -5,6 +5,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from '../config/env';
 import { getRefinarRascunhoPersona } from './refinarRascunhoPersona';
+import { logAiUsage } from './aiUsage.service';
 
 const MAX_RASCUNHO_CHARS = 25_000;
 const GEMINI_FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'] as const;
@@ -43,10 +44,23 @@ function mapGeminiErrorMessage(err: unknown): string {
   return message || 'Não foi possível refinar o rascunho';
 }
 
-async function callGeminiModel(modelName: string, fullPrompt: string) {
+async function callGeminiModel(modelName: string, fullPrompt: string, userId?: string) {
   const gemini = new GoogleGenerativeAI(env.geminiApiKey);
   const model = gemini.getGenerativeModel({ model: modelName });
   const result = await model.generateContent(fullPrompt);
+
+  const usage = result.response.usageMetadata;
+  if (usage) {
+    void logAiUsage({
+      provider: 'gemini',
+      model: modelName,
+      feature: 'refinar_rascunho',
+      inputTokens: usage.promptTokenCount,
+      outputTokens: usage.candidatesTokenCount,
+      userId,
+    });
+  }
+
   return result.response.text();
 }
 
@@ -80,7 +94,7 @@ export async function generateRefinarRascunhoWithGemini(params: {
     let lastError: unknown = null;
     for (const modelName of modelsToTry) {
       try {
-        const response = await callGeminiModel(modelName, fullPrompt);
+        const response = await callGeminiModel(modelName, fullPrompt, params.userId);
         if (modelName !== env.geminiModel) {
           console.warn(`[gemini-refinar] fallback OK com modelo ${modelName}`);
         }

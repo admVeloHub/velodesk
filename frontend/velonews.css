@@ -38,7 +38,7 @@
   margin: 0;
   font-size: 0.9375rem;
   font-weight: 700;
-  color: var(--eco-navy, #04072E);
+  color: var(--eco-navy, #000058);
 }
 
 .velonews-popover__subtitle {
@@ -137,7 +137,7 @@
   width: 100%;
   border: 1px solid var(--eco-border, #E4E6EA);
   background: #fff;
-  color: var(--eco-navy, #04072E);
+  color: var(--eco-navy, #000058);
   border-radius: 8px;
   padding: 0.55rem 1rem;
   font-size: 0.8125rem;
@@ -312,7 +312,7 @@
 .velonews-critical-modal__comments-toggle {
   border: 1px solid #dbeafe;
   background: #eff6ff;
-  color: #1d4ed8;
+  color: #1634FF;
   border-radius: 8px;
   padding: 0.35rem 0.75rem;
   font-size: 0.8125rem;
@@ -370,7 +370,7 @@
 }
 
 .velonews-critical-modal__close-btn:not(:disabled) {
-  background: #2563eb;
+  background: #1634FF;
   cursor: pointer;
   opacity: 1;
 }
@@ -464,7 +464,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #2563eb;
+  background: #1634FF;
   color: #fff;
   display: flex;
   align-items: center;
@@ -519,7 +519,7 @@
   align-self: flex-end;
   border: none;
   border-radius: 8px;
-  background: #2563eb;
+  background: #1634FF;
   color: #fff;
   padding: 0.45rem 0.9rem;
   font-weight: 600;
@@ -681,8 +681,8 @@
 }
 
 .velonews-history-modal__filter-tabs button.is-active {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: #1634FF;
+  border-color: #1634FF;
   color: #fff;
 }
 

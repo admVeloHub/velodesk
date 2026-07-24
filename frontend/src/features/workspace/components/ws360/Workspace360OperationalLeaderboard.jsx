@@ -1,31 +1,113 @@
 /**
  * Leaderboard operacional — painel supervisor
- * VERSION: v2.2.0 | DATE: 2026-07-06
+ * VERSION: v4.0.0 | DATE: 2026-07-21
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   filterOperationalLeaderboard,
   LEADERBOARD_CHANNEL_OPTIONS,
   LEADERBOARD_SHIFT_OPTIONS,
 } from '../../../../services/workspace/deskData';
+import { fetchWorkspace360Leaderboard } from '../../../../services/workspace/workspace360Api';
+import GestaoPeriodFilter from '../gestaoInsights/GestaoPeriodFilter';
+import '../gestaoInsights/gestaoInsights.css';
 
 function trendClass(trend) {
   return trend === 'down' ? 'ws360-leaderboard__trend--down' : 'ws360-leaderboard__trend--up';
 }
 
-function vsYesterdayClass(value) {
+function deltaClass(value) {
   if (!value || value === '—') return '';
   if (value.startsWith('-')) return 'ws360-leaderboard__delta--down';
   if (value.startsWith('+')) return 'ws360-leaderboard__delta--up';
   return '';
 }
 
-export default function Workspace360OperationalLeaderboard({ entries = [] }) {
+function LeaderboardColumn({ icon, title, rows }) {
+  return (
+    <div className="ws360-leaderboard__column">
+      <h5 className="ws360-leaderboard__column-title">
+        <i className={`ti ${icon}`} aria-hidden="true" />
+        {title}
+      </h5>
+      {rows.length === 0 ? (
+        <p className="ws360-leaderboard__empty">Sem dados</p>
+      ) : (
+        <ol className="ws360-leaderboard__list">
+          {rows.map((entry, index) => (
+            <li
+              key={entry.id}
+              className={
+                'ws360-leaderboard__item' +
+                (entry.rank === 1 ? ' ws360-leaderboard__item--first' : '') +
+                (index === rows.length - 1 ? ' ws360-leaderboard__item--last' : '')
+              }
+            >
+              <span className="ws360-leaderboard__rank" aria-hidden="true">
+                {entry.rank}
+              </span>
+              <div className="ws360-leaderboard__body">
+                <div className="ws360-leaderboard__name-row">
+                  {entry.medal ? (
+                    <span className="ws360-leaderboard__medal" aria-label="1º lugar">
+                      <i className="ti ti-medal" />
+                    </span>
+                  ) : null}
+                  <span className={'ws360-leaderboard__trend ' + trendClass(entry.trend)} aria-hidden="true">
+                    <i className={'ti ti-arrow-' + (entry.trend === 'down' ? 'down' : 'up')} />
+                  </span>
+                  <strong className="ws360-leaderboard__name">{entry.name}</strong>
+                </div>
+                <p className="ws360-leaderboard__metrics">
+                  {entry.sla} SLA · {entry.primaryValue} {entry.primaryLabel} · TMA {entry.tma} · Pesquisa média{' '}
+                  {entry.csat == null ? '—' : entry.csat}
+                  <br />
+                  <span className={'ws360-leaderboard__delta ' + deltaClass(entry.vsLastWeek)}>
+                    vs semana anterior: {entry.vsLastWeek || '—'}
+                  </span>
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+export default function Workspace360OperationalLeaderboard() {
   const [shift, setShift] = useState('all');
   const [channel, setChannel] = useState('all');
+  const [period, setPeriod] = useState({ period: 'mes' });
+  const [entries, setEntries] = useState({ resolvedRanking: [], interactionRanking: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const rows = useMemo(
-    () => filterOperationalLeaderboard(entries, { shift, channel }),
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+    fetchWorkspace360Leaderboard({ period: period.period, from: period.from, to: period.to })
+      .then((result) => {
+        if (active) setEntries(result);
+      })
+      .catch(() => {
+        if (active) setError('Não foi possível carregar o leaderboard operacional.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [period.period, period.from, period.to]);
+
+  const resolvedRows = useMemo(
+    () => filterOperationalLeaderboard(entries?.resolvedRanking, { shift, channel }),
+    [entries, shift, channel],
+  );
+  const interactionRows = useMemo(
+    () => filterOperationalLeaderboard(entries?.interactionRanking, { shift, channel }),
     [entries, shift, channel],
   );
 
@@ -59,48 +141,19 @@ export default function Workspace360OperationalLeaderboard({ entries = [] }) {
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
+          <GestaoPeriodFilter value={period} onChange={setPeriod} idPrefix="gestao-leaderboard" />
         </div>
       </header>
 
-      {rows.length === 0 ? (
-        <p className="ws360-leaderboard__empty">Sem dados</p>
+      {error ? <p className="gestao-insight-card__error">{error}</p> : null}
+
+      {loading ? (
+        <p className="gestao-insight-card__loading">Carregando…</p>
       ) : (
-        <ol className="ws360-leaderboard__list">
-          {rows.map((entry, index) => (
-            <li
-              key={entry.id}
-              className={
-                'ws360-leaderboard__item' +
-                (entry.rank === 1 ? ' ws360-leaderboard__item--first' : '') +
-                (index === rows.length - 1 ? ' ws360-leaderboard__item--last' : '')
-              }
-            >
-              <span className="ws360-leaderboard__rank" aria-hidden="true">
-                {entry.rank}
-              </span>
-              <div className="ws360-leaderboard__body">
-                <div className="ws360-leaderboard__name-row">
-                  {entry.medal ? (
-                    <span className="ws360-leaderboard__medal" aria-label="1º lugar">
-                      <i className="ti ti-medal" />
-                    </span>
-                  ) : null}
-                  <span className={'ws360-leaderboard__trend ' + trendClass(entry.trend)} aria-hidden="true">
-                    <i className={'ti ti-arrow-' + (entry.trend === 'down' ? 'down' : 'up')} />
-                  </span>
-                  <strong className="ws360-leaderboard__name">{entry.name}</strong>
-                </div>
-                <p className="ws360-leaderboard__metrics">
-                  {entry.sla} SLA · {entry.resolved} resolvidos · TMA {entry.tma} · CSAT {entry.csat == null ? '—' : entry.csat}
-                  {' · '}
-                  <span className={'ws360-leaderboard__delta ' + vsYesterdayClass(entry.vsYesterday)}>
-                    vs ontem: {entry.vsYesterday || '—'}
-                  </span>
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <div className="ws360-leaderboard__columns">
+          <LeaderboardColumn icon="ti-circle-check" title="Mais resolveram" rows={resolvedRows} />
+          <LeaderboardColumn icon="ti-messages" title="Mais interagiram" rows={interactionRows} />
+        </div>
       )}
     </section>
   );

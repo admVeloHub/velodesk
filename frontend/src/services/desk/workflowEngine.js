@@ -1,6 +1,6 @@
 /**
- * workflowEngine v1.6.0 — ícones por acao.tipo; step index; sem criterios por passo
- * VERSION: v1.6.0 | DATE: 2026-07-16
+ * workflowEngine v1.8.0 — exclui escalonar-* legado; só workflows configurados
+ * VERSION: v1.8.0 | DATE: 2026-07-23
  */
 import { getRuntimeGrupos, getRuntimeWorkflows } from './workflowRuntimeStore';
 
@@ -122,6 +122,10 @@ export function evaluateGatilhoCriterios(criterios = [], fields, grupos = getRun
   return evaluateCriterios(criterios, fields, grupos);
 }
 
+export function isLegacyEscalonarWorkflowSlug(slug) {
+  return String(slug || '').trim().toLowerCase().startsWith('escalonar-');
+}
+
 function buildDecisionFromPasso(passoConfig, slug) {
   if (passoConfig?.acao?.tipo !== 'aprovacao') return null;
   const rotas = passoConfig.acao.rotas || [];
@@ -138,6 +142,7 @@ function buildDecisionFromPasso(passoConfig, slug) {
 
 function getTeamFromAtribuicao(atribuicao) {
   if (!atribuicao) return 'n1';
+  if (atribuicao.tipo === 'funcao') return atribuicao.funcaoSlug || 'atendimento';
   if (atribuicao.tipo === 'grupo') return atribuicao.grupoSlug || 'n1';
   if (atribuicao.tipo === 'colaborador') return 'n1';
   return 'n1';
@@ -175,6 +180,7 @@ export function normalizeWorkflowDef(definicao) {
     title: definicao.titulo || definicao.slug,
     description: definicao.descricao || '',
     gatilho: definicao.gatilho,
+    requisicao: definicao.requisicao,
     passosEnvelope: passos,
     steps,
     defaultActiveStepId,
@@ -196,7 +202,10 @@ export function getWorkflowTemplateById(templateId, definitions = getRuntimeWork
 
 export function resolveWorkflowForTicket(ticket, rightFields = {}, definitions = getRuntimeWorkflows()) {
   const fields = readFields(ticket, rightFields);
-  const match = definitions.find((def) => evaluateGatilhoCriterios(def.gatilho?.criterios || [], fields));
+  const match = definitions.find(
+    (def) => !isLegacyEscalonarWorkflowSlug(def.slug)
+      && evaluateGatilhoCriterios(def.gatilho?.criterios || [], fields),
+  );
   return match ? normalizeWorkflowDef(match) : null;
 }
 
@@ -214,8 +223,13 @@ export function resolveAtribuidoForStep(step, fields = {}) {
   switch (atribuicao.tipo) {
     case 'colaborador':
       return String(atribuicao.colaborador || '').trim();
-    case 'grupo':
-      return atribuicao.grupoSlug ? `grupo:${atribuicao.grupoSlug}` : '';
+    case 'funcao':
+      return atribuicao.funcaoSlug ? `funcao:${atribuicao.funcaoSlug}` : '';
+    case 'grupo': {
+      const map = { n1: 'atendimento', n2: 'n2', financeiro: 'financeiro', suporte: 'suporte' };
+      const slug = atribuicao.grupoSlug ? (map[atribuicao.grupoSlug] || atribuicao.grupoSlug) : '';
+      return slug ? `funcao:${slug}` : '';
+    }
     case 'responsavel_ticket':
       return String(fields.responsavel || '').trim();
     default:

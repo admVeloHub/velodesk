@@ -1,14 +1,12 @@
 /**
- * workflowConfigData v2.6.0 — SISTEMA_MODOS, resolveStepIcon, passo sem icone/criterios
- * VERSION: v2.6.0 | DATE: 2026-07-16
+ * workflowConfigData v2.8.0 — FUNCAO_ATRIBUICAO inclui produtos (+ fallback dinâmico no editor)
+ * VERSION: v2.8.0 | DATE: 2026-07-24
  */
-
-export const WORKFLOW_CONFIG_TABS = [
-  { id: 'steps', label: 'Etapas do fluxo', icon: 'ti-list-details' },
-  { id: 'slas', label: 'SLAs e prazos', icon: 'ti-clock' },
-  { id: 'notifications', label: 'Notificações', icon: 'ti-bell' },
-  { id: 'automations', label: 'Automações', icon: 'ti-bolt' },
-];
+import {
+  normalizeRequisicaoConfig,
+  slugifyRequisicaoLabel,
+  createRequisicaoCampoClientKey,
+} from '../../../services/workflow/workflowRequisicao';
 
 export const TRIGGER_PATH_FIELDS = [
   { key: 'produto', label: 'Produto', placeholder: 'Ex.: Produto X' },
@@ -106,8 +104,9 @@ export function findGatilhoCriterioLabel(fonte, campo) {
 /** Produto/motivo definidos em outros critérios do gatilho (cascata tabulação) */
 export function resolveGatilhoCascadeContext(criterios = []) {
   const list = criterios || [];
-  const produtoRow = list.find((c) => c.fonte === 'tabulacao' && c.campo === 'produto' && c.valor);
-  const motivoRow = list.find((c) => c.fonte === 'tabulacao' && c.campo === 'motivo' && c.valor);
+  const isTabulacao = (c) => !c?.fonte || c.fonte === 'tabulacao';
+  const produtoRow = list.find((c) => isTabulacao(c) && c.campo === 'produto' && String(c.valor || '').trim());
+  const motivoRow = list.find((c) => isTabulacao(c) && c.campo === 'motivo' && String(c.valor || '').trim());
   return {
     produto: String(produtoRow?.valor || '').trim(),
     motivo: String(motivoRow?.valor || '').trim(),
@@ -160,10 +159,41 @@ export function resolveStepIcon(acaoTipo) {
 }
 
 export const ATRIBUICAO_TIPOS = [
-  { value: 'grupo', label: 'Grupo de responsabilidade' },
+  { value: 'funcao', label: 'Atuação' },
   { value: 'colaborador', label: 'Colaborador' },
   { value: 'responsavel_ticket', label: 'Responsável do ticket' },
 ];
+
+export const FUNCAO_ATRIBUICAO_OPCOES = [
+  { value: 'atendimento', label: 'Atendimento' },
+  { value: 'n2', label: 'N2' },
+  { value: 'suporte', label: 'Suporte' },
+  { value: 'financeiro', label: 'Financeiro' },
+  { value: 'produtos', label: 'Produto' },
+  { value: 'reclame-aqui', label: 'Reclame Aqui' },
+  { value: 'bacen', label: 'Bacen' },
+  { value: 'procon', label: 'Procon' },
+  { value: 'consumidor-gov', label: 'Consumidor .GOV' },
+  { value: 'gestao', label: 'Gestão' },
+];
+
+/** Une fallback estático + funções Desk + atuações VeloHub (ex.: Produto). */
+export function buildFuncaoAtribuicaoOpcoes(funcoesDesk = [], velohub = []) {
+  const map = new Map();
+  FUNCAO_ATRIBUICAO_OPCOES.forEach((item) => map.set(item.value, item));
+  (funcoesDesk || []).forEach((f) => {
+    const slug = String(f?.slug || '').trim();
+    if (!slug) return;
+    map.set(slug, { value: slug, label: String(f.nome || slug).trim() || slug });
+  });
+  (velohub || []).forEach((v) => {
+    const slug = String(v?.funcaoSlug || '').trim();
+    if (!slug) return;
+    const label = String(v.funcao || map.get(slug)?.label || slug).trim() || slug;
+    map.set(slug, { value: slug, label });
+  });
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+}
 
 export const ATRIBUICAO_SISTEMA = { value: 'sistema', label: 'Sistema (automático)' };
 
@@ -189,10 +219,6 @@ export const ROTA_VARIAVEIS = [
   { value: 'request_info', label: 'Pedir informação' },
   { value: 'concluir', label: 'Concluir' },
 ];
-
-export function getWorkflowConfigTab(id) {
-  return WORKFLOW_CONFIG_TABS.find((tab) => tab.id === id) || WORKFLOW_CONFIG_TABS[0];
-}
 
 export function formatTriggerPath(gatilho) {
   const criterios = gatilho?.criterios || [];
@@ -277,10 +303,29 @@ export function createEmptyPassoEnvelope(ordem = 0) {
       nome: 'Nova etapa',
       descricao: '',
       slaHoras: null,
-      atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' },
+      atribuicao: { tipo: 'funcao', funcaoSlug: 'atendimento', grupoSlug: '', colaborador: '' },
       acao: { tipo: 'manual', rotas: [] },
     },
   };
+}
+
+export function createEmptyRequisicaoCampo(gatilho, existingCampos = []) {
+  const existingIds = (existingCampos || []).map((c) => c.id);
+  const id = slugifyRequisicaoLabel('', gatilho, existingIds);
+  return {
+    _clientKey: createRequisicaoCampoClientKey(),
+    id,
+    label: '',
+    tipo: 'text',
+    obrigatorio: false,
+    ordem: existingCampos.length,
+    opcoes: [],
+    ajuda: '',
+  };
+}
+
+export function normalizeRequisicao(requisicao, gatilho) {
+  return normalizeRequisicaoConfig(requisicao, gatilho);
 }
 
 export function createEmptyWorkflowDocument() {
@@ -294,6 +339,7 @@ export function createEmptyWorkflowDocument() {
       tipo: 'tabulacao',
       criterios: [],
     },
+    requisicao: { campos: [] },
     passos: [
       createEmptyPassoEnvelope(0),
     ],

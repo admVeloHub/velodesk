@@ -1,4 +1,5 @@
-/** workflowMatcher v1.3.0 — avaliação de critérios de gatilho e passo */
+/** workflowMatcher v1.5.0 — exclui workflows escalonar-* legados */
+import { GRUPO_TO_FUNCAO_MAP } from '../config/funcaoPermissaoDefaults';
 import type { IGrupoResponsabilidade } from '../models/GrupoResponsabilidade';
 import type { IWorkflowCriterio } from '../models/WorkflowDefinicao';
 
@@ -98,6 +99,10 @@ export function evaluateCriterios(
   });
 }
 
+export function isLegacyEscalonarWorkflowSlug(slug: unknown): boolean {
+  return String(slug || '').trim().toLowerCase().startsWith('escalonar-');
+}
+
 /** Gatilho sem critérios nunca ativa o workflow */
 export function evaluateGatilhoCriterios(
   criterios: IWorkflowCriterio[],
@@ -135,14 +140,20 @@ export function buildTabulationFieldsFromTicket(ticket: {
 }
 
 export function resolveAtribuidoForPasso(
-  atribuicao: { tipo: string; grupoSlug?: string; colaborador?: string },
+  atribuicao: { tipo: string; grupoSlug?: string; funcaoSlug?: string; colaborador?: string },
   fields: Record<string, string>,
 ): string {
   switch (atribuicao.tipo) {
     case 'colaborador':
       return String(atribuicao.colaborador || '').trim();
+    case 'funcao':
+      return atribuicao.funcaoSlug ? `funcao:${atribuicao.funcaoSlug}` : '';
     case 'grupo':
-      return atribuicao.grupoSlug ? `grupo:${atribuicao.grupoSlug}` : '';
+      if (atribuicao.grupoSlug) {
+        const mapped = GRUPO_TO_FUNCAO_MAP[atribuicao.grupoSlug.toLowerCase()] || atribuicao.grupoSlug;
+        return `funcao:${mapped}`;
+      }
+      return '';
     case 'responsavel_ticket':
       return String(fields.responsavel || '').trim();
     default:

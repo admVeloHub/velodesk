@@ -1,13 +1,15 @@
 ﻿/**
  * Painel 360° — Agente
- * VERSION: v3.0.1 | DATE: 2026-07-14
+ * VERSION: v3.0.2 | DATE: 2026-07-22
  */
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { buildAgent360View, computeAgent360View } from '../../services/workspace/deskData';
 import { useWorkspace360 } from '../../hooks/useWorkspace360';
 import { useTickets } from '../../context/TicketsContext';
 import { getAgentName } from '../../services/clientDb';
+import { findTicketEntry } from '../../services/ticketsStorage';
+import { markWorkflowInfoRequestsReadForTicket } from '../../services/workflow/workflowInfoNotifications';
 import Workspace360Kpis from './components/ws360/Workspace360Kpis';
 import Workspace360DualTicketSection from './components/ws360/Workspace360DualTicketSection';
 import Workspace360TicketSection from './components/ws360/Workspace360TicketSection';
@@ -17,18 +19,28 @@ export default function AgentPanel() {
   const navigate = useNavigate();
   const { openTicket } = useTickets();
   const { data, loading, error } = useWorkspace360();
+  const [infoRevision, setInfoRevision] = useState(0);
+
+  useEffect(() => {
+    const onInfoChanged = () => setInfoRevision((value) => value + 1);
+    window.addEventListener('velodesk:workflow-info-changed', onInfoChanged);
+    return () => window.removeEventListener('velodesk:workflow-info-changed', onInfoChanged);
+  }, []);
 
   const view = useMemo(() => {
     if (data) return buildAgent360View(data, getAgentName());
     if (!loading) return computeAgent360View();
     return null;
-  }, [data, loading]);
+  }, [data, loading, infoRevision]);
 
   const clientReplied = view?.sections?.find((s) => s.id === 'client-replied');
   const actionNow = view?.sections?.find((s) => s.id === 'action-now');
   const workflow = view?.sections?.find((s) => s.id === 'workflow');
 
   const handleOpenTicket = useCallback((ticketId) => {
+    const entry = findTicketEntry(ticketId);
+    markWorkflowInfoRequestsReadForTicket(entry?.ticket || ticketId);
+
     if (typeof window.openTicket === 'function') {
       window.openTicket(ticketId);
       return;

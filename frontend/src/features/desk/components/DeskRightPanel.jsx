@@ -1,19 +1,55 @@
 /**
- * DeskRightPanel v1.5.0 — aprovação abaixo de Detalhe; tabulação read-only por atuação
- * VERSION: v1.5.0 | DATE: 2026-07-16
+ * DeskRightPanel v1.9.0 — Responder Solicitação (comunicacaoWorkflow)
+ * VERSION: v1.9.0 | DATE: 2026-07-24
  */
-import React, { useEffect, useState } from 'react';
-import { DEFAULT_TIPO, hasApplyableTabulation, parseTabulationDisplay } from '../../../services/tabulationConfig';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { DEFAULT_TIPO, hasApplyableTabulation, isTabulationComplete, parseTabulationDisplay } from '../../../services/tabulationConfig';
 import { useTabulation } from '../../../context/TabulationContext';
 import { useDeskAgents } from '../../../hooks/useDeskAgents';
 import { DeskStatusCommitButton } from './DeskComposePanel';
 import TicketOperationProgress from './TicketOperationProgress';
 import ProcessosPopover from './ProcessosPopover';
-import { AGENT_FORWARD_OPTIONS } from '../../../services/desk/constants';
+import { DESK_THERMOMETER_UI_ENABLED } from '../../../services/desk/constants';
 import { isTicketInWorkflow } from '../../../services/desk/utils';
+import { getAutoCloseOnSave, setAutoCloseOnSave } from '../../../services/desk/agentDeskPreferences';
+import { ticketHasComunicacaoWorkflow } from '../../../services/workflow/workflowDecisionHandlers';
 
 const CANAL_OPTIONS_FALLBACK = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
 const TIPO_OPTIONS_FALLBACK = ['Reclamação', 'Solicitação', 'Dúvida', 'Informação'];
+
+function useAgentSettingsPopoverPosition(open, anchorRef) {
+  const [layout, setLayout] = useState(null);
+
+  useEffect(() => {
+    if (!open) {
+      setLayout(null);
+      return undefined;
+    }
+
+    const update = () => {
+      const btn = anchorRef.current;
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      setLayout({
+        popover: {
+          right: `${Math.max(12, window.innerWidth - rect.right)}px`,
+          bottom: `${Math.max(12, window.innerHeight - rect.top + 8)}px`,
+        },
+      });
+    };
+
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open, anchorRef]);
+
+  return layout;
+}
 
 function SelectField({ id, label, fieldKey, value, options, readonly, onFieldChange, showPlaceholder = false, optionItems = null }) {
   return (
@@ -41,10 +77,13 @@ export default function DeskRightPanel({
   queueId,
   rightFields,
   sendStatus,
-  escalonar,
   onFieldChange,
-  onEscalonarChange,
   onApplyTabulation,
+  onStartWorkflow,
+  startingWorkflow = false,
+  canStartWorkflow = false,
+  onReplyWorkflowRequest,
+  replyWorkflowBusy = false,
   onCommitStatus,
   onOpenChat,
   onCloseChat,
@@ -60,13 +99,31 @@ export default function DeskRightPanel({
   iaShowSection = false,
   iaAuditScore = null,
   tabulationReadonly = false,
-  workflowProgress = null,
-  workflowDecision = null,
-  onWorkflowDecisionChange,
 }) {
-  const { loading, getMotivos, getDetalhes, getProdutoNames, getTipoChamadoOptions, getCanalContatoOptions } = useTabulation();
+  const { loading, config, getMotivos, getDetalhes, getProdutoNames, getTipoChamadoOptions, getCanalContatoOptions } = useTabulation();
   const { currentAgentValue } = useDeskAgents();
   const [processosOpen, setProcessosOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [autoCloseOnSave, setAutoCloseOnSaveState] = useState(() => getAutoCloseOnSave());
+  const settingsBtnRef = useRef(null);
+  const settingsPopoverLayout = useAgentSettingsPopoverPosition(settingsOpen, settingsBtnRef);
+
+  useEffect(() => {
+    if (!settingsOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setSettingsOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [settingsOpen]);
+
+  const toggleAutoCloseOnSave = () => {
+    setAutoCloseOnSaveState((prev) => {
+      const next = !prev;
+      setAutoCloseOnSave(next);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!currentAgentValue || String(rightFields.responsavel || '').trim()) return;
@@ -86,6 +143,9 @@ export default function DeskRightPanel({
     ? getDetalhes(rightFields.produto, rightFields.motivo)
     : [];
 
+  const tabulationComplete = isTabulationComplete(rightFields, config);
+  const showIaTabulationPanel = !tabulationComplete && iaShowSection;
+
   const tabulationText = iaTabulationLoading
     ? (iaWaitingMessage || 'Gerando sugestão com base nos POPs…')
     : iaHasTabulationSuggestion
@@ -99,29 +159,37 @@ export default function DeskRightPanel({
     || hasApplyableTabulation(parsedTabulation)
   );
   const inWorkflow = isTicketInWorkflow(ticket);
-  const isApprovalStep = workflowProgress?.activeStep?.acao?.tipo === 'aprovacao';
-  const canForward = Boolean(
-    rightFields.motivo && detalheOptions.length > 0 && !inWorkflow,
-  );
+  const showThermoUi = DESK_THERMOMETER_UI_ENABLED;
+  const showOperationProgress = !inWorkflow;
+  const showThermoSection = showThermoUi || showOperationProgress;
+  const showStartWorkflow = canStartWorkflow && tabulationComplete && !inWorkflow && !tabulationReadonly;
+  const showReplyWorkflow = inWorkflow && ticketHasComunicacaoWorkflow(ticket) && typeof onReplyWorkflowRequest === 'function';
 
   return (
     <aside className="crm-right-panel" id="crmRightPanel">
       <div className="crm-right-panel__scroll">
+        {showThermoSection ? (
         <section className="rp-section">
           <div className="rp-section__header">
-            <div className="rp-section__label">Termômetro do cliente</div>
-            {!inWorkflow ? (
+            {showThermoUi ? (
+              <div className="rp-section__label">Termômetro do cliente</div>
+            ) : null}
+            {showOperationProgress ? (
               <TicketOperationProgress
                 ticket={ticket}
                 queueId={queueId}
-                escalonar={escalonar}
               />
             ) : null}
           </div>
-          <div className="thermo-score" id="thermoScore" style={{ color: thermoColor }}>{thermo}</div>
-          <div className="thermo-bar"><div className="thermo-fill" id="thermoFill" style={{ width: thermo + '%', background: thermoColor }} /></div>
-          <div className="thermo-label" id="thermoLabel" style={{ color: thermoColor }}>{thermoLabel}</div>
+          {showThermoUi ? (
+            <>
+              <div className="thermo-score" id="thermoScore" style={{ color: thermoColor }}>{thermo}</div>
+              <div className="thermo-bar"><div className="thermo-fill" id="thermoFill" style={{ width: thermo + '%', background: thermoColor }} /></div>
+              <div className="thermo-label" id="thermoLabel" style={{ color: thermoColor }}>{thermoLabel}</div>
+            </>
+          ) : null}
         </section>
+        ) : null}
 
         <section className="rp-section">
           <div className="rp-section__label">Classificação</div>
@@ -180,42 +248,8 @@ export default function DeskRightPanel({
               onFieldChange={onFieldChange}
             />
           )}
-          {isApprovalStep ? (
-            <div className="rp-field rp-field--workflow-decision">
-              <span className="rp-field__label">Decisão de aprovação</span>
-              <div className="rp-workflow-decision-toggles">
-                <button
-                  type="button"
-                  className={'rp-workflow-decision-btn' + (workflowDecision === 'approve' ? ' is-active' : '')}
-                  onClick={() => onWorkflowDecisionChange?.('approve')}
-                >
-                  Aprovado
-                </button>
-                <button
-                  type="button"
-                  className={'rp-workflow-decision-btn rp-workflow-decision-btn--reject' + (workflowDecision === 'reject' ? ' is-active' : '')}
-                  onClick={() => onWorkflowDecisionChange?.('reject')}
-                >
-                  Reprovado
-                </button>
-              </div>
-            </div>
-          ) : null}
-          {canForward ? (
-            <SelectField
-              id="selEscalonar"
-              label="Encaminhar para"
-              fieldKey="escalonar"
-              value={escalonar || ''}
-              optionItems={AGENT_FORWARD_OPTIONS}
-              showPlaceholder
-              onFieldChange={(_, value) => onEscalonarChange?.(value)}
-            />
-          ) : null}
-        </section>
 
-        {iaShowSection && (
-          <section className="rp-section">
+          {showIaTabulationPanel ? (
             <div className={'ia-tabulation' + (iaTabulationLoading ? ' ia-tabulation--loading' : '')}>
               <div className="ia-tabulation__label">
                 SUGESTÃO
@@ -230,17 +264,6 @@ export default function DeskRightPanel({
               <div className="ia-tabulation__actions">
                 <button
                   type="button"
-                  className={'ia-tabulation__btn ia-tabulation__btn--processos' + (processosOpen ? ' is-active' : '')}
-                  id="btnOpenProcessos"
-                  aria-expanded={processosOpen}
-                  aria-haspopup="dialog"
-                  aria-controls="processosDrawer"
-                  onClick={() => setProcessosOpen((open) => !open)}
-                >
-                  Processos
-                </button>
-                <button
-                  type="button"
                   className="ia-tabulation__btn ia-tabulation__btn--apply"
                   id="btnApplyTabulation"
                   disabled={!canApplyTabulation}
@@ -249,14 +272,101 @@ export default function DeskRightPanel({
                   Aplicar tabulação
                 </button>
               </div>
-              <ProcessosPopover
-                open={processosOpen}
-                onClose={() => setProcessosOpen(false)}
-              />
             </div>
-          </section>
-        )}
+          ) : null}
+
+          <div className="rp-tabulation-actions">
+            <button
+              type="button"
+              className={'container-secondary rp-tabulation-actions__btn rp-tabulation-actions__btn--processos' + (processosOpen ? ' is-active' : '')}
+              id="btnOpenProcessos"
+              aria-expanded={processosOpen}
+              aria-haspopup="dialog"
+              aria-controls="processosDrawer"
+              onClick={() => setProcessosOpen((open) => !open)}
+            >
+              Processos
+            </button>
+            {showStartWorkflow ? (
+              <button
+                type="button"
+                className={'container-secondary rp-tabulation-actions__btn rp-tabulation-actions__btn--start-workflow' + (startingWorkflow ? ' is-active' : '')}
+                id="btnStartWorkflow"
+                disabled={startingWorkflow}
+                onClick={onStartWorkflow}
+              >
+                {startingWorkflow ? 'Iniciando…' : 'Iniciar Workflow'}
+              </button>
+            ) : null}
+            {showReplyWorkflow ? (
+              <button
+                type="button"
+                className={'container-secondary rp-tabulation-actions__btn rp-tabulation-actions__btn--reply-wf' + (replyWorkflowBusy ? ' is-active' : '')}
+                id="btnReplyWorkflowRequest"
+                disabled={replyWorkflowBusy}
+                onClick={onReplyWorkflowRequest}
+              >
+                Responder Solicitação
+              </button>
+            ) : null}
+          </div>
+          <ProcessosPopover
+            open={processosOpen}
+            onClose={() => setProcessosOpen(false)}
+          />
+        </section>
       </div>
+      <div className="crm-right-panel__settings-bar">
+        <div className="crm-right-panel__settings-wrap">
+          <button
+            ref={settingsBtnRef}
+            type="button"
+            className={'crm-right-panel__settings-btn' + (settingsOpen ? ' is-open' : '')}
+            id="btnDeskAgentSettings"
+            aria-label="Configurações do atendimento"
+            aria-expanded={settingsOpen}
+            aria-haspopup="dialog"
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
+            <i className="ti ti-settings" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+      {settingsOpen && settingsPopoverLayout
+        ? createPortal(
+          <div className="crm-agent-settings-layer" id="deskAgentSettingsLayer">
+            <button
+              type="button"
+              className="crm-agent-settings-backdrop"
+              aria-label="Fechar configurações"
+              onClick={() => setSettingsOpen(false)}
+            />
+            <div
+              className="crm-agent-settings-popover"
+              id="deskAgentSettingsPopover"
+              style={settingsPopoverLayout.popover}
+              role="dialog"
+              aria-label="Configurações do atendimento"
+            >
+              <div className="crm-agent-settings-popover__title">Comportamento ao Salvar</div>
+              <div className="crm-agent-settings-popover__row">
+                <button
+                  type="button"
+                  className={
+                    'crm-agent-settings-popover__toggle'
+                    + (autoCloseOnSave ? ' is-close' : ' is-keep')
+                  }
+                  aria-pressed={autoCloseOnSave}
+                  onClick={toggleAutoCloseOnSave}
+                >
+                  {autoCloseOnSave ? 'Fechar' : 'Manter'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )
+        : null}
       <div className="crm-right-panel__footer">
         <button
           type="button"

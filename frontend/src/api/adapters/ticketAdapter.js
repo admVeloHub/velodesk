@@ -1,6 +1,6 @@
 /**
- * ticketAdapter v1.4.6 — meus-resolvidos global na fila meus-chamados
- * VERSION: v1.4.6 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.6.0 — listOnly + queueEntryAt da listagem
+ * VERSION: v1.6.0 | DATE: 2026-07-23 | AUTHOR: VeloHub Development Team
  */
 import { getAgentName } from '../../services/clientDb';
 import { DEFAULT_TIPO } from '../../services/tabulationConfig';
@@ -63,6 +63,7 @@ export function apiTicketToCockpit(ticket) {
     _id: id,
     clienteId,
     title,
+    workflow: ticket.workflow,
     chamadoTitulo: repairUtf8Mojibake(ticket.chamadoTitulo || ticket.title || title),
     status: ticket.status || 'novo',
     messages: (ticket.messages || []).map(normalizeMessage),
@@ -79,6 +80,8 @@ export function apiTicketToCockpit(ticket) {
     },
     createdAt: ticket.createdAt || new Date().toISOString(),
     updatedAt: ticket.updatedAt || ticket.createdAt || new Date().toISOString(),
+    listOnly: ticket.listOnly === true,
+    queueEntryAt: ticket.queueEntryAt,
   };
 }
 

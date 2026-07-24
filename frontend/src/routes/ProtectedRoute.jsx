@@ -1,6 +1,6 @@
 /**
- * ProtectedRoute v1.3.0 — rotas autenticadas; boxes via TicketsContext
- * VERSION: v1.3.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team
+ * ProtectedRoute v1.3.0 — rotas autenticadas via gate VeloHub
+ * VERSION: v1.3.0 | DATE: 2026-07-23
  */
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';

@@ -1,15 +1,13 @@
 /**
- * WorkflowsList v2.1.0 — cards + tabela via API + modal grupos
- * VERSION: v2.1.0 | DATE: 2026-07-14
+ * WorkflowsList v2.2.0 — cards + tabela via API
+ * VERSION: v2.2.0 | DATE: 2026-07-17
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { workflowApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
-import { useWorkflowConfig } from '../../../context/WorkflowConfigContext';
 import ConfigAtivoToggle from '../components/ConfigAtivoToggle';
 import { computeWorkflowStats, formatTriggerPath } from './workflowConfigData';
 import WorkflowDeleteConfirmModal from './WorkflowDeleteConfirmModal';
-import GruposResponsabilidadeModal from './GruposResponsabilidadeModal';
 
 function sortWorkflows(list) {
   return [...(list || [])].sort((a, b) => (a.titulo || '').localeCompare(b.titulo || '', 'pt-BR'));
@@ -23,13 +21,11 @@ export default function WorkflowsList({
   onDelete,
 }) {
   const { showNotification } = useNotifications();
-  const { reload: reloadRuntime, grupos } = useWorkflowConfig();
   const [workflows, setWorkflows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
-  const [gruposModalOpen, setGruposModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,14 +94,10 @@ export default function WorkflowsList({
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-forms" /></span>
           <div className="stat-info"><h3>{stats.tabulacao}</h3><p>Gatilhos por tabulação</p></div>
         </div>
-        <button
-          type="button"
-          className="stat-card stat-card--clickable"
-          onClick={() => setGruposModalOpen(true)}
-        >
-          <span className="stat-icon" aria-hidden="true"><i className="ti ti-users-group" /></span>
-          <div className="stat-info"><h3>{grupos?.length || 0}</h3><p>Grupos de responsabilidade</p></div>
-        </button>
+        <div className="stat-card stat-card--static">
+          <span className="stat-icon" aria-hidden="true"><i className="ti ti-shield-lock" /></span>
+          <div className="stat-info"><h3>RBAC</h3><p>Atribuição por função</p></div>
+        </div>
         <div className="stat-card stat-card--static">
           <span className="stat-icon" aria-hidden="true"><i className="ti ti-player-pause" /></span>
           <div className="stat-info"><h3>{stats.inativos}</h3><p>Workflows inativos</p></div>
@@ -178,12 +170,6 @@ export default function WorkflowsList({
         onConfirm={confirmDelete}
       />
 
-      {gruposModalOpen ? (
-        <GruposResponsabilidadeModal
-          onClose={() => setGruposModalOpen(false)}
-          onChanged={reloadRuntime}
-        />
-      ) : null}
     </div>
   );
 }

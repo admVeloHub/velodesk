@@ -1,6 +1,13 @@
 import React from 'react';
 
-export default function Workspace360Kpis({ kpis, gridAppend = null, ariaLabel = 'Meu dia', title = 'Meu dia' }) {
+export default function Workspace360Kpis({
+  kpis,
+  gridAppend = null,
+  gridAppendInline = false,
+  ariaLabel = 'Meu dia',
+  title = 'Meu dia',
+}) {
+  const useExtendedGrid = gridAppend && !gridAppendInline;
   return (
     <section className="ws360-kpis" aria-label={ariaLabel}>
       <div className="ws360-kpis__head">
@@ -8,7 +15,7 @@ export default function Workspace360Kpis({ kpis, gridAppend = null, ariaLabel = 
           <i className="ti ti-chart-bar" aria-hidden="true" /> {title}
         </h3>
       </div>
-      <div className={`ws360-kpi-grid${gridAppend ? ' ws360-kpi-grid--with-append' : ''}`}>
+      <div className={`ws360-kpi-grid${useExtendedGrid ? ' ws360-kpi-grid--with-append' : ''}`}>
         {kpis.map((kpi) => (
           <article key={kpi.id} className={`ws360-kpi ws360-kpi--${kpi.tone}`}>
             <div className="ws360-kpi__top">

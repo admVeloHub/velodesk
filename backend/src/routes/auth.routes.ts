@@ -1,11 +1,18 @@
-/** auth.routes v1.3.0 — Google SSO via cadastro Desk (acessos.Desk); sem allowlist/dev-login */
+/** auth.routes v1.4.1 — login email/senha via funcionarios_cadastroColaboradores + Google SSO */
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { User } from '../models/User';
 import { signToken } from '../middleware/auth';
 import { isFuncionariosConnected, isMongoConnected } from '../config/database';
 import { verifyGoogleIdToken } from '../services/googleAuth.service';
-import { resolveDeskAccessFromCadastro } from '../services/deskCadastroAccess.service';
+import {
+  evaluateColaboradorDeskAccess,
+  resolveDeskAccessFromCadastro,
+} from '../services/deskCadastroAccess.service';
+import {
+  findColaboradorAuthByEmail,
+  verifyColaboradorPassword,
+} from '../services/colaboradoresCadastro.service';
 import { env } from '../config/env';
 
 const router = Router();
@@ -24,26 +31,52 @@ router.post('/login', async (req: Request, res: Response) => {
     if (!isMongoConnected()) {
       return res.status(503).json({ message: 'Banco de dados indisponível. Aguarde o backend conectar ao MongoDB.' });
     }
+    if (!isFuncionariosConnected()) {
+      return res.status(503).json({
+        message: 'Cadastro de colaboradores indisponível. Aguarde a conexão com o VeloHubCentral.',
+      });
+    }
+
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: 'Email e senha são obrigatórios' });
     }
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const colaboradorAuth = await findColaboradorAuthByEmail(normalizedEmail);
+    if (!colaboradorAuth || !verifyColaboradorPassword(colaboradorAuth, password)) {
       return res.status(401).json({ message: 'Credenciais inválidas' });
     }
 
-    const access = await resolveDeskAccessFromCadastro(user.email);
+    const access = evaluateColaboradorDeskAccess(colaboradorAuth);
     if (!access.ok) {
       return res.status(access.status).json({ message: access.reason });
     }
 
-    if (user.role !== access.role) {
-      user.role = access.role;
-      await user.save();
+    const name = displayNameFromColaborador(access.colaborador.colaboradorNome, normalizedEmail);
+
+    let user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      const hash = await bcrypt.hash(`cadastro-desk:${normalizedEmail}`, 10);
+      user = await User.create({
+        name,
+        email: normalizedEmail,
+        password: hash,
+        role: access.role,
+      });
+    } else {
+      let dirty = false;
+      if (user.role !== access.role) {
+        user.role = access.role;
+        dirty = true;
+      }
+      if (name && user.name !== name) {
+        user.name = name;
+        dirty = true;
+      }
+      if (dirty) await user.save();
     }
 
-    const name = displayNameFromColaborador(access.colaborador.colaboradorNome, user.email);
     const token = signToken({
       userId: user.id,
       email: user.email,

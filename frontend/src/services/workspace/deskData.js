@@ -1,11 +1,17 @@
 /**
  * Workspace — dados operacionais do painel 360°
- * VERSION: v2.2.1 | DATE: 2026-07-14
+ * VERSION: v2.3.0 | DATE: 2026-07-22
  */
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { getAgentName } from '../clientDb';
 import { getSlaClass, isTicketInWorkflow, getWorkflowProgress } from '../desk/utils';
+import { ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import { getWorkflowInfoRequests, resolveDeskTicketIdForInfoRequest } from '../workflow/workflowInfoNotifications';
+import { getWorkflowTeamQueueMeta, ticketMatchesWorkflowTeam } from '../workflow/workflowTeamQueues';
+import {
+  canActOnTicket,
+  resolveWorkflowTeamQueueForUser,
+} from '../permissions/permissionService';
 
 function computeProductionWeek() {
   const mockCounts = [6, 7, 9, 5, 8, 3, 4];
@@ -194,23 +200,35 @@ function mapInfoRequestToRow(request) {
   };
 }
 
-function buildWorkflowSectionRows(workflowEntries) {
+function mergeWorkflowInfoRequestRows(existingRows, baseCount = 0) {
   const infoRequests = getWorkflowInfoRequests();
   const infoRows = infoRequests.map(mapInfoRequestToRow);
   const infoTicketIds = new Set(infoRows.map((row) => row.id));
 
-  const workflowRows = workflowEntries
-    .filter((entry) => !infoTicketIds.has(String(entry.ticket.id)))
-    .slice(0, 5)
-    .map((entry) => mapEntryToRow(entry, 'workflow'));
+  const workflowRows = existingRows
+    .filter((row) => !infoTicketIds.has(String(row.id)))
+    .slice(0, 5);
 
   const merged = [...infoRows, ...workflowRows].slice(0, 5);
   const unreadInfo = infoRows.filter((row) => row.unread).length;
 
   return {
     tickets: merged,
-    count: workflowEntries.length + unreadInfo,
+    count: baseCount + unreadInfo,
   };
+}
+
+function buildWorkflowSectionRows(workflowEntries) {
+  const workflowRows = workflowEntries
+    .slice(0, 5)
+    .map((entry) => mapEntryToRow(entry, 'workflow'));
+
+  return mergeWorkflowInfoRequestRows(workflowRows, workflowEntries.length);
+}
+
+export function mergeWorkflowInfoRequestsIntoSection(section, existingTickets = []) {
+  const merged = mergeWorkflowInfoRequestRows(existingTickets, section.count ?? existingTickets.length);
+  return { ...section, ...merged };
 }
 
 function classifyEntry(entry) {
@@ -314,7 +332,8 @@ function classifyEscalationCategory(ticket) {
 
 /** Fallback local do Painel 360° Gestão quando a API não responde */
 export function computeSupervisor360View() {
-  const entries = getAllCockpitTickets().filter((entry) => entry.queueId !== 'resolvidos');
+  const allEntries = getAllCockpitTickets();
+  const entries = allEntries.filter((entry) => entry.queueId !== 'resolvidos');
   let slaRisk = 0;
   let slaCriticalCount = 0;
 
@@ -324,11 +343,24 @@ export function computeSupervisor360View() {
     if (sla === 'critical') slaCriticalCount += 1;
   });
 
+  const slaCriticalOnlyEntries = entries.filter(
+    (entry) => getSlaClass(entry.ticket) === 'critical' && !classifyEscalationCategory(entry.ticket),
+  );
+
   const categories = [
     { id: 'financeiro', label: 'Financeiro', count: 0, accent: 'orange' },
     { id: 'estorno', label: 'Estorno', count: 0, accent: 'navy' },
+    { id: 'sla-critico', label: 'SLA crítico', count: slaCriticalOnlyEntries.length, accent: 'red' },
   ];
-  const groupedEntries = { financeiro: [], estorno: [] };
+  const groupedEntries = {
+    financeiro: [],
+    estorno: [],
+    'sla-critico': slaCriticalOnlyEntries.slice(0, 20).map((entry) => ({
+      ticket: entry.ticket,
+      queueId: entry.queueId,
+      sla: getSlaClass(entry.ticket),
+    })),
+  };
 
   entries.forEach((entry) => {
     const categoryId = classifyEscalationCategory(entry.ticket);
@@ -362,25 +394,46 @@ export function computeSupervisor360View() {
     };
   });
 
-  const agentStats = new Map();
-  entries.forEach(({ ticket }) => {
-    const agent = String(ticket.responsibleAgent || ticket.lateralForm?.responsavel || 'Sem responsável').trim();
-    if (!agentStats.has(agent)) agentStats.set(agent, { tickets: 0 });
-    agentStats.get(agent).tickets += 1;
+  const agentOf = (ticket) => String(ticket.responsibleAgent || ticket.lateralForm?.responsavel || 'Sem responsável').trim();
+
+  const resolvedStats = new Map();
+  allEntries
+    .filter((entry) => entry.queueId === 'resolvidos')
+    .forEach(({ ticket }) => {
+      const agent = agentOf(ticket);
+      resolvedStats.set(agent, (resolvedStats.get(agent) || 0) + 1);
+    });
+
+  const interactionStats = new Map();
+  allEntries.forEach(({ ticket }) => {
+    const agent = agentOf(ticket);
+    interactionStats.set(agent, (interactionStats.get(agent) || 0) + 1);
   });
 
-  const leaderboard = [...agentStats.entries()]
-    .sort((a, b) => b[1].tickets - a[1].tickets)
+  const buildMockRanking = (statsMap, primaryLabel) => [...statsMap.entries()]
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
-    .map(([agent, stats], index) => ({
+    .map(([agent, count], index) => ({
+      id: `${primaryLabel}-${agent.replace(/\s+/g, '-')}`,
       rank: index + 1,
-      agent,
-      tickets: stats.tickets,
-      slaPct: 90,
+      name: agent,
+      medal: index === 0,
+      trend: 'up',
+      sla: '90%',
+      primaryValue: count,
+      primaryLabel,
       tma: '—',
+      csat: null,
+      vsLastWeek: '—',
       shift: 'all',
       channel: 'all',
     }));
+
+  const leaderboard = {
+    resolvedRanking: buildMockRanking(resolvedStats, 'resolvidos'),
+    interactionRanking: buildMockRanking(interactionStats, 'interações'),
+  };
 
   return buildSupervisor360View({
     kpis: {
@@ -418,8 +471,13 @@ export function computeManagementStats() {
   };
 }
 
-export function computeWorkflow360View() {
-  const entries = getAllCockpitTickets().filter(({ ticket }) => isTicketInWorkflow(ticket));
+export function computeWorkflow360View(teamId = null) {
+  const teamMeta = teamId ? getWorkflowTeamQueueMeta(teamId) : null;
+  const entries = getAllCockpitTickets().filter(({ ticket }) => {
+    if (!isTicketInWorkflow(ticket)) return false;
+    if (teamId) return ticketMatchesWorkflowTeam(ticket, teamId);
+    return true;
+  });
   const now = new Date();
   const greeting = now.getHours() < 12 ? 'Bom dia' : now.getHours() < 18 ? 'Boa tarde' : 'Boa noite';
   const dateLabel = now.toLocaleDateString('pt-BR', {
@@ -432,6 +490,7 @@ export function computeWorkflow360View() {
 
   let slaCritical = 0;
   let awaitingExternal = 0;
+  let awaitingDecision = 0;
   let completedToday = 0;
 
   const enriched = entries.map((entry) => {
@@ -440,6 +499,7 @@ export function computeWorkflow360View() {
     if (sla === 'critical' || sla === 'warning') slaCritical++;
     const progress = getWorkflowProgress(ticket);
     if (progress?.awaitingTeamLabel) awaitingExternal++;
+    if (ticketAwaitingDecision(ticket, progress)) awaitingDecision++;
     if (progress?.workflow?.status === 'completed') completedToday++;
     return { ...entry, sla, progress };
   }).sort((a, b) => {
@@ -453,14 +513,21 @@ export function computeWorkflow360View() {
     .map((entry) => mapEntryToRow(entry, 'workflow'));
 
   const externalRows = enriched
-    .filter(({ progress }) => progress?.awaitingTeamLabel)
+    .filter(({ progress, ticket }) => {
+      if (teamId) {
+        return ticketAwaitingDecision(ticket, progress)
+          || progress?.activeStep?.team === teamId;
+      }
+      return progress?.awaitingTeamLabel;
+    })
     .slice(0, 5)
     .map((entry) => mapEntryToRow(entry, 'workflow'));
 
+  const teamLabel = teamMeta?.name || 'Workflow';
   const sections = [
     {
       id: 'workflow-active',
-      title: 'Fluxos em andamento',
+      title: teamId ? `Encaminhados · ${teamLabel}` : 'Fluxos em andamento',
       icon: 'ti ti-arrows-exchange',
       variant: 'workflow',
       count: enriched.filter(({ progress }) => progress?.workflow?.status !== 'completed').length,
@@ -468,10 +535,10 @@ export function computeWorkflow360View() {
     },
     {
       id: 'workflow-external',
-      title: 'Aguardando time externo',
+      title: teamId ? `Aguardando ação · ${teamLabel}` : 'Aguardando time externo',
       icon: 'ti ti-building-bank',
       variant: 'workflow',
-      count: awaitingExternal,
+      count: teamId ? awaitingDecision : awaitingExternal,
       tickets: externalRows,
     },
   ];
@@ -479,11 +546,94 @@ export function computeWorkflow360View() {
   return {
     greeting,
     agentName: getAgentName() || 'operador',
+    teamId,
+    teamLabel,
     dateTimeLabel: `${dateLabel.charAt(0).toUpperCase()}${dateLabel.slice(1)} · ${timeLabel}`,
     kpis: [
-      { id: 'total', label: 'Em workflow', value: String(enriched.length), hint: 'ativos', tone: 'neutral', icon: 'ti ti-arrows-exchange' },
+      { id: 'total', label: teamId ? `Fila ${teamLabel}` : 'Em workflow', value: String(enriched.length), hint: 'ativos', tone: 'neutral', icon: 'ti ti-arrows-exchange' },
       { id: 'sla', label: 'SLA em risco', value: String(slaCritical), hint: slaCritical > 0 ? 'atenção' : null, tone: slaCritical > 0 ? 'warn' : 'neutral', icon: 'ti ti-clock-exclamation' },
-      { id: 'external', label: 'Aguardando time', value: String(awaitingExternal), hint: 'externo', tone: awaitingExternal > 0 ? 'warn' : 'neutral', icon: 'ti ti-users' },
+      { id: 'external', label: teamId ? 'Aguardando decisão' : 'Aguardando time', value: String(teamId ? awaitingDecision : awaitingExternal), hint: teamId ? teamLabel : 'externo', tone: (teamId ? awaitingDecision : awaitingExternal) > 0 ? 'warn' : 'neutral', icon: 'ti ti-users' },
+      { id: 'done', label: 'Concluídos hoje', value: String(completedToday), hint: 'workflow', tone: 'success', icon: 'ti ti-circle-check' },
+    ],
+    sections,
+  };
+}
+
+export function computeWorkflow360ViewForUser(perm) {
+  const teamId = resolveWorkflowTeamQueueForUser(perm);
+  if (teamId) return computeWorkflow360View(teamId);
+
+  const entries = getAllCockpitTickets().filter(({ ticket }) => {
+    if (!isTicketInWorkflow(ticket)) return false;
+    return canActOnTicket(ticket, perm);
+  });
+
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? 'Bom dia' : now.getHours() < 18 ? 'Boa tarde' : 'Boa noite';
+  const dateLabel = now.toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const timeLabel = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  let slaCritical = 0;
+  let awaitingDecision = 0;
+  let completedToday = 0;
+
+  const enriched = entries.map((entry) => {
+    const { ticket } = entry;
+    const sla = getSlaClass(ticket);
+    if (sla === 'critical' || sla === 'warning') slaCritical++;
+    const progress = getWorkflowProgress(ticket);
+    if (ticketAwaitingDecision(ticket, progress)) awaitingDecision++;
+    if (progress?.workflow?.status === 'completed') completedToday++;
+    return { ...entry, sla, progress };
+  }).sort((a, b) => {
+    const prio = { critical: 0, warning: 1, ok: 2 };
+    return (prio[a.sla] || 9) - (prio[b.sla] || 9);
+  });
+
+  const activeRows = enriched
+    .filter(({ progress }) => progress?.workflow?.status !== 'completed')
+    .slice(0, 8)
+    .map((entry) => mapEntryToRow(entry, 'workflow'));
+
+  const actionRows = enriched
+    .filter(({ progress, ticket }) => ticketAwaitingDecision(ticket, progress) || canActOnTicket(ticket, perm))
+    .slice(0, 5)
+    .map((entry) => mapEntryToRow(entry, 'workflow'));
+
+  const sections = [
+    {
+      id: 'workflow-active',
+      title: 'Fluxos atribuídos a mim',
+      icon: 'ti ti-arrows-exchange',
+      variant: 'workflow',
+      count: enriched.filter(({ progress }) => progress?.workflow?.status !== 'completed').length,
+      tickets: activeRows,
+    },
+    {
+      id: 'workflow-external',
+      title: 'Aguardando minha ação',
+      icon: 'ti ti-building-bank',
+      variant: 'workflow',
+      count: awaitingDecision,
+      tickets: actionRows,
+    },
+  ];
+
+  return {
+    greeting,
+    agentName: getAgentName() || 'operador',
+    teamId: null,
+    teamLabel: 'Workflow',
+    dateTimeLabel: `${dateLabel.charAt(0).toUpperCase()}${dateLabel.slice(1)} · ${timeLabel}`,
+    kpis: [
+      { id: 'total', label: 'Minha fila', value: String(enriched.length), hint: 'ativos', tone: 'neutral', icon: 'ti ti-arrows-exchange' },
+      { id: 'sla', label: 'SLA em risco', value: String(slaCritical), hint: slaCritical > 0 ? 'atenção' : null, tone: slaCritical > 0 ? 'warn' : 'neutral', icon: 'ti ti-clock-exclamation' },
+      { id: 'external', label: 'Aguardando decisão', value: String(awaitingDecision), hint: 'pendentes', tone: awaitingDecision > 0 ? 'warn' : 'neutral', icon: 'ti ti-users' },
       { id: 'done', label: 'Concluídos hoje', value: String(completedToday), hint: 'workflow', tone: 'success', icon: 'ti ti-circle-check' },
     ],
     sections,
@@ -567,10 +717,13 @@ export function buildAgent360View(apiPayload, agentName) {
   });
   const timeLabel = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-  const sections = (apiPayload?.sections ?? []).map((section) => ({
-    ...section,
-    tickets: (section.entries ?? []).map((entry) => mapEntryToRow(entry, section.variant)),
-  }));
+  const sections = (apiPayload?.sections ?? []).map((section) => {
+    const tickets = (section.entries ?? []).map((entry) => mapEntryToRow(entry, section.variant));
+    if (section.id === 'workflow') {
+      return mergeWorkflowInfoRequestsIntoSection(section, tickets);
+    }
+    return { ...section, tickets };
+  });
 
   return {
     greeting,
@@ -588,7 +741,7 @@ export function buildSupervisor360View(apiPayload) {
     kpis: buildSupervisorKpis(apiPayload?.kpis),
     escalated: apiPayload?.escalated ?? { categories: [], slaCriticalCount: 0, groups: [] },
     channelVision: apiPayload?.channelVision ?? [],
-    leaderboard: apiPayload?.leaderboard ?? [],
+    leaderboard: apiPayload?.leaderboard ?? { resolvedRanking: [], interactionRanking: [] },
   };
 }
 

@@ -1,16 +1,19 @@
 /**
- * DeskQueuePanel v1.1.0 — fila de atendimento
+ * DeskQueuePanel v1.2.0 — fila de atendimento + modo de busca CPF/Ticket
  */
 import React, { useState } from 'react';
 import { countByQueue } from '../../../services/desk/utils';
+import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET } from '../../../services/desk/constants';
 import CreateQueueBoxModal from './CreateQueueBoxModal';
 
 export default function DeskQueuePanel({
   queueStatuses,
   activeQueue,
   searchQuery,
+  searchMode,
   collapsed,
   onSearchChange,
+  onSearchModeToggle,
   onSearchSubmit,
   onSelectQueue,
   onCollapse,
@@ -19,6 +22,7 @@ export default function DeskQueuePanel({
   onQueueBoxCreated,
 }) {
   const [boxModalOpen, setBoxModalOpen] = useState(false);
+  const isTicketMode = searchMode === DESK_SEARCH_MODE_TICKET;
 
   return (
     <>
@@ -46,7 +50,7 @@ export default function DeskQueuePanel({
               <input
                 type="search"
                 id="crmQueueSearch"
-                placeholder="Buscar tickets…"
+                placeholder={isTicketMode ? 'Buscar por protocolo…' : 'Buscar por CPF…'}
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
                 onKeyDown={(e) => {
@@ -56,6 +60,15 @@ export default function DeskQueuePanel({
                   }
                 }}
               />
+              <button
+                type="button"
+                className="queue-search__mode"
+                onClick={onSearchModeToggle}
+                title={isTicketMode ? 'Buscar por protocolo do ticket' : 'Buscar por CPF do cliente'}
+                aria-pressed={isTicketMode}
+              >
+                {isTicketMode ? 'Ticket' : 'CPF'}
+              </button>
             </label>
           </div>
           <ul className="queue-status-list" id="queueStatusList">

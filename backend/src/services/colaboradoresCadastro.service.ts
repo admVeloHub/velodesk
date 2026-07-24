@@ -1,6 +1,7 @@
 /**
- * colaboradoresCadastro.service v1.0.1 — leitura console_funcionarios (MONGO_ENV)
- * VERSION: v1.0.1 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * colaboradoresCadastro.service v1.2.0 — findByEmail não quebra se MONGO_ENV ainda não conectou
+ * Campos de login: userMail, password, CPF, colaboradorNome (LISTA_SCHEMAS.rb L652-683)
+ * VERSION: v1.2.0 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team
  */
 import { env } from '../config/env';
 import { getFuncionariosConnection, isFuncionariosConnected } from '../config/database';
@@ -34,6 +35,49 @@ const PUBLIC_PROJECTION = {
   afastado: 1,
   profile_pic: 1,
 } as const;
+
+const AUTH_PROJECTION = {
+  ...PUBLIC_PROJECTION,
+  password: 1,
+  CPF: 1,
+} as const;
+
+export interface ColaboradorAuthRecord extends ColaboradorDeskPublico {
+  password: string;
+  CPF: string;
+}
+
+function normalizeNameToken(value: string): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function onlyDigits(value: string): string {
+  return String(value || '').replace(/\D/g, '');
+}
+
+/** Senha padrão quando password vazio em funcionarios_cadastroColaboradores: nome.sobrenome + CPF. */
+export function buildDefaultColaboradorPassword(colaboradorNome: string, cpf: string): string {
+  const parts = String(colaboradorNome || '').trim().split(/\s+/).filter(Boolean);
+  const first = normalizeNameToken(parts[0] || 'colaborador');
+  const last = normalizeNameToken(parts.length > 1 ? parts[parts.length - 1] : parts[0] || 'colaborador');
+  const cpfDigits = onlyDigits(cpf);
+  return `${first}.${last}${cpfDigits}`;
+}
+
+export function resolveColaboradorPassword(
+  storedPassword: string | undefined | null,
+  colaboradorNome: string,
+  cpf: string,
+): string {
+  const trimmed = String(storedPassword || '').trim();
+  if (trimmed) return trimmed;
+  return buildDefaultColaboradorPassword(colaboradorNome, cpf);
+}
 
 function mapPublico(doc: Record<string, unknown> | null): ColaboradorDeskPublico | null {
   if (!doc) return null;
@@ -79,20 +123,75 @@ export async function listColaboradoresDesk(): Promise<ColaboradorDeskPublico[]>
     .sort((a, b) => a.colaboradorNome.localeCompare(b.colaboradorNome, 'pt-BR'));
 }
 
+export async function listColaboradoresVelotaxDesk(): Promise<ColaboradorDeskPublico[]> {
+  const col = getCadastroCollection();
+  const docs = await col
+    .find(
+      {
+        desligado: { $ne: true },
+        $or: DESK_ACCESS_OR,
+        empresa: { $regex: /^velotax$/i },
+      },
+      { maxTimeMS: 10000 },
+    )
+    .project(PUBLIC_PROJECTION)
+    .toArray();
+
+  return docs
+    .map((d) => mapPublico(d as Record<string, unknown>))
+    .filter((d): d is ColaboradorDeskPublico => Boolean(d))
+    .sort((a, b) => a.colaboradorNome.localeCompare(b.colaboradorNome, 'pt-BR'));
+}
+
+function buildEmailMatchFilter(normalized: string) {
+  return {
+    $or: [
+      { userMail: normalized },
+      { userMail: new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+    ],
+  };
+}
+
+function mapAuthRecord(doc: Record<string, unknown> | null): ColaboradorAuthRecord | null {
+  const publico = mapPublico(doc);
+  if (!publico) return null;
+  return {
+    ...publico,
+    password: String(doc?.password || ''),
+    CPF: String(doc?.CPF || ''),
+  };
+}
+
 export async function findColaboradorByEmail(email: string): Promise<ColaboradorDeskPublico | null> {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized) return null;
+  if (!isFuncionariosConnected()) return null;
+
+  const col = getCadastroCollection();
+  const doc = await col.findOne(buildEmailMatchFilter(normalized), { projection: PUBLIC_PROJECTION });
+
+  return mapPublico(doc as Record<string, unknown> | null);
+}
+
+/** Busca em funcionarios_cadastroColaboradores (userMail + password + CPF) para login email/senha. */
+export async function findColaboradorAuthByEmail(email: string): Promise<ColaboradorAuthRecord | null> {
   const normalized = String(email || '').trim().toLowerCase();
   if (!normalized) return null;
 
   const col = getCadastroCollection();
-  const doc = await col.findOne(
-    {
-      $or: [
-        { userMail: normalized },
-        { userMail: new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-      ],
-    },
-    { projection: PUBLIC_PROJECTION },
-  );
+  const doc = await col.findOne(buildEmailMatchFilter(normalized), { projection: AUTH_PROJECTION });
 
-  return mapPublico(doc as Record<string, unknown> | null);
+  return mapAuthRecord(doc as Record<string, unknown> | null);
+}
+
+export function verifyColaboradorPassword(
+  colaborador: ColaboradorAuthRecord,
+  password: string,
+): boolean {
+  const effective = resolveColaboradorPassword(
+    colaborador.password,
+    colaborador.colaboradorNome,
+    colaborador.CPF,
+  );
+  return String(password || '') === effective;
 }

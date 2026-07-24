@@ -3,7 +3,15 @@
  * VERSION: v1.0.1 | DATE: 2026-07-02
  */
 
-const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'DIV', 'P', 'UL', 'OL', 'LI']);
+const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'DIV', 'P', 'UL', 'OL', 'LI', 'IMG']);
+
+export const COMPOSE_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
+
+export function isAllowedComposeImageSrc(src) {
+  const value = String(src || '').trim();
+  return /^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(value)
+    || /^https:\/\/.+/i.test(value);
+}
 
 const FORMAT_COMMANDS = {
   bold: 'bold',
@@ -52,6 +60,19 @@ export function sanitizeComposeHtml(html) {
     [...node.childNodes].forEach((child) => {
       if (child.nodeType === Node.ELEMENT_NODE) {
         const el = child;
+        if (el.tagName === 'IMG') {
+          const src = el.getAttribute('src') || '';
+          if (!isAllowedComposeImageSrc(src)) {
+            el.remove();
+            return;
+          }
+          const alt = String(el.getAttribute('alt') || 'Imagem anexada').slice(0, 200);
+          [...el.attributes].forEach((attr) => el.removeAttribute(attr.name));
+          el.setAttribute('src', src);
+          el.setAttribute('alt', alt);
+          el.className = 'compose-inline-image';
+          return;
+        }
         if (!ALLOWED_TAGS.has(el.tagName)) {
           const fragment = document.createDocumentFragment();
           while (el.firstChild) fragment.appendChild(el.firstChild);
@@ -176,6 +197,36 @@ export function insertPlainTextInEditor(root, text) {
   } catch {
     root.innerHTML = sanitizeComposeHtml((root.innerHTML || '') + normalizePlainToHtml(value));
   }
+}
+
+export function insertImageInEditor(root, src, alt = 'Imagem anexada') {
+  if (!root || !isAllowedComposeImageSrc(src)) return false;
+
+  root.focus();
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = String(alt || 'Imagem anexada').slice(0, 200);
+  img.className = 'compose-inline-image';
+
+  const selection = window.getSelection();
+  if (selection?.rangeCount) {
+    const range = selection.getRangeAt(0);
+    if (root.contains(range.commonAncestorContainer)) {
+      range.deleteContents();
+      range.insertNode(img);
+      range.setStartAfter(img);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return true;
+    }
+  }
+
+  if (root.lastChild && root.lastChild.nodeName !== 'BR') {
+    root.appendChild(document.createElement('br'));
+  }
+  root.appendChild(img);
+  return true;
 }
 
 export function setEditorHtml(root, html) {

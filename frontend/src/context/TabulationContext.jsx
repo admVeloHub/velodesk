@@ -1,6 +1,6 @@
 /**
- * TabulationContext v1.3.0 — opções dinâmicas + tratamento 429
- * VERSION: v1.3.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team
+ * TabulationContext v1.4.0 — resolveMotivo/DetalheOptions para gatilho
+ * VERSION: v1.4.0 | DATE: 2026-07-23 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { tabulationApi } from '../api/client';
@@ -13,6 +13,8 @@ import {
   getMotivos,
   getProdutoNames,
   getTipoChamadoOptions,
+  resolveDetalheOptions,
+  resolveMotivoOptions,
 } from '../services/tabulationConfig';
 
 const TabulationContext = createContext(null);
@@ -73,6 +75,8 @@ export function TabulationProvider({ children }) {
     getProdutoNames: () => getProdutoNames(config),
     getMotivos: (produto) => getMotivos(config, produto),
     getDetalhes: (produto, motivo) => getDetalhes(config, produto, motivo),
+    resolveMotivoOptions: (produto) => resolveMotivoOptions(config, produto),
+    resolveDetalheOptions: (produto, motivo) => resolveDetalheOptions(config, produto, motivo),
     getTipoChamadoOptions: () => getTipoChamadoOptions(config),
     getCanalContatoOptions: () => getCanalContatoOptions(config),
   }), [config, loading, error, reload]);

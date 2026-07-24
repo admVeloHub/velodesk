@@ -1,6 +1,6 @@
 /**
- * ticketsStorage v1.0.0 — facade API + cache local de tickets/boxes (Desk)
- * VERSION: v1.0.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * ticketsStorage v1.1.0 — facade API + cache local de tickets/boxes (Desk)
+ * VERSION: v1.1.0 | DATE: 2026-07-23 | AUTHOR: VeloHub Development Team
  */
 import {
   getCachedColumns,
@@ -16,8 +16,8 @@ import {
 } from './ticketsCache';
 import { apiTicketToCockpit } from '../api/adapters/ticketAdapter';
 
-export async function refreshTicketsFromApi() {
-  return loadBoxesFromApi();
+export async function refreshTicketsFromApi(userEmail = '') {
+  return loadBoxesFromApi(userEmail);
 }
 
 export function getTicketColumns() {
@@ -122,3 +122,5 @@ export {
   persistDraftTicket,
   isDraftTicket,
 };
+
+export { loadTicketDetailFromApi, patchTicketInCache } from './ticketsCache';

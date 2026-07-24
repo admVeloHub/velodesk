@@ -31,8 +31,13 @@ import ticketAiRoutes from './routes/ticketAi.routes';
 import agentsRoutes from './routes/agents.routes';
 import inboundRoutes from './routes/inbound.routes';
 import workspace360Routes from './routes/workspace360.routes';
+import gestaoInsightsRoutes from './routes/gestaoInsights.routes';
+import aiUsageRoutes from './routes/aiUsage.routes';
 import colaboradoresRoutes from './routes/colaboradores.routes';
 import workflowNotificacoesRoutes from './routes/workflowNotificacoes.routes';
+import permissionsRoutes from './routes/permissions.routes';
+import funcoesPermissoesRoutes from './routes/funcoesPermissoes.routes';
+import agentesDeskRoutes from './routes/agentesDesk.routes';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
@@ -40,7 +45,7 @@ import {
   getOpenAiTicketSuggestStatus,
   isOpenAiTicketSuggestConfigured,
 } from './services/openaiTicketSuggest.service';
-import { seedDevelopmentData, purgeAllMockTickets } from './services/seed.service';
+import { seedDevelopmentData, purgeAllMockTickets, runDeskConfigMigrations } from './services/seed.service';
 import { getAgentsStatus } from './services/agents/openaiAgent.util';
 import { startGestaoChamadosJob } from './jobs/gestaoChamados.job';
 import { bootstrapEmailServices } from './services/emailBootstrap.service';
@@ -142,6 +147,11 @@ app.use('/api/tabulation', tabulationRoutes);
 app.use('/api/workflows', workflowsRoutes);
 app.use('/api/workflow-notificacoes', workflowNotificacoesRoutes);
 app.use('/api/workspace360', workspace360Routes);
+app.use('/api/gestao-insights', gestaoInsightsRoutes);
+app.use('/api/ai-usage', aiUsageRoutes);
+app.use('/api/permissions', permissionsRoutes);
+app.use('/api/funcoes-permissoes', funcoesPermissoesRoutes);
+app.use('/api/agentes-desk', agentesDeskRoutes);
 
 if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);
@@ -169,6 +179,9 @@ async function tryConnectDatabase(uri?: string): Promise<boolean> {
     activeMongoUri = targetUri;
     await purgeAllMockTickets();
     await seedDevelopmentData();
+    if (env.nodeEnv !== 'development') {
+      await runDeskConfigMigrations();
+    }
     await startChamadoProtocoloWatcher();
     console.log('[startup] MongoDB conectado (chamados + cadastros + desk_config).');
     return true;

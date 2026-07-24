@@ -1,4 +1,4 @@
-/** workflowTicket.service v1.1.0 — runtime workflow (acao.automatica) */
+/** workflowTicket.service v1.4.0 — startWorkflow com slug explícito; sem escalonar legado */
 import { isAutomaticaStep, resolveAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
@@ -8,14 +8,24 @@ import {
   currentStatus,
   readTabulacaoSnapshot,
 } from './chamado.mapper';
-import { getWorkflowById, resolveWorkflowForTicket } from './workflowDefinicao.service';
+import { getWorkflowById, getWorkflowBySlug, resolveWorkflowForTicket } from './workflowDefinicao.service';
+import { getActiveGrupos } from './grupoResponsabilidade.service';
 import {
   buildTabulationFieldsFromTicket,
+  evaluateGatilhoCriterios,
+  isLegacyEscalonarWorkflowSlug,
   resolveAtribuidoForPasso,
 } from './workflowMatcher.service';
-import { getActiveGrupos } from './grupoResponsabilidade.service';
+import {
+  canUserActOnWorkflowStep,
+} from './permission.service';
 import { executeSistemaStep, isDevolutivaPasso } from './workflowSistemaExecutor.service';
 import { buildLateralWorkflowDto } from './workflowDto.util';
+import {
+  applyRequisicaoToChamado,
+  buildRequisicaoSnapshot,
+} from './workflowRequisicao.service';
+import type { IChamadoWorkflowRequisicao } from '../config/workflowRequisicaoDefaults';
 
 export class WorkflowAdvanceError extends Error {
   status: number;
@@ -60,7 +70,7 @@ function applyAtribuidoForPasso(chamado: IChamadoN1, passo: IWorkflowPassoEnvelo
   const fields = buildTabulationFieldsFromTicket({
     tabulacao: chamado.tabulacao as unknown as Array<Record<string, string>>,
   });
-  const atribuido = resolveAtribuidoForPasso(passo.passo?.atribuicao || { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, fields);
+  const atribuido = resolveAtribuidoForPasso(passo.passo?.atribuicao || { tipo: 'funcao', funcaoSlug: 'atendimento', colaborador: '' }, fields);
   if (!atribuido) return;
   const tab = readTabulacaoSnapshot(chamado.tabulacao[0]);
   chamado.tabulacao = [{ ...tab, atribuido }];
@@ -168,6 +178,7 @@ export async function activateWorkflowForChamado(
   chamado: IChamadoN1,
   definicao: IWorkflowDefinicao,
   autor = 'Sistema',
+  options: { requisicao?: IChamadoWorkflowRequisicao | null } = {},
 ): Promise<boolean> {
   const wf = ensureWorkflowState(chamado);
   if (wf.active && wf.workflowId) return false;
@@ -185,12 +196,27 @@ export async function activateWorkflowForChamado(
   wf.completedAt = null;
   wf.pendingDecision = null;
 
+  if (options.requisicao) {
+    wf.requisicao = options.requisicao;
+  }
+
   applyAtribuidoForPasso(chamado, passo);
 
   appendWorkflowRegistro(chamado, {
     autor,
     anotacaoInterna: `Workflow "${definicao.titulo}" ativado.`,
-    metadados: { workflow: buildLateralWorkflowDto(chamado, definicao) },
+    metadados: {
+      workflow: buildLateralWorkflowDto(chamado, definicao),
+      ...(options.requisicao
+        ? {
+          requisicao: {
+            valores: options.requisicao.valores,
+            workflowId: String(definicao._id),
+            campoIds: Object.keys(options.requisicao.valores || {}),
+          },
+        }
+        : {}),
+    },
     alteracoes: [{ workflowActivated: definicao.slug }],
   });
 
@@ -213,6 +239,60 @@ export async function tryActivateWorkflowOnTabulation(
   return activateWorkflowForChamado(chamado, definicao, autor);
 }
 
+export async function startWorkflowForChamado(
+  chamado: IChamadoN1,
+  authUser?: AuthPayload | null,
+  requisicaoValores?: Record<string, unknown>,
+  definicaoSlug?: string,
+): Promise<IChamadoN1> {
+  const wf = chamado.workflow;
+  if (wf?.active && wf.workflowId) {
+    throw new WorkflowAdvanceError('Workflow já está ativo neste ticket', 400);
+  }
+
+  const ticketCtx = {
+    tabulacao: chamado.tabulacao as unknown as Array<Record<string, string>>,
+    lateralForm: chamado.lateralForm as Record<string, unknown> | undefined,
+  };
+  const fields = buildTabulationFieldsFromTicket(ticketCtx);
+  const grupos = await getActiveGrupos();
+
+  let definicao: IWorkflowDefinicao | null = null;
+  const slug = String(definicaoSlug || '').trim();
+
+  if (slug) {
+    if (isLegacyEscalonarWorkflowSlug(slug)) {
+      throw new WorkflowAdvanceError('Workflow de encaminhamento legado não está disponível', 400);
+    }
+    definicao = await getWorkflowBySlug(slug);
+    if (!definicao || definicao.ativo === false) {
+      throw new WorkflowAdvanceError('Workflow selecionado não encontrado ou inativo', 400);
+    }
+    if (!evaluateGatilhoCriterios(definicao.gatilho?.criterios || [], fields, grupos)) {
+      throw new WorkflowAdvanceError('Tabulação não compatível com o workflow selecionado', 400);
+    }
+  } else {
+    definicao = await resolveWorkflowForTicket(ticketCtx);
+  }
+
+  if (!definicao) {
+    throw new WorkflowAdvanceError('Tabulação não compatível com nenhum workflow ativo', 400);
+  }
+
+  const requisicaoSnapshot = buildRequisicaoSnapshot(definicao, requisicaoValores, authUser);
+  const autor = authUser?.name || authUser?.email || 'Agente';
+  const activated = await activateWorkflowForChamado(chamado, definicao, autor, {
+    requisicao: requisicaoSnapshot,
+  });
+  if (!activated) {
+    throw new WorkflowAdvanceError('Não foi possível iniciar o workflow', 400);
+  }
+
+  applyRequisicaoToChamado(chamado, requisicaoSnapshot);
+
+  return chamado;
+}
+
 export async function canUserActOnStep(
   chamado: IChamadoN1,
   definicao: IWorkflowDefinicao,
@@ -225,45 +305,19 @@ export async function canUserActOnStep(
   const passo = passoAtIndex(definicao, wf.step ?? 0);
   if (!passo) return false;
 
-  const atribuicao = passo.passo?.atribuicao;
   const automatica = resolveAutomaticaConfig(passo.passo);
 
   if (isAutomaticaStep(passo.passo) && automatica?.modo !== 'call_to_action') {
     return false;
   }
 
-  if (!atribuicao) return false;
-
-  const userEmail = String(authUser.email || '').trim().toLowerCase();
-  const userName = String(authUser.name || '').trim().toLowerCase();
-  const fields = buildTabulationFieldsFromTicket({
-    tabulacao: chamado.tabulacao as unknown as Array<Record<string, string>>,
-  });
-
-  if (atribuicao.tipo === 'sistema') {
+  const atribuicao = passo.passo?.atribuicao;
+  if (atribuicao?.tipo === 'sistema') {
     return automatica?.modo === 'call_to_action';
   }
 
-  if (atribuicao.tipo === 'colaborador') {
-    const target = String(atribuicao.colaborador || '').trim().toLowerCase();
-    return target === userEmail || target === userName;
-  }
-
-  if (atribuicao.tipo === 'responsavel_ticket') {
-    const resp = String(fields.responsavel || '').trim().toLowerCase();
-    return resp === userEmail || resp === userName || resp.includes(userEmail);
-  }
-
-  if (atribuicao.tipo === 'grupo') {
-    const grupos = await getActiveGrupos();
-    const grupo = grupos.find((g) => g.slug === atribuicao.grupoSlug);
-    return (grupo?.membros || []).some((m) => {
-      const val = String(m.valor || '').trim().toLowerCase();
-      return val && (val === userEmail || val === userName || userEmail.includes(val));
-    });
-  }
-
-  return true;
+  const isApproval = passo.passo?.acao?.tipo === 'aprovacao';
+  return canUserActOnWorkflowStep(authUser, chamado, isApproval);
 }
 
 export async function advanceWorkflowManual(

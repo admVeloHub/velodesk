@@ -3,7 +3,11 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useNotifications } from '../../../context/NotificationContext';
-import { saveCadastralRequest } from '../../../services/cadastral/cadastralRequestStore';
+import {
+  persistSolicitacaoProdutosOnTicket,
+  saveCadastralRequest,
+} from '../../../services/cadastral/cadastralRequestStore';
+import { findTicketEntry } from '../../../services/ticketsStorage';
 import {
   TIPO_INFORMACAO_OPTIONS,
   TIPO_SOLICITACAO_OPTIONS,
@@ -29,7 +33,7 @@ export default function SolicitacoesFormTab({
   clientOverride,
 }) {
   const { showNotification } = useNotifications();
-  const { prefill, formatCpf } = useProdSolicTicketPrefill({ ticketOverride, clientOverride });
+  const { prefill, activeTabId, formatCpf } = useProdSolicTicketPrefill({ ticketOverride, clientOverride });
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
 
@@ -41,7 +45,7 @@ export default function SolicitacoesFormTab({
     }));
   }, [prefill]);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (!validateCpfTicket(form, showNotification)) return;
     if (!String(form.dadoAntigo || '').trim() || !String(form.dadoNovo || '').trim()) {
@@ -51,7 +55,7 @@ export default function SolicitacoesFormTab({
 
     setSubmitting(true);
     try {
-      saveCadastralRequest({
+      const request = saveCadastralRequest({
         categoria: 'solicitacoes',
         cpf: form.cpf,
         ticketId: form.ticketId,
@@ -63,6 +67,15 @@ export default function SolicitacoesFormTab({
         observacoes: form.observacoes.trim(),
         urgente: form.urgente,
       });
+
+      const ticketRef = ticketOverride?.id
+        || findTicketEntry(activeTabId)?.ticket?.id
+        || findTicketEntry(form.ticketId)?.ticket?.id;
+
+      if (ticketRef) {
+        await persistSolicitacaoProdutosOnTicket(ticketRef, request);
+      }
+
       showNotification('Solicitação enviada ao time de Produtos.', 'success');
       setForm({
         ...EMPTY_FORM,

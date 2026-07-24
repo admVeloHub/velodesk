@@ -21,6 +21,7 @@ import {
   mapOpenAiErrorMessage,
   parseAiJson,
 } from './openaiAgent.util';
+import { logAiUsage } from '../aiUsage.service';
 
 export type GestaoSnapshot = GestaoHourlySnapshot;
 
@@ -176,6 +177,16 @@ export async function runGestaoChamadosCycle(): Promise<{
             },
           },
         });
+        if (response.usage) {
+          void logAiUsage({
+            provider: 'openai',
+            model: response.model || env.openaiModel,
+            feature: 'gestao_chamados',
+            inputTokens: response.usage.input_tokens,
+            outputTokens: response.usage.output_tokens,
+          });
+        }
+
         const raw = extractOutputText(response);
         llmSummary = parseAiJson<Record<string, unknown>>(raw) || undefined;
       } catch (llmErr) {

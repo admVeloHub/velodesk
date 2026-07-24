@@ -8,6 +8,7 @@ import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from
 import { getTicketSuggestPersona } from './ticketSuggestPersona';
 import { runAgentPipeline } from './agents/agentOrchestrator.service';
 import { getAgentsStatus, isAgentsConfigured } from './agents/openaiAgent.util';
+import { logAiUsage } from './aiUsage.service';
 
 const MAX_MESSAGES = 50;
 const MAX_MESSAGE_CHARS = 8_000;
@@ -412,6 +413,20 @@ export async function generateTicketAiSuggest(
       },
     });
 
+    const model = response.model || env.openaiModel;
+    if (response.usage) {
+      void logAiUsage({
+        provider: 'openai',
+        model,
+        feature: 'ticket_suggest_legacy',
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        ticketId: params.ticketId,
+        protocolo: params.protocolo,
+        userId,
+      });
+    }
+
     const rawText = extractOutputText(response);
     const parsed = parseAiJson(rawText);
 
@@ -426,7 +441,7 @@ export async function generateTicketAiSuggest(
       respostaSugerida: parsed.respostaSugerida.trim(),
       tabulacao,
       tabulacaoDisplay: buildTabulationDisplay(tabulacao),
-      model: response.model || env.openaiModel,
+      model,
     };
   } catch (err) {
     console.error('[ticket-ai-suggest]', err);

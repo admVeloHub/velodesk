@@ -5,7 +5,8 @@ export default function Workspace360TicketRow({ ticket, onOpen }) {
     <button
       type="button"
       className={`ws360-ticket-row ws360-ticket-row--${ticket.accent}${ticket.unread ? ' ws360-ticket-row--unread' : ''}`}
-      onClick={() => onOpen(ticket.id)}
+      onClick={() => onOpen?.(ticket.id)}
+      disabled={!onOpen}
     >
       <span className="ws360-ticket-row__avatar" aria-hidden="true">
         {ticket.initials}

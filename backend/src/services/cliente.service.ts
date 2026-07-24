@@ -1,4 +1,4 @@
-﻿/** cliente.service v1.2.0 — inbound e-mail: lookup por e-mail, sem upsert sem CPF */
+/** cliente.service v1.3.0 — batch loadDadosForRefs para listagem de boxes */
 import mongoose from 'mongoose';
 import { getClienteModel, ICliente, IClienteDados } from '../models/Cliente';
 import type { IClienteRef } from '../models/ChamadoN1';
@@ -122,6 +122,75 @@ export async function loadDadosForRef(ref?: IClienteRef | null): Promise<IClient
   if (ref.clienteCpf) {
     const byCpf = await findClienteByCpf(ref.clienteCpf);
     return getPrimaryDados(byCpf);
+  }
+
+  return null;
+}
+
+export interface ClienteDadosBatchContext {
+  byClienteId: Map<string, IClienteDados>;
+  byCpf: Map<string, IClienteDados>;
+}
+
+export async function batchLoadDadosForRefs(
+  refs: Array<IClienteRef | null | undefined>,
+): Promise<ClienteDadosBatchContext> {
+  const byClienteId = new Map<string, IClienteDados>();
+  const byCpf = new Map<string, IClienteDados>();
+
+  const ids = new Set<string>();
+  const cpfs = new Set<string>();
+
+  refs.forEach((ref) => {
+    if (!ref) return;
+    const idStr = String(ref.clienteId ?? '').trim();
+    if (idStr && mongoose.Types.ObjectId.isValid(idStr)) ids.add(idStr);
+    const cpf = normalizeCpf(ref.clienteCpf);
+    if (cpf) cpfs.add(cpf);
+  });
+
+  const Cliente = getClienteModel();
+  const [clientesById, clientesByCpf] = await Promise.all([
+    ids.size
+      ? Cliente.find({ _id: { $in: [...ids] } })
+      : Promise.resolve([] as ICliente[]),
+    cpfs.size
+      ? Cliente.find({ 'clienteDados.clienteCpf': { $in: [...cpfs] } })
+      : Promise.resolve([] as ICliente[]),
+  ]);
+
+  clientesById.forEach((cliente) => {
+    const dados = getPrimaryDados(cliente);
+    if (!dados) return;
+    byClienteId.set(String(cliente._id), dados);
+    const cpf = normalizeCpf(dados.clienteCpf);
+    if (cpf && !byCpf.has(cpf)) byCpf.set(cpf, dados);
+  });
+
+  clientesByCpf.forEach((cliente) => {
+    const dados = getPrimaryDados(cliente);
+    if (!dados) return;
+    const cpf = normalizeCpf(dados.clienteCpf);
+    if (cpf && !byCpf.has(cpf)) byCpf.set(cpf, dados);
+  });
+
+  return { byClienteId, byCpf };
+}
+
+export function resolveDadosFromBatch(
+  ref: IClienteRef | null | undefined,
+  batch: ClienteDadosBatchContext,
+): IClienteDados | null {
+  if (!ref) return null;
+
+  const idStr = String(ref.clienteId ?? '').trim();
+  if (idStr && batch.byClienteId.has(idStr)) {
+    return batch.byClienteId.get(idStr)!;
+  }
+
+  const cpf = normalizeCpf(ref.clienteCpf);
+  if (cpf && batch.byCpf.has(cpf)) {
+    return batch.byCpf.get(cpf)!;
   }
 
   return null;

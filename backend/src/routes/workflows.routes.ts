@@ -4,12 +4,8 @@ import { authMiddleware } from '../middleware/auth';
 import { supervisorMiddleware } from '../middleware/supervisor';
 import { isDeskConfigConnected } from '../config/database';
 import {
-  createGrupo,
-  deleteGrupo,
   getGrupoById,
   listGrupos,
-  patchGrupo,
-  replaceGrupo,
   getActiveGrupos,
 } from '../services/grupoResponsabilidade.service';
 import {
@@ -79,49 +75,20 @@ router.get('/grupos-responsabilidade/:id', authMiddleware, supervisorMiddleware,
   }
 });
 
-router.post('/grupos-responsabilidade', authMiddleware, supervisorMiddleware, async (req, res: Response) => {
-  try {
-    if (!isDeskConfigConnected()) return deskConfigUnavailable(res);
-    const grupo = await createGrupo(req.body, actorName(req));
-    res.status(201).json(grupo);
-  } catch (err) {
-    const msg = (err as Error).message;
-    res.status(msg.includes('já cadastrado') ? 409 : 400).json({ message: msg });
-  }
+router.post('/grupos-responsabilidade', authMiddleware, (_req, res: Response) => {
+  res.status(410).json({ message: 'Grupos de atuação descontinuados. Use atribuição por função.' });
 });
 
-router.put('/grupos-responsabilidade/:id', authMiddleware, supervisorMiddleware, async (req, res: Response) => {
-  try {
-    if (!isDeskConfigConnected()) return deskConfigUnavailable(res);
-    const grupo = await replaceGrupo(String(req.params.id), req.body, actorName(req));
-    if (!grupo) return res.status(404).json({ message: 'Grupo não encontrado' });
-    res.json(grupo);
-  } catch (err) {
-    const msg = (err as Error).message;
-    res.status(msg.includes('já cadastrado') ? 409 : 400).json({ message: msg });
-  }
+router.put('/grupos-responsabilidade/:id', authMiddleware, (_req, res: Response) => {
+  res.status(410).json({ message: 'Grupos de atuação descontinuados. Use atribuição por função.' });
 });
 
-router.patch('/grupos-responsabilidade/:id', authMiddleware, supervisorMiddleware, async (req, res: Response) => {
-  try {
-    if (!isDeskConfigConnected()) return deskConfigUnavailable(res);
-    const grupo = await patchGrupo(String(req.params.id), req.body, actorName(req));
-    if (!grupo) return res.status(404).json({ message: 'Grupo não encontrado' });
-    res.json(grupo);
-  } catch (err) {
-    res.status(400).json({ message: (err as Error).message });
-  }
+router.patch('/grupos-responsabilidade/:id', authMiddleware, (_req, res: Response) => {
+  res.status(410).json({ message: 'Grupos de atuação descontinuados. Use atribuição por função.' });
 });
 
-router.delete('/grupos-responsabilidade/:id', authMiddleware, supervisorMiddleware, async (req, res: Response) => {
-  try {
-    if (!isDeskConfigConnected()) return deskConfigUnavailable(res);
-    const ok = await deleteGrupo(String(req.params.id));
-    if (!ok) return res.status(404).json({ message: 'Grupo não encontrado' });
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(400).json({ message: (err as Error).message });
-  }
+router.delete('/grupos-responsabilidade/:id', authMiddleware, (_req, res: Response) => {
+  res.status(410).json({ message: 'Grupos de atuação descontinuados. Use atribuição por função.' });
 });
 
 router.get('/:id', authMiddleware, supervisorMiddleware, async (req, res: Response) => {

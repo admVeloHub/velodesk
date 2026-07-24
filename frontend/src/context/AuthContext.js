@@ -1,6 +1,6 @@
 /**
- * AuthContext v1.8.0 — presença offline no logout
- * VERSION: v1.8.0 | DATE: 2026-07-21 | AUTHOR: VeloHub Development Team
+ * AuthContext v1.8.1 — auth_mode por fonte (google | cadastro-desk)
+ * VERSION: v1.8.1 | DATE: 2026-07-22 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import { isGoogleDeskAuthMode, isGoogleDeskSession } from '../config/deskAuthMode';
@@ -9,6 +9,7 @@ import { isHubSessionActive, readHubSession } from '../config/hubSession';
 import { setApiMode } from '../services/ticketsCache';
 import { getDeskDisplayName, isLegacyDeskUser } from '../utils/userDisplayName';
 import { clearDeskAuthSession, isBackendJwtUsable } from '../utils/backendJwt';
+import { clearCachedPermissions } from '../services/permissions/permissionService';
 import { notifyAgentOfflineAndStop } from '../services/agentPresence';
 
 const AuthContext = createContext(null);
@@ -33,6 +34,7 @@ function readStoredColaborador() {
 
 function clearStoredAuthSession() {
   clearDeskAuthSession();
+  clearCachedPermissions();
 }
 
 function colaboradorHasDeskAccess(colaborador) {
@@ -140,7 +142,10 @@ export function AuthProvider({ children }) {
     }
     localStorage.setItem('velodesk_token', result.token);
     localStorage.setItem('velodesk_gate_authorized', '1');
-    localStorage.setItem('velodesk_auth_mode', 'google');
+    localStorage.setItem(
+      'velodesk_auth_mode',
+      enrichedUser.source === 'cadastro-desk' ? 'cadastro-desk' : 'google',
+    );
     setApiMode(true);
     setAuthStatus('authorized');
   }, []);

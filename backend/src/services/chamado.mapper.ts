@@ -1,12 +1,20 @@
-/** chamado.mapper v1.9.1 — meus-resolvidos global sem filtro responsável */
+/** chamado.mapper v2.3.0 — fila workflow: atribuido OU workflowId da definição do time */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
-import { loadDadosForRef, resolveClienteRefFromBody } from './cliente.service';
+import {
+  batchLoadDadosForRefs,
+  loadDadosForRef,
+  resolveClienteRefFromBody,
+  resolveDadosFromBatch,
+  type ClienteDadosBatchContext,
+} from './cliente.service';
 import { allocateNextProtocolo } from './protocolo.service';
 import type { IClienteDados } from '../models/Cliente';
+import type { IWorkflowDefinicao } from '../models/WorkflowDefinicao';
 import { assertTabulacaoForStatus } from './tabulation.service';
 import { buildLateralWorkflowDto, loadWorkflowDefForChamado, syncLegacyWorkflowFromBody } from './workflowDto.util';
+import { getWorkflowsByIds } from './workflowDefinicao.service';
 
 export type RegistroOrigin = 'agente' | 'cliente';
 
@@ -255,6 +263,22 @@ export interface TicketDto {
   responsibleAgent?: string;
   formData?: Record<string, unknown>;
   lateralForm?: Record<string, unknown>;
+  workflow?: {
+    active?: boolean;
+    workflowId?: string | null;
+    step?: number;
+    passoId?: string | null;
+    startedAt?: Date | null;
+    completedAt?: Date | null;
+    pendingDecision?: Record<string, unknown> | string | null;
+    requisicao?: {
+      preenchidaEm?: Date;
+      preenchidaPor?: string;
+      valores?: Record<string, unknown>;
+      comunicacaoWorkflow?: Array<{ mensagem: string; data: Date; autor: string }>;
+      comunicacaoPendente?: boolean;
+    };
+  };
   messages?: TicketMessageDto[];
   internalNotes?: TicketMessageDto[];
   registroHistorico?: RegistroHistoricoDto[];
@@ -263,6 +287,107 @@ export interface TicketDto {
   slaBreached?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
+  listOnly?: boolean;
+  queueEntryAt?: Date;
+}
+
+/** Limites por box na listagem GET /boxes */
+export const BOX_LIST_DEFAULT_LIMIT = 250;
+export const BOX_LIST_RESOLVED_LIMIT = 150;
+export const BOX_LIST_RESOLVED_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+const TERMINAL_BOX_STATUSES = new Set(['resolvido', 'cancelado', 'fechado']);
+
+export interface ChamadoMapContext {
+  mode: 'list' | 'full';
+  clienteBatch: ClienteDadosBatchContext;
+  workflowById: Map<string, IWorkflowDefinicao>;
+}
+
+export interface BoxListFindOptions {
+  filter: Record<string, unknown>;
+  limit: number;
+  sort: { updatedAt: -1 };
+}
+
+export async function buildChamadoMapContext(
+  chamados: IChamadoN1[],
+  mode: 'list' | 'full' = 'list',
+): Promise<ChamadoMapContext> {
+  const refs = chamados.map((chamado) => chamado.cliente?.[0] as LegacyClienteEmbed | undefined);
+  const clienteBatch = await batchLoadDadosForRefs(refs);
+
+  const workflowIds = chamados
+    .filter((chamado) => chamado.workflow?.active && chamado.workflow.workflowId)
+    .map((chamado) => String(chamado.workflow!.workflowId));
+
+  const workflowById = mode === 'list'
+    ? await getWorkflowsByIds(workflowIds)
+    : new Map<string, IWorkflowDefinicao>();
+
+  return { mode, clienteBatch, workflowById };
+}
+
+export function buildBoxListFindOptions(
+  status: string,
+  queue?: string,
+  responsavelCandidates?: string[],
+  extraFilter?: Record<string, unknown>,
+): BoxListFindOptions {
+  const baseFilter = buildChamadoQueryFilter(status, queue, responsavelCandidates, extraFilter);
+  const isTerminal = TERMINAL_BOX_STATUSES.has(status);
+
+  let filter: Record<string, unknown> = baseFilter;
+  if (isTerminal) {
+    const since = new Date(Date.now() - BOX_LIST_RESOLVED_MAX_AGE_MS);
+    filter = { $and: [baseFilter, { updatedAt: { $gte: since } }] };
+  }
+
+  return {
+    filter,
+    limit: isTerminal ? BOX_LIST_RESOLVED_LIMIT : BOX_LIST_DEFAULT_LIMIT,
+    sort: { updatedAt: -1 },
+  };
+}
+
+export async function chamadosToTickets(
+  chamados: IChamadoN1[],
+  boxId: string,
+  mode: 'list' | 'full' = 'full',
+): Promise<TicketDto[]> {
+  if (!chamados.length) return [];
+  if (mode === 'full') {
+    return Promise.all(chamados.map((chamado) => chamadoToTicket(chamado, boxId)));
+  }
+
+  const ctx = await buildChamadoMapContext(chamados, 'list');
+  return chamados.map((chamado) => chamadoToTicketListItem(chamado, boxId, ctx));
+}
+
+function buildLateralWorkflowListDto(
+  chamado: IChamadoN1,
+  definicao: IWorkflowDefinicao,
+): Record<string, unknown> {
+  const wf = chamado.workflow;
+  if (!wf?.active || !wf.workflowId) return {};
+
+  return {
+    templateId: definicao.slug,
+    definicaoSlug: definicao.slug,
+    definicaoId: String(definicao._id),
+    title: definicao.titulo,
+    step: wf.step ?? 0,
+    startedAt: wf.startedAt ? new Date(wf.startedAt).toISOString() : null,
+    completedAt: wf.completedAt ? new Date(wf.completedAt).toISOString() : null,
+    status: wf.completedAt ? 'completed' : 'active',
+    pendingDecision: wf.pendingDecision ?? null,
+  };
+}
+
+function resolveQueueEntryAt(chamado: IChamadoN1): Date | undefined {
+  const registros = chamado.registro ?? [];
+  if (!registros.length) return chamado.createdAt ?? chamado.updatedAt;
+  return registros[registros.length - 1]?.data ?? chamado.createdAt ?? chamado.updatedAt;
 }
 
 const BOX_NAME_BY_STATUS: Record<string, string> = {
@@ -700,65 +825,39 @@ function currentTabulacao(chamado: IChamadoN1) {
   return tabulacao[tabulacao.length - 1];
 }
 
-export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Promise<TicketDto> {
-  const tab = currentTabulacao(chamado);
-  const ref = chamado.cliente?.[0] as LegacyClienteEmbed | undefined;
-  const status = currentStatus(chamado);
+export async function chamadoToTicket(
+  chamado: IChamadoN1,
+  boxId?: string,
+  ctx?: ChamadoMapContext,
+): Promise<TicketDto> {
+  if (ctx?.mode === 'list') {
+    return chamadoToTicketListItem(chamado, boxId, ctx);
+  }
+  return chamadoToTicketFull(chamado, boxId);
+}
 
+export function chamadoToTicketListItem(
+  chamado: IChamadoN1,
+  boxId: string | undefined,
+  ctx: ChamadoMapContext,
+): TicketDto {
+  return buildTicketDtoCore(chamado, boxId, ctx);
+}
+
+interface FullTicketExtras {
+  cadastro?: IClienteDados | null;
+  lateralWorkflow?: Record<string, unknown>;
+  persistedApproval?: Record<string, unknown>;
+  reclameAqui?: Record<string, unknown> | null;
+}
+
+async function chamadoToTicketFull(
+  chamado: IChamadoN1,
+  boxId?: string,
+): Promise<TicketDto> {
+  const ref = chamado.cliente?.[0] as LegacyClienteEmbed | undefined;
   let cadastro = await loadDadosForRef(ref);
   if (!cadastro) cadastro = legacyDadosFromRef(ref);
-
-  const clientName = cadastro?.clienteNome;
-
-  const messages: TicketMessageDto[] = [];
-  const internalNotes: TicketMessageDto[] = [];
-  const registroHistorico: RegistroHistoricoDto[] = [];
-  chamado.registro?.forEach((reg, index) => {
-    const origin = resolveRegistroOrigin(reg);
-    registroHistorico.push({
-      id: `${index}-reg`,
-      registroIndex: index,
-      time: reg.data,
-      origin,
-      autor: resolveStoredRegistroAutor(reg, origin, clientName),
-      alteracoes: businessAlteracoesFromRegistro(reg),
-      status: reg.status || 'novo',
-      anotacaoInterna: String(reg.anotacaoInterna ?? '').trim() || undefined,
-    });
-    const regAutor = resolveStoredRegistroAutor(reg, origin, clientName);
-    if (reg.mensagemPublica) {
-      messages.push({
-        id: `${index}-pub`,
-        text: reg.mensagemPublica,
-        sender: senderFromOrigin(origin),
-        origin,
-        author: regAutor || undefined,
-        type: 'public',
-        time: reg.data,
-        registroIndex: index,
-        attachments: reg.anexosMensagemPublica ?? [],
-      });
-    }
-    if (reg.anotacaoInterna) {
-      internalNotes.push({
-        id: `${index}-int`,
-        text: reg.anotacaoInterna,
-        sender: 'me',
-        origin: 'agente',
-        author: regAutor || undefined,
-        type: 'internal',
-        time: reg.data,
-        registroIndex: index,
-        attachments: reg.anexosAnotacaoInterna ?? [],
-      });
-    }
-  });
-
-  const titulo = chamado.chamadoTitulo?.trim()
-    || tab?.motivo?.trim()
-    || chamado.chamadoProtocolo;
-
-  const clientCpf = ref?.clienteCpf || cadastro?.clienteCpf;
 
   let lateralWorkflow: Record<string, unknown> | undefined;
   if (chamado.workflow?.active && chamado.workflow.workflowId) {
@@ -768,11 +867,103 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
     }
   }
   if (!lateralWorkflow) {
-    const persistedWorkflow = findLatestWorkflowFromRegistro(chamado);
-    lateralWorkflow = persistedWorkflow ?? undefined;
+    lateralWorkflow = findLatestWorkflowFromRegistro(chamado) ?? undefined;
   }
-  const persistedApproval = findLatestApprovalFromRegistro(chamado);
-  const reclameAqui = findReclameAquiFromChamado(chamado);
+
+  return buildTicketDtoCore(chamado, boxId, undefined, {
+    cadastro,
+    lateralWorkflow,
+    persistedApproval: findLatestApprovalFromRegistro(chamado) ?? undefined,
+    reclameAqui: findReclameAquiFromChamado(chamado),
+  });
+}
+
+function buildTicketDtoCore(
+  chamado: IChamadoN1,
+  boxId?: string,
+  ctx?: ChamadoMapContext,
+  extras: FullTicketExtras = {},
+): TicketDto {
+  const listOnly = ctx?.mode === 'list';
+  const tab = currentTabulacao(chamado);
+  const ref = chamado.cliente?.[0] as LegacyClienteEmbed | undefined;
+  const status = currentStatus(chamado);
+
+  let cadastro: IClienteDados | null = extras.cadastro ?? null;
+  if (!cadastro && ctx?.mode === 'list') {
+    cadastro = resolveDadosFromBatch(ref, ctx.clienteBatch);
+    if (!cadastro) cadastro = legacyDadosFromRef(ref);
+  } else if (!cadastro) {
+    cadastro = legacyDadosFromRef(ref);
+  }
+
+  const clientName = cadastro?.clienteNome;
+
+  const messages: TicketMessageDto[] = [];
+  const internalNotes: TicketMessageDto[] = [];
+  const registroHistorico: RegistroHistoricoDto[] = [];
+
+  if (!listOnly) {
+    chamado.registro?.forEach((reg, index) => {
+      const origin = resolveRegistroOrigin(reg);
+      registroHistorico.push({
+        id: `${index}-reg`,
+        registroIndex: index,
+        time: reg.data,
+        origin,
+        autor: resolveStoredRegistroAutor(reg, origin, clientName),
+        alteracoes: businessAlteracoesFromRegistro(reg),
+        status: reg.status || 'novo',
+        anotacaoInterna: String(reg.anotacaoInterna ?? '').trim() || undefined,
+      });
+      const regAutor = resolveStoredRegistroAutor(reg, origin, clientName);
+      if (reg.mensagemPublica) {
+        messages.push({
+          id: `${index}-pub`,
+          text: reg.mensagemPublica,
+          sender: senderFromOrigin(origin),
+          origin,
+          author: regAutor || undefined,
+          type: 'public',
+          time: reg.data,
+          registroIndex: index,
+          attachments: reg.anexosMensagemPublica ?? [],
+        });
+      }
+      if (reg.anotacaoInterna) {
+        internalNotes.push({
+          id: `${index}-int`,
+          text: reg.anotacaoInterna,
+          sender: 'me',
+          origin: 'agente',
+          author: regAutor || undefined,
+          type: 'internal',
+          time: reg.data,
+          registroIndex: index,
+          attachments: reg.anexosAnotacaoInterna ?? [],
+        });
+      }
+    });
+  }
+
+  const titulo = chamado.chamadoTitulo?.trim()
+    || tab?.motivo?.trim()
+    || chamado.chamadoProtocolo;
+
+  const clientCpf = ref?.clienteCpf || cadastro?.clienteCpf;
+
+  let lateralWorkflow: Record<string, unknown> | undefined = extras.lateralWorkflow;
+  if (!lateralWorkflow && chamado.workflow?.active && chamado.workflow.workflowId && listOnly && ctx) {
+    const definicao = ctx.workflowById.get(String(chamado.workflow.workflowId));
+    if (definicao) {
+      lateralWorkflow = buildLateralWorkflowListDto(chamado, definicao);
+    }
+  }
+  if (!lateralWorkflow && !listOnly) {
+    lateralWorkflow = findLatestWorkflowFromRegistro(chamado) ?? undefined;
+  }
+  const persistedApproval = listOnly ? undefined : (extras.persistedApproval ?? findLatestApprovalFromRegistro(chamado) ?? undefined);
+  const reclameAqui = listOnly ? null : (extras.reclameAqui ?? findReclameAquiFromChamado(chamado));
 
   return {
     _id: chamado._id.toString(),
@@ -788,6 +979,40 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
     clientName,
     clientCPF: clientCpf,
     responsibleAgent: tab?.responsavel,
+    workflow: chamado.workflow?.active
+      ? {
+        active: chamado.workflow.active,
+        workflowId: chamado.workflow.workflowId ? String(chamado.workflow.workflowId) : null,
+        step: chamado.workflow.step ?? 0,
+        passoId: chamado.workflow.passoId ? String(chamado.workflow.passoId) : null,
+        startedAt: chamado.workflow.startedAt,
+        completedAt: chamado.workflow.completedAt,
+        pendingDecision: chamado.workflow.pendingDecision ?? null,
+        requisicao: (() => {
+          const req = chamado.workflow.requisicao;
+          if (!req) return undefined;
+          const comunicacao = Array.isArray(req.comunicacaoWorkflow) ? req.comunicacaoWorkflow : [];
+          const comunicacaoPendente = comunicacao.length > 0;
+          if (listOnly) {
+            return {
+              valores: req.valores || {},
+              comunicacaoPendente,
+            };
+          }
+          return {
+            preenchidaEm: req.preenchidaEm,
+            preenchidaPor: req.preenchidaPor,
+            valores: req.valores || {},
+            comunicacaoWorkflow: comunicacao.map((item) => ({
+              mensagem: String(item.mensagem || ''),
+              data: item.data,
+              autor: String(item.autor || ''),
+            })),
+            comunicacaoPendente,
+          };
+        })(),
+      }
+      : undefined,
     lateralForm: {
       tipoChamado: tab?.tipoChamado,
       classificacaoTipo: tab?.tipoChamado,
@@ -798,20 +1023,22 @@ export async function chamadoToTicket(chamado: IChamadoN1, boxId?: string): Prom
       atribuido: tab?.atribuido,
       clienteCpf: clientCpf,
       clienteNome: clientName,
-      clienteEmail: cadastro?.clienteEmail?.lista ?? [],
-      clienteTelefone: cadastro?.clienteTelefone?.lista ?? [],
+      clienteEmail: listOnly ? [] : (cadastro?.clienteEmail?.lista ?? []),
+      clienteTelefone: listOnly ? [] : (cadastro?.clienteTelefone?.lista ?? []),
       cpf: clientCpf,
       canal: reclameAqui ? 'Reclame Aqui' : undefined,
       reclameAqui: reclameAqui ?? undefined,
       workflow: lateralWorkflow,
       approval: persistedApproval ?? undefined,
     },
-    messages,
-    internalNotes,
-    registroHistorico,
+    messages: listOnly ? [] : messages,
+    internalNotes: listOnly ? [] : internalNotes,
+    registroHistorico: listOnly ? [] : registroHistorico,
     slaBreached: isSlaBreached(chamado),
     createdAt: chamado.createdAt,
     updatedAt: chamado.updatedAt,
+    listOnly: listOnly || undefined,
+    queueEntryAt: listOnly ? resolveQueueEntryAt(chamado) : undefined,
   };
 }
 
@@ -914,14 +1141,95 @@ export function meusChamadosNovosResponsavelFilter(candidates: string[]) {
   };
 }
 
-export function buildChamadoQueryFilter(status: string, queue?: string, responsavelCandidates?: string[]) {
+function lastTabulacaoAtribuidoExpr() {
+  return {
+    $toLower: {
+      $ifNull: [
+        {
+          $let: {
+            vars: { lastTab: { $arrayElemAt: ['$tabulacao', -1] } },
+            in: '$$lastTab.atribuido',
+          },
+        },
+        '',
+      ],
+    },
+  };
+}
+
+export function atribuidoFuncaoFilter(funcaoSlug: string) {
+  const expected = `funcao:${String(funcaoSlug || '').trim().toLowerCase()}`;
+  return {
+    $expr: {
+      $eq: [lastTabulacaoAtribuidoExpr(), expected],
+    },
+  };
+}
+
+/** Filtro por atribuição: qualquer uma das funções do usuário (`funcao:{slug}`). */
+export function atribuidoFuncoesFilter(funcaoSlugs: string[]) {
+  const expected = [
+    ...new Set(
+      (funcaoSlugs || [])
+        .map((s) => String(s || '').trim().toLowerCase())
+        .filter(Boolean)
+        .map((s) => `funcao:${s}`),
+    ),
+  ];
+  if (!expected.length) {
+    return { _id: { $exists: false } };
+  }
+  return {
+    $expr: {
+      $in: [lastTabulacaoAtribuidoExpr(), expected],
+    },
+  };
+}
+
+/**
+ * Fila do ator de Workflow: tickets com atribuído na função OU workflow ativo
+ * cuja definição é `escalonar-{funcao}` / `{funcao}` (ex.: escalonar-produtos).
+ */
+export function workflowActorQueueFilter(
+  funcaoSlugs: string[],
+  workflowDefinitionIds: Array<string | { toString(): string }>,
+) {
+  const atribuido = atribuidoFuncoesFilter(funcaoSlugs);
+  const ids = (workflowDefinitionIds || [])
+    .map((id) => {
+      try {
+        return new mongoose.Types.ObjectId(String(id));
+      } catch {
+        return null;
+      }
+    })
+    .filter((id): id is mongoose.Types.ObjectId => Boolean(id));
+
+  if (!ids.length) return atribuido;
+
+  return {
+    $or: [
+      atribuido,
+      {
+        'workflow.active': true,
+        'workflow.workflowId': { $in: ids },
+      },
+    ],
+  };
+}
+
+export function buildChamadoQueryFilter(status: string, queue?: string, responsavelCandidates?: string[], extraFilter?: Record<string, unknown>) {
   const filters: Record<string, unknown>[] = [lastStatusFilter(status)];
 
-  if (queue === 'meus-chamados' && responsavelCandidates?.length && status !== 'resolvido') {
+  if (queue === 'meus-chamados' && responsavelCandidates?.length) {
     const responsavelFilter = status === 'novo'
       ? meusChamadosNovosResponsavelFilter(responsavelCandidates)
       : meusChamadosResponsavelFilter(responsavelCandidates);
     filters.push(responsavelFilter);
+  }
+
+  if (queue === 'funcao-atribuido' && extraFilter) {
+    filters.push(extraFilter);
   }
 
   return filters.length === 1 ? filters[0] : { $and: filters };

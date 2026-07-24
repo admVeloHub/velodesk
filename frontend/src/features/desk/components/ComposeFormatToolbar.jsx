@@ -1,8 +1,8 @@
 /**
- * ComposeFormatToolbar v1.0.3 — destaque visual do botão ativo (queryCommandState)
- * VERSION: v1.0.3 | DATE: 2026-07-02
+ * ComposeFormatToolbar v1.1.0 — botão anexar imagem à direita
+ * VERSION: v1.1.0 | DATE: 2026-07-22
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { applyFormatAction, resolveFormatShortcut } from '../../../services/desk/composeTextFormat';
 
 const EMPTY_FORMAT_STATE = {
@@ -88,7 +88,23 @@ export default function ComposeFormatToolbar({
   activeFormats = EMPTY_FORMAT_STATE,
   variant = 'public',
   embedded = false,
+  onImageSelected,
+  attachDisabled = false,
 }) {
+  const fileInputRef = useRef(null);
+
+  const handleAttachClick = useCallback(() => {
+    if (attachDisabled) return;
+    fileInputRef.current?.click();
+  }, [attachDisabled]);
+
+  const handleFileChange = useCallback((event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !onImageSelected) return;
+    onImageSelected(file);
+  }, [onImageSelected]);
+
   return (
     <div
       className={
@@ -118,6 +134,30 @@ export default function ComposeFormatToolbar({
           </button>
         </React.Fragment>
       ))}
+      {onImageSelected ? (
+        <>
+          <button
+            type="button"
+            className="toolbar-btn crm-compose-toolbar__btn crm-compose-toolbar__attach"
+            title="Anexar imagem"
+            aria-label="Anexar imagem"
+            disabled={attachDisabled}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleAttachClick}
+          >
+            <i className="ti ti-photo" aria-hidden="true" />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            className="crm-compose-toolbar__file-input"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={handleFileChange}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

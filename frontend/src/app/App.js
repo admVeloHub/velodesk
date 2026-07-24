@@ -47,6 +47,9 @@ import AlteracoesCadastraisPage from '../pages/AlteracoesCadastraisPage';
 import EspeciaisSelectPage from '../features/especiais/EspeciaisSelectPage';
 import EspeciaisChannelPage from '../features/especiais/EspeciaisChannelPage';
 import ReclameAquiChannelPage from '../features/especiais/ReclameAquiChannelPage';
+import CasoEspecialDetailPage from '../features/workspace/components/gestaoDetail/CasoEspecialDetailPage';
+import AiUsageDetailPage from '../features/workspace/components/gestaoDetail/AiUsageDetailPage';
+import { PermissionProvider } from '../context/PermissionContext';
 
 import { initCockpitGlobals } from '../config/cockpitConfig';
 
@@ -75,6 +78,10 @@ function AppRoutes() {
             { index: true, element: React.createElement(DefaultLandingRedirect) },
 
             { path: 'workspace', element: React.createElement(WorkspacePage) },
+
+            { path: 'workspace/gestao/casos-especiais/:orgao', element: React.createElement(CasoEspecialDetailPage) },
+
+            { path: 'workspace/gestao/custo-ia', element: React.createElement(AiUsageDetailPage) },
 
             { path: 'workflow', element: React.createElement(WorkflowPage) },
 
@@ -140,9 +147,11 @@ function AppProviders({ children }) {
 
           null,
 
-          React.createElement(ProfileProvider, null,
-            React.createElement(TabulationProvider, null,
-              React.createElement(WorkflowConfigProvider, null, children)
+          React.createElement(PermissionProvider, null,
+            React.createElement(ProfileProvider, null,
+              React.createElement(TabulationProvider, null,
+                React.createElement(WorkflowConfigProvider, null, children)
+              )
             )
           )
 

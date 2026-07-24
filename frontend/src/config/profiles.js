@@ -91,6 +91,7 @@ export const NAV_ITEMS = [
   },
   { id: 'chat', path: '/chat', label: 'Mensagens', icon: 'ti-message-2', tooltip: 'Mensagens', badge: true },
   { id: 'config', path: '/config', label: 'Configurações', icon: 'ti-settings', tooltip: 'Configurações' },
+  { id: 'especiais-canais', path: '/especiais', label: 'Canais Especiais', icon: 'ti-star', tooltip: 'Canais Especiais' },
   { id: 'client-portal', path: '/client-portal', label: 'Portal Cliente', icon: 'ti-external-link', tooltip: 'Portal do Cliente' },
 ];
 
@@ -116,6 +117,7 @@ export function getProfileDefaultPath(profileId = 'agent') {
   if (pageId === 'tickets') return '/tickets?desk=v2';
   if (pageId === 'workflow-inbox') return '/workflow';
   if (pageId === 'alteracoes-cadastrais') return '/alteracoes-cadastrais';
+  if (pageId === 'especiais-canais') return '/especiais';
   if (pageId === 'analytics-ia') return '/analytics-ia';
   return `/${pageId}`;
 }

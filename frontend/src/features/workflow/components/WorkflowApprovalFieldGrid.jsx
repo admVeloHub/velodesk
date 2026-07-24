@@ -1,3 +1,7 @@
+/**
+ * WorkflowApprovalFieldGrid v1.1.0 — grid 3 colunas (contexto + requisição)
+ * VERSION: v1.1.0 | DATE: 2026-07-24
+ */
 import React from 'react';
 
 export default function WorkflowApprovalFieldGrid({ fields }) {
