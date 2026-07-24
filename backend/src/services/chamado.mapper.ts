@@ -1,4 +1,4 @@
-/** chamado.mapper v2.3.0 — fila workflow: atribuido OU workflowId da definição do time */
+/** chamado.mapper v2.3.1 — resolvidos na fila meus-chamados sem filtro de responsável */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -1221,7 +1221,7 @@ export function workflowActorQueueFilter(
 export function buildChamadoQueryFilter(status: string, queue?: string, responsavelCandidates?: string[], extraFilter?: Record<string, unknown>) {
   const filters: Record<string, unknown>[] = [lastStatusFilter(status)];
 
-  if (queue === 'meus-chamados' && responsavelCandidates?.length) {
+  if (queue === 'meus-chamados' && responsavelCandidates?.length && status !== 'resolvido') {
     const responsavelFilter = status === 'novo'
       ? meusChamadosNovosResponsavelFilter(responsavelCandidates)
       : meusChamadosResponsavelFilter(responsavelCandidates);

@@ -1,6 +1,6 @@
 /**
- * DeskMyTicketsTable v1.2.0 — Meus Tickets: seção Novos retrátil; demais status em lista contínua
- * VERSION: v1.2.0 | DATE: 2026-07-22
+ * DeskMyTicketsTable v1.2.1 — seção Em andamento retrátil restaurada
+ * VERSION: v1.2.1 | DATE: 2026-07-24
  */
 import React, { useMemo, useState } from 'react';
 import {
@@ -14,7 +14,7 @@ import {
 } from '../../../services/desk/utils';
 import { SLA_SHORT_LABELS } from '../../../services/desk/constants';
 
-const MY_TICKETS_SECTIONS_WITHOUT_HEADER = new Set(['em-andamento', 'pendente', 'resolvidos']);
+const MY_TICKETS_SECTIONS_WITHOUT_HEADER = new Set(['pendente', 'resolvidos']);
 
 function renderTicketRows(sectionEntries, onSelectTicket) {
   return sectionEntries.map(({ ticket }) => {

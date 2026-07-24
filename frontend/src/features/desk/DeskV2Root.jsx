@@ -1,14 +1,12 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.14.0 | DATE: 2026-07-24
- * — Responder solicitação: retorno imediato da thread no modal
+ * VERSION: v3.14.1 | DATE: 2026-07-24
+ * — filas vazias permanecem selecionadas (sem redirect automático)
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   filterTickets,
   resolveDeskSearchEntries,
-  pickDefaultQueueId,
-  countByQueue,
   pickNextTicketFromEntries,
   resolveDeskWorkingEntries,
   getEntryTicketId,
@@ -246,13 +244,6 @@ export default function DeskV2Root() {
     restoreCustomBoxes();
     setQueueStatuses(getAllQueueStatuses());
   }, []);
-
-  useEffect(() => {
-    if (appliedSearch.trim()) return;
-    if (countByQueue(activeQueue) > 0) return;
-    const nextQueue = pickDefaultQueueId(activeQueue);
-    if (nextQueue !== activeQueue) setActiveQueue(nextQueue);
-  }, [refreshKey, appliedSearch, activeQueue]);
 
   useEffect(() => {
     loadSpellEngine().catch(() => {});

@@ -1,6 +1,6 @@
 /**
- * permissionService v1.5.0 — escopo WF também por definicaoSlug escalonar-{funcao}
- * VERSION: v1.5.0 | DATE: 2026-07-24
+ * permissionService v1.5.1 — gestão não usa fila meus-chamados
+ * VERSION: v1.5.1 | DATE: 2026-07-24
  */
 import api from '../../api/client';
 import { normalizeProfileId } from '../../config/profiles';
@@ -37,6 +37,11 @@ export function writeCachedPermissions(payload) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } else {
     localStorage.removeItem(STORAGE_KEY);
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('velodesk:permissions'));
+  } catch {
+    /* SSR / test */
   }
 }
 
@@ -199,6 +204,7 @@ export function hasWorkflowPortalAccess(perm = readCachedPermissions()) {
 export function shouldUseMeusChamadosFila(perm = readCachedPermissions()) {
   if (!perm) return true;
   if (hasPermission(perm.permissoes, 'tickets', 'ver_todos')) return false;
+  if (perm.funcaoSlug === 'gestao' || (perm.funcoes || []).includes('gestao')) return false;
   if (
     hasPermission(perm.permissoes, 'tickets', 'atuar_atribuido')
     && hasPermission(perm.permissoes, 'portal', 'workflow')

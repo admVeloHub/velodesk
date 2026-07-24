@@ -1,11 +1,11 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.3.5 | DATE: 2026-07-24
- * — busca global por CPF ou protocolo (modo selecionável na fila)
+ * VERSION: v3.3.9 | DATE: 2026-07-24
+ * — Gestão vê todos os tickets nas categorias do Desk
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
-import { ticketAssignedToCurrentAgent, ticketMatchesAgentResponsavel } from './responsavelSegmentation';
+import { ticketMatchesAgentResponsavel, shouldUseMeusChamadosFila, shouldViewAllDeskTickets } from './responsavelSegmentation';
 import {
   MEUS_TICKETS_QUEUE_ID,
   QUEUE_STATUSES,
@@ -884,9 +884,34 @@ function matchesTicketSearch(entry, q, searchMode = DESK_SEARCH_MODE_CPF) {
 
 function filterMyTicketsEntries(searchQuery) {
   const q = (searchQuery || '').toLowerCase();
+  const activeQueues = new Set(['novos', 'em-andamento', 'pendente', 'resolvidos']);
+
+  if (shouldViewAllDeskTickets()) {
+    return getAllCockpitTickets().filter((entry) => {
+      if (!activeQueues.has(entry.queueId)) return false;
+      return matchesTicketSearch(entry, q);
+    });
+  }
+
+  const agentQueues = new Set(['novos', 'em-andamento', 'pendente']);
+  const trustBackendQueues = shouldUseMeusChamadosFila();
+
   return getAllCockpitTickets().filter((entry) => {
-    if (!ticketAssignedToCurrentAgent(entry.ticket)) return false;
-    return matchesTicketSearch(entry, q);
+    const { queueId, ticket } = entry;
+
+    if (queueId === 'resolvidos') {
+      if (!ticketMatchesAgentResponsavel(ticket)) return false;
+      return matchesTicketSearch(entry, q);
+    }
+
+    if (!agentQueues.has(queueId)) return false;
+
+    // /boxes?fila=meus-chamados já filtra por responsável no backend — não re-filtrar no cliente
+    if (trustBackendQueues) {
+      return matchesTicketSearch(entry, q);
+    }
+
+    return ticketMatchesAgentResponsavel(ticket) && matchesTicketSearch(entry, q);
   });
 }
 
@@ -905,11 +930,18 @@ export function groupMyTicketsByStatus(entries) {
   return MY_TICKETS_STATUS_SECTIONS.map((section) => ({
     ...section,
     entries: sortTicketEntries(
-      (entries || []).filter((entry) => entry.queueId === section.id),
+      (entries || []).filter((entry) => matchesMyTicketsStatusSection(entry, section.id)),
       'sla',
       'asc',
     ),
   })).filter((section) => section.entries.length > 0);
+}
+
+function matchesMyTicketsStatusSection(entry, sectionId) {
+  if (entry.queueId === sectionId) return true;
+  if (sectionId !== 'em-andamento') return false;
+  const status = String(entry.ticket?.status || '').trim().toLowerCase();
+  return status === 'em-aberto' || status === 'em-andamento' || status === 'em andamento';
 }
 
 export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOldestFirst = false) {
@@ -918,10 +950,13 @@ export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOld
     return sortTicketEntries(filterMyTicketsEntries(q), 'sla', 'asc');
   }
   const filterByResponsavel = shouldFilterByAgentResponsavel(activeQueue);
+  const trustBackendQueues = shouldUseMeusChamadosFila();
   const filtered = getAllCockpitTickets()
     .filter((entry) => {
       if (entry.queueId !== activeQueue) return false;
-      if (filterByResponsavel && !ticketMatchesAgentResponsavel(entry.ticket)) return false;
+      if (filterByResponsavel && !trustBackendQueues && !ticketMatchesAgentResponsavel(entry.ticket)) {
+        return false;
+      }
       return matchesTicketSearch(entry, q);
     });
   return sortTicketEntries(filtered, activeSort, 'desc', entrySortOldestFirst);
@@ -955,9 +990,12 @@ export function countByQueue(queueId) {
     return filterMyTicketsEntries('').length;
   }
   const filterByResponsavel = shouldFilterByAgentResponsavel(queueId);
+  const trustBackendQueues = shouldUseMeusChamadosFila();
   return getAllCockpitTickets().filter((e) => {
     if (e.queueId !== queueId) return false;
-    if (filterByResponsavel && !ticketMatchesAgentResponsavel(e.ticket)) return false;
+    if (filterByResponsavel && !trustBackendQueues && !ticketMatchesAgentResponsavel(e.ticket)) {
+      return false;
+    }
     return true;
   }).length;
 }

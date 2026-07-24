@@ -1,13 +1,13 @@
 /**
- * responsavelSegmentation v1.4.1 — ticketAssignedToCurrentAgent para Meus Tickets
- * VERSION: v1.4.1 | DATE: 2026-07-21
+ * responsavelSegmentation v1.5.0 — gestão vê todas as categorias do Desk
+ * VERSION: v1.5.0 | DATE: 2026-07-24
  */
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 import { normalizeProfileId } from '../../config/profiles';
 import {
   readCachedPermissions,
   shouldUseMeusChamadosFila as permShouldUseMeusChamados,
-  ticketMatchesAgentResponsavel as permTicketMatches,
+  hasPermission,
   canActOnTicket,
   filterTicketForUser,
 } from '../permissions/permissionService';
@@ -54,15 +54,33 @@ export function readAuthDeskRole() {
   return null;
 }
 
+export function isGestaoDeskProfile(profileId = readDeskProfileId()) {
+  return normalizeProfileId(profileId) === 'gestao';
+}
+
+/** Gestão / supervisor / ver_todos: todas as categorias (Novos, Em andamento, Pendente, Resolvidos). */
+export function shouldViewAllDeskTickets(profileId = readDeskProfileId()) {
+  const perm = readCachedPermissions();
+  if (perm && hasPermission(perm.permissoes, 'tickets', 'ver_todos')) return true;
+  if (perm && (perm.funcaoSlug === 'gestao' || (perm.funcoes || []).includes('gestao'))) return true;
+  if (isGestaoDeskProfile(profileId)) return true;
+  if (readAuthDeskRole() === 'supervisor') return true;
+  return false;
+}
+
 export function shouldUseMeusChamadosFila(profileId = readDeskProfileId()) {
+  if (shouldViewAllDeskTickets(profileId)) return false;
+
+  const normalized = normalizeProfileId(profileId);
+  if (['gestao', 'workflow'].includes(normalized)) return false;
+
   const perm = readCachedPermissions();
   if (perm) return permShouldUseMeusChamados(perm);
 
   const authRole = readAuthDeskRole();
   if (authRole === 'agent') return true;
   if (authRole === 'supervisor') return false;
-  const normalized = normalizeProfileId(profileId);
-  return !['gestao', 'workflow'].includes(normalized);
+  return true;
 }
 
 export function buildResponsavelCandidates() {
@@ -87,8 +105,11 @@ export function buildResponsavelCandidates() {
 }
 
 export function ticketMatchesAgentResponsavel(ticket, profileId = readDeskProfileId()) {
+  if (shouldViewAllDeskTickets(profileId)) return true;
+
   const perm = readCachedPermissions();
-  if (perm) return filterTicketForUser(ticket, perm);
+  if (perm && hasPermission(perm.permissoes, 'tickets', 'ver_todos')) return true;
+  if (perm && !permShouldUseMeusChamados(perm)) return true;
 
   if (!shouldUseMeusChamadosFila(profileId)) return true;
 
