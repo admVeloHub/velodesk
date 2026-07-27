@@ -1,6 +1,6 @@
 /**
- * API client v1.14.0 — agentesDesk só via GET (sem sync manual)
- * VERSION: v1.14.0 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team
+ * API client v1.14.1 — GET ticket sem cache (evita 304 vazio)
+ * VERSION: v1.14.1 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -94,7 +94,16 @@ export const ticketsApi = {
   list: () => api.get('/tickets').then((r) => r.data),
   getByProtocol: (protocolo) =>
     api.get(`/tickets/by-protocol/${encodeURIComponent(protocolo.trim())}`).then((r) => r.data),
-  get: (id) => api.get(`/tickets/${id}`).then((r) => r.data),
+  get: (id) => api.get(`/tickets/${id}`, {
+    headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+    params: { _: Date.now() },
+    validateStatus: (status) => status >= 200 && status < 300,
+  }).then((r) => {
+    if (!r.data || (typeof r.data === 'object' && !r.data._id && !r.data.id)) {
+      throw new Error('Resposta vazia ao carregar ticket');
+    }
+    return r.data;
+  }),
   create: (data) => api.post('/tickets', data).then((r) => r.data),
   update: (id, data) => api.put(`/tickets/${id}`, data).then((r) => r.data),
   delete: (id) => api.delete(`/tickets/${id}`).then((r) => r.data),

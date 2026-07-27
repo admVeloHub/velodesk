@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.9.4 — não re-filtra em andamento após meus-chamados API
- * VERSION: v1.9.4 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.9.5 — valida detalhe antes de marcar _detailLoaded
+ * VERSION: v1.9.5 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -217,12 +217,21 @@ export async function loadTicketDetailFromApi(ticketId) {
   deskLog.tickets('loadTicketDetailFromApi → início', { ticketId });
   try {
     const raw = await ticketsApi.get(ticketId);
+    if (raw?.listOnly === true) {
+      throw new Error('API retornou listagem resumida em vez do detalhe completo');
+    }
     const full = apiTicketToCockpit(raw);
+    if (!full?.id && !full?._id) {
+      throw new Error('Ticket inválido na resposta da API');
+    }
     full.listOnly = false;
     full._detailLoaded = true;
     patchTicketInCache(ticketId, full);
     deskLog.tickets('loadTicketDetailFromApi → ok', {
       ticketId,
+      messages: full?.messages?.length || 0,
+      internalNotes: full?.internalNotes?.length || 0,
+      registroHistorico: full?.registroHistorico?.length || 0,
       requisicao: full?.workflow?.requisicao?.valores || {},
       listOnly: full.listOnly,
     });

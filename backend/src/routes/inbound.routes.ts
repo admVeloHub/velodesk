@@ -1,4 +1,4 @@
-﻿/** inbound.routes v1.2.0 — app-notify pós-insert MongoDB */
+﻿/** inbound.routes v1.2.1 — Gmail Pub/Sub: lote + 503 quando backlog (retry Pub/Sub) */
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { env } from '../config/env';
@@ -70,7 +70,18 @@ router.post('/gmail/pubsub', async (req: Request, res: Response) => {
   }
 
   try {
-    const { processed, results } = await handleGmailPubSubPush(req.body);
+    const { processed, results, hasMore } = await handleGmailPubSubPush(req.body);
+
+    if (hasMore) {
+      console.info('[inbound/gmail/pubsub] backlog parcial — aguardando retry Pub/Sub', { processed });
+      return res.status(503).json({
+        ok: false,
+        partial: true,
+        processed,
+        message: 'Backlog parcial — Pub/Sub reentregará para continuar',
+      });
+    }
+
     return res.status(200).json({ ok: true, processed, results });
   } catch (err) {
     console.error('[inbound/gmail/pubsub]', err);

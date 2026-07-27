@@ -1,4 +1,4 @@
-/** tickets.routes v1.10.0 — POST workflow/comunicacao */
+/** tickets.routes v1.10.1 — GET detalhe sem cache HTTP */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -102,6 +102,7 @@ router.get('/:id', authMiddleware, async (req, res: Response) => {
   const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
   const boxes = await loadBoxes();
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
 });
 

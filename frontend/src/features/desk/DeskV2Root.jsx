@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.14.1 | DATE: 2026-07-24
- * — filas vazias permanecem selecionadas (sem redirect automático)
+ * VERSION: v3.14.2 | DATE: 2026-07-27
+ * — recarrega detalhe se ticket ficou vazio (304/cache)
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
@@ -66,6 +66,20 @@ import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET } from '../../services/de
 import ProdutosForwardPopover from './components/ProdutosForwardPopover';
 import WorkflowComunicacaoModal from '../workflow/components/WorkflowComunicacaoModal';
 import { replyWorkflowComunicacao } from '../../services/workflow/workflowDecisionHandlers';
+
+function ticketNeedsDetailLoad(ticket) {
+  if (!ticket) return true;
+  if (ticket.listOnly === true) return true;
+  if (!ticket._detailLoaded) return true;
+  const hasContent = (ticket.messages?.length || 0) > 0
+    || (ticket.internalNotes?.length || 0) > 0
+    || (ticket.registroHistorico?.length || 0) > 0;
+  if (hasContent) return false;
+  const status = String(ticket.status || '').trim().toLowerCase();
+  if (status === 'novo') return false;
+  // Ticket em andamento/resolvido sem thread — provável falha de cache (304)
+  return true;
+}
 
 function applyRightFieldsToTicket(t, rightFields) {
   const prevLf = t.lateralForm || {};
@@ -277,10 +291,7 @@ export default function DeskV2Root() {
     }
     const entry = findTicketEntry(activeTabId);
     const current = entry?.ticket;
-    if (!current?.listOnly && current?._detailLoaded) {
-      return undefined;
-    }
-    if (!current?.listOnly && (current?.messages?.length || current?.registroHistorico?.length)) {
+    if (!ticketNeedsDetailLoad(current)) {
       return undefined;
     }
 
@@ -302,7 +313,7 @@ export default function DeskV2Root() {
     return () => {
       cancelled = true;
     };
-  }, [activeTabId, refreshKey, patchTicket, showNotification]);
+  }, [activeTabId, patchTicket, showNotification]);
 
   useEffect(() => {
     if (pendingAdvanceTicketIdRef.current) return;
