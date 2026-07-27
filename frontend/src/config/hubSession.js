@@ -1,9 +1,24 @@
 /**
- * hubSession v1.0.0 — leitura da sessão VeloHub (hub_sessions)
- * VERSION: v1.0.0 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
+ * hubSession v1.1.0 — aliasColaborador na sessão VeloHub
+ * VERSION: v1.1.0 | DATE: 2026-07-27
  */
 
 export const HUB_SESSION_STORAGE_KEY = 'hub_session';
+
+function resolveFirstLastName(colaboradorNome) {
+  const parts = String(colaboradorNome || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
+
+function resolveHubDisplayName(session) {
+  const alias = String(session?.aliasColaborador || '').trim();
+  if (alias) return alias;
+  const fromNome = resolveFirstLastName(session?.colaboradorNome);
+  if (fromNome) return fromNome;
+  return session?.colaboradorNome || session?.userEmail || '';
+}
 
 export function readHubSession() {
   if (typeof window === 'undefined') return null;
@@ -28,8 +43,10 @@ export function hubSessionToUser(session) {
   if (!session) return null;
   return {
     id: session.sessionId || session.userEmail,
-    name: session.colaboradorNome || session.userEmail,
+    name: resolveHubDisplayName(session),
     email: session.userEmail,
+    aliasColaborador: session.aliasColaborador || '',
+    colaboradorNome: session.colaboradorNome || '',
     role: 'agent',
     source: 'velohub',
     sessionId: session.sessionId,

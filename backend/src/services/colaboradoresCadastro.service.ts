@@ -1,7 +1,7 @@
 /**
- * colaboradoresCadastro.service v1.2.0 — findByEmail não quebra se MONGO_ENV ainda não conectou
- * Campos de login: userMail, password, CPF, colaboradorNome (LISTA_SCHEMAS.rb L652-683)
- * VERSION: v1.2.0 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team
+ * colaboradoresCadastro.service v1.3.0 — aliasColaborador para exibição no Desk
+ * Campos de login: userMail, password, CPF, colaboradorNome, aliasColaborador
+ * VERSION: v1.3.0 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
  */
 import { env } from '../config/env';
 import { getFuncionariosConnection, isFuncionariosConnected } from '../config/database';
@@ -9,6 +9,7 @@ import { getFuncionariosConnection, isFuncionariosConnected } from '../config/da
 export interface ColaboradorDeskPublico {
   _id: unknown;
   colaboradorNome: string;
+  aliasColaborador: string;
   userMail: string;
   atuacao: Array<{ funcao?: string } | string>;
   acessos: Record<string, boolean>;
@@ -26,6 +27,7 @@ const DESK_ACCESS_OR = [
 
 const PUBLIC_PROJECTION = {
   colaboradorNome: 1,
+  aliasColaborador: 1,
   userMail: 1,
   atuacao: 1,
   acessos: 1,
@@ -79,11 +81,35 @@ export function resolveColaboradorPassword(
   return buildDefaultColaboradorPassword(colaboradorNome, cpf);
 }
 
+function resolveFirstLastName(colaboradorNome: string): string {
+  const parts = String(colaboradorNome || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
+
+/** Nome exibido em atendimentos — aliasColaborador ou primeiro+último nome. */
+export function resolveColaboradorDisplayName(
+  colaborador: Pick<ColaboradorDeskPublico, 'aliasColaborador' | 'colaboradorNome'> | null | undefined,
+  emailFallback = '',
+): string {
+  const alias = String(colaborador?.aliasColaborador || '').trim();
+  if (alias) return alias;
+
+  const fromNome = resolveFirstLastName(String(colaborador?.colaboradorNome || ''));
+  if (fromNome) return fromNome;
+
+  const email = String(emailFallback || '').trim().toLowerCase();
+  if (email.includes('@')) return email.split('@')[0] ?? email;
+  return email;
+}
+
 function mapPublico(doc: Record<string, unknown> | null): ColaboradorDeskPublico | null {
   if (!doc) return null;
   return {
     _id: doc._id,
     colaboradorNome: String(doc.colaboradorNome || ''),
+    aliasColaborador: String(doc.aliasColaborador || ''),
     userMail: String(doc.userMail || ''),
     atuacao: Array.isArray(doc.atuacao) ? (doc.atuacao as ColaboradorDeskPublico['atuacao']) : [],
     acessos: (doc.acessos && typeof doc.acessos === 'object'

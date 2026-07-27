@@ -1,6 +1,6 @@
 /**
- * DeskComposePanel v1.9.2 — remove avatar ao lado do compose
- * VERSION: v1.9.2 | DATE: 2026-07-03
+ * DeskComposePanel v1.9.3 — nomeOperador via aliasColaborador / cadastro
+ * VERSION: v1.9.3 | DATE: 2026-07-27
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SEND_STATUS_OPTIONS } from '../../../services/desk/constants';
@@ -8,6 +8,7 @@ import { useComposeSpellCheck } from '../../../hooks/useComposeSpellCheck';
 import { useTabulation } from '../../../context/TabulationContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useNotifications } from '../../../context/NotificationContext';
+import { getDeskDisplayName } from '../../../utils/userDisplayName';
 import { htmlToPlainText, normalizePlainToHtml, COMPOSE_IMAGE_MAX_BYTES } from '../../../services/desk/composeRichEditor';
 import SpellSuggestionBar, { SpellErrorsPanel } from './SpellSuggestionBar';
 import ComposeRichEditor from './ComposeRichEditor';
@@ -299,8 +300,9 @@ export default function DeskComposePanel({
     : 'Digite sua resposta ao cliente...';
 
   const nomeOperador = useMemo(() => {
-    const full = String(user?.name || colaborador?.nome || colaborador?.name || '').trim();
-    return full.split(/\s+/)[0] || '';
+    const full = String(getDeskDisplayName(user, colaborador) || '').trim();
+    if (!full) return '';
+    return full.split(/\s+/)[0] || full;
   }, [user, colaborador]);
 
   const handlePublicReplace = useCallback((startIndex, deleteCount, insertText) => {

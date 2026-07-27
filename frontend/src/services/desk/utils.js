@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.3.11 | DATE: 2026-07-27
- * — múltiplos e-mails/telefones + WhatsApp no cadastro
+ * VERSION: v3.3.12 | DATE: 2026-07-27
+ * — higieniza citação/assinatura em respostas de e-mail na thread
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
@@ -1144,6 +1144,44 @@ function mapAgentInternalNote(note, ticket) {
   };
 }
 
+/**
+ * Extrai só o conteúdo novo de uma resposta de e-mail (sem citação/assinatura).
+ * Espelha backend/src/services/emailReplyContent.util.ts
+ */
+export function extractEmailReplyContent(raw) {
+  let text = String(raw ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (!text.trim()) return '';
+
+  const quoteHeaders = [
+    /^Em\s.+?\sescreveu:\s*$/im,
+    /^On\s.+?\swrote:\s*$/im,
+    /^-{2,}\s*Original Message\s*-{2,}\s*$/im,
+    /^De:\s.+$/im,
+    /^From:\s.+$/im,
+  ];
+
+  let cutAt = text.length;
+  for (const pattern of quoteHeaders) {
+    const match = pattern.exec(text);
+    if (match && match.index != null && match.index < cutAt) {
+      cutAt = match.index;
+    }
+  }
+  text = text.slice(0, cutAt);
+
+  text = text
+    .split('\n')
+    .filter((line) => !/^\s*>/.test(line))
+    .join('\n');
+
+  const sig = /^-- \s*$/m.exec(text);
+  if (sig && sig.index != null) {
+    text = text.slice(0, sig.index);
+  }
+
+  return text.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 export function buildRegistroThread(ticket) {
   if (!ticket) return [];
 
@@ -1194,10 +1232,15 @@ export function buildRegistroThread(ticket) {
     const authorName = isClient
       ? (ticket.clientName || m.author)
       : (m.author || getAgentName());
+    const rawText = String(m.text || m.message || '').trim();
+    const looksLikeEmailReply = /escreveu:|wrote:|Original Message|^\s*>/m.test(rawText);
+    const text = isClient && looksLikeEmailReply
+      ? extractEmailReplyContent(rawText)
+      : rawText;
     return {
       type: bubbleType,
       initials: getInitials(isClient ? ticket.clientName || m.author : authorName),
-      text: String(m.text || m.message || '').trim(),
+      text,
       meta: formatMsgMeta(ts, authorName),
       timestamp: ts,
     };

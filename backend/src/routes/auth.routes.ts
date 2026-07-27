@@ -1,4 +1,4 @@
-/** auth.routes v1.4.1 — login email/senha via funcionarios_cadastroColaboradores + Google SSO */
+/** auth.routes v1.5.0 — display name via aliasColaborador */
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { User } from '../models/User';
@@ -12,19 +12,11 @@ import {
 import {
   findColaboradorAuthByEmail,
   verifyColaboradorPassword,
+  resolveColaboradorDisplayName,
 } from '../services/colaboradoresCadastro.service';
 import { env } from '../config/env';
 
 const router = Router();
-
-function displayNameFromColaborador(
-  colaboradorNome: string,
-  email: string,
-): string {
-  const nome = String(colaboradorNome || '').trim();
-  if (nome) return nome;
-  return String(email || '').split('@')[0] || email;
-}
 
 router.post('/login', async (req: Request, res: Response) => {
   try {
@@ -53,7 +45,7 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(access.status).json({ message: access.reason });
     }
 
-    const name = displayNameFromColaborador(access.colaborador.colaboradorNome, normalizedEmail);
+    const name = resolveColaboradorDisplayName(access.colaborador, normalizedEmail);
 
     let user = await User.findOne({ email: normalizedEmail });
     if (!user) {
@@ -129,10 +121,7 @@ router.post('/auth/google', async (req: Request, res: Response) => {
       return res.status(access.status).json({ message: access.reason });
     }
 
-    const name = displayNameFromColaborador(
-      access.colaborador.colaboradorNome,
-      googleUser.email,
-    );
+    const name = resolveColaboradorDisplayName(access.colaborador, googleUser.email);
 
     let user = await User.findOne({ email: googleUser.email });
     if (!user) {

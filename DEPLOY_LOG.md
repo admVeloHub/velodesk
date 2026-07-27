@@ -1,10 +1,32 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.48.0 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.49.0 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: aliasColaborador, higienização e-mail e expurgo avaliação bot
+
+- **Data/Hora**: 2026-07-27
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.49.0
+  - userDisplayName v1.1.0, colaboradoresCadastro.service v1.3.0, auth.routes v1.5.0
+  - DeskComposePanel v1.9.3, chamado.mapper v2.3.2, emailReplyContent.util v1.0.0
+  - botEvaluationPurge.service v1.0.0, desk/utils v3.3.12
+- **Arquivos modificados**:
+  - `frontend/src/utils/userDisplayName.js`, `clientDb.js`, `AuthContext.js`, `hubSession.js` — nome de exibição: `aliasColaborador` → primeiro+último de `colaboradorNome` → fallback e-mail
+  - `backend/src/services/colaboradoresCadastro.service.ts`, `auth.routes.ts` — projeta `aliasColaborador`; JWT/login usa `resolveColaboradorDisplayName`
+  - `frontend/src/features/desk/components/DeskComposePanel.jsx` — Revisão de texto (Gemini) usa `getDeskDisplayName` no compose
+  - `backend/src/services/emailReplyContent.util.ts`, `email-inbound.service.ts`, `chamado.mapper.ts`, `frontend/src/services/desk/utils.js` — remove citação/assinatura de respostas de e-mail na thread
+  - `backend/scripts/purge-bot-evaluation-tickets.ts`, `botEvaluationPurge.service.ts` — expurgo de tickets de pesquisa `info@velotax.info` (1.398 removidos em dev)
+- **Descrição**: Compositores e revisores de mensagem passam a usar alias ou nome civil em vez do prefixo do e-mail. Respostas inbound de e-mail deixam de poluir a conversa com thread citada. Script de expurgo remove tickets gerados pelas pesquisas de avaliação do bot antes da regra `mail_ignorado`.
+- **Status**: Concluído (push dev + main)
+
+---
 
 ### GitHub Push — Desk: correção crítica do fluxo inbound de e-mail (thread contínua)
 

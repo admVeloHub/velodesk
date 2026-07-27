@@ -1,13 +1,13 @@
 /**
- * AuthContext v1.8.1 — auth_mode por fonte (google | cadastro-desk)
- * VERSION: v1.8.1 | DATE: 2026-07-22 | AUTHOR: VeloHub Development Team
+ * AuthContext v1.8.2 — nome de exibição via aliasColaborador
+ * VERSION: v1.8.2 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import { isGoogleDeskAuthMode, isGoogleDeskSession } from '../config/deskAuthMode';
 import { isLocalDevBypass } from '../config/devAuth';
 import { isHubSessionActive, readHubSession } from '../config/hubSession';
 import { setApiMode } from '../services/ticketsCache';
-import { getDeskDisplayName, isLegacyDeskUser } from '../utils/userDisplayName';
+import { getDeskDisplayName, resolveAgentDisplayName, isLegacyDeskUser } from '../utils/userDisplayName';
 import { clearDeskAuthSession, isBackendJwtUsable } from '../utils/backendJwt';
 import { clearCachedPermissions } from '../services/permissions/permissionService';
 import { notifyAgentOfflineAndStop } from '../services/agentPresence';
@@ -61,7 +61,7 @@ function readInitialAuth() {
         clearStoredAuthSession();
         return { authStatus: 'pending', user: null, colaborador: null, token: null };
       }
-      const displayName = user.name || getDeskDisplayName(user) || user.email;
+      const displayName = getDeskDisplayName(user, colaborador) || user.email;
       const normalizedUser = { ...user, name: displayName };
       return {
         authStatus: 'authorized',
@@ -119,12 +119,17 @@ export function AuthProvider({ children }) {
 
   const bootstrapFromGoogleLogin = useCallback(async (result) => {
     const colaboradorPayload = result.colaborador || null;
-    const displayName = result.user?.name
-      || colaboradorPayload?.colaboradorNome
-      || getDeskDisplayName(result.user?.email);
+    const displayName = resolveAgentDisplayName({
+      aliasColaborador: colaboradorPayload?.aliasColaborador,
+      colaboradorNome: colaboradorPayload?.colaboradorNome,
+      name: result.user?.name,
+      email: result.user?.email,
+    });
     const enrichedUser = {
       ...result.user,
       name: displayName,
+      aliasColaborador: colaboradorPayload?.aliasColaborador || '',
+      colaboradorNome: colaboradorPayload?.colaboradorNome || '',
       source: result.user?.source || 'google-desk',
     };
     setUser(enrichedUser);
@@ -168,9 +173,10 @@ export function AuthProvider({ children }) {
   const updateUser = useCallback((partial) => {
     setUser((prev) => {
       const base = prev || { id: 'local', name: '', email: '' };
+      const colaborador = readStoredColaborador();
       const next = { ...base, ...partial };
-      if (next.email && !partial?.name) {
-        next.name = getDeskDisplayName(next.email);
+      if (!partial?.name) {
+        next.name = getDeskDisplayName(next, colaborador);
       }
       localStorage.setItem('velodesk_user', JSON.stringify(next));
       return next;

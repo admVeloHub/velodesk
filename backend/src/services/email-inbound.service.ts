@@ -1,4 +1,4 @@
-﻿/** email-inbound.service v1.6.0 — claim idempotente por Message-Id antes de create/reply */
+﻿/** email-inbound.service v1.7.0 — higieniza corpo da resposta (sem citação/assinatura) */
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { applyAssignmentIfNeeded } from './assignmentRouter.service';
 import { appendMessage, createChamadoFromBody } from './chamado.mapper';
@@ -11,6 +11,7 @@ import {
   markInboundMessageDone,
   markInboundMessageFailed,
 } from './inboundDedupe.service';
+import { extractEmailReplyContent } from './emailReplyContent.util';
 import type { InboundEmailPayload, InboundEmailProcessResult } from './inbound-email/types';
 
 export const LEGACY_PROTOCOL_PATTERN = /VD-\d{8}-\d{4}/i;
@@ -30,9 +31,8 @@ export function stripHtml(html: string): string {
 
 export function resolveEmailBody(payload: InboundEmailPayload): string {
   const text = payload.textBody.trim();
-  if (text) return text;
-  if (payload.htmlBody) return stripHtml(payload.htmlBody);
-  return '';
+  const raw = text || (payload.htmlBody ? stripHtml(payload.htmlBody) : '');
+  return extractEmailReplyContent(raw);
 }
 
 export function extractProtocolFromSubject(subject: string): string | null {

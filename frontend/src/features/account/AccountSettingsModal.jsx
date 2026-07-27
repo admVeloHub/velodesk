@@ -12,7 +12,7 @@ import { getDeskDisplayName } from '../../utils/userDisplayName';
 import { getInitials } from '../../services/desk/utils';
 
 export default function AccountSettingsModal({ open, onClose }) {
-  const { user, updateUser } = useAuth();
+  const { user, colaborador, updateUser } = useAuth();
   const { darkMode, toggleDarkMode } = useTheme();
   const { showNotification } = useNotifications();
   const { profile } = useProfile();
@@ -25,7 +25,7 @@ export default function AccountSettingsModal({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return undefined;
-    setName(getDeskDisplayName(user) || user?.name || '');
+    setName(getDeskDisplayName(user, colaborador) || user?.name || '');
     setEmail(user?.email || '');
     setCurrentPassword('');
     setNewPassword('');
@@ -40,7 +40,7 @@ export default function AccountSettingsModal({ open, onClose }) {
 
   if (!open) return null;
 
-  const initials = getInitials(getDeskDisplayName(user) || user?.name || '');
+  const initials = getInitials(getDeskDisplayName(user, colaborador) || user?.name || '');
 
   const handleSave = () => {
     if (!name.trim()) {

@@ -1,6 +1,6 @@
 /**
- * TicketsContext v1.7.0 — refresh silencioso das filas (atualização automática do Desk)
- * VERSION: v1.7.0 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.7.1 — refresh silencioso das filas (atualização automática do Desk)
+ * VERSION: v1.7.1 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi } from '../services/ticketsStorage';
@@ -33,7 +33,8 @@ export function TicketsProvider({ children }) {
   const hydratedRef = useRef(false);
 
   const patchTicket = useCallback((ticketId, ticket) => {
-    if (patchTicketInCache(ticketId, ticket)) {
+    const aplicado = patchTicketInCache(ticketId, ticket);
+    if (aplicado) {
       setRefreshKey((k) => k + 1);
     }
   }, []);

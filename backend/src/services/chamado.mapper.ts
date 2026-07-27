@@ -1,4 +1,4 @@
-/** chamado.mapper v2.3.1 — resolvidos na fila meus-chamados sem filtro de responsável */
+/** chamado.mapper v2.3.2 — higieniza texto de resposta de e-mail na montagem do DTO */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -15,6 +15,7 @@ import type { IWorkflowDefinicao } from '../models/WorkflowDefinicao';
 import { assertTabulacaoForStatus } from './tabulation.service';
 import { buildLateralWorkflowDto, loadWorkflowDefForChamado, syncLegacyWorkflowFromBody } from './workflowDto.util';
 import { getWorkflowsByIds } from './workflowDefinicao.service';
+import { extractEmailReplyContent } from './emailReplyContent.util';
 
 export type RegistroOrigin = 'agente' | 'cliente';
 
@@ -926,9 +927,14 @@ function buildTicketDtoCore(
       });
       const regAutor = resolveStoredRegistroAutor(reg, origin, clientName);
       if (reg.mensagemPublica) {
+        const meta = registroMetadados(reg);
+        const isEmailInbound = String(meta.source ?? '').toLowerCase() === 'email-inbound';
+        const publicText = isEmailInbound
+          ? extractEmailReplyContent(reg.mensagemPublica)
+          : reg.mensagemPublica;
         messages.push({
           id: `${index}-pub`,
-          text: reg.mensagemPublica,
+          text: publicText,
           sender: senderFromOrigin(origin),
           origin,
           author: regAutor || undefined,

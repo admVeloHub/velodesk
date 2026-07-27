@@ -1,6 +1,6 @@
 /**
  * Client DB localStorage
- * VERSION: v1.1.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.1.1 | DATE: 2026-07-27
  */
 import { getDeskDisplayName } from '../utils/userDisplayName';
 export function getClientDB() {
@@ -42,7 +42,8 @@ export function resetClientDB() {
 export function getAgentName() {
   try {
     const user = JSON.parse(localStorage.getItem('velodesk_user') || '{}');
-    return getDeskDisplayName(user) || '';
+    const colaborador = JSON.parse(localStorage.getItem('velodesk_colaborador') || '{}');
+    return getDeskDisplayName(user, colaborador) || '';
   } catch {
     return '';
   }

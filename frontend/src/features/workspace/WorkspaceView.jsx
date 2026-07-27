@@ -22,18 +22,18 @@ function resolveWorkspacePanel(profileId) {
 
 export default function WorkspaceView() {
   const { profileId } = useProfile();
-  const { user } = useAuth();
+  const { user, colaborador } = useAuth();
   const Panel = resolveWorkspacePanel(profileId);
 
   const header = useMemo(() => {
     const view = computeAgent360View();
-    const agentName = getDeskDisplayName(user) || view.agentName || '';
+    const agentName = getDeskDisplayName(user, colaborador) || view.agentName || '';
     return {
       greeting: view.greeting,
       agentName,
       dateTimeLabel: view.dateTimeLabel,
     };
-  }, [user]);
+  }, [user, colaborador]);
 
   return (
     <div id="workspace" className="page workspace-page eco-page active">

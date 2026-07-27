@@ -1,6 +1,6 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.16.0 | DATE: 2026-07-27
+ * VERSION: v3.16.1 | DATE: 2026-07-27
  * — atualização automática: ticket aberto (15s) e filas (60s)
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
