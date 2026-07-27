@@ -1,6 +1,6 @@
 /**
- * DeskInternalNotesPanel v1.4.0 — Notas: supervisor (registro agente) / agente (só internas)
- * VERSION: v1.4.0 | DATE: 2026-07-03
+ * DeskInternalNotesPanel v1.4.1 — histórico de alterações por capacidade (não só profileId gestao)
+ * VERSION: v1.4.1 | DATE: 2026-07-27
  */
 import React, { useMemo, useEffect, useState } from 'react';
 import {
@@ -9,6 +9,7 @@ import {
   formatRegistroOccurrenceTimestamp,
 } from '../../../services/desk/utils';
 import { useProfile } from '../../../context/ProfileContext';
+import { shouldViewAllDeskTickets } from '../../../services/desk/responsavelSegmentation';
 
 const KIND_META = {
   agent: { icon: null, useInitials: true },
@@ -110,7 +111,8 @@ function NoteAvatar({ note }) {
 
 export default function DeskInternalNotesPanel({ ticket, client }) {
   const { profileId } = useProfile();
-  const supervisorView = profileId === 'gestao';
+  // Gestão/supervisor/ver_todos: feed completo — mesmo se o portal ativo for "agent" (RBAC).
+  const supervisorView = shouldViewAllDeskTickets(profileId) || profileId === 'gestao';
   const [infoRevision, setInfoRevision] = useState(0);
 
   useEffect(() => {
@@ -124,63 +126,65 @@ export default function DeskInternalNotesPanel({ ticket, client }) {
     [ticket, client, supervisorView, infoRevision],
   );
 
-  const formatTimestamp = supervisorView
-    ? formatRegistroOccurrenceTimestamp
-    : formatInternalNoteTimestamp;
-
   if (!notes.length) {
     return (
       <div className="crm-internal-notes crm-internal-notes--empty">
-        <p>{supervisorView ? 'Nenhuma anotação ou alteração de agente registrada.' : 'Nenhuma nota interna registrada.'}</p>
+        <p>{supervisorView ? 'Nenhuma anotação ou alteração de agente registrada.' : 'Nenhuma nota interna ou alteração registrada.'}</p>
       </div>
     );
   }
 
   return (
     <div className="crm-internal-notes">
-      {notes.map((note, index) => (
-        <React.Fragment key={note.id}>
-          {index > 0 ? <hr className="crm-note-card__divider" aria-hidden="true" /> : null}
-          <article className={`crm-note-card crm-note-card--${note.kind}`}>
-            <div className="crm-note-card__accent" aria-hidden="true" />
-            <div className="crm-note-card__inner">
-              <header className="crm-note-card__head">
-                <div className="crm-note-card__head-left">
-                  <NoteAvatar note={note} />
-                  <div className="crm-note-card__meta">
-                    <strong className="crm-note-card__author">{note.badge}</strong>
-                    {!supervisorView ? (
-                      <span className={`crm-note-card__badge crm-note-card__badge--${note.kind}`}>
-                        {note.author}
-                      </span>
-                    ) : null}
+      {notes.map((note, index) => {
+        const isRegistro = note.kind === 'registro';
+        const timestampLabel = isRegistro
+          ? formatRegistroOccurrenceTimestamp(note.timestamp)
+          : formatInternalNoteTimestamp(note.timestamp);
+        return (
+          <React.Fragment key={note.id}>
+            {index > 0 ? <hr className="crm-note-card__divider" aria-hidden="true" /> : null}
+            <article className={`crm-note-card crm-note-card--${note.kind}`}>
+              <div className="crm-note-card__accent" aria-hidden="true" />
+              <div className="crm-note-card__inner">
+                <header className="crm-note-card__head">
+                  <div className="crm-note-card__head-left">
+                    <NoteAvatar note={note} />
+                    <div className="crm-note-card__meta">
+                      <strong className="crm-note-card__author">{note.badge}</strong>
+                      {!supervisorView && !isRegistro ? (
+                        <span className={`crm-note-card__badge crm-note-card__badge--${note.kind}`}>
+                          {note.author}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-                <time className="crm-note-card__time" dateTime={note.timestamp}>
-                  {formatTimestamp(note.timestamp)}
-                </time>
-              </header>
-              {!supervisorView && note.ticketTitle && !isSameTicketNote(note, ticket) ? (
-                <p className="crm-note-card__ticket-ref">
-                  Ticket #{note.ticketId} · {note.ticketTitle}
-                </p>
-              ) : null}
-              {supervisorView && note.kind === 'registro' ? (
-                <RegistroOccurrenceBody note={note} />
-              ) : (
-                <NoteBody body={note.body} boldSegments={note.boldSegments} />
-              )}
-              {!supervisorView && note.tags?.length ? (
-                <div className="crm-note-card__tags">
-                  {note.tags.map((tag) => (
-                    <span key={tag} className="crm-note-card__tag">{tag}</span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </article>
-        </React.Fragment>
-      ))}
+                  <time className="crm-note-card__time" dateTime={note.timestamp}>
+                    {timestampLabel}
+                  </time>
+                </header>
+                {!supervisorView && !isRegistro && note.ticketTitle && !isSameTicketNote(note, ticket) ? (
+                  <p className="crm-note-card__ticket-ref">
+                    Ticket #{note.ticketId} · {note.ticketTitle}
+                  </p>
+                ) : null}
+                {isRegistro ? (
+                  <RegistroOccurrenceBody note={note} />
+                ) : (
+                  <NoteBody body={note.body} boldSegments={note.boldSegments} />
+                )}
+                {!supervisorView && !isRegistro && note.tags?.length ? (
+                  <div className="crm-note-card__tags">
+                    {note.tags.map((tag) => (
+                      <span key={tag} className="crm-note-card__tag">{tag}</span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </article>
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }

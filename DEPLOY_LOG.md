@@ -1,10 +1,27 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.46.5 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.46.6 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: restaura histórico de alterações na aba Notas
+
+- **Data/Hora**: 2026-07-27
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.46.6
+  - DeskInternalNotesPanel v1.4.1, desk/utils v3.3.10
+- **Arquivos modificados**:
+  - `frontend/src/features/desk/components/DeskInternalNotesPanel.jsx` — visão de histórico por `shouldViewAllDeskTickets` (não só `profileId === gestao`); renderiza cards `registro` com alterações
+  - `frontend/src/services/desk/utils.js` — feed do agente inclui histórico de alterações/status sem remover notas internas
+- **Descrição**: Com mensagens e notas internas já ok, o histórico de alterações sumia porque a aba Notas só montava o feed completo quando `profileId === 'gestao'`. No RBAC atual, gestão/supervisor com `ver_todos` pode operar no portal agent e perdia as alterações. Restaura o histórico sem alterar o cache de detalhe do ticket.
+- **Status**: Concluído (push dev + main)
+
+---
 
 ### GitHub Push — Desk: patchTicketInCache não gravava detalhe no array
 

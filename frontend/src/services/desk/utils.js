@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.3.9 | DATE: 2026-07-24
- * — Gestão vê todos os tickets nas categorias do Desk
+ * VERSION: v3.3.10 | DATE: 2026-07-27
+ * — Agente: notas internas + histórico de alterações na aba Notas
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
@@ -1581,6 +1581,59 @@ function buildSupervisorRegistroFeed(ticket, client) {
   return merged;
 }
 
+/** Agente: só ocorrências com diff de tabulação/status (não duplica notas internas). */
+function buildAgentAlteracoesHistoricoFeed(ticket, client) {
+  const merged = [];
+  const seen = new Set();
+
+  normalizeTicketForDeskV2(ticket);
+  const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
+  const tabulationState = {};
+  let prevStatus = null;
+
+  historico.forEach((entry) => {
+    const previousTabulationState = { ...tabulationState };
+    const {
+      tabulationChanges,
+      statusLabel,
+      previousStatusLabel,
+      statusChanged,
+    } = collectRegistroOccurrenceData(entry, previousTabulationState, prevStatus);
+
+    if (
+      isAgentRegistroEntry(entry)
+      && (tabulationChanges.length > 0 || statusChanged)
+    ) {
+      const ticketId = String(ticket.id || ticket._id);
+      const id = `${ticketId}:${entry.id || entry.registroIndex}:alt`;
+      if (!seen.has(id)) {
+        seen.add(id);
+        const author = resolveRegistroAutorLabel(entry, ticket, client);
+        merged.push({
+          id,
+          kind: 'registro',
+          author,
+          initials: getInitials(author),
+          badge: 'Alteração',
+          timestamp: entry.time || entry.timestamp || ticket.updatedAt,
+          tabulationChanges,
+          statusLabel,
+          previousStatusLabel,
+          statusChanged,
+          internalExcerpt: '',
+          ticketId,
+          ticketTitle: getTicketTitle(ticket),
+        });
+      }
+    }
+
+    applyAlteracoesToTabulationState(tabulationState, entry.alteracoes);
+    if (entry.status) prevStatus = entry.status;
+  });
+
+  return merged;
+}
+
 export function buildClientInternalNotesFeed(ticket, client, options = {}) {
   const { supervisorView = false } = options;
   if (!ticket) return [];
@@ -1589,7 +1642,13 @@ export function buildClientInternalNotesFeed(ticket, client, options = {}) {
     return buildSupervisorRegistroFeed(ticket, client);
   }
 
-  return buildAgentInternalNotesFeed(ticket);
+  const notes = buildAgentInternalNotesFeed(ticket);
+  const alteracoes = buildAgentAlteracoesHistoricoFeed(ticket, client);
+  if (!alteracoes.length) return notes;
+
+  return [...notes, ...alteracoes].sort(
+    (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
+  );
 }
 
 export function applySendStatus(entry, queueId) {
