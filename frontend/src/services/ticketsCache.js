@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.9.6 — não preserva detalhe vazio no merge (race refresh vs GET /:id)
- * VERSION: v1.9.6 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.9.7 — patchTicketInCache grava de fato em box.tickets[]
+ * VERSION: v1.9.7 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -229,7 +229,8 @@ export function setCachedColumns(next, userEmail = '') {
 export function patchTicketInCache(ticketId, nextTicket, userEmail = '') {
   const entry = findInColumns(ticketId);
   if (!entry) return false;
-  entry.ticket = nextTicket;
+  // Substitui o item no array — entry.ticket = x só muda o wrapper local e não atualiza columns.
+  entry.box.tickets[entry.index] = nextTicket;
   persistColumnsToStorage(columns, userEmail);
   return true;
 }
@@ -347,8 +348,13 @@ function findInColumns(ticketId) {
   const id = String(ticketId);
   for (let i = 0; i < columns.length; i++) {
     const box = columns[i];
-    const t = (box.tickets || []).find((x) => String(x.id) === id || String(x._id) === id);
-    if (t) return { ticket: t, box, boxId: box.id };
+    if (!Array.isArray(box.tickets)) continue;
+    const index = box.tickets.findIndex(
+      (x) => String(x.id) === id || String(x._id) === id,
+    );
+    if (index >= 0) {
+      return { ticket: box.tickets[index], box, boxId: box.id, index };
+    }
   }
   return null;
 }
@@ -376,7 +382,7 @@ export async function updateTicketViaApi(ticketId, updater) {
     return findInColumns(apiId)?.ticket || updated;
   }
 
-  entry.ticket = updated;
+  entry.box.tickets[entry.index] = updated;
   return updated;
 }
 

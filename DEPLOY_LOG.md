@@ -1,10 +1,26 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.46.4 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.46.5 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: patchTicketInCache não gravava detalhe no array
+
+- **Data/Hora**: 2026-07-27
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.46.5
+  - ticketsCache v1.9.7
+- **Arquivos modificados**:
+  - `frontend/src/services/ticketsCache.js` — `patchTicketInCache` e update offline passam a substituir `box.tickets[index]`; `findInColumns` retorna o índice
+- **Descrição**: Corrige causa raiz da UI sem conversa/notas/histórico: GET `/tickets/:id` retornava o detalhe completo, mas `entry.ticket = next` só alterava um wrapper local e o array da listagem (`listOnly` vazio) continuava sendo lido pelo Desk.
+- **Status**: Concluído (push dev + main)
+
+---
 
 ### GitHub Push — Desk: race condition apagava conteúdo de tickets após refresh
 
