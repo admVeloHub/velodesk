@@ -1,10 +1,32 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.49.0 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.50.0 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: instrumentação auto-refresh prod + rede local
+
+- **Data/Hora**: 2026-07-27
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.50.0
+  - deskPlatformTrace v1.0.0, deskTraceIngestConfig v1.0.0, deskDebugLog v1.0.1
+  - DeskV2Root v3.16.3, TicketsContext v1.7.3, .env.example v1.3.1
+- **Arquivos modificados**:
+  - `frontend/src/utils/deskPlatformTrace.js` (novo) — traços enxutos sempre no console (`[VeloDesk:trace]`) com contexto env/host/rede; ingest opcional
+  - `frontend/src/utils/deskTraceIngestConfig.js` (novo) — URL de ingest via sessionStorage, `VITE_DESK_TRACE_INGEST_URL` ou localhost:7310 em dev
+  - `frontend/src/utils/deskDebugLog.js` — `velodeskDebug.setTraceIngest()` / `getTraceIngest()`
+  - `frontend/src/features/desk/DeskV2Root.jsx` — poll 15s: `poll:msgs-mudou`, `poll:erro`, `render:thread-mudou`
+  - `frontend/src/context/TicketsContext.js` — `patchTicket:miss` quando cache não aplica patch
+  - `frontend/.env.example` — documenta `VITE_DESK_TRACE_INGEST_URL`
+- **Descrição**: Centraliza instrumentação do auto-refresh do Desk para funcionar em produção e rede local (console sempre visível). Ingest remoto deixa de depender de fetch hardcoded espalhado; em prod sem config só console; em dev/LAN configurável por env ou `velodeskDebug.setTraceIngest(url)`.
+- **Status**: Pendente push
+
+---
 
 ### GitHub Push — Desk: aliasColaborador, higienização e-mail e expurgo avaliação bot
 

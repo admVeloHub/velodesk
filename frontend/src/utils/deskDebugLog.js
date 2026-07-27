@@ -1,11 +1,13 @@
 /**
- * deskDebugLog v1.0.0 — console de diagnóstico forçável (usa console.log, não debug)
- * VERSION: v1.0.0 | DATE: 2026-07-24
+ * deskDebugLog v1.0.1 — console de diagnóstico forçável (usa console.log, não debug)
+ * VERSION: v1.0.1 | DATE: 2026-07-27
  *
  * Ativar:  localStorage.setItem('velodesk:debug', '1'); location.reload();
  * Desativar: localStorage.removeItem('velodesk:debug'); location.reload();
  * Ou no console: velodeskDebug.enable() / velodeskDebug.disable()
  */
+import { setDeskTraceIngestUrl, getDeskTraceIngestUrl } from './deskTraceIngestConfig';
+
 const STORAGE_KEY = 'velodesk:debug';
 const PREFIX = '[VeloDesk]';
 
@@ -94,6 +96,11 @@ export function initDeskDebug() {
       if (isDeskDebugEnabled()) window.velodeskDebug.disable();
       else window.velodeskDebug.enable();
     },
+    setTraceIngest(url) {
+      setDeskTraceIngestUrl(url);
+      console.log(`${PREFIX} trace ingest →`, getDeskTraceIngestUrl() || '(desativado — só console)');
+    },
+    getTraceIngest: getDeskTraceIngestUrl,
   };
 
   if (!isDeskDebugEnabled() || bannerPrinted) return;

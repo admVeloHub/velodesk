@@ -1,12 +1,12 @@
 /**
- * TicketsContext v1.7.1 — refresh silencioso das filas (atualização automática do Desk)
- * VERSION: v1.7.1 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.7.3 — instrumentação patchTicket miss (prod + rede local)
+ * VERSION: v1.7.3 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi } from '../services/ticketsStorage';
 import { hydrateColumnsFromStorage, patchTicketInCache } from '../services/ticketsCache';
 import { getTicketProtocolLabel } from '../services/desk/utils';
-import deskLog from '../utils/deskDebugLog';
+import deskPlatformTrace from '../utils/deskPlatformTrace';
 import { useAuth } from './AuthContext';
 
 const TicketsContext = createContext(null);
@@ -34,6 +34,10 @@ export function TicketsProvider({ children }) {
 
   const patchTicket = useCallback((ticketId, ticket) => {
     const aplicado = patchTicketInCache(ticketId, ticket);
+    if (!aplicado) {
+      const detail = { ticketId: String(ticketId), msgs: ticket?.messages?.length ?? null };
+      deskPlatformTrace('tickets-cache', 'patchTicket:miss', detail, 'warn');
+    }
     if (aplicado) {
       setRefreshKey((k) => k + 1);
     }

@@ -1,7 +1,8 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.16.1 | DATE: 2026-07-27
+ * VERSION: v3.16.3 | DATE: 2026-07-27
  * — atualização automática: ticket aberto (15s) e filas (60s)
+ * — instrumentação enxuta do poll de detalhe (só mudança de mensagens / erros)
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
@@ -66,6 +67,7 @@ import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET } from '../../services/de
 import ProdutosForwardPopover from './components/ProdutosForwardPopover';
 import WorkflowComunicacaoModal from '../workflow/components/WorkflowComunicacaoModal';
 import { replyWorkflowComunicacao } from '../../services/workflow/workflowDecisionHandlers';
+import deskPlatformTrace, { createPlatformTraceCounter } from '../../utils/deskPlatformTrace';
 
 /** Respostas de cliente chegam por e-mail a qualquer momento: a thread se atualiza sozinha */
 const AUTO_REFRESH_DETAIL_MS = 15000;
@@ -84,6 +86,8 @@ function ticketNeedsDetailLoad(ticket) {
   // Ticket em andamento/resolvido sem thread — provável falha de cache (304)
   return true;
 }
+
+const agentDebugMsgCount = createPlatformTraceCounter();
 
 function applyRightFieldsToTicket(t, rightFields) {
   const prevLf = t.lateralForm || {};
@@ -337,8 +341,22 @@ export default function DeskV2Root() {
       inFlight = true;
       try {
         const full = await loadTicketDetailFromApi(ticketId);
+        const msgs = full?.messages?.length ?? 0;
+        const prev = agentDebugMsgCount[ticketId];
+        if (prev == null || msgs !== prev) {
+          const last = full?.messages?.[msgs - 1];
+          deskPlatformTrace('auto-refresh', 'poll:msgs-mudou', {
+            ticketId,
+            de: prev ?? null,
+            para: msgs,
+            ultimaOrigem: last?.origin || last?.sender || null,
+            patch: !cancelled && !commitInProgressRef.current,
+          });
+          agentDebugMsgCount[ticketId] = msgs;
+        }
         if (!cancelled && !commitInProgressRef.current) patchTicket(ticketId, full);
-      } catch {
+      } catch (err) {
+        deskPlatformTrace('auto-refresh', 'poll:erro', { ticketId, message: String(err?.message || err) }, 'warn');
         /* rede instável não deve interromper o atendimento */
       } finally {
         inFlight = false;
@@ -860,6 +878,15 @@ export default function DeskV2Root() {
   };
 
   const convMsgs = ticket ? buildRegistroThread(ticket) : [];
+  if (ticket?.id) {
+    const tid = String(ticket.id);
+    const threadLen = convMsgs.length;
+    const prevThread = agentDebugMsgCount[`thread:${tid}`];
+    if (prevThread !== threadLen) {
+      agentDebugMsgCount[`thread:${tid}`] = threadLen;
+      deskPlatformTrace('auto-refresh', 'render:thread-mudou', { ticketId: tid, msgsNaThread: threadLen, refreshKey });
+    }
+  }
   const ticketAi = useTicketAiSuggestions(ticket, rightFields, convMsgs, internalText);
 
   const handleApplyTabulation = useCallback(async () => {
