@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.14.2 | DATE: 2026-07-27
- * — recarrega detalhe se ticket ficou vazio (304/cache)
+ * VERSION: v3.14.3 | DATE: 2026-07-27
+ * — recarrega detalhe após refresh de filas se ticket ficou vazio
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
@@ -313,7 +313,7 @@ export default function DeskV2Root() {
     return () => {
       cancelled = true;
     };
-  }, [activeTabId, patchTicket, showNotification]);
+  }, [activeTabId, refreshKey, patchTicket, showNotification]);
 
   useEffect(() => {
     if (pendingAdvanceTicketIdRef.current) return;

@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.9.5 — valida detalhe antes de marcar _detailLoaded
- * VERSION: v1.9.5 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.9.6 — não preserva detalhe vazio no merge (race refresh vs GET /:id)
+ * VERSION: v1.9.6 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -15,7 +15,7 @@ import {
 import { readDeskProfileId, shouldUseMeusChamadosFila, ticketMatchesAgentResponsavel } from './desk/responsavelSegmentation';
 import { getAgentName } from './clientDb';
 
-const BOXES_CACHE_KEY = 'velodesk_boxes_cache_v1';
+const BOXES_CACHE_KEY = 'velodesk_boxes_cache_v2';
 const BOXES_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 let columns = [];
@@ -82,7 +82,9 @@ export function getCachedColumns() {
 function stripDraftsFromColumns(cols) {
   return (cols || []).map((box) => ({
     ...box,
-    tickets: (box.tickets || []).filter((ticket) => !isDraftTicket(ticket)),
+    tickets: (box.tickets || [])
+      .filter((ticket) => !isDraftTicket(ticket))
+      .map(sanitizeTicketDetailFlags),
   }));
 }
 
@@ -132,13 +134,33 @@ function mergeLateralFormPreservingWorkflow(prevLf = {}, nextLf = {}) {
   return merged;
 }
 
+function ticketHasDetailContent(ticket) {
+  if (!ticket) return false;
+  return (ticket.messages?.length || 0) > 0
+    || (ticket.internalNotes?.length || 0) > 0
+    || (ticket.registroHistorico?.length || 0) > 0;
+}
+
+function sanitizeTicketDetailFlags(ticket) {
+  if (!ticket || isDraftTicket(ticket)) return ticket;
+  if (!ticket._detailLoaded || ticketHasDetailContent(ticket)) return ticket;
+  return {
+    ...ticket,
+    _detailLoaded: false,
+    listOnly: true,
+    messages: [],
+    internalNotes: [],
+    registroHistorico: [],
+  };
+}
+
 function mergePreservedDetails(prevCols, nextCols) {
   const preserved = new Map();
   (prevCols || []).forEach((box) => {
     (box.tickets || []).forEach((ticket) => {
-      if (ticket._detailLoaded && !isDraftTicket(ticket)) {
-        preserved.set(String(ticket.id || ticket._id), ticket);
-      }
+      if (!ticket._detailLoaded || isDraftTicket(ticket)) return;
+      if (!ticketHasDetailContent(ticket)) return;
+      preserved.set(String(ticket.id || ticket._id), ticket);
     });
   });
   if (!preserved.size) return nextCols;
@@ -191,7 +213,7 @@ export function hydrateColumnsFromStorage(expectedEmail = '') {
     if (normalizedExpected && normalizedStored && normalizedExpected !== normalizedStored) return false;
     columns = parsed.columns.map((box) => ({
       ...box,
-      tickets: [...(box.tickets || [])],
+      tickets: (box.tickets || []).map(sanitizeTicketDetailFlags),
     }));
     return true;
   } catch {
@@ -279,13 +301,13 @@ export async function loadBoxesFromApi(userEmail = '') {
     const profileId = readDeskProfileId();
     const params = shouldUseMeusChamadosFila(profileId) ? { fila: 'meus-chamados' } : undefined;
     const data = await boxesApi.list(params);
-    const prevColumns = columns;
-    columns = filterColumnsForAgent(
-      mergePreservedDetails(
-        prevColumns,
-        injectDraftTickets(adaptColumnsFromApi(data, { fila: params?.fila }), drafts),
-      ),
+    const nextCols = injectDraftTickets(
+      adaptColumnsFromApi(data, { fila: params?.fila }),
+      drafts,
     );
+    // Usa columns no momento do merge (não snapshot no início) — evita apagar detalhe
+    // carregado via GET /:id enquanto a listagem /boxes ainda estava em voo.
+    columns = filterColumnsForAgent(mergePreservedDetails(columns, nextCols));
     persistColumnsToStorage(columns, userEmail);
     const ticketCount = columns.reduce((n, box) => n + (box.tickets?.length || 0), 0);
     const withRequisicao = columns.flatMap((b) => b.tickets || [])

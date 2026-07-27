@@ -1,10 +1,27 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.46.3 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.46.4 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: race condition apagava conteúdo de tickets após refresh
+
+- **Data/Hora**: 2026-07-27
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.46.4
+  - ticketsCache v1.9.6, DeskV2Root v3.14.3
+- **Arquivos modificados**:
+  - `frontend/src/services/ticketsCache.js` — merge preserva detalhe só com conteúdo real; usa estado atual das colunas no merge (não snapshot); cache local `velodesk_boxes_cache_v2`; sanitiza `_detailLoaded` vazio
+  - `frontend/src/features/desk/DeskV2Root.jsx` — recarrega detalhe após refresh de filas (`refreshKey`)
+- **Descrição**: Corrige regressão em que GET `/tickets/:id` carregava o ticket completo, mas o refresh de `/boxes` sobrescrevia com cache vazio (`_detailLoaded` sem mensagens). Conversa, notas e histórico voltam a persistir na UI.
+- **Status**: Concluído (push dev + main)
+
+---
 
 ### GitHub Push — Desk: conteúdo de tickets + Gmail Pub/Sub em lotes
 
