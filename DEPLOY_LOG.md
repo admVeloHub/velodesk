@@ -11,7 +11,7 @@
 - **Data/Hora**: 2026-07-27
 - **Tipo**: GitHub Push
 - **Repositório**: https://github.com/admVeloHub/velodesk
-- **Branch**: dev
+- **Branch**: dev + main
 - **Versão (componentes)**:
   - DEPLOY_LOG v1.50.0
   - deskPlatformTrace v1.0.0, deskTraceIngestConfig v1.0.0, deskDebugLog v1.0.1
@@ -24,7 +24,7 @@
   - `frontend/src/context/TicketsContext.js` — `patchTicket:miss` quando cache não aplica patch
   - `frontend/.env.example` — documenta `VITE_DESK_TRACE_INGEST_URL`
 - **Descrição**: Centraliza instrumentação do auto-refresh do Desk para funcionar em produção e rede local (console sempre visível). Ingest remoto deixa de depender de fetch hardcoded espalhado; em prod sem config só console; em dev/LAN configurável por env ou `velodeskDebug.setTraceIngest(url)`.
-- **Status**: Pendente push
+- **Status**: Concluído (push dev + main)
 
 ---
 
