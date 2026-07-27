@@ -1,6 +1,6 @@
 /**
  * Seções da Central de Configurações
- * VERSION: v1.3.3 | DATE: 2026-07-15
+ * VERSION: v1.4.0 | DATE: 2026-07-27
  */
 export const CONFIG_SECTIONS = [
   {
@@ -23,6 +23,13 @@ export const CONFIG_SECTIONS = [
     menuDesc: 'RBAC, funções Desk e agentes VeloHub',
     cardDesc: 'Overrides por função e lista de agentes',
     icon: 'ti-shield-lock',
+  },
+  {
+    id: 'email',
+    label: 'E-mail',
+    menuDesc: 'Ignorados, spam e remetentes prioritários',
+    cardDesc: 'Filtros do inbound antes de criar tickets',
+    icon: 'ti-mail',
   },
   {
     id: 'automations',

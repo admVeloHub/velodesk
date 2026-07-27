@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.3.10 | DATE: 2026-07-27
- * — Agente: notas internas + histórico de alterações na aba Notas
+ * VERSION: v3.3.11 | DATE: 2026-07-27
+ * — múltiplos e-mails/telefones + WhatsApp no cadastro
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
@@ -237,15 +237,27 @@ export function buildTags(ticket) {
 
 export function getClientContactFields(ticket, client) {
   const lf = ticket?.lateralForm || {};
-  const emails = lf.clienteEmail;
-  const phones = lf.clienteTelefone;
-  const emailFromLf = Array.isArray(emails) ? emails[0] : emails?.lista?.[0];
-  const phoneFromLf = Array.isArray(phones) ? phones[0] : phones?.lista?.[0];
+  const emailsRaw = lf.clienteEmail;
+  const phonesRaw = lf.clienteTelefone;
+  const emailList = Array.isArray(emailsRaw)
+    ? emailsRaw.map((item) => String(item || '').trim()).filter(Boolean)
+    : (emailsRaw?.lista || []).map((item) => String(item || '').trim()).filter(Boolean);
+  const phoneList = Array.isArray(phonesRaw)
+    ? phonesRaw.map((item) => String(item || '').trim()).filter(Boolean)
+    : (phonesRaw?.lista || []).map((item) => String(item || '').trim()).filter(Boolean);
+  const whatsappFromLf = String(lf.clienteTelefoneWhatsapp || '').trim();
+  const whatsappFromClient = String(client?.whatsappPhone || client?.telefoneWhatsapp || '').trim();
+  const whatsappPhone = whatsappFromLf || whatsappFromClient || phoneList[0] || '';
+  const emailFromLf = emailList[0];
+  const phoneFromLf = whatsappPhone || phoneList[0];
   return {
     name: lf.clienteNome || ticket?.clientName || ticket?.solicitante || client?.name || '',
     cpf: formatCpf(lf.clienteCpf || lf.cpf || ticket?.clientCPF || client?.cpf || ''),
     email: emailFromLf || ticket?.clientEmail || client?.email || '',
     phone: phoneFromLf || ticket?.clientPhone || client?.telefone || '',
+    emails: emailList,
+    phones: phoneList,
+    whatsappPhone,
   };
 }
 

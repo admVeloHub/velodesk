@@ -1,4 +1,4 @@
-/** gmailWatch.service v1.1.0 — users.watch + renovação + health preciso */
+/** gmailWatch.service v1.2.0 — watch preserva ponteiro de history; avanço monotônico */
 import { env } from '../../config/env';
 import { isDeskConfigConnected } from '../../config/database';
 import { getGmailWatchStateModel, findGmailWatchSingleton } from '../../models/GmailWatchState';
@@ -21,6 +21,10 @@ export interface GmailWatchHealth {
   lastWatchAt: string | null;
 }
 
+/**
+ * Grava o registro do watch sem tocar no historyId já existente: sobrescrever o ponteiro
+ * descartaria silenciosamente todo o backlog ainda não processado.
+ */
 async function persistWatchState(mailbox: string, historyId: string, expiration: number) {
   const Model = getGmailWatchStateModel();
   await Model.findOneAndUpdate(
@@ -29,13 +33,21 @@ async function persistWatchState(mailbox: string, historyId: string, expiration:
       $set: {
         configKey: env.gmailWatchStateDocumentId,
         mailbox,
-        historyId: String(historyId),
         expiration,
         lastWatchAt: new Date(),
       },
+      $setOnInsert: { historyId: String(historyId) },
     },
     { upsert: true, new: true }
   );
+
+  const current = await findGmailWatchSingleton();
+  if (!current?.historyId) {
+    await Model.updateOne(
+      { configKey: env.gmailWatchStateDocumentId },
+      { $set: { historyId: String(historyId) } }
+    );
+  }
 }
 
 export async function setupGmailWatch(): Promise<{ historyId: string; expiration: number } | null> {
@@ -133,11 +145,36 @@ export async function getStoredHistoryId(): Promise<string | null> {
   return state?.historyId ? String(state.historyId) : null;
 }
 
-export async function updateStoredHistoryId(historyId: string): Promise<void> {
+function toHistoryNumber(value: unknown): bigint | null {
+  const raw = String(value ?? '').trim();
+  if (!/^\d+$/.test(raw)) return null;
+  try {
+    return BigInt(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Avança o ponteiro apenas para frente. Retorna true quando houve avanço real.
+ * Retroceder reprocessaria histórico já consumido e geraria duplicidade.
+ */
+export async function updateStoredHistoryId(historyId: string): Promise<boolean> {
+  const next = String(historyId ?? '').trim();
+  if (!next) return false;
+
+  const current = await getStoredHistoryId();
+  const nextNum = toHistoryNumber(next);
+  const currentNum = toHistoryNumber(current);
+
+  if (current === next) return false;
+  if (nextNum !== null && currentNum !== null && nextNum <= currentNum) return false;
+
   const Model = getGmailWatchStateModel();
   await Model.findOneAndUpdate(
     { configKey: env.gmailWatchStateDocumentId },
-    { $set: { historyId: String(historyId) } },
+    { $set: { historyId: next } },
     { upsert: true }
   );
+  return true;
 }

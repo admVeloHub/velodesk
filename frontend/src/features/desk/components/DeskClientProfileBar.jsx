@@ -1,10 +1,15 @@
 /**
- * DeskClientProfileBar v1.5.0 — Avançar Workflow ao lado do stepper
- * VERSION: v1.5.0 | DATE: 2026-07-16
+ * DeskClientProfileBar v1.6.0 — múltiplos e-mails/telefones + WhatsApp
+ * VERSION: v1.6.0 | DATE: 2026-07-27
  */
 import React, { useEffect, useState } from 'react';
 import { getClientContactFields, getClientActiveProducts, getProductTagClass, getTicketProtocolLabel, isTicketInWorkflow } from '../../../services/desk/utils';
+import { useNotifications } from '../../../context/NotificationContext';
 import TicketWorkflowStepper from './TicketWorkflowStepper';
+import ClientContactFieldsEditor, {
+  buildContactDraftFromFields,
+  validateClientContactDraft,
+} from './ClientContactFieldsEditor';
 
 function resolveProtocolLabel(ticket) {
   const protocol = getTicketProtocolLabel(ticket);
@@ -22,24 +27,45 @@ export default function DeskClientProfileBar({
   advancingWorkflow = false,
   canAdvanceWorkflow = false,
 }) {
+  const { showNotification } = useNotifications();
   const [editOpen, setEditOpen] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
-  const [draft, setDraft] = useState({ name: '', email: '', phone: '' });
+  const [draft, setDraft] = useState({
+    name: '',
+    emails: [''],
+    phones: [''],
+    whatsappPhone: '',
+  });
+  const [emailErrors, setEmailErrors] = useState({});
   const contact = getClientContactFields(ticket, client);
   const activeProducts = getClientActiveProducts(ticket, client);
   const protocolLabel = resolveProtocolLabel(ticket);
   const inWorkflow = isTicketInWorkflow(ticket);
 
   const openEdit = () => {
-    setDraft({ name: contact.name, email: contact.email, phone: contact.phone });
+    setDraft(buildContactDraftFromFields(contact));
+    setEmailErrors({});
     setEditOpen(true);
   };
 
   const saveEdit = async () => {
     if (!onSaveContact || savingContact) return;
+    const validation = validateClientContactDraft(draft);
+    if (!validation.ok) {
+      if (validation.emailIndex != null) {
+        setEmailErrors({ [validation.emailIndex]: true });
+      }
+      showNotification(validation.message, 'error');
+      return;
+    }
     setSavingContact(true);
     try {
-      await onSaveContact(draft);
+      await onSaveContact({
+        name: validation.nome,
+        emails: validation.emailList,
+        phones: validation.phoneList,
+        whatsappPhone: validation.whatsappPhone,
+      });
       setEditOpen(false);
     } catch {
       // notificação tratada no DeskV2Root
@@ -100,18 +126,33 @@ export default function DeskClientProfileBar({
               <i className="ti ti-pencil" aria-hidden="true" />
             </button>
             {editOpen && (
-              <div className="crm-client-edit-popover" id="clientEditPopover" role="dialog" aria-labelledby="clientEditPopoverTitle">
+              <div className="crm-client-edit-popover crm-client-edit-popover--wide" id="clientEditPopover" role="dialog" aria-labelledby="clientEditPopoverTitle">
                 <button type="button" className="crm-client-edit-popover__close" id="btnCloseClientEdit" title="Fechar" aria-label="Fechar" onClick={() => setEditOpen(false)}>
                   <i className="ti ti-x" />
                 </button>
                 <h3 className="crm-client-edit-popover__title" id="clientEditPopoverTitle">Editar contato</h3>
                 <div className="crm-client-edit-popover__fields">
-                  <label className="crm-client-edit-popover__label" htmlFor="editClientName">Nome</label>
-                  <input type="text" className="crm-client-edit-popover__input" id="editClientName" value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} autoComplete="name" />
-                  <label className="crm-client-edit-popover__label" htmlFor="editClientEmail">E-mail</label>
-                  <input type="email" className="crm-client-edit-popover__input" id="editClientEmail" value={draft.email} onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))} autoComplete="email" />
-                  <label className="crm-client-edit-popover__label" htmlFor="editClientPhone">Telefone</label>
-                  <input type="tel" className="crm-client-edit-popover__input" id="editClientPhone" value={draft.phone} onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))} autoComplete="tel" />
+                  <ClientContactFieldsEditor
+                    idPrefix="editClient"
+                    name={draft.name}
+                    onNameChange={(value) => setDraft((d) => ({ ...d, name: value }))}
+                    emails={draft.emails}
+                    onEmailsChange={(emails) => setDraft((d) => ({ ...d, emails }))}
+                    phones={draft.phones}
+                    onPhonesChange={(phones) => setDraft((d) => ({ ...d, phones }))}
+                    whatsappPhone={draft.whatsappPhone}
+                    onWhatsappPhoneChange={(whatsappPhone) => setDraft((d) => ({ ...d, whatsappPhone }))}
+                    emailErrors={emailErrors}
+                    onEmailBlur={(index, value) => {
+                      const trimmed = String(value || '').trim();
+                      setEmailErrors((prev) => {
+                        const next = { ...prev };
+                        if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) next[index] = true;
+                        else delete next[index];
+                        return next;
+                      });
+                    }}
+                  />
                 </div>
                 <div className="crm-client-edit-popover__footer">
                   <button

@@ -1,6 +1,6 @@
 /**
- * TicketsContext v1.6.1 — recarrega filas ao carregar permissões (gestão vê todos)
- * VERSION: v1.6.1 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.7.0 — refresh silencioso das filas (atualização automática do Desk)
+ * VERSION: v1.7.0 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi } from '../services/ticketsStorage';
@@ -38,10 +38,10 @@ export function TicketsProvider({ children }) {
     }
   }, []);
 
-  const refreshTickets = useCallback(async () => {
+  const runRefresh = useCallback(async (silent) => {
     if (isAuthenticated) {
-      setLoading(true);
-      deskLog.tickets('TicketsContext.refreshTickets → início');
+      if (!silent) setLoading(true);
+      deskLog.tickets('TicketsContext.refreshTickets → início', { silent: Boolean(silent) });
       try {
         await refreshTicketsFromApi(user?.email);
         deskLog.tickets('TicketsContext.refreshTickets → ok');
@@ -51,8 +51,11 @@ export function TicketsProvider({ children }) {
         deskLog.error('TICKETS', 'TicketsContext.refreshTickets → falhou', {
           status,
           message: apiMsg || err?.message,
+          silent: Boolean(silent),
         });
-        if (status === 401 || status === 403) {
+        if (silent) {
+          // Atualização de fundo: falha de rede não deve poluir o console do agente
+        } else if (status === 401 || status === 403) {
           console.warn('TicketsContext: sessão inválida ao carregar tickets — faça login novamente.');
         } else if (status === 503 || /mongodb|banco/i.test(apiMsg)) {
           console.warn('TicketsContext: backend/Mongo indisponível ao carregar tickets.');
@@ -60,12 +63,17 @@ export function TicketsProvider({ children }) {
           console.warn('TicketsContext: falha ao carregar tickets.', apiMsg || err?.message);
         }
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
     }
     setRefreshKey((k) => k + 1);
     return getTicketColumns();
   }, [isAuthenticated, user?.email]);
+
+  const refreshTickets = useCallback(() => runRefresh(false), [runRefresh]);
+
+  /** Atualização de fundo: sem spinner e sem ruído de log */
+  const refreshTicketsSilent = useCallback(() => runRefresh(true), [runRefresh]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -158,6 +166,7 @@ export function TicketsProvider({ children }) {
       replaceOpenTabId,
       setActiveTabId,
       refreshTickets,
+      refreshTicketsSilent,
       selectTicketFromModal,
       getTicketColumns,
       patchTicket,

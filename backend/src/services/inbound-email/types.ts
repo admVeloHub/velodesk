@@ -1,4 +1,4 @@
-﻿/** inbound-email/types v1.0.0 */
+﻿/** inbound-email/types v1.1.0 — action skipped (spam/ignorado) */
 
 export interface InboundEmailAttachment {
   filename: string;
@@ -19,10 +19,12 @@ export interface InboundEmailPayload {
   receivedAt: Date;
 }
 
-export type InboundEmailProcessAction = 'created' | 'replied' | 'duplicate';
+export type InboundEmailProcessAction = 'created' | 'replied' | 'duplicate' | 'skipped';
 
 export interface InboundEmailProcessResult {
   action: InboundEmailProcessAction;
-  chamadoProtocolo: string;
-  ticketId: string;
+  chamadoProtocolo?: string;
+  ticketId?: string;
+  reason?: 'spam' | 'ignored';
+  messageId?: string;
 }

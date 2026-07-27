@@ -1,4 +1,4 @@
-﻿/** inbound.routes v1.2.1 — Gmail Pub/Sub: lote + 503 quando backlog (retry Pub/Sub) */
+﻿/** inbound.routes v1.3.0 — Gmail Pub/Sub: 503 em backlog parcial e em cold start do desk_config */
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { env } from '../config/env';
@@ -84,7 +84,14 @@ router.post('/gmail/pubsub', async (req: Request, res: Response) => {
 
     return res.status(200).json({ ok: true, processed, results });
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error('[inbound/gmail/pubsub]', err);
+
+    // Instância ainda subindo: 503 faz o Pub/Sub reentregar em vez de descartar a notificação
+    if (/desk_config|MongoDB|indispon/i.test(message)) {
+      return res.status(503).json({ ok: false, retry: true, message });
+    }
+
     return res.status(500).json({ message: 'Falha ao processar notificação Gmail' });
   }
 });

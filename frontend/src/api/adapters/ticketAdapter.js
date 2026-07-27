@@ -1,6 +1,6 @@
 /**
- * ticketAdapter v1.6.0 — listOnly + queueEntryAt da listagem
- * VERSION: v1.6.0 | DATE: 2026-07-23 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.6.1 — clienteTelefoneWhatsapp no lateralForm
+ * VERSION: v1.6.1 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
  */
 import { getAgentName } from '../../services/clientDb';
 import { DEFAULT_TIPO } from '../../services/tabulationConfig';
@@ -141,6 +141,7 @@ export function cockpitTicketToApi(ticket) {
       clienteNome: clientName || '',
       clienteEmail: emailList,
       clienteTelefone: phoneList,
+      clienteTelefoneWhatsapp: lf.clienteTelefoneWhatsapp || ticket.clientPhone || phoneList[0] || undefined,
       clienteId: ticket.clienteId || lf.clienteId,
       escalonar: lf.escalonar,
       wasEscalated: lf.wasEscalated,

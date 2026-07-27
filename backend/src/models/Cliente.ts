@@ -1,12 +1,17 @@
-/** Cliente v1.0.0 — b2c_cadastros.clientes (DESK_LISTA_SCHEMAS.rb) */
+/** Cliente v1.1.0 — b2c_cadastros.clientes; telefone WhatsApp em clienteTelefone.whatsapp */
 import { Schema, Document, Model } from 'mongoose';
 import { getCadastrosConnection } from '../config/database';
+
+export interface IClienteTelefone {
+  lista: string[];
+  whatsapp?: string;
+}
 
 export interface IClienteDados {
   clienteCpf: string;
   clienteNome: string;
   clienteEmail: { lista: string[] };
-  clienteTelefone: { lista: string[] };
+  clienteTelefone: IClienteTelefone;
 }
 
 export interface IAtendimentoHistorico {
@@ -27,7 +32,10 @@ const ClienteDadosSchema = new Schema<IClienteDados>(
     clienteCpf: { type: String, default: '' },
     clienteNome: { type: String, default: '' },
     clienteEmail: { lista: { type: [String], default: [] } },
-    clienteTelefone: { lista: { type: [String], default: [] } },
+    clienteTelefone: {
+      lista: { type: [String], default: [] },
+      whatsapp: { type: String, default: '' },
+    },
   },
   { _id: false }
 );

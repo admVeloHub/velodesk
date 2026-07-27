@@ -22,6 +22,7 @@
     "test:gmail-modules": "tsx scripts/test-gmail-modules.ts",
     "test:gmail-watch": "tsx scripts/test-gmail-watch.ts",
     "test:gmail-inbound": "tsx scripts/test-gmail-inbound.ts",
+    "test:mail-rules": "tsx scripts/test-mail-rules.ts",
     "test:ai-usage": "tsx scripts/test-ai-usage.ts"
   },
   "dependencies": {

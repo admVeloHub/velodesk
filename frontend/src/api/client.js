@@ -1,6 +1,6 @@
 /**
- * API client v1.14.1 — GET ticket sem cache (evita 304 vazio)
- * VERSION: v1.14.1 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
+ * API client v1.15.0 — mailRulesApi (config inbound e-mail)
+ * VERSION: v1.15.0 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -241,4 +241,13 @@ export const agentsApi = {
   pipeline: (payload) => api.post('/agents/pipeline', payload).then((r) => r.data),
   revisarSugestao: (payload) => api.post('/agents/revisar-sugestao', payload).then((r) => r.data),
   gestaoAlerts: (params) => api.get('/agents/gestao/alerts', { params }).then((r) => r.data),
+};
+
+export const mailRulesApi = {
+  list: (list) => api.get(`/mail-rules/${encodeURIComponent(list)}`).then((r) => r.data),
+  create: (list, data) => api.post(`/mail-rules/${encodeURIComponent(list)}`, data).then((r) => r.data),
+  patch: (list, id, data) =>
+    api.patch(`/mail-rules/${encodeURIComponent(list)}/${encodeURIComponent(id)}`, data).then((r) => r.data),
+  remove: (list, id) =>
+    api.delete(`/mail-rules/${encodeURIComponent(list)}/${encodeURIComponent(id)}`).then((r) => r.data),
 };

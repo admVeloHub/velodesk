@@ -1,4 +1,4 @@
-/** cliente.service v1.3.0 — batch loadDadosForRefs para listagem de boxes */
+/** cliente.service v1.4.0 — whatsapp em clienteTelefone + listas múltiplas */
 import mongoose from 'mongoose';
 import { getClienteModel, ICliente, IClienteDados } from '../models/Cliente';
 import type { IClienteRef } from '../models/ChamadoN1';
@@ -37,12 +37,23 @@ function normalizeStringList(value: unknown, fallback: string[] = []): string[] 
   return fallback;
 }
 
+function normalizeTelefoneWhatsapp(value: unknown, phoneList: string[]): string {
+  const selected = String(value ?? '').trim();
+  if (selected && phoneList.includes(selected)) return selected;
+  if (phoneList.length === 1) return phoneList[0];
+  return '';
+}
+
 function dadosFromBody(body: Record<string, unknown>): IClienteDados | null {
   const lateral = (body.lateralForm ?? {}) as Record<string, unknown>;
   const cpf = normalizeCpf(body.clientCPF ?? lateral.clienteCpf ?? lateral.cpf);
   const nome = String(body.clientName ?? lateral.clienteNome ?? '').trim();
   const emailLista = normalizeStringList(lateral.clienteEmail);
   const telLista = normalizeStringList(lateral.clienteTelefone);
+  const whatsappRaw =
+    lateral.clienteTelefoneWhatsapp
+    ?? (lateral.clienteTelefone as { whatsapp?: unknown } | undefined)?.whatsapp
+    ?? (body.clienteTelefoneWhatsapp as unknown);
 
   if (!cpf && !nome) return null;
 
@@ -50,7 +61,10 @@ function dadosFromBody(body: Record<string, unknown>): IClienteDados | null {
     clienteCpf: cpf,
     clienteNome: nome,
     clienteEmail: { lista: emailLista },
-    clienteTelefone: { lista: telLista },
+    clienteTelefone: {
+      lista: telLista,
+      whatsapp: normalizeTelefoneWhatsapp(whatsappRaw, telLista),
+    },
   };
 
   if (!cpf) {

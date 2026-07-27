@@ -1,4 +1,4 @@
-/** gmailInbound.service v1.1.0 — Pub/Sub push em lotes (evita timeout 60s Cloud Run) */
+/** gmailInbound.service v1.2.0 — ponteiro de history monotônico (nunca congela nem descarta backlog) */
 import { env } from '../../config/env';
 import { processInboundEmail } from '../email-inbound.service';
 import type { InboundEmailProcessResult } from '../inbound-email/types';
@@ -28,6 +28,8 @@ export interface GmailHistoryProcessResult {
   results: InboundEmailProcessResult[];
   hasMore: boolean;
   latestHistoryId: string;
+  /** true quando o Gmail já expirou o startHistoryId (retenção de 7 dias) */
+  expired?: boolean;
 }
 
 export function decodePubSubMessage(body: GmailPubSubPushBody): GmailPushNotification | null {
@@ -41,8 +43,13 @@ export function decodePubSubMessage(body: GmailPubSubPushBody): GmailPushNotific
   }
 }
 
-function budgetExceeded(startedAt: number, processedCount: number): boolean {
-  if (processedCount >= env.gmailInboundMaxMessagesPerPush) return true;
+/** Orçamento conta apenas trabalho real (ticket criado ou mensagem anexada) */
+function isRealWork(action: InboundEmailProcessResult['action']): boolean {
+  return action === 'created' || action === 'replied';
+}
+
+function budgetExceeded(startedAt: number, workCount: number): boolean {
+  if (workCount >= env.gmailInboundMaxMessagesPerPush) return true;
   return Date.now() - startedAt >= env.gmailInboundBudgetMs;
 }
 
@@ -54,7 +61,10 @@ export async function processGmailHistory(
   const results: InboundEmailProcessResult[] = [];
   let pageToken: string | undefined;
   let latestHistoryId = startHistoryId;
-  let processedCount = 0;
+  /** Último record de history integralmente concluído — base do avanço garantido do ponteiro */
+  let cursorHistoryId = startHistoryId;
+  let completedRecords = 0;
+  let workCount = 0;
   let hasMore = false;
   const startedAt = Date.now();
 
@@ -64,6 +74,7 @@ export async function processGmailHistory(
         userId: 'me',
         startHistoryId,
         historyTypes: ['messageAdded'],
+        labelId: 'INBOX',
         pageToken,
       });
 
@@ -72,12 +83,14 @@ export async function processGmailHistory(
       }
 
       for (const record of historyRes.data.history ?? []) {
-        for (const added of record.messagesAdded ?? []) {
-          if (budgetExceeded(startedAt, processedCount)) {
-            hasMore = true;
-            break;
-          }
+        // Corta somente em fronteira de record e só depois de concluir pelo menos um,
+        // garantindo que todo push avance o ponteiro.
+        if (completedRecords > 0 && budgetExceeded(startedAt, workCount)) {
+          hasMore = true;
+          break;
+        }
 
+        for (const added of record.messagesAdded ?? []) {
           const msgRef = added.message;
           if (!msgRef?.id) continue;
 
@@ -95,12 +108,24 @@ export async function processGmailHistory(
           try {
             const result = await processInboundEmail(payload);
             results.push(result);
-            processedCount += 1;
+            if (isRealWork(result.action)) workCount += 1;
+            console.info('[gmailInbound] mensagem processada', {
+              historyRecordId: record.id,
+              messageId: payload.messageId,
+              action: result.action,
+              protocolo: result.chamadoProtocolo ?? null,
+            });
           } catch (err) {
-            console.error('[gmailInbound] processInboundEmail falhou:', (err as Error).message);
+            console.error('[gmailInbound] processInboundEmail falhou:', {
+              historyRecordId: record.id,
+              messageId: payload.messageId,
+              erro: (err as Error).message,
+            });
           }
         }
-        if (hasMore) break;
+
+        if (record.id) cursorHistoryId = String(record.id);
+        completedRecords += 1;
       }
 
       if (hasMore) break;
@@ -109,15 +134,25 @@ export async function processGmailHistory(
   } catch (err) {
     const message = (err as Error).message || String(err);
     if (/historyId|404|not found/i.test(message)) {
-      console.warn('[gmailInbound] historyId inválido/expirado — será realinhado na próxima notificação:', message);
-      return { results, hasMore: false, latestHistoryId: startHistoryId };
+      console.warn('[gmailInbound] historyId inválido/expirado — realinhamento necessário:', message);
+      return { results, hasMore: false, latestHistoryId: startHistoryId, expired: true };
     }
     throw err;
   }
 
-  if (!hasMore && latestHistoryId && latestHistoryId !== startHistoryId) {
-    await updateStoredHistoryId(latestHistoryId);
-  }
+  const nextHistoryId = hasMore ? cursorHistoryId : (latestHistoryId || cursorHistoryId);
+  const advanced = await updateStoredHistoryId(nextHistoryId);
+
+  console.info('[gmailInbound] history concluído', {
+    startHistoryId,
+    nextHistoryId,
+    ponteiroAvancou: advanced,
+    records: completedRecords,
+    trabalhoReal: workCount,
+    resultados: results.length,
+    hasMore,
+    duracaoMs: Date.now() - startedAt,
+  });
 
   return { results, hasMore, latestHistoryId };
 }
@@ -138,6 +173,23 @@ export async function handleGmailPubSubPush(
   const stored = await getStoredHistoryId();
   const startId = stored ?? String(notification.historyId);
 
-  const { results, hasMore } = await processGmailHistory(startId);
+  console.info('[gmailInbound] push recebido', {
+    storedHistoryId: stored,
+    notificationHistoryId: String(notification.historyId),
+    startId,
+  });
+
+  const { results, hasMore, expired } = await processGmailHistory(startId);
+
+  if (expired) {
+    const target = String(notification.historyId);
+    const realigned = await updateStoredHistoryId(target);
+    console.warn('[gmailInbound] ponteiro realinhado após expiração do history', {
+      de: startId,
+      para: target,
+      realigned,
+    });
+  }
+
   return { processed: results.length, results, hasMore };
 }

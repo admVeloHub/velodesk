@@ -38,6 +38,7 @@ import workflowNotificacoesRoutes from './routes/workflowNotificacoes.routes';
 import permissionsRoutes from './routes/permissions.routes';
 import funcoesPermissoesRoutes from './routes/funcoesPermissoes.routes';
 import agentesDeskRoutes from './routes/agentesDesk.routes';
+import mailRulesRoutes from './routes/mailRules.routes';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
@@ -159,6 +160,7 @@ app.use('/api/ai-usage', aiUsageRoutes);
 app.use('/api/permissions', permissionsRoutes);
 app.use('/api/funcoes-permissoes', funcoesPermissoesRoutes);
 app.use('/api/agentes-desk', agentesDeskRoutes);
+app.use('/api/mail-rules', mailRulesRoutes);
 
 if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);

@@ -1,34 +1,32 @@
 /**
  * Modal — cadastro cliente b2c_cadastros.clientes
- * VERSION: v1.0.1 | DATE: 2026-06-23
+ * VERSION: v1.1.0 | DATE: 2026-07-27
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { clientsApi } from '../../../api/client';
 import { buildClienteCreateBody } from '../../../api/adapters/clienteAdapter';
-import { formatCpf, isValidEmailFormat } from '../../../services/desk/utils';
+import { formatCpf } from '../../../services/desk/utils';
 import { useNotifications } from '../../../context/NotificationContext';
+import ClientContactFieldsEditor, { validateClientContactDraft } from './ClientContactFieldsEditor';
 
 export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
   const { showNotification } = useNotifications();
-  const nameRef = useRef(null);
-  const emailRef = useRef(null);
   const [nome, setNome] = useState('');
-  const [email, setEmail] = useState('');
-  const [telefone, setTelefone] = useState('');
-  const [nomeError, setNomeError] = useState(false);
-  const [emailError, setEmailError] = useState(false);
+  const [emails, setEmails] = useState(['']);
+  const [phones, setPhones] = useState(['']);
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [emailErrors, setEmailErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return undefined;
     setNome('');
-    setEmail('');
-    setTelefone('');
-    setNomeError(false);
-    setEmailError(false);
+    setEmails(['']);
+    setPhones(['']);
+    setWhatsappPhone('');
+    setEmailErrors({});
     setSaving(false);
-    nameRef.current?.focus();
 
     const onKey = (event) => {
       if (event.key === 'Escape') onClose();
@@ -40,22 +38,28 @@ export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
   if (!open) return null;
 
   const handleSave = async () => {
-    const emailTrim = email.trim();
-    if (!nome.trim()) {
-      setNomeError(true);
-      showNotification('Informe o nome do cliente.', 'error');
-      nameRef.current?.focus();
-      return;
-    }
-    if (emailTrim && !isValidEmailFormat(emailTrim)) {
-      setEmailError(true);
-      showNotification('Informe um e-mail válido (ex.: nome@dominio.com).', 'error');
-      emailRef.current?.focus();
+    const validation = validateClientContactDraft({
+      name: nome,
+      emails,
+      phones,
+      whatsappPhone,
+    });
+    if (!validation.ok) {
+      if (validation.emailIndex != null) {
+        setEmailErrors({ [validation.emailIndex]: true });
+      }
+      showNotification(validation.message, 'error');
       return;
     }
     setSaving(true);
     try {
-      const body = buildClienteCreateBody({ cpf, nome, email: emailTrim, telefone });
+      const body = buildClienteCreateBody({
+        cpf,
+        nome: validation.nome,
+        emails: validation.emailList,
+        phones: validation.phoneList,
+        whatsappPhone: validation.whatsappPhone,
+      });
       const cliente = await clientsApi.create(body);
       showNotification('Cliente cadastrado.', 'success');
       onSaved?.(cliente);
@@ -77,7 +81,7 @@ export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
         onClick={onClose}
       />
       <div
-        className="queue-box-modal"
+        className="queue-box-modal queue-box-modal--wide"
         role="dialog"
         aria-modal="true"
         aria-labelledby="registerClientModalTitle"
@@ -111,56 +115,27 @@ export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
               readOnly
             />
           </div>
-          <div className="queue-box-modal__field">
-            <label className="queue-box-modal__label" htmlFor="registerClientNome">
-              Nome <span className="queue-box-modal__req">*</span>
-            </label>
-            <input
-              ref={nameRef}
-              id="registerClientNome"
-              type="text"
-              className={'queue-box-modal__input' + (nomeError ? ' queue-box-modal__input--error' : '')}
-              value={nome}
-              onChange={(e) => {
-                setNome(e.target.value);
-                if (nomeError) setNomeError(false);
-              }}
-              autoComplete="name"
-            />
-          </div>
-          <div className="queue-box-modal__field">
-            <label className="queue-box-modal__label" htmlFor="registerClientEmail">E-mail</label>
-            <input
-              ref={emailRef}
-              id="registerClientEmail"
-              type="email"
-              className={'queue-box-modal__input' + (emailError ? ' queue-box-modal__input--error' : '')}
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (emailError) setEmailError(false);
-              }}
-              onBlur={() => {
-                const v = email.trim();
-                if (v && !isValidEmailFormat(v)) setEmailError(true);
-              }}
-              placeholder="nome@dominio.com"
-              autoComplete="email"
-              pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
-              title="Formato: nome@dominio.com"
-            />
-          </div>
-          <div className="queue-box-modal__field">
-            <label className="queue-box-modal__label" htmlFor="registerClientPhone">Telefone</label>
-            <input
-              id="registerClientPhone"
-              type="tel"
-              className="queue-box-modal__input"
-              value={telefone}
-              onChange={(e) => setTelefone(e.target.value)}
-              autoComplete="tel"
-            />
-          </div>
+          <ClientContactFieldsEditor
+            idPrefix="registerClient"
+            name={nome}
+            onNameChange={setNome}
+            emails={emails}
+            onEmailsChange={setEmails}
+            phones={phones}
+            onPhonesChange={setPhones}
+            whatsappPhone={whatsappPhone}
+            onWhatsappPhoneChange={setWhatsappPhone}
+            emailErrors={emailErrors}
+            onEmailBlur={(index, value) => {
+              const trimmed = String(value || '').trim();
+              setEmailErrors((prev) => {
+                const next = { ...prev };
+                if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) next[index] = true;
+                else delete next[index];
+                return next;
+              });
+            }}
+          />
         </div>
         <footer className="queue-box-modal__footer">
           <button type="button" className="btn-secondary queue-box-modal__btn" onClick={onClose} disabled={saving}>

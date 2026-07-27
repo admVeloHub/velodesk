@@ -1,6 +1,6 @@
 /**
  * Central de Configurações — layout V2
- * VERSION: v3.5.1 | DATE: 2026-07-14
+ * VERSION: v3.6.0 | DATE: 2026-07-27
  */
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { CONFIG_SECTIONS, getConfigSection } from './configSections';
 import TabulationFormsSection from './components/TabulationFormsSection';
 import FuncoesPermissoesSection from './funcoes/FuncoesPermissoesSection';
 import WorkflowsConfigSection from './workflow/WorkflowsConfigSection';
+import EmailConfigSection from './email/EmailConfigSection';
 import { usePermissions } from '../../context/PermissionContext';
 
 export default function ConfigView() {
@@ -98,6 +99,8 @@ export default function ConfigView() {
                 <WorkflowsConfigSection />
               ) : section === 'funcoes-permissoes' ? (
                 <FuncoesPermissoesSection />
+              ) : section === 'email' ? (
+                <EmailConfigSection />
               ) : (
                 <p className="config-placeholder-msg">
                   Editor de {active?.label?.toLowerCase()} — em desenvolvimento.

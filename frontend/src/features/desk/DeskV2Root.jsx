@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.14.3 | DATE: 2026-07-27
- * — recarrega detalhe após refresh de filas se ticket ficou vazio
+ * VERSION: v3.16.0 | DATE: 2026-07-27
+ * — atualização automática: ticket aberto (15s) e filas (60s)
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
@@ -67,6 +67,10 @@ import ProdutosForwardPopover from './components/ProdutosForwardPopover';
 import WorkflowComunicacaoModal from '../workflow/components/WorkflowComunicacaoModal';
 import { replyWorkflowComunicacao } from '../../services/workflow/workflowDecisionHandlers';
 
+/** Respostas de cliente chegam por e-mail a qualquer momento: a thread se atualiza sozinha */
+const AUTO_REFRESH_DETAIL_MS = 15000;
+const AUTO_REFRESH_QUEUES_MS = 60000;
+
 function ticketNeedsDetailLoad(ticket) {
   if (!ticket) return true;
   if (ticket.listOnly === true) return true;
@@ -121,6 +125,7 @@ export default function DeskV2Root() {
   const {
     refreshKey,
     refreshTickets,
+    refreshTicketsSilent,
     loading: ticketsLoading,
     openTabs,
     activeTabId,
@@ -314,6 +319,62 @@ export default function DeskV2Root() {
       cancelled = true;
     };
   }, [activeTabId, refreshKey, patchTicket, showNotification]);
+
+  // Ticket aberto: recarrega o detalhe em ciclo curto para trazer resposta do cliente sem ação do agente
+  useEffect(() => {
+    if (!activeTabId || isDraftTicket({ id: activeTabId })) {
+      return undefined;
+    }
+
+    const ticketId = String(activeTabId);
+    let cancelled = false;
+    let inFlight = false;
+
+    const syncDetail = async () => {
+      if (cancelled || inFlight) return;
+      if (document.hidden) return;
+      if (commitInProgressRef.current) return;
+      inFlight = true;
+      try {
+        const full = await loadTicketDetailFromApi(ticketId);
+        if (!cancelled && !commitInProgressRef.current) patchTicket(ticketId, full);
+      } catch {
+        /* rede instável não deve interromper o atendimento */
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const timer = window.setInterval(syncDetail, AUTO_REFRESH_DETAIL_MS);
+    const onVisibilityChange = () => {
+      if (!document.hidden) void syncDetail();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [activeTabId, patchTicket]);
+
+  // Filas: ciclo longo e silencioso para novos tickets aparecerem sem recarregar a página
+  useEffect(() => {
+    let inFlight = false;
+
+    const syncQueues = async () => {
+      if (inFlight || document.hidden || commitInProgressRef.current) return;
+      inFlight = true;
+      try {
+        await refreshTicketsSilent();
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const timer = window.setInterval(syncQueues, AUTO_REFRESH_QUEUES_MS);
+    return () => window.clearInterval(timer);
+  }, [refreshTicketsSilent]);
 
   useEffect(() => {
     if (pendingAdvanceTicketIdRef.current) return;
@@ -704,42 +765,58 @@ export default function DeskV2Root() {
     if (!ticket) return;
 
     const nome = String(draft?.name || '').trim();
-    const email = String(draft?.email || '').trim();
-    const telefone = String(draft?.phone || '').trim();
+    const emailList = Array.isArray(draft?.emails)
+      ? draft.emails.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+    const phoneList = Array.isArray(draft?.phones)
+      ? draft.phones.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+    const whatsappPhone = String(draft?.whatsappPhone || '').trim()
+      || (phoneList.length === 1 ? phoneList[0] : '');
     const cpf = normalizeCpf(ticket.lateralForm?.cpf || ticket.lateralForm?.clienteCpf || ticket.clientCPF);
 
     if (!nome) {
       showNotification('Informe o nome do cliente.', 'error');
       throw new Error('Nome obrigatório');
     }
-    if (email && !isValidEmailFormat(email)) {
-      showNotification('Informe um e-mail válido (ex.: nome@dominio.com).', 'error');
-      throw new Error('E-mail inválido');
+    for (const email of emailList) {
+      if (!isValidEmailFormat(email)) {
+        showNotification('Informe um e-mail válido (ex.: nome@dominio.com).', 'error');
+        throw new Error('E-mail inválido');
+      }
+    }
+    if (phoneList.length > 1 && !whatsappPhone) {
+      showNotification('Selecione qual telefone será usado no WhatsApp.', 'error');
+      throw new Error('WhatsApp obrigatório');
     }
 
     try {
       const clienteDoc = await persistClienteContact(clientsApi, {
         cpf,
         nome,
-        email,
-        telefone,
+        emails: emailList,
+        phones: phoneList,
+        whatsappPhone,
         clienteId: ticket.clienteId || ticket.lateralForm?.clienteId,
       });
       const clienteId = clienteDoc?._id || clienteDoc?.id || ticket.clienteId || ticket.lateralForm?.clienteId;
+      const primaryEmail = emailList[0] || '';
+      const primaryPhone = whatsappPhone || phoneList[0] || '';
 
       await updateTicketInCache(ticket.id, (t) => {
         t.clientName = nome;
         t.solicitante = nome;
-        t.clientEmail = email;
-        t.clientPhone = telefone;
+        t.clientEmail = primaryEmail;
+        t.clientPhone = primaryPhone;
         if (clienteId) t.clienteId = clienteId;
         t.lateralForm = {
           ...t.lateralForm,
           cpf,
           clienteCpf: cpf,
           clienteNome: nome,
-          clienteEmail: email ? [email] : [],
-          clienteTelefone: telefone ? [telefone] : [],
+          clienteEmail: emailList,
+          clienteTelefone: phoneList,
+          clienteTelefoneWhatsapp: whatsappPhone,
           clienteId: clienteId || t.lateralForm?.clienteId,
         };
         t.updatedAt = new Date().toISOString();

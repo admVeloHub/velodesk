@@ -1,6 +1,6 @@
 ﻿/**
  * Sidebar rail unificada — 3 estados: 10px | hover 52px | chevron fixa 220px
- * VERSION: v1.10.2 | DATE: 2026-07-21
+ * VERSION: v1.11.0 | DATE: 2026-07-27
  * Perfil: VeloHub (sem botÃ£o local na barra)
  */
 import React, { useCallback, useRef, useState } from 'react';
@@ -26,7 +26,7 @@ function isInsideVeloNewsPopover(target) {
   return target instanceof Element && Boolean(target.closest?.('.velonews-popover'));
 }
 
-export default function Sidebar({ onOpenAI }) {
+export default function Sidebar() {
   const { logout } = useAuth();
   const { isNavAllowed, profile } = useProfile();
   const { unreadCount, popoverOpen, togglePopover, bellAnchorRef } = useVeloNews();
@@ -153,19 +153,6 @@ export default function Sidebar({ onOpenAI }) {
               {item.badge && <span className="nav-item__badge" aria-hidden="true" />}
             </li>
           ))}
-          <li
-            className="nav-item"
-            id="btnAiAssistantNav"
-            data-tooltip="Assistente IA"
-            title="Assistente IA"
-            onClick={onOpenAI}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => navKeyActivate(e, onOpenAI)}
-          >
-            <i className="ti ti-robot" />
-            <span>Assistente IA</span>
-          </li>
         </ul>
         <div className="velo-nav-rail__foot">
           <div ref={bellAnchorRef} className="velo-nav-rail__foot-actions" data-tooltip="VeloNews">

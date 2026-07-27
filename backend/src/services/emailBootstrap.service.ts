@@ -1,7 +1,9 @@
-/** emailBootstrap.service v1.0.0 — Gmail transport + watch após desk_config pronto */
+/** emailBootstrap.service v1.1.0 — garante índice de idempotência inbound no bootstrap */
 import { env } from '../config/env';
 import { isAllMongoReady, isDeskConfigConnected } from '../config/database';
+import { ensureGmailInboundMessageIndexes } from '../models/GmailInboundMessage';
 import { loadEmailTransport, isEmailTransportReady } from './emailTransport.service';
+import { loadMailRules } from './mailRules.service';
 import {
   ensureGmailWatchFresh,
   setupGmailWatch,
@@ -76,6 +78,16 @@ export async function bootstrapEmailServices(): Promise<void> {
 
   if (!transportBootstrapDone) {
     await loadEmailTransport();
+    try {
+      await loadMailRules();
+    } catch (err) {
+      console.warn('[emailBootstrap] mail rules não carregadas:', (err as Error).message);
+    }
+    try {
+      await ensureGmailInboundMessageIndexes();
+    } catch (err) {
+      console.warn('[emailBootstrap] índice de idempotência inbound:', (err as Error).message);
+    }
     transportBootstrapDone = true;
   }
 

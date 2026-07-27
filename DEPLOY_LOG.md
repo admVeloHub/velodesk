@@ -1,10 +1,68 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.46.6 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.48.0 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: correção crítica do fluxo inbound de e-mail (thread contínua)
+
+- **Data/Hora**: 2026-07-27
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.48.0
+  - gmailInbound.service v1.2.0, gmailWatch.service v1.2.0, email-inbound.service v1.6.0
+  - GmailInboundMessage v1.0.0, inboundDedupe.service v1.0.0
+  - emailBootstrap.service v1.1.0, inbound.routes v1.3.0
+  - mailRules.service v1.0.1, EmailConfigSection v1.0.0
+  - TicketsContext v1.7.0, DeskV2Root v3.16.0
+- **Arquivos modificados**:
+  - `backend/src/services/gmail/gmailInbound.service.ts` — ponteiro de history monotônico: o `historyId` avança para o último record concluído mesmo com backlog parcial; corte de orçamento só em fronteira de record e só depois de concluir um; orçamento conta apenas trabalho real (`created`/`replied`); `history.list` com `labelId: INBOX`; realinhamento explícito quando o Gmail expira o `historyId`; logs de instrumentação por mensagem e por ciclo
+  - `backend/src/services/gmail/gmailWatch.service.ts` — `persistWatchState` não sobrescreve mais o `historyId` (preserva backlog em cold start/renovação); `updateStoredHistoryId` só avança para frente e informa se houve avanço
+  - `backend/src/models/GmailInboundMessage.ts` — nova collection `gmail_inbound_messages` em `desk_config` (índice único por `messageId`)
+  - `backend/src/services/inboundDedupe.service.ts` — claim atômico por Message-Id, retomada de claim abandonado, limite de tentativas e registro de falha
+  - `backend/src/services/email-inbound.service.ts` — claim antes de criar/anexar; marca `done`/`failed`; fluxo interno extraído para `runInboundEmailFlow`
+  - `backend/src/services/emailBootstrap.service.ts` — garante índice de idempotência no bootstrap
+  - `backend/src/routes/inbound.routes.ts` — 503 (retry Pub/Sub) quando o `desk_config` ainda não está pronto no cold start
+  - `backend/src/models/mailRule.shared.ts`, `MailIgnorado.ts`, `MailSpam.ts`, `MailPriority.ts`, `mailRules.service.ts`, `mailRules.routes.ts` — listas de e-mail ignorado/spam/prioridade
+  - `frontend/src/features/config/email/EmailConfigSection.jsx` — aba E-mail na Central
+  - `frontend/src/context/TicketsContext.js` — `refreshTicketsSilent` (atualização de fundo sem spinner)
+  - `frontend/src/features/desk/DeskV2Root.jsx` — atualização automática do ticket aberto (15s) e das filas (60s), pausada em aba oculta e durante envio
+- **Configuração de dados**: `desk_config.mail_ignorado` recebeu `info@velotax.info` (pesquisas de avaliação) — gerenciável na Central de Configurações › E-mail
+- **Descrição**: O inbound Gmail entrava em livelock: ao estourar o teto de 8 mensagens por push, o `historyId` não era gravado, então cada retry do Pub/Sub reprocessava as mesmas 8 mensagens como duplicadas e a fila nunca andava (4.450 pushes entre 16:51 e 19:42 UTC de 27/07). O ciclo só quebrava quando um cold start chamava `users.watch`, que sobrescrevia o ponteiro e descartava todo o backlog — as respostas de cliente daquela janela eram perdidas. Além disso, pushes concorrentes criavam tickets duplicados para o mesmo Message-Id (63 casos no histórico). No frontend, o Desk não tinha nenhuma atualização automática, então a mensagem já gravada só aparecia quando o agente agia.
+- **Status**: Concluído (push dev + main)
+
+### GitHub Push — Desk: config inbound e-mail (ignorados, spam, prioritários)
+
+- **Data/Hora**: 2026-07-27
+- **Tipo**: GitHub Push (pendente autorização)
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.47.0
+  - mailRules.service v1.0.1, email-inbound.service v1.5.0, inbound-email/types v1.1.0
+  - mailRules.routes v1.0.0, EmailConfigSection v1.0.0, client.js v1.15.0
+  - ConfigView v3.6.0, configSections v1.4.0, Sidebar v1.11.0, AppShell v2.6.0
+- **Arquivos modificados**:
+  - `backend/src/models/mailRule.shared.ts`, `MailIgnorado.ts`, `MailSpam.ts`, `MailPriority.ts` — collections `mail_ignorado`, `mail_spam`, `mail_priority` em `desk_config`
+  - `backend/src/services/mailRules.service.ts` — CRUD, snapshot em memória, `matchMailRule` (precedência spam > ignorado > priority)
+  - `backend/src/services/emailBootstrap.service.ts` — `loadMailRules()` no bootstrap
+  - `backend/src/services/email-inbound.service.ts` — skip antes de reply/create; prioridade `alta` + `metadados.mailPriority`
+  - `backend/src/services/inbound-email/types.ts` — action `skipped` com reason
+  - `backend/src/routes/mailRules.routes.ts`, `backend/src/index.ts` — API `/api/mail-rules/:list`
+  - `backend/scripts/test-mail-rules.ts` — testes de match, precedência e skip
+  - `frontend/src/features/config/email/EmailConfigSection.jsx` — aba E-mail na Central
+  - `frontend/src/features/config/configSections.js`, `ConfigView.jsx` — wire-up da seção
+  - `frontend/src/api/client.js` — `mailRulesApi`
+  - `frontend/styles.css` — estilos da seção E-mail
+  - `frontend/src/components/Sidebar.jsx`, `frontend/src/layout/AppShell.jsx` — remove Assistente IA da barra lateral
+- **Descrição**: Central de Configurações ganha aba E-mail com três listas persistidas em `desk_config`. O inbound aplica filtro inline (sem worker): spam/ignorados não criam ticket nem respondem thread; prioritários criam com prioridade alta. Assistente IA global removido da sidebar (mantido no compose do ticket).
+- **Status**: Implementado localmente — push aguardando autorização
+
+---
 
 ### GitHub Push — Desk: restaura histórico de alterações na aba Notas
 

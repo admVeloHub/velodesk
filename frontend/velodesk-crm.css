@@ -1693,6 +1693,10 @@
     padding: 14px 14px 12px;
 }
 
+#velodeskDeskV2Root .crm-client-edit-popover--wide {
+    width: min(420px, calc(100vw - 32px));
+}
+
 #velodeskDeskV2Root .crm-client-edit-popover__close {
     position: absolute;
     top: 10px;
@@ -1775,6 +1779,118 @@
 
 #velodeskDeskV2Root .crm-client-edit-popover__save:hover {
     background: #0f28cc;
+}
+
+#velodeskDeskV2Root .client-contact-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#velodeskDeskV2Root .client-contact-fields__group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#velodeskDeskV2Root .client-contact-fields__group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+#velodeskDeskV2Root .client-contact-fields__label {
+    font-size: var(--desk-fs-caption);
+    font-weight: 600;
+    color: #6b7280;
+}
+
+#velodeskDeskV2Root .client-contact-fields__input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 0.5px solid #E4E6EA;
+    border-radius: 6px;
+    font-size: var(--desk-fs-sm);
+    font-family: inherit;
+    color: #1a1a2e;
+    background: #fff;
+}
+
+#velodeskDeskV2Root .client-contact-fields__input:focus {
+    outline: none;
+    border-color: #1634FF;
+    box-shadow: 0 0 0 3px rgba(22, 52, 255, 0.12);
+}
+
+#velodeskDeskV2Root .client-contact-fields__input--error {
+    border-color: #dc2626;
+}
+
+#velodeskDeskV2Root .client-contact-fields__row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    align-items: center;
+}
+
+#velodeskDeskV2Root .client-contact-fields__row--phone {
+    grid-template-columns: 1fr auto auto;
+}
+
+#velodeskDeskV2Root .client-contact-fields__add-btn,
+#velodeskDeskV2Root .client-contact-fields__remove-btn {
+    border: none;
+    background: transparent;
+    color: #1634FF;
+    font-size: var(--desk-fs-caption);
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    border-radius: 6px;
+}
+
+#velodeskDeskV2Root .client-contact-fields__remove-btn {
+    color: #9ca3af;
+}
+
+#velodeskDeskV2Root .client-contact-fields__add-btn:hover,
+#velodeskDeskV2Root .client-contact-fields__remove-btn:hover {
+    background: #F3F4F8;
+}
+
+#velodeskDeskV2Root .client-contact-fields__wa {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #16a34a;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+#velodeskDeskV2Root .client-contact-fields__wa.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+#velodeskDeskV2Root .client-contact-fields__wa input {
+    margin: 0;
+}
+
+#velodeskDeskV2Root .client-contact-fields__hint {
+    margin: 0;
+    font-size: 0.68rem;
+    color: #9ca3af;
+    line-height: 1.35;
+}
+
+.queue-box-modal--wide {
+    width: min(480px, calc(100vw - 32px));
 }
 
 #velodeskDeskV2Root .ticket-op-progress {

@@ -878,6 +878,14 @@ async function chamadoToTicketFull(
   });
 }
 
+function resolveTicketPriorityFromChamado(chamado: IChamadoN1): string {
+  for (const reg of chamado.registro ?? []) {
+    const mailPriority = String(reg.metadados?.mailPriority ?? '').trim().toLowerCase();
+    if (mailPriority === 'alta' || mailPriority === 'critica') return mailPriority;
+  }
+  return 'media';
+}
+
 function buildTicketDtoCore(
   chamado: IChamadoN1,
   boxId?: string,
@@ -972,7 +980,7 @@ function buildTicketDtoCore(
     title: titulo,
     description: tab?.detalhe,
     status,
-    priority: 'media',
+    priority: resolveTicketPriorityFromChamado(chamado),
     channel: reclameAqui ? 'reclame-aqui' : 'digital',
     source: reclameAqui ? 'reclame-aqui' : 'velodesk',
     boxId,
@@ -1025,6 +1033,7 @@ function buildTicketDtoCore(
       clienteNome: clientName,
       clienteEmail: listOnly ? [] : (cadastro?.clienteEmail?.lista ?? []),
       clienteTelefone: listOnly ? [] : (cadastro?.clienteTelefone?.lista ?? []),
+      clienteTelefoneWhatsapp: listOnly ? undefined : (cadastro?.clienteTelefone?.whatsapp ?? undefined),
       cpf: clientCpf,
       canal: reclameAqui ? 'Reclame Aqui' : undefined,
       reclameAqui: reclameAqui ?? undefined,

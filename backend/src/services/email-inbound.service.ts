@@ -1,10 +1,16 @@
-﻿/** email-inbound.service v1.4.0 — ticket sem CPF/cliente + thread e-mail preservada */
+﻿/** email-inbound.service v1.6.0 — claim idempotente por Message-Id antes de create/reply */
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { applyAssignmentIfNeeded } from './assignmentRouter.service';
 import { appendMessage, createChamadoFromBody } from './chamado.mapper';
 import { normalizeEmail, resolveClienteRefFromEmail } from './cliente.service';
 import { notifyTicketOpenedAsync } from './emailNotification.service';
 import { runInboundAgentPipeline } from './agents/inboundAgentPipeline.service';
+import { matchMailRule } from './mailRules.service';
+import {
+  claimInboundMessage,
+  markInboundMessageDone,
+  markInboundMessageFailed,
+} from './inboundDedupe.service';
 import type { InboundEmailPayload, InboundEmailProcessResult } from './inbound-email/types';
 
 export const LEGACY_PROTOCOL_PATTERN = /VD-\d{8}-\d{4}/i;
@@ -97,6 +103,55 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
     throw new Error('Message-Id ausente no e-mail inbound');
   }
 
+  const rule = matchMailRule(payload);
+  if (rule === 'spam' || rule === 'ignored') {
+    console.info('[email-inbound] skipped', {
+      rule,
+      from: payload.from.email,
+      messageId,
+      subject: payload.subject,
+    });
+    return {
+      action: 'skipped',
+      reason: rule,
+      messageId,
+    };
+  }
+
+  const claim = await claimInboundMessage(messageId);
+  if (!claim.granted) {
+    console.info('[email-inbound] claim negado', {
+      messageId,
+      reason: claim.reason,
+      protocolo: claim.previous?.chamadoProtocolo || null,
+    });
+    return {
+      action: 'duplicate',
+      chamadoProtocolo: claim.previous?.chamadoProtocolo || undefined,
+      ticketId: claim.previous?.ticketId || undefined,
+      messageId,
+    };
+  }
+
+  try {
+    const result = await runInboundEmailFlow(payload, messageId, rule === 'priority');
+    await markInboundMessageDone(messageId, {
+      action: result.action,
+      chamadoProtocolo: result.chamadoProtocolo,
+      ticketId: result.ticketId,
+    });
+    return result;
+  } catch (err) {
+    await markInboundMessageFailed(messageId, (err as Error).message);
+    throw err;
+  }
+}
+
+async function runInboundEmailFlow(
+  payload: InboundEmailPayload,
+  messageId: string,
+  isPriority: boolean,
+): Promise<InboundEmailProcessResult> {
   const duplicate = await findChamadoByEmailMessageId(messageId);
   if (duplicate) {
     return {
@@ -132,6 +187,7 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
     description: bodyText,
     text: bodyText,
     status: 'novo',
+    priority: isPriority ? 'alta' : 'media',
     clientName: displayName,
     attachments,
     lateralForm: {
@@ -155,6 +211,7 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
       ...(partial.registro[0].metadados ?? {}),
       ...emailMeta,
       emailThreadRootId: inboundRootId,
+      ...(isPriority ? { mailPriority: 'alta' } : {}),
     };
     partial.registro[0].alteracoes = partial.registro[0].alteracoes ?? [];
   }
