@@ -107,6 +107,10 @@ export const env = {
   gmailPubsubVerifyToken: (process.env.GMAIL_PUBSUB_VERIFY_TOKEN || '').trim(),
   gmailWatchStateCollection: process.env.GMAIL_WATCH_STATE_COLLECTION || 'gmail_watch_state',
   gmailWatchStateDocumentId: process.env.GMAIL_WATCH_STATE_DOCUMENT_ID || 'desk_gmail_watch',
+  /** Máx. mensagens processadas por push Pub/Sub (evita timeout Cloud Run 60s) */
+  gmailInboundMaxMessagesPerPush: parseInt(process.env.GMAIL_INBOUND_MAX_MESSAGES_PER_PUSH || '8', 10),
+  /** Orçamento de tempo por push antes de devolver 503 (Pub/Sub reentrega) */
+  gmailInboundBudgetMs: parseInt(process.env.GMAIL_INBOUND_BUDGET_MS || '50000', 10),
   /** @deprecated use desk_config.email_transport Gmail API */
   emailFrom: process.env.EMAIL_FROM || '',
   /** @deprecated use desk_config.email_transport Gmail API */

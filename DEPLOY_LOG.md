@@ -1,10 +1,36 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.46.2 | DATE: 2026-07-24 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.46.3 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: conteúdo de tickets + Gmail Pub/Sub em lotes
+
+- **Data/Hora**: 2026-07-27
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.46.3
+  - index v1.9.6, tickets.routes v1.10.1, gmailInbound.service v1.1.0, inbound.routes v1.2.1
+  - nginx-cloudrun.conf.template v1.0.3, env (GMAIL_INBOUND_*)
+  - client.js v1.14.1, ticketsCache v1.9.5, DeskV2Root v3.14.2
+- **Arquivos modificados**:
+  - `backend/src/index.ts` — `etag: false` + `Cache-Control: no-store` em `/api` (evita 304 sem body no GET ticket)
+  - `backend/src/routes/tickets.routes.ts` — detalhe do ticket sem cache HTTP
+  - `frontend/src/api/client.js` — GET ticket sem cache; rejeita body vazio
+  - `frontend/src/services/ticketsCache.js` — valida detalhe antes de `_detailLoaded`
+  - `frontend/src/features/desk/DeskV2Root.jsx` — recarrega ticket vazio; fim do loop com `refreshKey`
+  - `backend/src/services/gmail/gmailInbound.service.ts` — processamento em lotes (8 msg / 50s); `historyId` só avança ao concluir lote
+  - `backend/src/routes/inbound.routes.ts` — 503 em backlog parcial (Pub/Sub reentrega)
+  - `docker/nginx-cloudrun.conf.template` — `proxy_read_timeout 120s` em `/api/inbound/gmail/pubsub`
+  - `backend/.env.example` — `GMAIL_INBOUND_MAX_MESSAGES_PER_PUSH`, `GMAIL_INBOUND_BUDGET_MS`
+- **Descrição**: Corrige tickets sem conversa/notas/histórico em produção (ETag 304 + marcação prematura de `_detailLoaded`). Corrige timeout 504 do Gmail Pub/Sub com processamento em lotes e retry controlado via 503.
+- **Status**: Concluído (push dev + main)
+
+---
 
 ### GitHub Push — Desk: Meus Tickets, resolvidos globais e visão gestão
 

@@ -99,14 +99,14 @@ async function runHistoryTest(startOverride?: string) {
   const startId = startOverride ?? (await getStoredHistoryId()) ?? '';
   console.log(`Processando history desde historyId=${startId} ...`);
 
-  const results = await processGmailHistory(startId);
+  const { results, hasMore } = await processGmailHistory(startId);
   if (results.length === 0) {
     console.log('Nenhuma mensagem nova processada.');
     console.log('Envie e-mail para suporte@velotax.com.br e rode novamente com --history');
     return;
   }
 
-  console.log(`OK — ${results.length} mensagem(ns) processada(s):`);
+  console.log(`OK — ${results.length} mensagem(ns) processada(s)${hasMore ? ' (backlog — rode de novo)' : ''}:`);
   for (const r of results) {
     console.log(`  action=${r.action} protocolo=${r.chamadoProtocolo} ticketId=${r.ticketId}`);
   }

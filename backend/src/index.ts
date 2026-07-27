@@ -1,4 +1,4 @@
-/** index v1.9.6 — rate limit 5000 + isenção GET leitura frequente */
+/** index v1.9.7 — ETag off + rate limit leitura; Cache-Control em /api */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -57,6 +57,7 @@ const whatsapp = require('./whatsapp/whatsappModule.js');
 const app = express();
 
 app.set('trust proxy', 1);
+app.set('etag', false);
 
 app.use(
   helmet({
@@ -86,6 +87,12 @@ const apiRateLimiter = rateLimit({
 });
 
 app.use('/api/', apiRateLimiter);
+
+app.use('/api', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.set('Pragma', 'no-cache');
+  next();
+});
 
 app.get('/api/health', (_req, res) => {
   const allReady = isAllMongoReady();
