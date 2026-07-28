@@ -58,6 +58,9 @@
     --desk-panel-collapsed-w: 36px;
     --desk-compose-min-h: 80px;
     --desk-compose-max-h: min(108px, 18vh);
+    --desk-compose-internal-min-h: 140px;
+    --desk-compose-internal-max-h: min(220px, 32vh);
+    --desk-compose-overlay-strip-h: 30px;
     --compose-footer-height: 44px;
     --desk-queue-header-pad: 10px 8px 8px;
     --desk-queue-item-pad: 6px 7px;
@@ -324,6 +327,62 @@
 #velodeskDeskV2Root .queue-search__mode[aria-pressed="true"] {
     background: rgba(22, 52, 255, 0.55);
     border-color: rgba(255, 255, 255, 0.28);
+    color: #fff;
+}
+
+#velodeskDeskV2Root .ticket-list-header .queue-search--ticket-list {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 6px 8px;
+    background: #f3f4f8;
+    border: 0.5px solid #e4e6ea;
+    border-radius: 8px;
+    color: #6b7280;
+    font-size: var(--desk-fs-caption);
+    box-sizing: border-box;
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
+}
+
+#velodeskDeskV2Root .ticket-list-header .queue-search--ticket-list input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: #1a1a2e;
+    font-size: var(--desk-fs-caption);
+    font-family: inherit;
+    min-width: 0;
+    pointer-events: auto;
+}
+
+#velodeskDeskV2Root .ticket-list-header .queue-search--ticket-list input::placeholder {
+    color: #9ca3af;
+}
+
+#velodeskDeskV2Root .ticket-list-header .queue-search--ticket-list .queue-search__mode {
+    border: 0.5px solid #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+    color: #475569;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    cursor: pointer;
+}
+
+#velodeskDeskV2Root .ticket-list-header .queue-search--ticket-list .queue-search__mode:hover {
+    background: #eef2ff;
+    color: #1634FF;
+}
+
+#velodeskDeskV2Root .ticket-list-header .queue-search--ticket-list .queue-search__mode[aria-pressed="true"] {
+    background: #1634FF;
+    border-color: #1634FF;
     color: #fff;
 }
 
@@ -2149,6 +2208,45 @@
     padding: 0 12px 12px;
 }
 
+#velodeskDeskV2Root .tab-panel--eventos.is-active {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#velodeskDeskV2Root .tab-panel--eventos .crm-internal-notes {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    margin-top: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: #f8fafc;
+}
+
+#velodeskDeskV2Root .tab-panel--eventos .crm-internal-notes .crm-note-card {
+    flex-shrink: 0;
+    flex-grow: 0;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+}
+
+#velodeskDeskV2Root .tab-panel--eventos .crm-internal-notes--empty {
+    flex: 1;
+    min-height: 0;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    font-size: var(--desk-fs-md);
+}
+
 #velodeskDeskV2Root .tab-panel--consultas.is-active {
     display: flex;
     flex-direction: column;
@@ -2414,6 +2512,8 @@
 #velodeskDeskV2Root .crm-note-card--changelog .crm-note-card__accent { background: #1694FF; }
 #velodeskDeskV2Root .crm-note-card--registro .crm-note-card__accent { background: #006AB9; }
 #velodeskDeskV2Root .crm-note-card--workflow .crm-note-card__accent { background: #006AB9; }
+#velodeskDeskV2Root .crm-note-card--mensagem-enviada .crm-note-card__accent { background: #1634FF; }
+#velodeskDeskV2Root .crm-note-card--mensagem-recebida .crm-note-card__accent { background: #006AB9; }
 
 #velodeskDeskV2Root .crm-note-card__divider {
     border: none;
@@ -2490,6 +2590,21 @@
     font-weight: 700;
 }
 
+#velodeskDeskV2Root .crm-note-card--mensagem-enviada .crm-note-card__avatar {
+    background: #eef2ff;
+    color: #1634FF;
+}
+
+#velodeskDeskV2Root .crm-note-card--mensagem-recebida .crm-note-card__avatar {
+    background: #e0f2fe;
+    color: #006AB9;
+}
+
+#velodeskDeskV2Root .crm-note-card__body--message {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 #velodeskDeskV2Root .crm-note-card__avatar--icon i {
     font-size: var(--desk-fs-md);
 }
@@ -2513,6 +2628,8 @@
 #velodeskDeskV2Root .crm-note-card--changelog .crm-note-card__author { color: #0369a1; }
 #velodeskDeskV2Root .crm-note-card--registro .crm-note-card__author { color: #006AB9; }
 #velodeskDeskV2Root .crm-note-card--workflow .crm-note-card__author { color: #006AB9; }
+#velodeskDeskV2Root .crm-note-card--mensagem-enviada .crm-note-card__author { color: #1634FF; }
+#velodeskDeskV2Root .crm-note-card--mensagem-recebida .crm-note-card__author { color: #006AB9; }
 
 #velodeskDeskV2Root .crm-note-card__badge {
     display: inline-flex;
@@ -2837,25 +2954,47 @@
     color: #000058;
 }
 
-#velodeskDeskV2Root .desk-ai-revision-modal {
-    max-width: 520px;
-    width: 92%;
+.desk-ai-revision-modal {
+    width: min(520px, calc(100vw - 32px));
 }
 
-#velodeskDeskV2Root .desk-ai-revision-modal__input {
+.desk-ai-revision-modal__score strong {
+    color: #1634FF;
+}
+
+.desk-ai-revision-modal__hint {
+    margin: 0 0 12px;
+    font-size: 0.82rem;
+    color: #64748b;
+    line-height: 1.45;
+}
+
+.desk-ai-revision-modal__input {
     width: 100%;
-    margin: 12px 0;
-    padding: 10px;
+    padding: 10px 11px;
     border: 1px solid #D0DBEE;
-    border-radius: 6px;
+    border-radius: 8px;
     font-family: inherit;
+    font-size: 0.875rem;
+    line-height: 1.45;
     resize: vertical;
+    min-height: 120px;
+    box-sizing: border-box;
 }
 
-#velodeskDeskV2Root .desk-ai-revision-modal__actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
+.desk-ai-revision-modal__input:focus {
+    outline: none;
+    border-color: #1634FF;
+    box-shadow: 0 0 0 2px rgba(22, 52, 255, 0.12);
+}
+
+.desk-ai-revision-modal__input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.desk-ai-revision-modal__actions {
+    margin: 0;
 }
 
 #velodeskDeskV2Root .ia-suggestion-bar__text {
@@ -3284,6 +3423,91 @@
     margin-top: 0;
 }
 
+#velodeskDeskV2Root .crm-compose-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone.internal-form {
+    background: #fffbf0;
+    border: 2px solid #f0d000;
+    border-radius: 8px;
+    padding: 0.55rem 0.65rem 0;
+    gap: 0.3rem;
+    box-sizing: border-box;
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone.internal-form .crm-notes-compose__header {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: #fffbf0;
+    color: #8b4513;
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: var(--desk-fs-caption);
+    line-height: 1.3;
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone.internal-form .crm-notes-compose__header i {
+    color: #8b4513;
+    font-size: 0.7rem;
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone.internal-form .compose-rich-editor,
+#velodeskDeskV2Root .crm-compose-editor-zone.internal-form .crm-notes-compose__textarea {
+    border-color: #ffe0b2;
+    background: #fffdf7;
+    min-height: var(--desk-compose-internal-min-h);
+    max-height: var(--desk-compose-internal-max-h);
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone--overlay-footer {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    gap: 0;
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone--overlay-footer.internal-form {
+    padding-bottom: 0;
+    gap: 0;
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone--overlay-footer:not(.internal-form) .spell-errors-panel,
+#velodeskDeskV2Root .crm-compose-editor-zone--overlay-footer:not(.internal-form) .spell-suggestion-bar {
+    margin-bottom: 0.45rem;
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone--overlay-footer.internal-form .crm-notes-compose__header,
+#velodeskDeskV2Root .crm-compose-editor-zone--overlay-footer.internal-form .spell-suggestion-bar {
+    margin-bottom: 0.3rem;
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone--overlay-footer .compose-rich-editor-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-bottom: 0;
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone--overlay-footer .compose-rich-editor-wrap--expandable .compose-rich-editor {
+    padding-bottom: 28px;
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone--overlay-footer .compose-rich-editor__expand-btn {
+    z-index: 3;
+    bottom: 8px;
+}
+
 #velodeskDeskV2Root .crm-compose-bottom-bar {
     display: flex;
     flex-wrap: wrap;
@@ -3299,6 +3523,57 @@
 #velodeskDeskV2Root .crm-compose-bottom-bar > .crm-compose-toolbar--embedded {
     flex: 1;
     min-width: 0;
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar.crm-compose-bottom-bar--overlay {
+    position: relative;
+    flex-shrink: 0;
+    align-self: stretch;
+    width: 100%;
+    max-width: 100%;
+    min-height: var(--desk-compose-overlay-strip-h);
+    margin: 0;
+    margin-top: 0;
+    padding: 2px 0.65rem;
+    gap: 0;
+    box-sizing: border-box;
+    border-radius: 0 0 6px 6px;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    border-top: 1px solid #e4e6ea;
+}
+
+#velodeskDeskV2Root .crm-compose-editor-zone--overlay-footer.internal-form .crm-compose-bottom-bar--overlay {
+    padding-left: 0.65rem;
+    padding-right: 0.65rem;
+    background: #f8fafc;
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar.crm-compose-bottom-bar--overlay > .crm-compose-toolbar--embedded {
+    flex: 0 0 auto;
+    min-width: 0;
+    gap: 2px;
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar.crm-compose-bottom-bar--overlay .crm-compose-toolbar__btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar.crm-compose-bottom-bar--overlay .crm-compose-toolbar__btn i {
+    font-size: 13px;
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar.crm-compose-bottom-bar--overlay .crm-compose-toolbar__sep {
+    margin: 2px 2px;
+    min-height: 18px;
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar.crm-compose-bottom-bar--overlay .crm-compose-bottom-bar__sep {
+    min-height: 22px;
+    margin: 0 0.1rem;
 }
 
 #velodeskDeskV2Root .crm-compose-bottom-bar__sep {
@@ -3460,6 +3735,35 @@
     background: transparent;
     border: none;
     border-radius: 0;
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar .crm-compose-toolbar--embedded {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar .crm-compose-toolbar--internal {
+    background: transparent;
+    border: none;
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar .crm-compose-toolbar--internal .crm-compose-toolbar__btn:hover {
+    background: #e8eef8;
+    color: #000058;
+    border-color: #c7d2fe;
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar .crm-compose-toolbar--internal .crm-compose-toolbar__btn--active {
+    background: #000058;
+    color: #fff;
+    border-color: #000058;
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar .crm-compose-toolbar--internal .crm-compose-toolbar__btn--active:hover {
+    background: #000070;
+    color: #fff;
+    border-color: #000070;
 }
 
 #velodeskDeskV2Root .crm-compose-toolbar__attach {

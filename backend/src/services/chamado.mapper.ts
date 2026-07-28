@@ -64,6 +64,29 @@ function registroMetadados(reg: IRegistro): Record<string, unknown> {
   return {};
 }
 
+function readProconFromBody(body: Record<string, unknown>): Record<string, unknown> | null {
+  const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
+  const pc = lf.procon;
+  if (pc && typeof pc === 'object' && !Array.isArray(pc)) {
+    return pc as Record<string, unknown>;
+  }
+  return null;
+}
+
+function findProconFromChamado(chamado: IChamadoN1): Record<string, unknown> | null {
+  for (const reg of chamado.registro ?? []) {
+    const meta = registroMetadados(reg);
+    if (String(meta.source ?? '').toLowerCase() === 'procon') {
+      const nested = meta.procon;
+      if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+        return nested as Record<string, unknown>;
+      }
+      return meta;
+    }
+  }
+  return null;
+}
+
 function readReclameAquiFromBody(body: Record<string, unknown>): Record<string, unknown> | null {
   const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
   const ra = lf.reclameAqui;
@@ -121,6 +144,7 @@ export function resolveRegistroOrigin(reg: IRegistro): RegistroOrigin {
   const meta = registroMetadados(reg);
   if (String(meta.source ?? '').toLowerCase() === 'email-inbound') return 'cliente';
   if (String(meta.source ?? '').toLowerCase() === 'reclame-aqui') return 'cliente';
+  if (String(meta.source ?? '').toLowerCase() === 'procon') return 'cliente';
 
   const legacy = legacyAlteracoesObject(reg);
   if (legacy) {
@@ -546,6 +570,7 @@ export async function createChamadoFromBody(
 
   const clientName = String(body.clientName ?? '').trim();
   const raData = readReclameAquiFromBody(body);
+  const pcData = readProconFromBody(body);
   const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
   const workflowMeta = lf.workflow;
 
@@ -567,6 +592,44 @@ export async function createChamadoFromBody(
       anexosAnotacaoInterna: [],
       alteracoes: [],
       metadados: raMetadados,
+      status,
+    };
+    registro = [clienteRegistro];
+
+    if (workflowMeta && typeof workflowMeta === 'object' && !Array.isArray(workflowMeta)) {
+      registro.push({
+        data: new Date(),
+        origin: 'agente',
+        autor: resolveRegistroAutor('agente', {
+          authUser,
+          authorHint: String(body.author ?? '').trim(),
+          clientName,
+        }),
+        mensagemPublica: '',
+        anexosMensagemPublica: [],
+        anotacaoInterna: '',
+        anexosAnotacaoInterna: [],
+        alteracoes: buildAlteracoesItem({ workflow: workflowMeta }),
+        metadados: { workflow: workflowMeta },
+        status,
+      });
+    }
+  } else if (pcData) {
+    const complaintText = String(pcData.descricao ?? text ?? '').trim();
+    const pcMetadados: Record<string, unknown> = {
+      source: 'procon',
+      procon: pcData,
+    };
+    const clienteRegistro: IRegistro = {
+      data: new Date(),
+      origin: 'cliente',
+      autor: clientName || String(pcData.consumidor ?? '').trim() || 'Consumidor',
+      mensagemPublica: internal ? '' : complaintText,
+      anexosMensagemPublica: internal ? [] : attachments,
+      anotacaoInterna: '',
+      anexosAnotacaoInterna: [],
+      alteracoes: [],
+      metadados: pcMetadados,
       status,
     };
     registro = [clienteRegistro];
@@ -855,6 +918,7 @@ interface FullTicketExtras {
   lateralWorkflow?: Record<string, unknown>;
   persistedApproval?: Record<string, unknown>;
   reclameAqui?: Record<string, unknown> | null;
+  procon?: Record<string, unknown> | null;
 }
 
 async function chamadoToTicketFull(
@@ -881,6 +945,7 @@ async function chamadoToTicketFull(
     lateralWorkflow,
     persistedApproval: findLatestApprovalFromRegistro(chamado) ?? undefined,
     reclameAqui: findReclameAquiFromChamado(chamado),
+    procon: findProconFromChamado(chamado),
   });
 }
 
@@ -985,6 +1050,9 @@ function buildTicketDtoCore(
   }
   const persistedApproval = listOnly ? undefined : (extras.persistedApproval ?? findLatestApprovalFromRegistro(chamado) ?? undefined);
   const reclameAqui = listOnly ? null : (extras.reclameAqui ?? findReclameAquiFromChamado(chamado));
+  const procon = listOnly ? null : (extras.procon ?? findProconFromChamado(chamado));
+  const especialChannel = reclameAqui ? 'reclame-aqui' : procon ? 'procon' : null;
+  const especialSource = reclameAqui ? 'reclame-aqui' : procon ? 'procon' : 'velodesk';
 
   return {
     _id: chamado._id.toString(),
@@ -994,8 +1062,8 @@ function buildTicketDtoCore(
     description: tab?.detalhe,
     status,
     priority: resolveTicketPriorityFromChamado(chamado),
-    channel: reclameAqui ? 'reclame-aqui' : 'digital',
-    source: reclameAqui ? 'reclame-aqui' : 'velodesk',
+    channel: especialChannel ?? 'digital',
+    source: especialSource,
     boxId,
     clientName,
     clientCPF: clientCpf,
@@ -1048,8 +1116,9 @@ function buildTicketDtoCore(
       clienteTelefone: listOnly ? [] : (cadastro?.clienteTelefone?.lista ?? []),
       clienteTelefoneWhatsapp: listOnly ? undefined : (cadastro?.clienteTelefone?.whatsapp ?? undefined),
       cpf: clientCpf,
-      canal: reclameAqui ? 'Reclame Aqui' : undefined,
+      canal: reclameAqui ? 'Reclame Aqui' : procon ? 'Procon' : undefined,
       reclameAqui: reclameAqui ?? undefined,
+      procon: procon ?? undefined,
       workflow: lateralWorkflow,
       approval: persistedApproval ?? undefined,
     },

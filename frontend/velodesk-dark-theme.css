@@ -680,6 +680,10 @@ body.velodesk-dark #velodeskDeskV2Root .tab-panel--notes .crm-internal-notes {
     background: var(--velo-dark-surface-inset);
 }
 
+body.velodesk-dark #velodeskDeskV2Root .tab-panel--eventos .crm-internal-notes {
+    background: var(--velo-dark-surface-inset);
+}
+
 body.velodesk-dark #velodeskDeskV2Root .crm-consultas {
     background: var(--velo-dark-surface-inset);
 }
@@ -862,6 +866,38 @@ body.velodesk-dark #velodeskDeskV2Root .crm-compose-toolbar__btn--active:hover {
 body.velodesk-dark #velodeskDeskV2Root .crm-compose-toolbar--internal .crm-compose-toolbar__btn--active {
     background: #d97706;
     border-color: #d97706;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-compose-bottom-bar .crm-compose-toolbar--internal .crm-compose-toolbar__btn--active {
+    background: #3b82f6;
+    border-color: #3b82f6;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-compose-bottom-bar .crm-compose-toolbar--internal .crm-compose-toolbar__btn--active:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-compose-editor-zone.internal-form {
+    background: rgba(251, 191, 36, 0.08);
+    border-color: rgba(251, 191, 36, 0.35);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-compose-editor-zone.internal-form .crm-notes-compose__header {
+    background: rgba(255, 251, 240, 0.12);
+    color: #fde68a;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-compose-editor-zone.internal-form .crm-notes-compose__header i {
+    color: #fde68a;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-compose-bottom-bar.crm-compose-bottom-bar--overlay {
+    background: rgba(15, 23, 42, 0.92);
+    border-top-color: rgba(148, 163, 184, 0.35);
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
 }
 
 body.velodesk-dark #velodeskDeskV2Root .spell-textarea-wrap--has-errors .spell-textarea-input {

@@ -1,7 +1,9 @@
 /**
- * DeskTicketList v2.1.0 — skeleton durante carregamento inicial
+ * DeskTicketList v2.2.1 — busca por protocolo/CPF abaixo do título
+ * VERSION: v2.2.1 | DATE: 2026-07-28
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET } from '../../../services/desk/constants';
 import {
   formatTicketListTime,
   getSlaClass,
@@ -16,18 +18,35 @@ export default function DeskTicketList({
   activeSort,
   entries,
   searchActive,
+  searchQuery = '',
+  searchMode,
   collapsed,
   entrySortOldestFirst,
   onSelectTicket,
   onSortChange,
   onToggleEntrySort,
+  onSearchChange,
+  onSearchModeToggle,
+  onSearchSubmit,
   onCollapse,
   onExpand,
   onReload,
   refreshing = false,
   showSkeleton = false,
 }) {
+  const isTicketMode = searchMode === DESK_SEARCH_MODE_TICKET;
+  const [query, setQuery] = useState(searchQuery);
   const skeletonItems = [1, 2, 3, 4, 5, 6];
+
+  useEffect(() => {
+    setQuery(searchQuery);
+  }, [searchQuery]);
+
+  const handleQueryChange = (value) => {
+    setQuery(value);
+    onSearchChange?.(value);
+  };
+
   return (
     <aside className={'ticket-list-panel' + (collapsed ? ' is-collapsed' : '')} id="crmTicketListPanel">
       <div className="ticket-list-panel__inner">
@@ -62,6 +81,43 @@ export default function DeskTicketList({
                 <i className="ti ti-refresh" aria-hidden="true" />
               </button>
             </div>
+          </div>
+
+          <div
+            className="queue-search queue-search--ticket-list"
+            role="search"
+          >
+            <i className="ti ti-search" aria-hidden="true" />
+            <input
+              type="text"
+              id="crmQueueSearch"
+              name="crmQueueSearch"
+              autoComplete="off"
+              spellCheck={false}
+              inputMode={isTicketMode ? 'text' : 'numeric'}
+              placeholder={isTicketMode ? 'Buscar por protocolo…' : 'Buscar por CPF…'}
+              value={query}
+              onChange={(e) => handleQueryChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onSearchSubmit?.();
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="queue-search__mode"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSearchModeToggle?.();
+              }}
+              title={isTicketMode ? 'Buscar por protocolo do ticket' : 'Buscar por CPF do cliente'}
+              aria-pressed={isTicketMode}
+            >
+              {isTicketMode ? 'Ticket' : 'CPF'}
+            </button>
           </div>
 
           <div className="ticket-list-tabs-bar">

@@ -1,9 +1,9 @@
 /**
- * RaQueuePanel — filas Reclame Aqui (layout CRM)
+ * PcQueuePanel — filas Procon (layout CRM)
  */
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RA_GROUPS } from '../../../services/especiais/reclameAquiData';
+import { PC_GROUPS } from '../../../services/especiais/proconData';
 
 const GROUP_DOTS = {
   danger: '#ef4444',
@@ -12,7 +12,7 @@ const GROUP_DOTS = {
   neutral: '#94a3b8',
 };
 
-export default function RaQueuePanel({
+export default function PcQueuePanel({
   activeGroup,
   searchQuery,
   collapsed,
@@ -29,12 +29,12 @@ export default function RaQueuePanel({
   return (
     <aside
       className={`ra-crm-queue${collapsed ? ' is-collapsed' : ''}`}
-      id="raCrmQueuePanel"
+      id="pcCrmQueuePanel"
     >
       <div className="ra-crm-queue__inner">
         <div className="ra-crm-queue__header">
           <div className="ra-crm-queue__header-top">
-            <h2 className="ra-crm-queue__title">Filas RA</h2>
+            <h2 className="ra-crm-queue__title">Filas Procon</h2>
             <button
               type="button"
               className="ra-crm-panel-retract"
@@ -49,7 +49,7 @@ export default function RaQueuePanel({
             <i className="ti ti-search" aria-hidden="true" />
             <input
               type="search"
-              placeholder="Buscar reclamações…"
+              placeholder="Buscar demandas…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               onKeyDown={(e) => {
@@ -63,7 +63,7 @@ export default function RaQueuePanel({
         </div>
 
         <ul className="ra-crm-queue-list">
-          {RA_GROUPS.map((group) => (
+          {PC_GROUPS.map((group) => (
             <li
               key={group.id}
               className={`ra-crm-queue-item${activeGroup === group.id ? ' is-active' : ''}`}
@@ -86,7 +86,7 @@ export default function RaQueuePanel({
           <button
             type="button"
             className="ra-crm-queue-btn ra-crm-queue-btn--secondary"
-            onClick={() => navigate('/especiais/reclame-aqui')}
+            onClick={() => navigate('/especiais/procon')}
           >
             <i className="ti ti-table" aria-hidden="true" />
             Gestão
@@ -94,10 +94,10 @@ export default function RaQueuePanel({
           <button
             type="button"
             className="ra-crm-queue-btn ra-crm-queue-btn--primary"
-            onClick={() => (onNovaReclamacao ? onNovaReclamacao() : navigate('/especiais/reclame-aqui/nova'))}
+            onClick={() => (onNovaReclamacao ? onNovaReclamacao() : navigate('/especiais/procon/nova'))}
           >
             <i className="ti ti-plus" aria-hidden="true" />
-            Nova reclamação
+            Nova demanda
           </button>
         </div>
       </div>

@@ -250,6 +250,13 @@ export async function loadTicketDetailFromApi(ticketId) {
     full.listOnly = false;
     full._detailLoaded = true;
     patchTicketInCache(ticketId, full);
+    try {
+      window.dispatchEvent(new CustomEvent('velodesk:ticket-detail-changed', {
+        detail: { ticketId: String(ticketId) },
+      }));
+    } catch {
+      /* ignore */
+    }
     deskLog.tickets('loadTicketDetailFromApi → ok', {
       ticketId,
       messages: full?.messages?.length || 0,
@@ -379,7 +386,8 @@ export async function updateTicketViaApi(ticketId, updater) {
     assertApiReady('atualizar ticket');
     await ticketsApi.update(apiId, cockpitTicketToApi(updated));
     await loadBoxesFromApi();
-    return findInColumns(apiId)?.ticket || updated;
+    const detailed = await loadTicketDetailFromApi(apiId);
+    return detailed || findInColumns(apiId)?.ticket || updated;
   }
 
   entry.box.tickets[entry.index] = updated;
@@ -392,7 +400,8 @@ export async function addMessageViaApi(ticketId, payload) {
     assertApiReady('enviar mensagem');
     await ticketsApi.addMessage(apiId, payload);
     await loadBoxesFromApi();
-    return findInColumns(apiId)?.ticket;
+    const detailed = await loadTicketDetailFromApi(apiId);
+    return detailed || findInColumns(apiId)?.ticket;
   }
   return updateTicketViaApi(ticketId, (t) => {
     const isInternalOnly = Boolean(payload.internal);

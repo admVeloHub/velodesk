@@ -47,6 +47,7 @@ import AlteracoesCadastraisPage from '../pages/AlteracoesCadastraisPage';
 import EspeciaisSelectPage from '../features/especiais/EspeciaisSelectPage';
 import EspeciaisChannelPage from '../features/especiais/EspeciaisChannelPage';
 import ReclameAquiChannelPage from '../features/especiais/ReclameAquiChannelPage';
+import ProconChannelPage from '../features/especiais/ProconChannelPage';
 import CasoEspecialDetailPage from '../features/workspace/components/gestaoDetail/CasoEspecialDetailPage';
 import AiUsageDetailPage from '../features/workspace/components/gestaoDetail/AiUsageDetailPage';
 import { PermissionProvider } from '../context/PermissionContext';
@@ -96,6 +97,8 @@ function AppRoutes() {
             { path: 'especiais', element: React.createElement(EspeciaisSelectPage) },
 
             { path: 'especiais/reclame-aqui/*', element: React.createElement(ReclameAquiChannelPage) },
+
+            { path: 'especiais/procon/*', element: React.createElement(ProconChannelPage) },
 
             { path: 'especiais/:channelId', element: React.createElement(EspeciaisChannelPage) },
 

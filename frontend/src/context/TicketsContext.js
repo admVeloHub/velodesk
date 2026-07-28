@@ -41,6 +41,13 @@ export function TicketsProvider({ children }) {
     }
     if (aplicado) {
       setRefreshKey((k) => k + 1);
+      try {
+        window.dispatchEvent(new CustomEvent('velodesk:ticket-detail-changed', {
+          detail: { ticketId: String(ticketId) },
+        }));
+      } catch {
+        /* ignore */
+      }
     }
   }, []);
 

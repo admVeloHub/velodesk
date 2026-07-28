@@ -869,9 +869,10 @@ export const MY_TICKETS_STATUS_SECTIONS = [
 
 function matchesTicketByCpf(ticket, rawQuery) {
   const digits = normalizeCpf(String(rawQuery || '').trim());
-  if (digits.length !== 11) return false;
+  if (!digits) return false;
   const ticketCpf = normalizeCpf(ticket.lateralForm?.cpf || ticket.clientCPF || '');
-  return ticketCpf === digits;
+  if (digits.length === 11) return ticketCpf === digits;
+  return ticketCpf.startsWith(digits);
 }
 
 function matchesTicketByProtocol(ticket, rawQuery) {
@@ -1428,6 +1429,17 @@ const ALTERACAO_FIELD_LABELS = {
   atribuido: 'Atribuído',
   escalonar: 'Escalonar',
   status: 'Status',
+  workflowActivated: 'Workflow ativado',
+  workflowStep: 'Passo workflow',
+  passoNome: 'Passo workflow',
+  workflowCompleted: 'Workflow concluído',
+  workflowDecision: 'Decisão workflow',
+  agentHandoff: 'Handoff agente',
+  nivelCriticidade: 'Criticidade',
+  auditScore: 'Score auditoria',
+  origem: 'Origem',
+  palavrasCriticas: 'Palavras críticas',
+  trigger: 'Gatilho',
 };
 
 const ALTERACAO_STATE_ALIASES = {
@@ -1482,10 +1494,18 @@ function collectRegistroOccurrenceData(entry, previousTabulationState = {}, prev
     });
   });
 
+  const hasAlteracoes = (entry.alteracoes || []).length > 0;
   const statusChanged = Boolean(
     entry.status
-    && prevStatus !== null
-    && String(entry.status) !== String(prevStatus)
+    && (
+      (prevStatus !== null && String(entry.status) !== String(prevStatus))
+      || (
+        prevStatus === null
+        && hasAlteracoes
+        && String(entry.status).trim() !== ''
+        && String(entry.status) !== 'novo'
+      )
+    )
   );
   const statusLabel = statusChanged ? getTicketStatusLabel(entry.status) : null;
   const previousStatusLabel = statusChanged && prevStatus
@@ -1640,72 +1660,82 @@ function buildSupervisorRegistroFeed(ticket, client) {
   return merged;
 }
 
-/** Agente: só ocorrências com diff de tabulação/status (não duplica notas internas). */
-function buildAgentAlteracoesHistoricoFeed(ticket, client) {
+/** Aba Notas: somente notas internas e pedidos workflow (sem registros/alterações). */
+export function buildInternalNotesOnlyFeed(ticket) {
+  if (!ticket) return [];
+  return buildAgentInternalNotesFeed(ticket);
+}
+
+/** @deprecated Use buildInternalNotesOnlyFeed — mantido por compatibilidade. */
+export function buildClientInternalNotesFeed(ticket) {
+  return buildInternalNotesOnlyFeed(ticket);
+}
+
+function mapMessageToEventItem(m, ticket) {
+  const origin = m.origin || (m.sender === 'them' ? 'cliente' : 'agente');
+  const isClient = (
+    origin === 'cliente'
+    || m.fromClient === true
+    || m.type === 'client'
+    || m.sender === 'them'
+  );
+  const ts = m.timestamp || m.time || m.createdAt;
+  const authorName = isClient
+    ? (ticket.clientName || m.author || 'Cliente')
+    : (m.author || getAgentName() || 'Agente');
+  const rawText = String(m.text || m.message || '').trim();
+  const looksLikeEmailReply = /escreveu:|wrote:|Original Message|^\s*>/m.test(rawText);
+  const body = normalizeMessageDisplayText(
+    isClient && looksLikeEmailReply
+      ? extractEmailReplyContent(rawText)
+      : rawText,
+  );
+  if (!body) return null;
+
+  const ticketId = String(ticket.id || ticket._id);
+  const msgId = m.id || `${ts}:${isClient ? 'in' : 'out'}`;
+  return {
+    id: `${ticketId}:${msgId}`,
+    kind: isClient ? 'mensagem-recebida' : 'mensagem-enviada',
+    author: authorName,
+    initials: getInitials(authorName),
+    badge: isClient ? 'Mensagem recebida' : 'Mensagem enviada',
+    timestamp: ts,
+    body,
+    attachments: Array.isArray(m.attachments) ? m.attachments : [],
+    ticketId,
+    ticketTitle: getTicketTitle(ticket),
+  };
+}
+
+function buildMessageEventsFeed(ticket) {
+  if (!ticket) return [];
+
+  normalizeTicketForDeskV2(ticket);
   const merged = [];
   const seen = new Set();
 
-  normalizeTicketForDeskV2(ticket);
-  const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
-  const tabulationState = {};
-  let prevStatus = null;
-
-  historico.forEach((entry) => {
-    const previousTabulationState = { ...tabulationState };
-    const {
-      tabulationChanges,
-      statusLabel,
-      previousStatusLabel,
-      statusChanged,
-    } = collectRegistroOccurrenceData(entry, previousTabulationState, prevStatus);
-
-    if (
-      isAgentRegistroEntry(entry)
-      && (tabulationChanges.length > 0 || statusChanged)
-    ) {
-      const ticketId = String(ticket.id || ticket._id);
-      const id = `${ticketId}:${entry.id || entry.registroIndex}:alt`;
-      if (!seen.has(id)) {
-        seen.add(id);
-        const author = resolveRegistroAutorLabel(entry, ticket, client);
-        merged.push({
-          id,
-          kind: 'registro',
-          author,
-          initials: getInitials(author),
-          badge: 'Alteração',
-          timestamp: entry.time || entry.timestamp || ticket.updatedAt,
-          tabulationChanges,
-          statusLabel,
-          previousStatusLabel,
-          statusChanged,
-          internalExcerpt: '',
-          ticketId,
-          ticketTitle: getTicketTitle(ticket),
-        });
-      }
-    }
-
-    applyAlteracoesToTabulationState(tabulationState, entry.alteracoes);
-    if (entry.status) prevStatus = entry.status;
+  (ticket.messages || []).forEach((m) => {
+    if (!m || m.type === 'internal') return;
+    if (m.type === 'system') return;
+    const mapped = mapMessageToEventItem(m, ticket);
+    if (!mapped || seen.has(mapped.id)) return;
+    seen.add(mapped.id);
+    merged.push(mapped);
   });
 
   return merged;
 }
 
-export function buildClientInternalNotesFeed(ticket, client, options = {}) {
-  const { supervisorView = false } = options;
+/** Aba Eventos: registros/gatilhos (visão gestão) + mensagens públicas enviadas/recebidas. */
+export function buildTicketEventsFeed(ticket, client) {
   if (!ticket) return [];
 
-  if (supervisorView) {
-    return buildSupervisorRegistroFeed(ticket, client);
-  }
+  const registros = buildSupervisorRegistroFeed(ticket, client);
+  const messages = buildMessageEventsFeed(ticket);
+  if (!messages.length) return registros;
 
-  const notes = buildAgentInternalNotesFeed(ticket);
-  const alteracoes = buildAgentAlteracoesHistoricoFeed(ticket, client);
-  if (!alteracoes.length) return notes;
-
-  return [...notes, ...alteracoes].sort(
+  return [...registros, ...messages].sort(
     (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
   );
 }

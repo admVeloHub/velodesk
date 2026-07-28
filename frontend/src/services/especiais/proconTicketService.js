@@ -1,0 +1,221 @@
+/**
+ * proconTicketService — bridge Procon ↔ API tickets
+ */
+import { ticketsApi } from '../../api/client';
+import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
+import { getAgentName } from '../clientDb';
+import { createWorkflowState, getWorkflowTemplateById } from '../desk/workflowEngine';
+import { PC_STATUS } from './proconData';
+import {
+  buildRegistroDefaults,
+  registerDemanda,
+  getDemandaById,
+} from './proconStore';
+
+const PC_WORKFLOW_SLUG = 'procon-tratativa';
+
+function normalizeCpf(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function buildProconMeta(form) {
+  const defaults = buildRegistroDefaults(form);
+  return {
+    protocoloProcon: defaults.protocoloProcon,
+    idDemanda: defaults.idDemanda || defaults.protocoloProcon,
+    statusPc: PC_STATUS.NAO_RESPONDIDA,
+    prazoLegal: defaults.prazoLegal,
+    dataDemanda: defaults.dataDemanda,
+    assunto: defaults.assunto,
+    descricao: defaults.descricao,
+    consumidor: defaults.consumidor,
+    cpf: defaults.cpf,
+    produto: defaults.produto,
+    tipo: defaults.tipo,
+    motivo: defaults.motivo,
+    orgaoProcon: defaults.orgaoProcon,
+    cidade: defaults.cidade,
+    uf: defaults.uf,
+  };
+}
+
+export function buildTicketPayloadFromDemanda(form, workflow = null) {
+  const meta = buildProconMeta(form);
+  const cpf = normalizeCpf(form.cpf);
+  const author = getAgentName();
+
+  return {
+    chamadoTitulo: String(form.assunto || '').trim() || 'Demanda Procon',
+    title: String(form.assunto || '').trim() || 'Demanda Procon',
+    text: String(form.descricao || '').trim(),
+    description: String(form.descricao || '').trim(),
+    status: 'novo',
+    clientName: String(form.consumidor || '').trim(),
+    clientCPF: cpf || undefined,
+    author,
+    lateralForm: {
+      classificacaoTipo: form.tipo || 'Reclamação',
+      tipoChamado: form.tipo || 'Reclamação',
+      produto: form.produto || '',
+      motivo: form.motivo || form.assunto || '',
+      detalhe: 'Demanda Procon',
+      canal: 'Procon',
+      responsavel: author,
+      clienteCpf: cpf,
+      cpf,
+      clienteNome: form.consumidor || '',
+      clienteTelefone: form.telefoneWhatsapp ? [form.telefoneWhatsapp] : [],
+      clienteEmail: form.email ? [form.email] : [],
+      procon: meta,
+      workflow: workflow || undefined,
+    },
+  };
+}
+
+function buildFallbackPcWorkflow() {
+  const now = new Date().toISOString();
+  const author = getAgentName() || 'sistema';
+  return {
+    templateId: PC_WORKFLOW_SLUG,
+    definicaoSlug: PC_WORKFLOW_SLUG,
+    title: 'TRATATIVA PROCON',
+    currentStepId: 'pc-triagem',
+    step: 0,
+    startedAt: now,
+    stepHistory: [{
+      stepId: 'pc-triagem',
+      status: 'active',
+      at: now,
+      by: author,
+      trigger: 'procon-register',
+    }],
+    status: 'active',
+    systemMessageInjected: false,
+  };
+}
+
+export function buildPcWorkflowState() {
+  const template = getWorkflowTemplateById(PC_WORKFLOW_SLUG);
+  if (template) {
+    return createWorkflowState(template, {
+      by: getAgentName() || 'sistema',
+      trigger: 'procon-register',
+    });
+  }
+  return buildFallbackPcWorkflow();
+}
+
+export async function registerDemandaAndCreateTicket(form) {
+  const workflow = buildPcWorkflowState();
+  const payload = buildTicketPayloadFromDemanda(form, workflow);
+  const created = await ticketsApi.create(payload);
+  const ticket = apiTicketToCockpit(created);
+  const ticketId = String(ticket.id || ticket._id);
+
+  const publicText = String(form.respostaPublica || '').trim();
+  if (publicText) {
+    await ticketsApi.addMessage(ticketId, {
+      text: publicText,
+      author: getAgentName(),
+      sender: 'me',
+    });
+  }
+
+  const pcItem = registerDemanda({
+    ...form,
+    ticketId,
+    chamadoProtocolo: ticket.chamadoProtocolo,
+    workflowAtivo: true,
+    workflow: 'Tratativa Procon',
+    statusPc: PC_STATUS.NAO_RESPONDIDA,
+  });
+
+  return {
+    id: pcItem.id,
+    ticketId,
+    pcItem,
+    ticket,
+  };
+}
+
+export async function fetchPcTicketView(pcId) {
+  const pcItem = getDemandaById(pcId);
+  if (!pcItem) return null;
+
+  if (!pcItem.ticketId) {
+    return { pcItem, ticket: null };
+  }
+
+  const raw = await ticketsApi.get(pcItem.ticketId);
+  const ticket = apiTicketToCockpit(raw);
+  const apiPc = ticket.lateralForm?.procon;
+
+  return {
+    pcItem: {
+      ...pcItem,
+      ...(apiPc && typeof apiPc === 'object' ? apiPc : {}),
+      ticketId: pcItem.ticketId,
+      chamadoProtocolo: ticket.chamadoProtocolo || pcItem.chamadoProtocolo,
+    },
+    ticket,
+  };
+}
+
+export async function sendPcWaMessage(ticketId, text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return null;
+  await ticketsApi.addMessage(ticketId, {
+    text: trimmed,
+    author: getAgentName(),
+    sender: 'me',
+  });
+  const raw = await ticketsApi.get(ticketId);
+  return apiTicketToCockpit(raw);
+}
+
+export async function publishPcPublicResponse(ticketId, text) {
+  await ticketsApi.addMessage(ticketId, {
+    text: String(text || '').trim(),
+    author: getAgentName(),
+    sender: 'me',
+  });
+  const raw = await ticketsApi.get(ticketId);
+  return apiTicketToCockpit(raw);
+}
+
+export async function savePcInternalNote(ticketId, text) {
+  await ticketsApi.addMessage(ticketId, {
+    internalText: String(text || '').trim(),
+    text: '',
+    author: getAgentName(),
+    sender: 'me',
+  });
+  const raw = await ticketsApi.get(ticketId);
+  return apiTicketToCockpit(raw);
+}
+
+export function getPcThreadMessages(ticket, pcItem) {
+  const messages = ticket?.messages || [];
+  if (!messages.length) return [];
+
+  const complaintText = String(pcItem?.descricao || messages[0]?.text || '').trim();
+  return messages.filter((msg, index) => {
+    if (index === 0 && msg.fromClient && String(msg.text || '').trim() === complaintText) {
+      return false;
+    }
+    return Boolean(String(msg.text || '').trim());
+  });
+}
+
+export function formatPcDeadlineLabel(iso) {
+  if (!iso) return '—';
+  const diff = new Date(iso).getTime() - Date.now();
+  if (diff <= 0) return 'Prazo vencido';
+  const totalHours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  if (days > 0) {
+    return `${days} dia${days > 1 ? 's' : ''} e ${hours} hora${hours !== 1 ? 's' : ''}`;
+  }
+  return `${hours} hora${hours !== 1 ? 's' : ''}`;
+}

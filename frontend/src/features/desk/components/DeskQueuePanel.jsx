@@ -1,20 +1,14 @@
 /**
- * DeskQueuePanel v1.2.0 — fila de atendimento + modo de busca CPF/Ticket
+ * DeskQueuePanel v1.3.0 — fila de atendimento (busca movida para lista de tickets)
  */
 import React, { useState } from 'react';
 import { countByQueue } from '../../../services/desk/utils';
-import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET } from '../../../services/desk/constants';
 import CreateQueueBoxModal from './CreateQueueBoxModal';
 
 export default function DeskQueuePanel({
   queueStatuses,
   activeQueue,
-  searchQuery,
-  searchMode,
   collapsed,
-  onSearchChange,
-  onSearchModeToggle,
-  onSearchSubmit,
   onSelectQueue,
   onCollapse,
   onExpand,
@@ -22,7 +16,6 @@ export default function DeskQueuePanel({
   onQueueBoxCreated,
 }) {
   const [boxModalOpen, setBoxModalOpen] = useState(false);
-  const isTicketMode = searchMode === DESK_SEARCH_MODE_TICKET;
 
   return (
     <>
@@ -45,31 +38,6 @@ export default function DeskQueuePanel({
                 <i className="ti ti-chevron-left" />
               </button>
             </div>
-            <label className="queue-search">
-              <i className="ti ti-search" />
-              <input
-                type="search"
-                id="crmQueueSearch"
-                placeholder={isTicketMode ? 'Buscar por protocolo…' : 'Buscar por CPF…'}
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    onSearchSubmit?.();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="queue-search__mode"
-                onClick={onSearchModeToggle}
-                title={isTicketMode ? 'Buscar por protocolo do ticket' : 'Buscar por CPF do cliente'}
-                aria-pressed={isTicketMode}
-              >
-                {isTicketMode ? 'Ticket' : 'CPF'}
-              </button>
-            </label>
           </div>
           <ul className="queue-status-list" id="queueStatusList">
             {queueStatuses.map((s) => (

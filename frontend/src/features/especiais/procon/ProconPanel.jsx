@@ -1,35 +1,35 @@
 /**
- * ReclameAquiPanel — painel operacional Reclame Aqui
+ * ProconPanel — painel operacional Procon
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationContext';
-import { useRaNovaReclamacaoModals } from '../../../hooks/useRaNovaReclamacaoModals';
+import { usePcNovaDemandaModals } from '../../../hooks/usePcNovaDemandaModals';
 import {
   getFooterSummary,
-  getReclameAquiKpis,
+  getProconKpis,
   getReportSeries,
-  groupReclamacoesByStatus,
-  loadReclamacoes,
-} from '../../../services/especiais/reclameAquiStore';
-import ReclameAquiTopBar from './ReclameAquiTopBar';
-import ReclameAquiPageHeader from './ReclameAquiPageHeader';
-import ReclameAquiToolbar from './ReclameAquiToolbar';
-import ReclameAquiKpiRow from './ReclameAquiKpiRow';
-import ReclameAquiTableView from './ReclameAquiTableView';
-import ReclameAquiReportsView from './ReclameAquiReportsView';
+  groupDemandasByStatus,
+  loadDemandas,
+} from '../../../services/especiais/proconStore';
+import ProconTopBar from './ProconTopBar';
+import ProconPageHeader from './ProconPageHeader';
+import ProconToolbar from './ProconToolbar';
+import ProconKpiRow from './ProconKpiRow';
+import ProconTableView from './ProconTableView';
+import ProconReportsView from './ProconReportsView';
 
 function loadViewState({ search, activeChips }) {
-  const items = loadReclamacoes({ search, activeChips });
+  const items = loadDemandas({ search, activeChips });
   return {
     items,
-    kpis: getReclameAquiKpis(items),
-    groups: groupReclamacoesByStatus(items),
+    kpis: getProconKpis(items),
+    groups: groupDemandasByStatus(items),
     series: getReportSeries(items),
   };
 }
 
-export default function ReclameAquiPanel() {
+export default function ProconPanel() {
   const navigate = useNavigate();
   const { showNotification } = useNotifications();
 
@@ -40,10 +40,7 @@ export default function ReclameAquiPanel() {
   const [page, setPage] = useState(1);
   const [listVersion, setListVersion] = useState(0);
 
-  const { openNovaFlow, modals: novaModals } = useRaNovaReclamacaoModals({
-    navigate,
-    onImported: () => setListVersion((v) => v + 1),
-  });
+  const { openNovaDemandaFlow, modals: demandaModals } = usePcNovaDemandaModals({ navigate });
 
   const view = useMemo(
     () => loadViewState({ search, activeChips }),
@@ -61,7 +58,7 @@ export default function ReclameAquiPanel() {
 
   const handleToolbarAction = useCallback((action) => {
     if (action === 'nova') {
-      openNovaFlow();
+      openNovaDemandaFlow();
       return;
     }
     const messages = {
@@ -70,7 +67,7 @@ export default function ReclameAquiPanel() {
       exportar: 'Exportação em breve.',
     };
     showNotification(messages[action] || 'Em breve.', 'info');
-  }, [openNovaFlow, showNotification]);
+  }, [openNovaDemandaFlow, showNotification]);
 
   const handleToggleSelect = useCallback((id) => {
     setSelectedIds((prev) =>
@@ -85,9 +82,9 @@ export default function ReclameAquiPanel() {
   const handleRowAction = useCallback((action, item) => {
     if (action === 'responder' && item?.id) {
       if (item.ticketId) {
-        navigate(`/especiais/reclame-aqui/ticket/${item.id}`);
+        navigate(`/especiais/procon/ticket/${item.id}`);
       } else {
-        navigate(`/especiais/reclame-aqui/registro/${item.id}`);
+        navigate(`/especiais/procon/registro/${item.id}`);
       }
       return;
     }
@@ -95,8 +92,8 @@ export default function ReclameAquiPanel() {
   }, [navigate, showNotification]);
 
   return (
-    <div className="ra-panel" id="reclameAquiPanel">
-      <ReclameAquiTopBar />
+    <div className="ra-panel" id="proconPanel">
+      <ProconTopBar />
 
       <div className="ra-panel__body">
         <button
@@ -108,9 +105,9 @@ export default function ReclameAquiPanel() {
           Trocar canal
         </button>
 
-        <ReclameAquiPageHeader activeTab={activeTab} onTabChange={setActiveTab} />
+        <ProconPageHeader activeTab={activeTab} onTabChange={setActiveTab} />
 
-        <ReclameAquiToolbar
+        <ProconToolbar
           search={search}
           onSearchChange={setSearch}
           activeChips={activeChips}
@@ -118,11 +115,11 @@ export default function ReclameAquiPanel() {
           onAction={handleToolbarAction}
         />
 
-        <ReclameAquiKpiRow kpis={view.kpis} />
+        <ProconKpiRow kpis={view.kpis} />
 
         <div className="ra-panel__content">
           {activeTab === 'tabela' && (
-            <ReclameAquiTableView
+            <ProconTableView
               groups={view.groups}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
@@ -131,7 +128,7 @@ export default function ReclameAquiPanel() {
             />
           )}
           {activeTab === 'relatorios' && (
-            <ReclameAquiReportsView series={view.series} kpis={view.kpis} />
+            <ProconReportsView series={view.series} kpis={view.kpis} />
           )}
         </div>
 
@@ -153,7 +150,7 @@ export default function ReclameAquiPanel() {
         ) : null}
       </div>
 
-      {novaModals}
+      {demandaModals}
     </div>
   );
 }

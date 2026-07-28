@@ -1,0 +1,129 @@
+/**
+ * DeskNoteCardParts v1.0.0 — blocos compartilhados de cards Notas/Eventos
+ * VERSION: v1.0.0 | DATE: 2026-07-28
+ */
+import React from 'react';
+
+export const NOTE_KIND_META = {
+  agent: { icon: null, useInitials: true },
+  ai: { icon: 'ti ti-sparkles' },
+  system: { icon: 'ti ti-terminal-2' },
+  sla: { icon: 'ti ti-alert-triangle' },
+  registro: { icon: 'ti ti-history' },
+  workflow: { icon: 'ti ti-message-question' },
+  'mensagem-enviada': { icon: 'ti ti-send' },
+  'mensagem-recebida': { icon: 'ti ti-mail' },
+};
+
+export function isSameTicketNote(note, ticket) {
+  const noteId = String(note.ticketId ?? '');
+  return noteId === String(ticket?.id ?? '') || noteId === String(ticket?._id ?? '');
+}
+
+export function NoteBody({ body, boldSegments }) {
+  if (!boldSegments?.length) {
+    return <p className="crm-note-card__body">{body}</p>;
+  }
+
+  let segments = [body];
+  boldSegments.forEach((bold) => {
+    segments = segments.flatMap((part, partIdx) => {
+      if (typeof part !== 'string') return [part];
+      return part.split(bold).flatMap((chunk, idx, arr) => {
+        const items = [chunk];
+        if (idx < arr.length - 1) {
+          items.push(<strong key={`${bold}-${partIdx}-${idx}`}>{bold}</strong>);
+        }
+        return items;
+      });
+    });
+  });
+
+  return <p className="crm-note-card__body">{segments}</p>;
+}
+
+export function formatTabulationChange(item) {
+  if (item.previousValue) {
+    return `${item.field}: ${item.previousValue} → ${item.value}`;
+  }
+  return `${item.field}: ${item.value}`;
+}
+
+export function RegistroOccurrenceBody({ note }) {
+  return (
+    <div className="crm-note-card__registro-body">
+      <p className="crm-note-card__inline-line">
+        <span className="crm-note-card__body-label">Realizado por:</span>{' '}
+        <span>{note.author}</span>
+      </p>
+      {note.internalExcerpt ? (
+        <div className="crm-note-card__registro-block">
+          <span className="crm-note-card__body-label">Anotação interna:</span>
+          <p className="crm-note-card__body">{note.internalExcerpt}</p>
+        </div>
+      ) : null}
+      {note.tabulationChanges?.length ? (
+        <div className="crm-note-card__registro-block">
+          <span className="crm-note-card__body-label">Alterações</span>
+          <ul className="crm-note-card__changes">
+            {note.tabulationChanges.map((item) => (
+              <li key={`${item.field}-${item.previousValue || ''}-${item.value}`}>
+                {formatTabulationChange(item)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {note.statusChanged && note.statusLabel ? (
+        <p className="crm-note-card__inline-line crm-note-card__status-line">
+          <span className="crm-note-card__body-label">Status:</span>{' '}
+          <span>
+            {note.previousStatusLabel
+              ? `${note.previousStatusLabel} → ${note.statusLabel}`
+              : note.statusLabel}
+          </span>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export function MessageEventBody({ note }) {
+  const isReceived = note.kind === 'mensagem-recebida';
+  return (
+    <div className="crm-note-card__registro-body">
+      <p className="crm-note-card__inline-line">
+        <span className="crm-note-card__body-label">
+          {isReceived ? 'Recebido de:' : 'Enviado por:'}
+        </span>{' '}
+        <span>{note.author}</span>
+      </p>
+      <div className="crm-note-card__registro-block">
+        <span className="crm-note-card__body-label">Mensagem:</span>
+        <p className="crm-note-card__body crm-note-card__body--message">{note.body}</p>
+      </div>
+      {note.attachments?.length ? (
+        <p className="crm-note-card__inline-line">
+          <span className="crm-note-card__body-label">Anexos:</span>{' '}
+          <span>{note.attachments.length}</span>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export function NoteAvatar({ note }) {
+  const meta = NOTE_KIND_META[note.kind] || NOTE_KIND_META.agent;
+  if (meta.useInitials) {
+    return (
+      <span className="crm-note-card__avatar" aria-hidden="true">
+        {String(note.initials || note.author || '??').slice(0, 2).toUpperCase()}
+      </span>
+    );
+  }
+  return (
+    <span className="crm-note-card__avatar crm-note-card__avatar--icon" aria-hidden="true">
+      <i className={meta.icon} />
+    </span>
+  );
+}

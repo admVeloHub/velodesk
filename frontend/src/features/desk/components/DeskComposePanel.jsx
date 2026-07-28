@@ -17,13 +17,6 @@ import ComposeRichEditor from './ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
 import ComposeRefinarModal from './ComposeRefinarModal';
 
-const MACROS = [
-  { value: 'F1', label: 'F1 — Saudação padrão', text: 'Olá! Obrigado por entrar em contato. Como posso ajudá-lo(a) hoje?' },
-  { value: 'F2', label: 'F2 — Aguardar retorno', text: 'Estamos analisando sua solicitação e retornaremos em breve.' },
-  { value: 'F3', label: 'F3 — Escalonamento', text: 'Encaminhei sua solicitação para a equipe especializada.' },
-  { value: 'F4', label: 'F4 — Encerramento NPS', text: 'Agradecemos o contato. Por favor, avalie nosso atendimento.' },
-];
-
 function readImageFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -141,30 +134,24 @@ export const DeskComposeFooter = DeskStatusCommitButton;
 
 function ComposeBottomBar({
   formatToolbar,
-  showMacros = false,
-  onMacroSelect,
+  showAiAssistant = false,
   onOpenRefinar,
+  overlay = false,
 }) {
   return (
-    <div className="crm-compose-bottom-bar ticket-response-actions" role="group" aria-label="Ferramentas do compose">
+    <div
+      className={
+        'crm-compose-bottom-bar ticket-response-actions'
+        + (overlay ? ' crm-compose-bottom-bar--overlay' : '')
+      }
+      role="group"
+      aria-label="Ferramentas do compose"
+    >
       {formatToolbar}
-      {showMacros ? (
+      {showAiAssistant ? (
         <>
           <span className="crm-compose-bottom-bar__sep" aria-hidden="true" />
           <div className="crm-compose-bottom-bar__tools">
-            <div className="ticket-macro-hub crm-compose-bottom-bar__macros">
-              <select
-                className="ticket-macro-select"
-                aria-label="Central de opções de resposta"
-                value=""
-                onChange={(e) => onMacroSelect?.(e.target.value)}
-              >
-                <option value="">Central de opções</option>
-                {MACROS.map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
-            </div>
             <button type="button" className="btn-secondary crm-compose-bottom-bar__ai" id="btnCrmAiAssistant" onClick={onOpenRefinar}>
               <i className="fas fa-robot" /> Assistente IA
             </button>
@@ -230,10 +217,10 @@ function InternalNoteFields({
   };
 
   return (
-    <div className="response-form internal-form crm-notes-compose__form spell-compose-wrap">
+    <div className="crm-compose-editor-zone crm-compose-editor-zone--overlay-footer response-form internal-form crm-notes-compose__form spell-compose-wrap">
       <div className="crm-notes-compose__header">
         <i className="fas fa-lock" aria-hidden="true" />
-        <span>Anotação interna — não será enviada ao cliente</span>
+        <span>Nota interna — não enviada ao cliente</span>
       </div>
       <SpellSuggestionBar
         suggestion={spell.activeSuggestion}
@@ -258,6 +245,7 @@ function InternalNoteFields({
         onClick={spell.handleClick}
       />
       <ComposeBottomBar
+        overlay
         formatToolbar={(
           <ComposeFormatToolbar
             applyAction={internalFormat.applyAction}
@@ -348,11 +336,6 @@ export default function DeskComposePanel({
     });
   };
 
-  const applyMacro = (value) => {
-    const macro = MACROS.find((m) => m.value === value);
-    if (macro) publicEditorRef.current?.insertPlainText(macro.text);
-  };
-
   const handleOpenRefinar = () => {
     const texto = composePlainText.trim();
     if (!texto) {
@@ -404,7 +387,7 @@ export default function DeskComposePanel({
             <div className="response-content octa-response-panel-body">
               {showPublic ? (
               <div className={'response-tab-content' + (variant === 'full' && composeMode !== 'public' ? '' : ' active')} id={'public-' + tid}>
-                <div className="response-form spell-compose-wrap">
+                <div className="crm-compose-editor-zone crm-compose-editor-zone--overlay-footer response-form spell-compose-wrap">
                   <SpellErrorsPanel
                     errors={spell.flaggedErrors}
                     onApplyFix={spell.applyErrorFix}
@@ -433,8 +416,8 @@ export default function DeskComposePanel({
                     onClick={spell.handleClick}
                   />
                   <ComposeBottomBar
-                    showMacros
-                    onMacroSelect={applyMacro}
+                    overlay
+                    showAiAssistant
                     onOpenRefinar={handleOpenRefinar}
                     formatToolbar={(
                       <ComposeFormatToolbar
@@ -447,14 +430,14 @@ export default function DeskComposePanel({
                       />
                     )}
                   />
-                  <ComposeRefinarModal
-                    open={refinarOpen}
-                    onClose={() => setRefinarOpen(false)}
-                    draftText={refinarDraft}
-                    nomeOperador={nomeOperador}
-                    onApply={handleApplyRefinar}
-                  />
                 </div>
+                <ComposeRefinarModal
+                  open={refinarOpen}
+                  onClose={() => setRefinarOpen(false)}
+                  draftText={refinarDraft}
+                  nomeOperador={nomeOperador}
+                  onApply={handleApplyRefinar}
+                />
               </div>
               ) : null}
               {showInternal ? (

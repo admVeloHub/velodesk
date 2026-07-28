@@ -51,6 +51,7 @@ import { markWorkflowInfoRequestsReadForTicket } from '../../services/workflow/w
 import DeskWhatsAppChat from './components/DeskWhatsAppChat';
 import DeskComposePanel from './components/DeskComposePanel';
 import DeskInternalNotesPanel from './components/DeskInternalNotesPanel';
+import DeskEventsPanel from './components/DeskEventsPanel';
 import DeskConsultasPanel from './components/DeskConsultasPanel';
 import DeskRightPanel from './components/DeskRightPanel';
 import { applyCascadeFieldChange, applyTabulationSuggestion, buildDefaultRightFields, getMotivos, hasApplyableTabulation, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, validateTabulationForSendStatus } from '../../services/tabulationConfig';
@@ -559,6 +560,16 @@ export default function DeskV2Root() {
     });
   };
 
+  const handleSearchChange = useCallback((value) => {
+    const next = String(value ?? '');
+    setSearchDraft(next);
+    const trimmed = next.trim();
+    setAppliedSearch(trimmed);
+    if (trimmed) {
+      setTableQueueBrowsing(false);
+    }
+  }, []);
+
   const handleSearchSubmit = () => {
     const q = searchDraft.trim();
     setAppliedSearch(q);
@@ -968,6 +979,8 @@ export default function DeskV2Root() {
       await updateTicketInCache(ticket.id, (t) => applyRightFieldsToTicket(t, fields));
       await ticketsApi.startWorkflow(ticket.id || ticket._id, body);
       await syncTicketViews();
+      const full = await loadTicketDetailFromApi(ticket.id || ticket._id);
+      if (full) patchTicket(ticket.id || ticket._id, full);
       await updateTicketInCache(ticket.id, (t) => {
         injectWorkflowSystemMessage(t, template);
         return t;
@@ -988,6 +1001,7 @@ export default function DeskV2Root() {
     syncTicketViews,
     ticket,
     workflowStartTemplate,
+    patchTicket,
   ]);
 
   const handleOpenComunicacaoModal = useCallback(async () => {
@@ -1144,12 +1158,7 @@ export default function DeskV2Root() {
       <DeskQueuePanel
         queueStatuses={queueStatuses}
         activeQueue={activeQueue}
-        searchQuery={searchDraft}
-        searchMode={searchMode}
         collapsed={queueCollapsed}
-        onSearchChange={setSearchDraft}
-        onSearchModeToggle={handleSearchModeToggle}
-        onSearchSubmit={handleSearchSubmit}
         onSelectQueue={selectQueue}
         onCollapse={() => handleQueueCollapse(true)}
         onExpand={() => handleQueueCollapse(false)}
@@ -1164,7 +1173,12 @@ export default function DeskV2Root() {
           activeSort={activeSort}
           entries={entries}
           searchActive={!!appliedSearch.trim()}
+          searchQuery={searchDraft}
+          searchMode={searchMode}
           collapsed={listCollapsed}
+          onSearchChange={handleSearchChange}
+          onSearchModeToggle={handleSearchModeToggle}
+          onSearchSubmit={handleSearchSubmit}
           onSelectTicket={selectTicket}
           onSortChange={setActiveSort}
           entrySortOldestFirst={entrySortOldestFirst}
@@ -1238,6 +1252,13 @@ export default function DeskV2Root() {
                 </button>
                 <button
                   type="button"
+                  className={'tab-btn' + (mainTab === 'eventos' ? ' is-active' : '')}
+                  onClick={() => selectMainTab('eventos')}
+                >
+                  <i className="ti ti-timeline" /> Eventos
+                </button>
+                <button
+                  type="button"
                   className={'tab-btn' + (mainTab === 'consultas' ? ' is-active' : '')}
                   onClick={() => selectMainTab('consultas')}
                 >
@@ -1282,6 +1303,7 @@ export default function DeskV2Root() {
                   className={
                     'tab-panel is-active'
                     + (mainTab === 'notas' ? ' tab-panel--notes' : '')
+                    + (mainTab === 'eventos' ? ' tab-panel--eventos' : '')
                     + (mainTab === 'consultas' ? ' tab-panel--consultas' : '')
                   }
                   data-panel={mainTab}
@@ -1320,6 +1342,11 @@ export default function DeskV2Root() {
                     </>
                   ) : mainTab === 'notas' ? (
                     <DeskInternalNotesPanel
+                      ticket={ticket}
+                      client={client}
+                    />
+                  ) : mainTab === 'eventos' ? (
+                    <DeskEventsPanel
                       ticket={ticket}
                       client={client}
                     />

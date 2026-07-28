@@ -8,7 +8,6 @@ import { DEFAULT_TIPO, hasApplyableTabulation, isTabulationComplete, parseTabula
 import { useTabulation } from '../../../context/TabulationContext';
 import { useDeskAgents } from '../../../hooks/useDeskAgents';
 import { DeskStatusCommitButton } from './DeskComposePanel';
-import TicketOperationProgress from './TicketOperationProgress';
 import ProcessosPopover from './ProcessosPopover';
 import { DESK_THERMOMETER_UI_ENABLED } from '../../../services/desk/constants';
 import { isTicketInWorkflow } from '../../../services/desk/utils';
@@ -160,34 +159,20 @@ export default function DeskRightPanel({
   );
   const inWorkflow = isTicketInWorkflow(ticket);
   const showThermoUi = DESK_THERMOMETER_UI_ENABLED;
-  const showOperationProgress = !inWorkflow;
-  const showThermoSection = showThermoUi || showOperationProgress;
   const showStartWorkflow = canStartWorkflow && tabulationComplete && !inWorkflow && !tabulationReadonly;
   const showReplyWorkflow = inWorkflow && ticketHasComunicacaoWorkflow(ticket) && typeof onReplyWorkflowRequest === 'function';
 
   return (
     <aside className="crm-right-panel" id="crmRightPanel">
       <div className="crm-right-panel__scroll">
-        {showThermoSection ? (
+        {showThermoUi ? (
         <section className="rp-section">
           <div className="rp-section__header">
-            {showThermoUi ? (
-              <div className="rp-section__label">Termômetro do cliente</div>
-            ) : null}
-            {showOperationProgress ? (
-              <TicketOperationProgress
-                ticket={ticket}
-                queueId={queueId}
-              />
-            ) : null}
+            <div className="rp-section__label">Termômetro do cliente</div>
           </div>
-          {showThermoUi ? (
-            <>
-              <div className="thermo-score" id="thermoScore" style={{ color: thermoColor }}>{thermo}</div>
-              <div className="thermo-bar"><div className="thermo-fill" id="thermoFill" style={{ width: thermo + '%', background: thermoColor }} /></div>
-              <div className="thermo-label" id="thermoLabel" style={{ color: thermoColor }}>{thermoLabel}</div>
-            </>
-          ) : null}
+          <div className="thermo-score" id="thermoScore" style={{ color: thermoColor }}>{thermo}</div>
+          <div className="thermo-bar"><div className="thermo-fill" id="thermoFill" style={{ width: thermo + '%', background: thermoColor }} /></div>
+          <div className="thermo-label" id="thermoLabel" style={{ color: thermoColor }}>{thermoLabel}</div>
         </section>
         ) : null}
 
