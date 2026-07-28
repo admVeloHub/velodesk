@@ -1,6 +1,6 @@
 /**
  * Desk CRM — constantes de filas e classificação
- * VERSION: v2.3.2 | DATE: 2026-07-24
+ * VERSION: v2.3.3 | DATE: 2026-07-28
  */
 export const MEUS_TICKETS_QUEUE_ID = 'meus-tickets';
 
@@ -33,14 +33,21 @@ export const SEND_STATUS_OPTION_CANCELADO = {
 export const SEND_STATUS_OPTIONS = SEND_STATUS_OPTIONS_AGENT;
 
 export function getSendStatusOptions(profileRole = 'agent') {
-  if (profileRole === 'supervisor') {
+  const role = String(profileRole || 'agent').trim().toLowerCase();
+  if (role === 'gestao' || role === 'supervisor') {
     return [...SEND_STATUS_OPTIONS_AGENT, SEND_STATUS_OPTION_CANCELADO];
   }
   return SEND_STATUS_OPTIONS_AGENT;
 }
 
+export function isGestaoSendRole(profileRole = 'agent') {
+  const role = String(profileRole || 'agent').trim().toLowerCase();
+  return role === 'gestao' || role === 'supervisor';
+}
+
+/** @deprecated use isGestaoSendRole */
 export function isSupervisorSendRole(profileRole) {
-  return profileRole === 'supervisor';
+  return isGestaoSendRole(profileRole);
 }
 
 export const CASCADE_CATEGORIES = [

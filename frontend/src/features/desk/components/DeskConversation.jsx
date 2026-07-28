@@ -1,11 +1,12 @@
 /**
- * DeskConversation v1.5.2 — normaliza auditScore numérico para badge
- * VERSION: v1.5.2 | DATE: 2026-07-13
+ * DeskConversation v1.5.4 — texto/links contidos na bolha da mensagem
+ * VERSION: v1.5.4 | DATE: 2026-07-28
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
 import { sanitizeComposeHtml } from '../../../services/desk/composeRichEditor';
 import { shouldHideWorkflowSystemThreadMessage } from '../../../services/desk/utils';
+import { normalizeMessageDisplayText } from '../../../utils/htmlText.util';
 
 const AUDIT_MIN_DISPLAY = 70;
 const AUDIT_HIGH_GREEN = 90;
@@ -20,7 +21,7 @@ function normalizeAuditScore(value) {
 }
 
 function MessageBubbleText({ text }) {
-  const raw = String(text || '');
+  const raw = normalizeMessageDisplayText(text);
   if (/<[a-z][\s\S]*>/i.test(raw)) {
     return (
       <span
@@ -30,7 +31,7 @@ function MessageBubbleText({ text }) {
     );
   }
   if (!composeTextHasFormatting(raw)) {
-    return raw;
+    return <span className="msg-bubble__formatted">{raw}</span>;
   }
 
   return (

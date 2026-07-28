@@ -1,9 +1,11 @@
 /**
- * DeskComposePanel v1.9.3 — nomeOperador via aliasColaborador / cadastro
- * VERSION: v1.9.3 | DATE: 2026-07-27
+ * DeskComposePanel v1.9.4 — opção Cancelado restaurada para perfil Gestão
+ * VERSION: v1.9.4 | DATE: 2026-07-28
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SEND_STATUS_OPTIONS } from '../../../services/desk/constants';
+import { getSendStatusOptions } from '../../../services/desk/constants';
+import { useProfile } from '../../../context/ProfileContext';
+import { shouldViewAllDeskTickets } from '../../../services/desk/responsavelSegmentation';
 import { useComposeSpellCheck } from '../../../hooks/useComposeSpellCheck';
 import { useTabulation } from '../../../context/TabulationContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -54,7 +56,12 @@ async function attachImageToEditor(editorRef, file, showNotification) {
 export function DeskStatusCommitButton({ sendStatus, onCommitStatus, variant = 'compose', disabled = false }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
-  const currentStatus = SEND_STATUS_OPTIONS.find((o) => o.id === sendStatus) || SEND_STATUS_OPTIONS[0];
+  const { profileId } = useProfile();
+  const sendStatusOptions = useMemo(() => {
+    if (shouldViewAllDeskTickets(profileId)) return getSendStatusOptions('gestao');
+    return getSendStatusOptions(profileId);
+  }, [profileId]);
+  const currentStatus = sendStatusOptions.find((o) => o.id === sendStatus) || sendStatusOptions[0];
 
   useEffect(() => {
     const close = (e) => {
@@ -108,7 +115,7 @@ export function DeskStatusCommitButton({ sendStatus, onCommitStatus, variant = '
         )}
       </button>
       <div className="crm-send-status__menu" id="crmStatusMenu" role="listbox" hidden={!menuOpen || disabled}>
-        {SEND_STATUS_OPTIONS.map((opt) => (
+        {sendStatusOptions.map((opt) => (
           <button
             key={opt.id}
             type="button"

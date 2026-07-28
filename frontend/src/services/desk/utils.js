@@ -1,11 +1,13 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.3.12 | DATE: 2026-07-27
+ * VERSION: v3.3.13 | DATE: 2026-07-28
  * — higieniza citação/assinatura em respostas de e-mail na thread
+ * — decodifica entidades HTML (&nbsp;) nas mensagens exibidas
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
 import { ticketMatchesAgentResponsavel, shouldUseMeusChamadosFila, shouldViewAllDeskTickets } from './responsavelSegmentation';
+import { normalizeMessageDisplayText } from '../../utils/htmlText.util';
 import {
   MEUS_TICKETS_QUEUE_ID,
   QUEUE_STATUSES,
@@ -1199,7 +1201,7 @@ export function buildRegistroThread(ticket) {
       if (m.type === 'system') {
         return {
           type: 'system',
-          text: String(m.text || m.message || '').trim(),
+          text: normalizeMessageDisplayText(String(m.text || m.message || '').trim()),
           meta: 'Sistema',
           timestamp: m.timestamp || m.time || m.createdAt,
         };
@@ -1234,9 +1236,11 @@ export function buildRegistroThread(ticket) {
       : (m.author || getAgentName());
     const rawText = String(m.text || m.message || '').trim();
     const looksLikeEmailReply = /escreveu:|wrote:|Original Message|^\s*>/m.test(rawText);
-    const text = isClient && looksLikeEmailReply
-      ? extractEmailReplyContent(rawText)
-      : rawText;
+    const text = normalizeMessageDisplayText(
+      isClient && looksLikeEmailReply
+        ? extractEmailReplyContent(rawText)
+        : rawText,
+    );
     return {
       type: bubbleType,
       initials: getInitials(isClient ? ticket.clientName || m.author : authorName),

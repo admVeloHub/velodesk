@@ -1,10 +1,35 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.50.0 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.52.0 | DATE: 2026-07-28 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: estabilidade, formatação e-mail, Cancelado gestão, links na thread
+
+- **Data/Hora**: 2026-07-28
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.52.0
+  - TicketsContext v1.7.4, DeskV2Root v3.16.4
+  - htmlText.util v1.0.0, desk/utils v3.3.13, DeskConversation v1.5.4
+  - chamado.mapper v2.3.3, email-inbound.service v1.7.1, emailHtml.util v1.0.1
+  - constants v2.3.3, DeskComposePanel v1.9.4, velodesk-crm.css v1.8.9
+- **Arquivos modificados**:
+  - `frontend/src/context/TicketsContext.js` — restaura `import deskLog` (corrige `ReferenceError` em prod)
+  - `frontend/src/features/desk/DeskV2Root.jsx` — traço `render:thread-mudou` em `useEffect`
+  - `frontend/src/utils/htmlText.util.js` (novo) — decodifica `&nbsp;` e entidades HTML na thread
+  - `backend/src/services/email-inbound.service.ts`, `chamado.mapper.ts`, `emailHtml.util.ts` — normalização na ingestão e no DTO
+  - `frontend/src/services/desk/utils.js`, `DeskConversation.jsx` — exibição sem entidades literais
+  - `frontend/src/services/desk/constants.js`, `DeskComposePanel.jsx` — opção **Cancelado** restaurada para perfil Gestão (`gestao` / `shouldViewAllDeskTickets`)
+  - `frontend/velodesk-crm.css` — quebra de linha de URLs/texto longo dentro da bolha da mensagem
+- **Descrição**: Hotfix de estabilidade pós-instrumentação; mensagens de e-mail deixam de exibir `&nbsp;` literal; perfil Gestão volta a enviar ticket como Cancelado; links longos na conversa ficam contidos na bolha.
+- **Status**: Concluído (push dev + main)
+
+---
 
 ### GitHub Push — Desk: instrumentação auto-refresh prod + rede local
 

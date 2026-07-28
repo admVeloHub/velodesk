@@ -1,6 +1,6 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.16.3 | DATE: 2026-07-27
+ * VERSION: v3.16.4 | DATE: 2026-07-28
  * — atualização automática: ticket aberto (15s) e filas (60s)
  * — instrumentação enxuta do poll de detalhe (só mudança de mensagens / erros)
  */
@@ -878,15 +878,21 @@ export default function DeskV2Root() {
   };
 
   const convMsgs = ticket ? buildRegistroThread(ticket) : [];
-  if (ticket?.id) {
-    const tid = String(ticket.id);
-    const threadLen = convMsgs.length;
-    const prevThread = agentDebugMsgCount[`thread:${tid}`];
-    if (prevThread !== threadLen) {
-      agentDebugMsgCount[`thread:${tid}`] = threadLen;
-      deskPlatformTrace('auto-refresh', 'render:thread-mudou', { ticketId: tid, msgsNaThread: threadLen, refreshKey });
-    }
-  }
+  const threadLen = convMsgs.length;
+  const activeTicketId = ticket?.id ? String(ticket.id) : '';
+
+  useEffect(() => {
+    if (!activeTicketId) return;
+    const prevThread = agentDebugMsgCount[`thread:${activeTicketId}`];
+    if (prevThread === threadLen) return;
+    agentDebugMsgCount[`thread:${activeTicketId}`] = threadLen;
+    deskPlatformTrace('auto-refresh', 'render:thread-mudou', {
+      ticketId: activeTicketId,
+      msgsNaThread: threadLen,
+      refreshKey,
+    });
+  }, [activeTicketId, threadLen, refreshKey]);
+
   const ticketAi = useTicketAiSuggestions(ticket, rightFields, convMsgs, internalText);
 
   const handleApplyTabulation = useCallback(async () => {

@@ -1,11 +1,12 @@
 /**
- * TicketsContext v1.7.3 — instrumentação patchTicket miss (prod + rede local)
- * VERSION: v1.7.3 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.7.4 — corrige import deskLog removido por engano
+ * VERSION: v1.7.4 | DATE: 2026-07-28 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi } from '../services/ticketsStorage';
 import { hydrateColumnsFromStorage, patchTicketInCache } from '../services/ticketsCache';
 import { getTicketProtocolLabel } from '../services/desk/utils';
+import deskLog from '../utils/deskDebugLog';
 import deskPlatformTrace from '../utils/deskPlatformTrace';
 import { useAuth } from './AuthContext';
 

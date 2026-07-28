@@ -1,7 +1,7 @@
-/** emailHtml.util v1.0.0 — HTML seguro do compose para corpo de e-mail */
+/** emailHtml.util v1.0.1 — decodifica entidades HTML em texto plano */
 const ALLOWED_TAGS = new Set(['b', 'strong', 'i', 'em', 'u', 'br', 'p', 'div', 'ul', 'ol', 'li']);
 
-function decodeBasicHtmlEntities(text: string): string {
+export function decodeBasicHtmlEntities(text: string): string {
   return text
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')

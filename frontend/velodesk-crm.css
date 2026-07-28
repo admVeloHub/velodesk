@@ -1,4 +1,4 @@
-/* Velodesk CRM v1.8.8 — busca CPF/Ticket na fila */
+/* Velodesk CRM v1.8.9 — quebra de linha em links/texto longo na thread */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -2667,7 +2667,7 @@
     justify-content: center;
 }
 
-#velodeskDeskV2Root .msg-row { display: flex; gap: 8px; align-items: flex-start; }
+#velodeskDeskV2Root .msg-row { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
 #velodeskDeskV2Root .msg-row--agent { flex-direction: row-reverse; }
 
 #velodeskDeskV2Root .msg-avatar {
@@ -2694,13 +2694,29 @@
 #velodeskDeskV2Root .msg-avatar--client { background: #1694FF; }
 #velodeskDeskV2Root .msg-avatar--agent { background: #000058; }
 
-#velodeskDeskV2Root .msg-body { max-width: 72%; }
-#velodeskDeskV2Root .msg-row--agent .msg-body { display: flex; flex-direction: column; align-items: flex-end; }
+#velodeskDeskV2Root .msg-body { max-width: 72%; min-width: 0; }
+#velodeskDeskV2Root .msg-row--agent .msg-body { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
 
 #velodeskDeskV2Root .msg-bubble {
     padding: 9px 12px;
     font-size: var(--desk-fs-sm);
     line-height: 1.45;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+#velodeskDeskV2Root .msg-bubble__formatted {
+    display: block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+#velodeskDeskV2Root .msg-bubble__formatted a {
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 #velodeskDeskV2Root .msg-bubble--system {

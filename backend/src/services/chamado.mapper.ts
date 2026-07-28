@@ -1,4 +1,4 @@
-/** chamado.mapper v2.3.2 — higieniza texto de resposta de e-mail na montagem do DTO */
+/** chamado.mapper v2.3.3 — decodifica entidades HTML nas mensagens do ticket */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -16,6 +16,11 @@ import { assertTabulacaoForStatus } from './tabulation.service';
 import { buildLateralWorkflowDto, loadWorkflowDefForChamado, syncLegacyWorkflowFromBody } from './workflowDto.util';
 import { getWorkflowsByIds } from './workflowDefinicao.service';
 import { extractEmailReplyContent } from './emailReplyContent.util';
+import { decodeBasicHtmlEntities } from './emailHtml.util';
+
+function normalizeTicketMessageText(raw: string): string {
+  return decodeBasicHtmlEntities(String(raw ?? '').trim());
+}
 
 export type RegistroOrigin = 'agente' | 'cliente';
 
@@ -929,9 +934,11 @@ function buildTicketDtoCore(
       if (reg.mensagemPublica) {
         const meta = registroMetadados(reg);
         const isEmailInbound = String(meta.source ?? '').toLowerCase() === 'email-inbound';
-        const publicText = isEmailInbound
-          ? extractEmailReplyContent(reg.mensagemPublica)
-          : reg.mensagemPublica;
+        const publicText = normalizeTicketMessageText(
+          isEmailInbound
+            ? extractEmailReplyContent(reg.mensagemPublica)
+            : reg.mensagemPublica,
+        );
         messages.push({
           id: `${index}-pub`,
           text: publicText,
@@ -947,7 +954,7 @@ function buildTicketDtoCore(
       if (reg.anotacaoInterna) {
         internalNotes.push({
           id: `${index}-int`,
-          text: reg.anotacaoInterna,
+          text: normalizeTicketMessageText(reg.anotacaoInterna),
           sender: 'me',
           origin: 'agente',
           author: regAutor || undefined,

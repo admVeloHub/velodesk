@@ -1,4 +1,5 @@
-﻿/** email-inbound.service v1.7.0 — higieniza corpo da resposta (sem citação/assinatura) */
+﻿/** email-inbound.service v1.7.1 — stripHtml decodifica entidades HTML (&nbsp; etc.) */
+import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { applyAssignmentIfNeeded } from './assignmentRouter.service';
 import { appendMessage, createChamadoFromBody } from './chamado.mapper';
@@ -22,11 +23,12 @@ export function normalizeMessageId(value: unknown): string {
 }
 
 export function stripHtml(html: string): string {
-  return html.replace(/<style[\s\S]*?<\/style>/gi, ' ')
+  const stripped = html.replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+  return decodeBasicHtmlEntities(stripped);
 }
 
 export function resolveEmailBody(payload: InboundEmailPayload): string {
