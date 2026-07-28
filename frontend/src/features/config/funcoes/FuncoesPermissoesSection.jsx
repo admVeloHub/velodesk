@@ -103,7 +103,7 @@ export default function FuncoesPermissoesSection() {
       const { data } = await api.put(`/funcoes-permissoes/${modalFuncaoSlug}`, payload);
       setFuncoes((prev) => prev.map((f) => (f.slug === modalFuncaoSlug ? { ...f, ...data } : f)));
       await reloadSessionPerms();
-      showNotification('Overrides salvos com sucesso.', 'success');
+      showNotification('Permissões alteradas', 'success');
       closeModal();
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Erro ao salvar';

@@ -356,7 +356,7 @@ export default function DeskComposePanel({
   const handleOpenRefinar = () => {
     const texto = composePlainText.trim();
     if (!texto) {
-      showNotification('Digite um rascunho antes de usar o Assistente IA.', 'warning');
+      showNotification('Rascunho não localizado', 'warning');
       return;
     }
     setRefinarDraft(texto);

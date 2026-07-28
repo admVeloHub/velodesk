@@ -909,10 +909,7 @@ export default function DeskV2Root() {
     );
 
     if (!changed) {
-      showNotification(
-        'Não foi possível aplicar a sugestão. Verifique se produto, motivo e detalhe existem na tabulação ativa.',
-        'warning',
-      );
+      showNotification('Tabulação indisponível', 'warning');
       return;
     }
 

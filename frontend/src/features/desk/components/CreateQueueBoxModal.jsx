@@ -47,7 +47,7 @@ export default function CreateQueueBoxModal({ open, onClose, onCreated }) {
     try {
       const box = createCustomQueueBox({ name, action });
       onCreated?.(box);
-      showNotification(`Caixa "${box.name}" criada na fila.`, 'success');
+      showNotification('Caixa adicionada', 'success');
       onClose();
     } catch {
       showNotification('Não foi possível criar a caixa.', 'error');

@@ -62,7 +62,7 @@ export default function DashboardView() {
   const handleExport = () => {
     const documentPayload = buildDashboardExportDocument(metrics, filters);
     downloadDashboardExport(documentPayload);
-    showNotification('Dashboard executivo exportado com sucesso.', 'success');
+    showNotification('Relatório gerado', 'success');
   };
 
   return (

@@ -61,30 +61,16 @@ export default function GestaoPanel() {
     navigate('/tickets?desk=v2');
   }, [navigate, openTicket]);
 
-  const handleRedistributeComplete = useCallback(async (outcome) => {
+  const handleRedistributeComplete = useCallback(async () => {
     await refreshTickets();
     await refresh();
-    if (outcome.sources?.length) {
-      const sourceLabel = outcome.sources.join(', ');
-      showNotification(
-        `${outcome.count} ticket${outcome.count === 1 ? '' : 's'} redistribuído${outcome.count === 1 ? '' : 's'} de ${sourceLabel} para ${outcome.targetAgent}.`,
-        'success',
-      );
-      return;
-    }
-    const fromLabel = outcome.previousAgent && outcome.previousAgent !== 'Sem responsável'
-      ? ` de ${outcome.previousAgent}`
-      : '';
-    showNotification(
-      `Ticket #${outcome.ticketId} redistribuído${fromLabel} para ${outcome.targetAgent}.`,
-      'success',
-    );
+    showNotification('Redirecionamento concluído', 'success');
   }, [refreshTickets, refresh, showNotification]);
 
-  const handleEscalateComplete = useCallback(async ({ ticketId, label }) => {
+  const handleEscalateComplete = useCallback(async ({ label }) => {
     await refreshTickets();
     await refresh();
-    showNotification(`Ticket #${ticketId} escalonado para ${label}.`, 'success');
+    showNotification(`Ticket escalonado ${label}`, 'success');
   }, [refreshTickets, refresh, showNotification]);
 
   if (loading && !view) {

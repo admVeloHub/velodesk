@@ -14,6 +14,7 @@ import { isRateLimitError, RATE_LIMIT_USER_MESSAGE } from '../utils/apiErrors';
 import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext(null);
+const TOAST_VISIBLE_MS = 2000;
 
 function mapPersistedNotification(row) {
   return {
@@ -69,7 +70,7 @@ export function NotificationProvider({ children }) {
     setTimeout(() => {
       el.classList.remove('is-visible');
       setTimeout(() => el.remove(), 300);
-    }, 3200);
+    }, TOAST_VISIBLE_MS);
   }, []);
 
   const markPersistedRead = useCallback(async (persistId) => {

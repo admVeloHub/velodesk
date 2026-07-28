@@ -49,7 +49,7 @@ function MailRulesPanel({ listId, listLabel, listDescription }) {
     try {
       await mailRulesApi.create(listId, form);
       setForm({ type: form.type, value: '', note: '' });
-      showNotification('Regra adicionada.', 'success');
+      showNotification('E-mail adicionado', 'success');
       await load();
     } catch (err) {
       showNotification(err?.response?.data?.message || 'Não foi possível adicionar a regra.', 'error');
@@ -71,7 +71,7 @@ function MailRulesPanel({ listId, listLabel, listDescription }) {
     if (!window.confirm(`Remover "${item.value}" da lista ${listLabel}?`)) return;
     try {
       await mailRulesApi.remove(listId, item.id);
-      showNotification('Regra removida.', 'success');
+      showNotification('E-mail removido', 'success');
       await load();
     } catch (err) {
       showNotification(err?.response?.data?.message || 'Erro ao remover regra.', 'error');

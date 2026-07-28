@@ -98,7 +98,7 @@ export default function ComposeRefinarModal({
         }
         const status = err?.response?.status;
         const msg = status === 503
-          ? 'Revisão de texto indisponível: Gemini não configurado no servidor.'
+          ? 'Revisão indisponível'
           : (err?.response?.data?.error || 'Falha na comunicação com o servidor.');
         showNotification(msg, 'error');
         handleClose();
@@ -112,7 +112,7 @@ export default function ComposeRefinarModal({
   const handleApply = useCallback(() => {
     if (!result.trim()) return;
     onApply(result);
-    showNotification('Texto substituído no compose.', 'success');
+    showNotification('Texto substituído', 'success');
     handleClose();
   }, [result, onApply, handleClose, showNotification]);
 
