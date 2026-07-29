@@ -15,15 +15,20 @@ export default function RaTicketList({
   activeSort,
   items,
   searchActive,
+  listSearchQuery = '',
   collapsed,
   onSelectItem,
   onSortChange,
+  onListSearchChange,
+  onListSearchSubmit,
   onCollapse,
   onExpand,
   onReload,
 }) {
   const groupName = RA_GROUPS.find((g) => g.id === activeGroup)?.label || '';
-  const listTitle = searchActive ? `Busca · ${items.length}` : `${groupName} · ${items.length}`;
+  const listTitle = (searchActive || listSearchQuery.trim())
+    ? `Busca · ${items.length}`
+    : `${groupName} · ${items.length}`;
 
   return (
     <aside
@@ -55,6 +60,22 @@ export default function RaTicketList({
               </button>
             </div>
           </div>
+          <label className="ra-crm-list-search">
+            <i className="ti ti-search" aria-hidden="true" />
+            <input
+              type="search"
+              placeholder="Buscar ticket ou CPF…"
+              value={listSearchQuery}
+              onChange={(e) => onListSearchChange?.(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onListSearchSubmit?.();
+                }
+              }}
+              aria-label="Buscar por número de ticket ou CPF"
+            />
+          </label>
           <div className="ra-crm-sort-chips">
             {['data', 'sla'].map((sort) => (
               <button

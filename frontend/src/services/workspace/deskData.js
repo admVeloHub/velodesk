@@ -246,6 +246,17 @@ const SECTION_DEFS = [
   { id: 'workflow', title: 'Atualização interna / workflow', icon: 'ti ti-arrows-exchange', variant: 'workflow' },
 ];
 
+const WS360_SECTION_QUEUE_MAP = {
+  'action-now': 'novos',
+  'client-replied': 'pendente',
+  workflow: 'em-andamento',
+};
+
+/** Fila do Desk CRM correspondente a uma seção do Painel 360° Agente. */
+export function resolveDeskQueueForWs360Section(sectionId) {
+  return WS360_SECTION_QUEUE_MAP[sectionId] || 'novos';
+}
+
 export function computeAgent360View() {
   const desk = computeAgentDeskData();
   const now = new Date();

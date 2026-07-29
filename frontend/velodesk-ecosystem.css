@@ -28,7 +28,7 @@
     background: var(--eco-surface) !important;
 }
 
-/* ?? Banner protótipo ?? */
+/* ?? Banner prot?tipo ?? */
 .eco-prototype-banner {
     position: fixed; top: 0; left: 0; right: 0; z-index: 400;
     background: linear-gradient(90deg, var(--eco-navy), var(--eco-blue));
@@ -46,7 +46,7 @@ body:has(.eco-prototype-banner) {
     --velo-banner-height: 32px;
 }
 
-/* ?? Páginas eco: transição fluida ?? */
+/* ?? P?ginas eco: transi??o fluida ?? */
 .eco-page-inner {
     max-width: 1440px;
     width: calc(100% - 32px);
@@ -100,7 +100,7 @@ body:has(.eco-prototype-banner) {
     top: 0;
 }
 
-/* ?? Painel 360° ? área cinza (dimensões ref. viewport) ?? */
+/* ?? Painel 360? ? ?rea cinza (dimens?es ref. viewport) ?? */
 #workspace.active.workspace-page,
 #workspace360Content.eco-page-inner--workspace360 {
     --ws360-sidebar-w: var(--velo-sidebar-compact, 56px);
@@ -226,7 +226,7 @@ body:has(.eco-prototype-banner) {
     color: var(--eco-navy); font-weight: 600;
 }
 
-/* ?? Botões header eco ?? */
+/* ?? Bot?es header eco ?? */
 .header-eco-actions { display: flex; align-items: center; gap: 0.5rem; }
 .btn-eco-ghost {
     display: inline-flex; align-items: center; gap: 0.4rem;
@@ -267,7 +267,7 @@ body:has(.eco-prototype-banner) {
 .ws-hero--monitor { background: linear-gradient(135deg, #0c4a6e, #0891b2, #22d3ee); }
 .ws-hero--training { background: linear-gradient(135deg, #064e3b, #059669, #34d399); }
 .ws-hero--mgmt { background: linear-gradient(135deg, #000033, #000058, #1634FF); }
-/* ws-hero--workflow usa gradiente azul padrão (.ws-hero / velotax-theme.css) */
+/* ws-hero--workflow usa gradiente azul padr?o (.ws-hero / velotax-theme.css) */
 /* Overrides dos CTAs do hero workflow: velodesk-crm.css */
 .ws-eyebrow {
     display: inline-block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em;
@@ -371,7 +371,7 @@ body:has(.eco-prototype-banner) {
 .ws-stat strong { display: block; font-size: 1.5rem; font-weight: 700; line-height: 1.1; color: var(--eco-navy); letter-spacing: -0.02em; }
 .ws-stat span { font-size: 0.78rem; color: #64748b; font-weight: 500; }
 
-/* ?? Painéis ?? */
+/* ?? Pain?is ?? */
 .ws-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; }
 .ws-panel {
     background: var(--eco-card); border-radius: var(--eco-radius);
@@ -388,7 +388,7 @@ body:has(.eco-prototype-banner) {
     background: linear-gradient(135deg, rgba(0,0,88,.05), rgba(79,110,247,.1)); color: var(--eco-accent); font-size: 0.8rem;
 }
 
-/* ?? Notificações ?? */
+/* ?? Notifica??es ?? */
 .ws-notif-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.55rem; }
 .ws-notif {
     padding: 0.75rem 0.9rem; border-radius: var(--eco-radius-sm); font-size: 0.84rem;
@@ -543,7 +543,7 @@ body:has(.eco-prototype-banner) {
 .ai-review-apply { border-radius: 8px !important; font-size: 0.75rem !important; }
 .ai-tag { font-size: 0.62rem; padding: 0.12rem 0.4rem; border-radius: 4px; text-transform: uppercase; font-weight: 700; }
 .ai-tag-ortografia { background: #fef3c7; color: #92400e; }
-.ai-tag-gramática, .ai-tag-gramatica { background: #dbeafe; color: #1e40af; }
+.ai-tag-gram?tica, .ai-tag-gramatica { background: #dbeafe; color: #1e40af; }
 .ai-tag-tom { background: #ede9fe; color: #5b21b6; }
 .ai-field-needs-review {
     border-color: var(--eco-accent) !important;
@@ -552,7 +552,7 @@ body:has(.eco-prototype-banner) {
 }
 .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.76rem; border-radius: 8px; }
 
-/* ?? Registro rápido modal ?? */
+/* ?? Registro r?pido modal ?? */
 #quickRegisterModal .modal-content {
     border-radius: 20px; overflow: hidden; border: none;
     box-shadow: var(--eco-shadow-lg); max-width: 560px;
@@ -601,7 +601,7 @@ body:has(.eco-prototype-banner) {
 }
 .ai-suggestion-box i { color: var(--eco-violet); margin-top: 0.15rem; }
 
-/* ?? IA: sugestões em ticket (resposta + tabulação) ?? */
+/* ?? IA: sugest?es em ticket (resposta + tabula??o) ?? */
 .velo-ai-suggest {
     margin-top: 0.75rem;
     padding: 0.75rem 0.85rem;
@@ -705,7 +705,7 @@ body:has(.eco-prototype-banner) {
     margin-left: 0;
 }
 
-/* ?? Painel ligação IA ?? */
+/* ?? Painel liga??o IA ?? */
 .call-assist-panel {
     position: fixed; right: -360px; top: calc(var(--velo-chrome-top, 60px) + 12px); width: 340px;
     max-height: calc(100vh - var(--velo-chrome-top, 60px) - 24px);
@@ -967,7 +967,7 @@ body:has(.eco-prototype-banner) {
     .qr-options { grid-template-columns: 1fr 1fr; }
 }
 
-/* ?? Formulário lateral fixo (tabulação) ?? */
+/* ?? Formul?rio lateral fixo (tabula??o) ?? */
 :root {
     --velo-ticket-lateral-width: clamp(280px, 32vw, 380px);
 }
@@ -1292,7 +1292,7 @@ body:has(.eco-prototype-banner) {
 }
 
 .velo-lf-risk--alto { color: #dc2626 !important; }
-.velo-lf-risk--médio, .velo-lf-risk--medio { color: #d97706 !important; }
+.velo-lf-risk--m?dio, .velo-lf-risk--medio { color: #d97706 !important; }
 .velo-lf-risk--baixo { color: #059669 !important; }
 
 .velo-lf-db-block ul {
@@ -1331,7 +1331,7 @@ body:has(.eco-prototype-banner) {
     .velo-lf-db-grid { grid-template-columns: 1fr; }
 }
 
-/* ?? Painel visual do cliente (termômetro + resumo) ?? */
+/* ?? Painel visual do cliente (term?metro + resumo) ?? */
 .velo-lf-db-head--visual {
     display: flex;
     align-items: flex-start;
@@ -1384,7 +1384,7 @@ body:has(.eco-prototype-banner) {
 .velo-chip--danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
 .velo-chip--info { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 
-/* Termômetro visual */
+/* Term?metro visual */
 .velo-thermo-visual {
     margin: 0 0 0.75rem;
     padding: 0.85rem;
@@ -1544,7 +1544,7 @@ body:has(.eco-prototype-banner) {
     margin-top: 0.3rem;
 }
 
-/* Termômetro compacto */
+/* Term?metro compacto */
 .velo-thermo-compact {
     display: flex;
     align-items: center;
@@ -1596,7 +1596,7 @@ body:has(.eco-prototype-banner) {
     margin-top: 0.35rem;
 }
 
-/* Próximo passo ? uma linha direta */
+/* Pr?ximo passo ? uma linha direta */
 .velo-brief {
     margin-bottom: 0.65rem;
     padding: 0.55rem 0.65rem;
@@ -1627,7 +1627,7 @@ body:has(.eco-prototype-banner) {
     color: #1e293b;
 }
 
-/* Histórico compacto */
+/* Hist?rico compacto */
 .velo-lf-history--compact {
     margin-top: 0;
     padding-top: 0.55rem;
@@ -1672,7 +1672,7 @@ body:has(.eco-prototype-banner) {
 /* Resumo legado ? ocultar se ainda existir */
 .velo-client-summary { display: none; }
 
-/* Termômetro legado (fallback) */
+/* Term?metro legado (fallback) */
 .velo-lf-thermo {
     margin-bottom: 0.75rem;
     padding: 0.65rem 0.75rem;
@@ -1739,7 +1739,7 @@ body:has(.eco-prototype-banner) {
     color: #334155;
 }
 
-/* Botão consulta CPF ? azul padrão */
+/* Bot?o consulta CPF ? azul padr?o */
 .velo-lf-db-btn {
     flex-shrink: 0;
     padding: 0.45rem 0.7rem;
@@ -1795,7 +1795,7 @@ body:has(.eco-prototype-banner) {
 .velo-tag--streaming { background: #db2777; }
 .velo-tag--default { background: #475569; }
 
-/* Histórico com busca */
+/* Hist?rico com busca */
 .velo-lf-history {
     margin-top: 0.65rem;
     padding-top: 0.55rem;
@@ -1857,7 +1857,7 @@ body:has(.eco-prototype-banner) {
     font-size: 0.7rem;
 }
 
-/* Termômetro ? marcador e retrátil */
+/* Term?metro ? marcador e retr?til */
 .velo-lf-thermo-toggle {
     width: 100%;
     display: flex;
@@ -1922,7 +1922,7 @@ body:has(.eco-prototype-banner) {
     display: none;
 }
 
-/* Notificações clicáveis */
+/* Notifica??es clic?veis */
 .ws-panel-hint {
     font-size: 0.78rem;
     color: #64748b;
@@ -1943,7 +1943,7 @@ body:has(.eco-prototype-banner) {
     font-size: 0.85rem;
 }
 
-/* ?? Painel de ação operacional (agent desk / cockpit) ?? */
+/* ?? Painel de a??o operacional (agent desk / cockpit) ?? */
 .ws-agent-desk--operational {
     gap: var(--ws360-block-gap, 20px);
     width: 100%;
@@ -1954,7 +1954,7 @@ body:has(.eco-prototype-banner) {
 }
 .ws-agent-desk--cockpit { --ws-transition: 180ms ease; }
 
-/* Hierarquia visual: nível 1 > 2 > 3 */
+/* Hierarquia visual: n?vel 1 > 2 > 3 */
 .ws-smart-next--priority-1 { z-index: 2; position: relative; }
 .ws-panel--level-2 { box-shadow: 0 2px 14px rgba(15, 23, 42, 0.07); }
 .ws-panel--level-3 {
@@ -2116,7 +2116,7 @@ body:has(.eco-prototype-banner) {
 .ws-panel__head-row h4 { margin: 0 !important; }
 .ws-panel__count { font-size: 0.72rem; font-weight: 700; color: #64748b; background: #f1f5f9; padding: 0.15rem 0.5rem; border-radius: 999px; }
 
-/* Fila operacional ? cards compactos e escaneáveis */
+/* Fila operacional ? cards compactos e escane?veis */
 .ws-queue-list { gap: 6px; display: flex; flex-direction: column; }
 .ws-queue-card {
     list-style: none; padding: 12px 14px 12px 16px; border-radius: 10px;
@@ -2266,7 +2266,7 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
 
 /* Modo escuro ws360/ws-agent ? velodesk-dark-theme.css */
 
-/* ??? Painel 360° ? layout ws360 (tokens --ws360-*) ??? */
+/* ??? Painel 360? ? layout ws360 (tokens --ws360-*) ??? */
 .ws360-shell {
     display: flex;
     flex-direction: column;
@@ -3035,7 +3035,7 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     height: 100%;
 }
 
-/* workflow alinhado à coluna esquerda (mesma largura que Cliente respondeu) */
+/* workflow alinhado ? coluna esquerda (mesma largura que Cliente respondeu) */
 .ws360-sections-row--lead .ws360-section {
     grid-column: 1;
 }
@@ -3078,7 +3078,7 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     align-self: start;
 }
 
-/* Status dos serviços ? mesmo formato/dimensão dos cards KPI */
+/* Status dos servi?os ? mesmo formato/dimens?o dos cards KPI */
 .ws360-service-status.ws360-kpi {
     width: var(--ws360-kpi-column-width, calc((100% - 4 * var(--ws360-kpi-gap, 14px)) / 5));
     max-width: 100%;
@@ -3192,7 +3192,7 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     }
 }
 
-/* Minha produção ? últimos 7 dias */
+/* Minha produ??o ? ?ltimos 7 dias */
 .ws360-production {
     padding: 0.875rem 1rem 1rem;
 }
@@ -3975,7 +3975,7 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     }
 }
 
-/* Relatórios operacionais ? supervisor */
+/* Relat?rios operacionais ? supervisor */
 .ws360-reports {
     padding: 1.15rem 1.25rem 1.25rem;
     margin-top: 1rem;
@@ -4130,7 +4130,7 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     }
 }
 
-/* Modal de relatório operacional ? supervisor */
+/* Modal de relat?rio operacional ? supervisor */
 .ws360-report-modal__backdrop {
     position: fixed;
     inset: 0;
@@ -4318,7 +4318,7 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     justify-content: center;
 }
 
-/* Modal de redistribuição ? supervisor */
+/* Modal de redistribui??o ? supervisor */
 .ws360-redistribute-modal__body {
     padding-top: 12px;
 }
@@ -5116,7 +5116,7 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     transform: translateY(-1px);
 }
 
-/* Visão por canal ? supervisor */
+/* Vis?o por canal ? supervisor */
 .ws360-channel-vision {
     margin-top: 1.25rem;
     padding-top: 1.15rem;
@@ -5482,7 +5482,7 @@ body.desk-v2-mode #aiChatbotModal {
     }
 }
 
-/* Modal ? configurações de conta */
+/* Modal ? configura??es de conta */
 .account-modal__backdrop {
     position: fixed;
     inset: 0;
@@ -7228,7 +7228,7 @@ body.desk-v2-mode #aiChatbotModal {
     }
 }
 
-/* ?? Workflow Config Editor (Gestão) ?? */
+/* ?? Workflow Config Editor (Gest?o) ?? */
 #config .config-content:has(.wf-config-shell) {
     padding: 0;
     overflow: hidden;
@@ -8161,7 +8161,7 @@ body.desk-v2-mode #aiChatbotModal {
     }
 }
 
-/* Workflow config ? editores de critérios, passos e grupos v1.1.0 */
+/* Workflow config ? editores de crit?rios, passos e grupos v1.1.0 */
 .wf-criteria-editor__list {
     list-style: none;
     margin: 0;
@@ -8584,7 +8584,7 @@ body.desk-v2-mode #aiChatbotModal {
     }
 }
 
-/* Grupos e Atribuições ? hub + lista de agentes v1.0.0 */
+/* Grupos e Atribui??es ? hub + lista de agentes v1.0.0 */
 .grupos-atrib-hub__lead {
     margin: 0 0 16px;
     font-size: 14px;
@@ -8761,7 +8761,7 @@ body.desk-v2-mode #aiChatbotModal {
     }
 }
 
-/* ?? Solicitações Produtos (Agente) ?? */
+/* ?? Solicita??es Produtos (Agente) ?? */
 .prod-solic-page-wrap {
     height: 100%;
     overflow: auto;
@@ -9353,7 +9353,7 @@ body.desk-v2-mode #aiChatbotModal {
     }
 }
 
-/* Perfil Especiais ? seleção de canal */
+/* Perfil Especiais ? sele??o de canal */
 .especiais-channel-select--in-workspace {
     max-width: none;
     margin: 0;
@@ -10027,7 +10027,7 @@ body.desk-v2-mode #aiChatbotModal {
     cursor: not-allowed;
 }
 
-/* Modal Nova reclamação / Import Hugme */
+/* Modal Nova reclama??o / Import Hugme */
 .ra-nova-modal__body {
     display: flex;
     flex-direction: column;
@@ -10515,7 +10515,7 @@ body.desk-v2-mode #aiChatbotModal {
     }
 }
 
-/* Reclame Aqui ? registro de reclamação */
+/* Reclame Aqui ? registro de reclama??o */
 .ra-registro {
     display: flex;
     flex-direction: column;
@@ -11072,12 +11072,12 @@ body.desk-v2-mode #aiChatbotModal {
     margin-left: auto;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__profile-actions .ticket-client-history-btn {
+#especiais-reclame-aqui .ra-ticket__profile-actions .ticket-client-history-btn , #especiais-procon .ra-ticket__profile-actions .ticket-client-history-btn {
     align-self: auto;
     margin-top: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__profile-actions .tab-btn {
+#especiais-reclame-aqui .ra-ticket__profile-actions .tab-btn , #especiais-procon .ra-ticket__profile-actions .tab-btn {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
@@ -11094,18 +11094,18 @@ body.desk-v2-mode #aiChatbotModal {
     line-height: 1.2;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__profile-actions .tab-btn.is-active {
+#especiais-reclame-aqui .ra-ticket__profile-actions .tab-btn.is-active , #especiais-procon .ra-ticket__profile-actions .tab-btn.is-active {
     color: #1634FF;
     border-color: #1634FF;
     background: #eef2ff;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__profile-actions .tab-btn:disabled {
+#especiais-reclame-aqui .ra-ticket__profile-actions .tab-btn:disabled , #especiais-procon .ra-ticket__profile-actions .tab-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel {
+#especiais-reclame-aqui .ra-ticket__consultas-panel , #especiais-procon .ra-ticket__consultas-panel {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -11113,7 +11113,7 @@ body.desk-v2-mode #aiChatbotModal {
     overflow: hidden;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas , #especiais-procon .ra-ticket__consultas-panel .crm-consultas {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -11124,25 +11124,25 @@ body.desk-v2-mode #aiChatbotModal {
     border-radius: 10px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas__header {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__header , #especiais-procon .ra-ticket__consultas-panel .crm-consultas__header {
     margin-bottom: 16px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas__title-row {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__title-row , #especiais-procon .ra-ticket__consultas-panel .crm-consultas__title-row {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 4px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas__title {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__title , #especiais-procon .ra-ticket__consultas-panel .crm-consultas__title {
     margin: 0;
     font-size: 1rem;
     font-weight: 700;
     color: #000058;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas__refresh {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__refresh , #especiais-procon .ra-ticket__consultas-panel .crm-consultas__refresh {
     width: 28px;
     height: 28px;
     min-width: 28px;
@@ -11150,13 +11150,13 @@ body.desk-v2-mode #aiChatbotModal {
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas__subtitle {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__subtitle , #especiais-procon .ra-ticket__consultas-panel .crm-consultas__subtitle {
     margin: 0;
     font-size: 0.875rem;
     color: #64748b;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas__section-title {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__section-title , #especiais-procon .ra-ticket__consultas-panel .crm-consultas__section-title {
     margin: 0 0 12px;
     font-size: 0.875rem;
     font-weight: 700;
@@ -11165,13 +11165,13 @@ body.desk-v2-mode #aiChatbotModal {
     color: #6b7280;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas__products-grid {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__products-grid , #especiais-procon .ra-ticket__consultas-panel .crm-consultas__products-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 14px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product , #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product {
     background: #fff;
     border: 0.5px solid #e4e6ea;
     border-radius: 12px;
@@ -11179,12 +11179,12 @@ body.desk-v2-mode #aiChatbotModal {
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product--active {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product--active , #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product--active {
     border-color: #1634FF;
     box-shadow: 0 0 0 1px rgba(22, 52, 255, 0.12);
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__header {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__header , #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -11192,7 +11192,7 @@ body.desk-v2-mode #aiChatbotModal {
     margin-bottom: 10px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__tag.velo-tag {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__tag.velo-tag , #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__tag.velo-tag {
     display: inline-flex;
     align-items: center;
     padding: 4px 10px;
@@ -11203,7 +11203,7 @@ body.desk-v2-mode #aiChatbotModal {
     line-height: 1.2;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__badge {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__badge , #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__badge {
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -11215,20 +11215,20 @@ body.desk-v2-mode #aiChatbotModal {
     white-space: nowrap;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__desc {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__desc , #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__desc {
     margin: 0 0 12px;
     font-size: 0.875rem;
     line-height: 1.5;
     color: #334155;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__meta {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__meta , #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__meta {
     margin: 0;
     display: grid;
     gap: 10px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__meta dt {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__meta dt , #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__meta dt {
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -11237,19 +11237,19 @@ body.desk-v2-mode #aiChatbotModal {
     margin-bottom: 2px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__meta dd {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__meta dd , #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__meta dd {
     margin: 0;
     font-size: 0.875rem;
     color: #1e293b;
     line-height: 1.45;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__motivos {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas-product__motivos , #especiais-procon .ra-ticket__consultas-panel .crm-consultas-product__motivos {
     margin: 0;
     padding-left: 18px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas__empty {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__empty , #especiais-procon .ra-ticket__consultas-panel .crm-consultas__empty {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -11263,18 +11263,18 @@ body.desk-v2-mode #aiChatbotModal {
     color: #64748b;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas__empty .ti {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__empty .ti , #especiais-procon .ra-ticket__consultas-panel .crm-consultas__empty .ti {
     font-size: 2rem;
     margin-bottom: 10px;
     opacity: 0.65;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas__empty p {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__empty p , #especiais-procon .ra-ticket__consultas-panel .crm-consultas__empty p {
     margin: 0;
     font-size: 0.9375rem;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__consultas-panel .crm-consultas__empty-hint {
+#especiais-reclame-aqui .ra-ticket__consultas-panel .crm-consultas__empty-hint , #especiais-procon .ra-ticket__consultas-panel .crm-consultas__empty-hint {
     margin-top: 6px !important;
     font-size: 0.875rem !important;
     color: #94a3b8;
@@ -11518,7 +11518,7 @@ body.desk-v2-mode #aiChatbotModal {
     color: #0f172a;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__side .ra-ticket__moderacao {
+#especiais-reclame-aqui .ra-ticket__side .ra-ticket__moderacao , #especiais-procon .ra-ticket__side .ra-ticket__moderacao {
     margin-bottom: 0;
     flex-shrink: 0;
 }
@@ -11600,7 +11600,7 @@ body.desk-v2-mode #aiChatbotModal {
     --ra-crm-col-side: 300px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-shell {
+#especiais-reclame-aqui .ra-crm-shell , #especiais-procon .ra-crm-shell {
     display: flex;
     align-items: stretch;
     flex: 1;
@@ -11611,14 +11611,17 @@ body.desk-v2-mode #aiChatbotModal {
     font-family: 'Poppins', sans-serif;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-shell *,
-#especiais-reclame-aqui, #especiais-procon .ra-crm-shell *::before,
-#especiais-reclame-aqui, #especiais-procon .ra-crm-shell *::after {
+#especiais-reclame-aqui .ra-crm-shell *,
+#especiais-reclame-aqui .ra-crm-shell *::before,
+#especiais-reclame-aqui .ra-crm-shell *::after,
+#especiais-procon .ra-crm-shell *,
+#especiais-procon .ra-crm-shell *::before,
+#especiais-procon .ra-crm-shell *::after {
     box-sizing: border-box;
 }
 
 /* Col 1 ? fila */
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue {
+#especiais-reclame-aqui .ra-crm-queue , #especiais-procon .ra-crm-queue {
     width: var(--ra-crm-col-queue);
     flex-shrink: 0;
     height: 100%;
@@ -11631,7 +11634,7 @@ body.desk-v2-mode #aiChatbotModal {
     transition: width 0.28s ease, min-width 0.28s ease;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue__inner {
+#especiais-reclame-aqui .ra-crm-queue__inner , #especiais-procon .ra-crm-queue__inner {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -11641,26 +11644,26 @@ body.desk-v2-mode #aiChatbotModal {
     transition: opacity 0.2s ease;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue.is-collapsed {
+#especiais-reclame-aqui .ra-crm-queue.is-collapsed , #especiais-procon .ra-crm-queue.is-collapsed {
     width: 36px;
     min-width: 36px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue.is-collapsed .ra-crm-queue__inner {
+#especiais-reclame-aqui .ra-crm-queue.is-collapsed .ra-crm-queue__inner , #especiais-procon .ra-crm-queue.is-collapsed .ra-crm-queue__inner {
     opacity: 0;
     pointer-events: none;
     visibility: hidden;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue.is-collapsed .ra-crm-panel-expand--queue {
+#especiais-reclame-aqui .ra-crm-queue.is-collapsed .ra-crm-panel-expand--queue , #especiais-procon .ra-crm-queue.is-collapsed .ra-crm-panel-expand--queue {
     display: flex;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue__header {
+#especiais-reclame-aqui .ra-crm-queue__header , #especiais-procon .ra-crm-queue__header {
     padding: 12px 10px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue__header-top {
+#especiais-reclame-aqui .ra-crm-queue__header-top , #especiais-procon .ra-crm-queue__header-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -11668,7 +11671,7 @@ body.desk-v2-mode #aiChatbotModal {
     margin-bottom: 10px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue__title {
+#especiais-reclame-aqui .ra-crm-queue__title , #especiais-procon .ra-crm-queue__title {
     margin: 0;
     font-size: 0.68rem;
     font-weight: 600;
@@ -11679,7 +11682,7 @@ body.desk-v2-mode #aiChatbotModal {
     min-width: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-search {
+#especiais-reclame-aqui .ra-crm-queue-search , #especiais-procon .ra-crm-queue-search {
     display: flex;
     align-items: center;
     gap: 5px;
@@ -11691,7 +11694,7 @@ body.desk-v2-mode #aiChatbotModal {
     font-size: 0.72rem;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-search input {
+#especiais-reclame-aqui .ra-crm-queue-search input , #especiais-procon .ra-crm-queue-search input {
     flex: 1;
     min-width: 0;
     border: 0;
@@ -11701,11 +11704,11 @@ body.desk-v2-mode #aiChatbotModal {
     outline: none;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-search input::placeholder {
+#especiais-reclame-aqui .ra-crm-queue-search input::placeholder , #especiais-procon .ra-crm-queue-search input::placeholder {
     color: rgba(255, 255, 255, 0.35);
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-list {
+#especiais-reclame-aqui .ra-crm-queue-list , #especiais-procon .ra-crm-queue-list {
     list-style: none;
     margin: 0;
     padding: 0 8px;
@@ -11714,7 +11717,7 @@ body.desk-v2-mode #aiChatbotModal {
     overflow-y: auto;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-item {
+#especiais-reclame-aqui .ra-crm-queue-item , #especiais-procon .ra-crm-queue-item {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -11726,23 +11729,23 @@ body.desk-v2-mode #aiChatbotModal {
     margin-bottom: 2px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-item:hover {
+#especiais-reclame-aqui .ra-crm-queue-item:hover , #especiais-procon .ra-crm-queue-item:hover {
     background: rgba(255, 255, 255, 0.08);
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-item.is-active {
+#especiais-reclame-aqui .ra-crm-queue-item.is-active , #especiais-procon .ra-crm-queue-item.is-active {
     background: rgba(249, 115, 22, 0.35);
     color: #fff;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-item__dot {
+#especiais-reclame-aqui .ra-crm-queue-item__dot , #especiais-procon .ra-crm-queue-item__dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-item__name {
+#especiais-reclame-aqui .ra-crm-queue-item__name , #especiais-procon .ra-crm-queue-item__name {
     flex: 1;
     min-width: 0;
     white-space: nowrap;
@@ -11750,20 +11753,20 @@ body.desk-v2-mode #aiChatbotModal {
     text-overflow: ellipsis;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-item__count {
+#especiais-reclame-aqui .ra-crm-queue-item__count , #especiais-procon .ra-crm-queue-item__count {
     font-size: 0.72rem;
     font-weight: 700;
     color: rgba(255, 255, 255, 0.55);
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue__footer {
+#especiais-reclame-aqui .ra-crm-queue__footer , #especiais-procon .ra-crm-queue__footer {
     padding: 10px 8px 12px;
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-btn {
+#especiais-reclame-aqui .ra-crm-queue-btn , #especiais-procon .ra-crm-queue-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -11778,23 +11781,23 @@ body.desk-v2-mode #aiChatbotModal {
     border: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-btn--secondary {
+#especiais-reclame-aqui .ra-crm-queue-btn--secondary , #especiais-procon .ra-crm-queue-btn--secondary {
     background: rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.85);
     border: 0.5px solid rgba(255, 255, 255, 0.15);
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-btn--primary {
+#especiais-reclame-aqui .ra-crm-queue-btn--primary , #especiais-procon .ra-crm-queue-btn--primary {
     background: #f97316;
     color: #fff;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-queue-btn--primary:hover {
+#especiais-reclame-aqui .ra-crm-queue-btn--primary:hover , #especiais-procon .ra-crm-queue-btn--primary:hover {
     background: #ea580c;
 }
 
 /* Col 2 ? lista */
-#especiais-reclame-aqui, #especiais-procon .ra-crm-list {
+#especiais-reclame-aqui .ra-crm-list , #especiais-procon .ra-crm-list {
     width: var(--ra-crm-col-list);
     flex-shrink: 0;
     height: 100%;
@@ -11808,7 +11811,7 @@ body.desk-v2-mode #aiChatbotModal {
     transition: width 0.28s ease, min-width 0.28s ease;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-list__inner {
+#especiais-reclame-aqui .ra-crm-list__inner , #especiais-procon .ra-crm-list__inner {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -11818,35 +11821,35 @@ body.desk-v2-mode #aiChatbotModal {
     transition: opacity 0.2s ease;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-list.is-collapsed {
+#especiais-reclame-aqui .ra-crm-list.is-collapsed , #especiais-procon .ra-crm-list.is-collapsed {
     width: 36px;
     min-width: 36px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-list.is-collapsed .ra-crm-list__inner {
+#especiais-reclame-aqui .ra-crm-list.is-collapsed .ra-crm-list__inner , #especiais-procon .ra-crm-list.is-collapsed .ra-crm-list__inner {
     opacity: 0;
     pointer-events: none;
     visibility: hidden;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-list.is-collapsed .ra-crm-panel-expand--list {
+#especiais-reclame-aqui .ra-crm-list.is-collapsed .ra-crm-panel-expand--list , #especiais-procon .ra-crm-list.is-collapsed .ra-crm-panel-expand--list {
     display: flex;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-list-header {
+#especiais-reclame-aqui .ra-crm-list-header , #especiais-procon .ra-crm-list-header {
     padding: 10px 10px 8px;
     border-bottom: 0.5px solid #e4e6ea;
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-list-header__row {
+#especiais-reclame-aqui .ra-crm-list-header__row , #especiais-procon .ra-crm-list-header__row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 6px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-list-header__title {
+#especiais-reclame-aqui .ra-crm-list-header__title , #especiais-procon .ra-crm-list-header__title {
     margin: 0;
     font-size: 0.78rem;
     font-weight: 700;
@@ -11858,19 +11861,46 @@ body.desk-v2-mode #aiChatbotModal {
     text-overflow: ellipsis;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-list-header__actions {
+#especiais-reclame-aqui .ra-crm-list-header__actions , #especiais-procon .ra-crm-list-header__actions {
     display: flex;
     align-items: center;
     gap: 4px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-sort-chips {
+#especiais-reclame-aqui .ra-crm-list-search , #especiais-procon .ra-crm-list-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 6px 8px;
+    background: #f1f5f9;
+    border: 0.5px solid #e2e8f0;
+    border-radius: 6px;
+    color: #94a3b8;
+    font-size: 0.72rem;
+}
+
+#especiais-reclame-aqui .ra-crm-list-search input , #especiais-procon .ra-crm-list-search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: #1a1a2e;
+    font: inherit;
+    outline: none;
+}
+
+#especiais-reclame-aqui .ra-crm-list-search input::placeholder , #especiais-procon .ra-crm-list-search input::placeholder {
+    color: #94a3b8;
+}
+
+#especiais-reclame-aqui .ra-crm-sort-chips , #especiais-procon .ra-crm-sort-chips {
     display: flex;
     gap: 4px;
     margin-top: 8px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-sort-chip {
+#especiais-reclame-aqui .ra-crm-sort-chip , #especiais-procon .ra-crm-sort-chip {
     border: 0.5px solid #e4e6ea;
     background: #f8fafc;
     border-radius: 999px;
@@ -11882,13 +11912,13 @@ body.desk-v2-mode #aiChatbotModal {
     font-family: inherit;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-sort-chip.is-active {
+#especiais-reclame-aqui .ra-crm-sort-chip.is-active , #especiais-procon .ra-crm-sort-chip.is-active {
     background: #fff7ed;
     border-color: #fdba74;
     color: #ea580c;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-cards {
+#especiais-reclame-aqui .ra-crm-ticket-cards , #especiais-procon .ra-crm-ticket-cards {
     list-style: none;
     margin: 0;
     padding: 6px;
@@ -11897,7 +11927,7 @@ body.desk-v2-mode #aiChatbotModal {
     overflow-y: auto;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card {
+#especiais-reclame-aqui .ra-crm-ticket-card , #especiais-procon .ra-crm-ticket-card {
     position: relative;
     padding: 10px 10px 28px;
     border: 1.5px solid transparent;
@@ -11908,17 +11938,17 @@ body.desk-v2-mode #aiChatbotModal {
     transition: border-color 0.15s, background 0.15s;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card:hover {
+#especiais-reclame-aqui .ra-crm-ticket-card:hover , #especiais-procon .ra-crm-ticket-card:hover {
     background: #fff7ed;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card.is-active {
+#especiais-reclame-aqui .ra-crm-ticket-card.is-active , #especiais-procon .ra-crm-ticket-card.is-active {
     border-color: #f97316;
     background: #fff7ed;
     box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.15);
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card__top {
+#especiais-reclame-aqui .ra-crm-ticket-card__top , #especiais-procon .ra-crm-ticket-card__top {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -11926,7 +11956,7 @@ body.desk-v2-mode #aiChatbotModal {
     margin-bottom: 4px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card__name {
+#especiais-reclame-aqui .ra-crm-ticket-card__name , #especiais-procon .ra-crm-ticket-card__name {
     font-size: 0.78rem;
     font-weight: 700;
     color: #1a1a2e;
@@ -11937,13 +11967,13 @@ body.desk-v2-mode #aiChatbotModal {
     text-overflow: ellipsis;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card__top .ra-badge {
+#especiais-reclame-aqui .ra-crm-ticket-card__top .ra-badge , #especiais-procon .ra-crm-ticket-card__top .ra-badge {
     font-size: 0.62rem;
     padding: 2px 6px;
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card__subject {
+#especiais-reclame-aqui .ra-crm-ticket-card__subject , #especiais-procon .ra-crm-ticket-card__subject {
     font-size: 0.74rem;
     color: #475569;
     line-height: 1.35;
@@ -11954,7 +11984,7 @@ body.desk-v2-mode #aiChatbotModal {
     overflow: hidden;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card__meta {
+#especiais-reclame-aqui .ra-crm-ticket-card__meta , #especiais-procon .ra-crm-ticket-card__meta {
     display: flex;
     justify-content: space-between;
     gap: 6px;
@@ -11962,7 +11992,7 @@ body.desk-v2-mode #aiChatbotModal {
     color: #94a3b8;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card__sla {
+#especiais-reclame-aqui .ra-crm-ticket-card__sla , #especiais-procon .ra-crm-ticket-card__sla {
     position: absolute;
     right: 10px;
     bottom: 8px;
@@ -11972,28 +12002,28 @@ body.desk-v2-mode #aiChatbotModal {
     border-radius: 999px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card__sla--danger {
+#especiais-reclame-aqui .ra-crm-ticket-card__sla--danger , #especiais-procon .ra-crm-ticket-card__sla--danger {
     background: #fef2f2;
     color: #dc2626;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card__sla--warning {
+#especiais-reclame-aqui .ra-crm-ticket-card__sla--warning , #especiais-procon .ra-crm-ticket-card__sla--warning {
     background: #fffbeb;
     color: #d97706;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card__sla--ok {
+#especiais-reclame-aqui .ra-crm-ticket-card__sla--ok , #especiais-procon .ra-crm-ticket-card__sla--ok {
     background: #f0fdf4;
     color: #16a34a;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-ticket-card__sla--neutral {
+#especiais-reclame-aqui .ra-crm-ticket-card__sla--neutral , #especiais-procon .ra-crm-ticket-card__sla--neutral {
     background: #f1f5f9;
     color: #64748b;
 }
 
 /* Col 3 ? main */
-#especiais-reclame-aqui, #especiais-procon .ra-crm-main {
+#especiais-reclame-aqui .ra-crm-main , #especiais-procon .ra-crm-main {
     flex: 1;
     min-width: 0;
     min-height: 0;
@@ -12003,8 +12033,10 @@ body.desk-v2-mode #aiChatbotModal {
     background: #f8fafc;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-main--loading,
-#especiais-reclame-aqui, #especiais-procon .ra-crm-empty-state--main {
+#especiais-reclame-aqui .ra-crm-main--loading,
+#especiais-reclame-aqui .ra-crm-empty-state--main,
+#especiais-procon .ra-crm-main--loading,
+#especiais-procon .ra-crm-empty-state--main {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -12013,7 +12045,7 @@ body.desk-v2-mode #aiChatbotModal {
     font-size: 0.9rem;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket--in-shell {
+#especiais-reclame-aqui .ra-ticket--in-shell , #especiais-procon .ra-ticket--in-shell {
     flex: 1;
     min-height: 0;
     height: 100%;
@@ -12024,7 +12056,7 @@ body.desk-v2-mode #aiChatbotModal {
     background: transparent;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket--in-shell .ra-ticket__main {
+#especiais-reclame-aqui .ra-ticket--in-shell .ra-ticket__main , #especiais-procon .ra-ticket--in-shell .ra-ticket__main {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -12032,11 +12064,11 @@ body.desk-v2-mode #aiChatbotModal {
     padding: 0 1rem;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket--in-shell .ra-ticket__main-scroll {
+#especiais-reclame-aqui .ra-ticket--in-shell .ra-ticket__main-scroll , #especiais-procon .ra-ticket--in-shell .ra-ticket__main-scroll {
     padding-top: 0.85rem;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket--in-shell .ra-ticket__compose {
+#especiais-reclame-aqui .ra-ticket--in-shell .ra-ticket__compose , #especiais-procon .ra-ticket--in-shell .ra-ticket__compose {
     margin-left: -1rem;
     margin-right: -1rem;
     border-radius: 0;
@@ -12045,7 +12077,7 @@ body.desk-v2-mode #aiChatbotModal {
 }
 
 /* Col 4 ? sidebar */
-#especiais-reclame-aqui, #especiais-procon .ra-crm-side {
+#especiais-reclame-aqui .ra-crm-side , #especiais-procon .ra-crm-side {
     width: var(--ra-crm-col-side);
     flex-shrink: 0;
     min-height: 0;
@@ -12054,15 +12086,15 @@ body.desk-v2-mode #aiChatbotModal {
     border-left: 0.5px solid #e2e8f0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-side .ra-ticket__side {
+#especiais-reclame-aqui .ra-crm-side .ra-ticket__side , #especiais-procon .ra-crm-side .ra-ticket__side {
     height: 100%;
     overflow-y: auto;
     padding: 1rem 0.85rem 1rem 0;
     scrollbar-gutter: stable;
 }
 
-/* Painéis recolher/expandir */
-#especiais-reclame-aqui, #especiais-procon .ra-crm-panel-retract {
+/* Pain?is recolher/expandir */
+#especiais-reclame-aqui .ra-crm-panel-retract , #especiais-procon .ra-crm-panel-retract {
     width: 26px;
     height: 26px;
     flex-shrink: 0;
@@ -12077,13 +12109,13 @@ body.desk-v2-mode #aiChatbotModal {
     padding: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-panel-retract--list {
+#especiais-reclame-aqui .ra-crm-panel-retract--list , #especiais-procon .ra-crm-panel-retract--list {
     border-color: #e4e6ea;
     background: #f8fafc;
     color: #64748b;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-icon-btn {
+#especiais-reclame-aqui .ra-crm-icon-btn , #especiais-procon .ra-crm-icon-btn {
     width: 26px;
     height: 26px;
     border: 0.5px solid #e4e6ea;
@@ -12097,7 +12129,7 @@ body.desk-v2-mode #aiChatbotModal {
     padding: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-panel-expand {
+#especiais-reclame-aqui .ra-crm-panel-expand , #especiais-procon .ra-crm-panel-expand {
     display: none;
     position: absolute;
     top: 0;
@@ -12120,12 +12152,12 @@ body.desk-v2-mode #aiChatbotModal {
     padding: 8px 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-panel-expand--list {
+#especiais-reclame-aqui .ra-crm-panel-expand--list , #especiais-procon .ra-crm-panel-expand--list {
     color: #64748b;
     background: #fff;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-empty-state {
+#especiais-reclame-aqui .ra-crm-empty-state , #especiais-procon .ra-crm-empty-state {
     padding: 16px;
     text-align: center;
     color: #94a3b8;
@@ -12142,26 +12174,28 @@ body.desk-v2-mode #aiChatbotModal {
 }
 
 @media (max-width: 960px) {
-    #especiais-reclame-aqui, #especiais-procon .ra-crm-shell {
+    #especiais-reclame-aqui .ra-crm-shell , #especiais-procon .ra-crm-shell {
         flex-wrap: wrap;
         height: auto;
         min-height: 100%;
         overflow: auto;
     }
 
-    #especiais-reclame-aqui, #especiais-procon .ra-crm-queue,
-    #especiais-reclame-aqui, #especiais-procon .ra-crm-list {
+    #especiais-reclame-aqui .ra-crm-queue,
+    #especiais-reclame-aqui .ra-crm-list,
+    #especiais-procon .ra-crm-queue,
+    #especiais-procon .ra-crm-list {
         width: 50%;
         height: 220px;
     }
 
-    #especiais-reclame-aqui, #especiais-procon .ra-crm-main {
+    #especiais-reclame-aqui .ra-crm-main , #especiais-procon .ra-crm-main {
         width: 100%;
         min-height: 50vh;
         order: 3;
     }
 
-    #especiais-reclame-aqui, #especiais-procon .ra-crm-side {
+    #especiais-reclame-aqui .ra-crm-side , #especiais-procon .ra-crm-side {
         width: 100%;
         max-height: 38vh;
         order: 4;
@@ -12169,7 +12203,7 @@ body.desk-v2-mode #aiChatbotModal {
 }
 
 /* RA ticket ? footer sidebar + Abrir conversa */
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__side-footer {
+#especiais-reclame-aqui .ra-ticket__side-footer , #especiais-procon .ra-ticket__side-footer {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -12177,11 +12211,11 @@ body.desk-v2-mode #aiChatbotModal {
     padding-top: 0.25rem;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__side-footer .ra-ticket__save-btn {
+#especiais-reclame-aqui .ra-ticket__side-footer .ra-ticket__save-btn , #especiais-procon .ra-ticket__side-footer .ra-ticket__save-btn {
     margin-top: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .rp-footer-btn {
+#especiais-reclame-aqui .rp-footer-btn , #especiais-procon .rp-footer-btn {
     width: 100%;
     padding: 8px;
     border-radius: 8px;
@@ -12196,24 +12230,24 @@ body.desk-v2-mode #aiChatbotModal {
     transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-#especiais-reclame-aqui, #especiais-procon .rp-footer-btn--secondary {
+#especiais-reclame-aqui .rp-footer-btn--secondary , #especiais-procon .rp-footer-btn--secondary {
     background: transparent;
     border: 1.5px solid #000058;
     color: #000058;
 }
 
-#especiais-reclame-aqui, #especiais-procon .rp-footer-btn--secondary.is-active {
+#especiais-reclame-aqui .rp-footer-btn--secondary.is-active , #especiais-procon .rp-footer-btn--secondary.is-active {
     background: #E8F5E9;
     border: 1.5px solid #15A237;
     color: #15A237;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-ticket__main--wa {
+#especiais-reclame-aqui .ra-ticket__main--wa , #especiais-procon .ra-ticket__main--wa {
     padding: 0;
     min-height: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-wa-wrap {
+#especiais-reclame-aqui .ra-crm-wa-wrap , #especiais-procon .ra-crm-wa-wrap {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -12222,7 +12256,7 @@ body.desk-v2-mode #aiChatbotModal {
     background: #E5DDD5;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat {
+#especiais-reclame-aqui .wa-chat , #especiais-procon .wa-chat {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -12231,7 +12265,7 @@ body.desk-v2-mode #aiChatbotModal {
     background: #E5DDD5;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__header {
+#especiais-reclame-aqui .wa-chat__header , #especiais-procon .wa-chat__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -12242,14 +12276,14 @@ body.desk-v2-mode #aiChatbotModal {
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__header-main {
+#especiais-reclame-aqui .wa-chat__header-main , #especiais-procon .wa-chat__header-main {
     display: flex;
     align-items: center;
     gap: 12px;
     min-width: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__avatar {
+#especiais-reclame-aqui .wa-chat__avatar , #especiais-procon .wa-chat__avatar {
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -12263,14 +12297,14 @@ body.desk-v2-mode #aiChatbotModal {
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__header-info {
+#especiais-reclame-aqui .wa-chat__header-info , #especiais-procon .wa-chat__header-info {
     display: flex;
     flex-direction: column;
     gap: 2px;
     min-width: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__name {
+#especiais-reclame-aqui .wa-chat__name , #especiais-procon .wa-chat__name {
     font-size: 0.9rem;
     font-weight: 600;
     white-space: nowrap;
@@ -12278,7 +12312,7 @@ body.desk-v2-mode #aiChatbotModal {
     text-overflow: ellipsis;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__status {
+#especiais-reclame-aqui .wa-chat__status , #especiais-procon .wa-chat__status {
     font-size: 0.72rem;
     color: rgba(255, 255, 255, 0.78);
     white-space: nowrap;
@@ -12286,14 +12320,14 @@ body.desk-v2-mode #aiChatbotModal {
     text-overflow: ellipsis;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__header-actions {
+#especiais-reclame-aqui .wa-chat__header-actions , #especiais-procon .wa-chat__header-actions {
     display: flex;
     align-items: center;
     gap: 18px;
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__header-btn {
+#especiais-reclame-aqui .wa-chat__header-btn , #especiais-procon .wa-chat__header-btn {
     border: none;
     background: transparent;
     color: #fff;
@@ -12303,7 +12337,7 @@ body.desk-v2-mode #aiChatbotModal {
     line-height: 1;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__body.conversation {
+#especiais-reclame-aqui .wa-chat__body.conversation , #especiais-procon .wa-chat__body.conversation {
     flex: 1;
     overflow-y: auto;
     padding: 12px 16px 16px;
@@ -12314,7 +12348,7 @@ body.desk-v2-mode #aiChatbotModal {
     min-height: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__date-sep {
+#especiais-reclame-aqui .wa-chat__date-sep , #especiais-procon .wa-chat__date-sep {
     align-self: center;
     background: rgba(255, 255, 255, 0.92);
     color: #54656f;
@@ -12326,20 +12360,20 @@ body.desk-v2-mode #aiChatbotModal {
     margin: 4px 0 10px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-msg {
+#especiais-reclame-aqui .wa-msg , #especiais-procon .wa-msg {
     display: flex;
     max-width: 78%;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-msg--in {
+#especiais-reclame-aqui .wa-msg--in , #especiais-procon .wa-msg--in {
     align-self: flex-start;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-msg--out {
+#especiais-reclame-aqui .wa-msg--out , #especiais-procon .wa-msg--out {
     align-self: flex-end;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-msg__bubble {
+#especiais-reclame-aqui .wa-msg__bubble , #especiais-procon .wa-msg__bubble {
     position: relative;
     padding: 7px 10px 6px;
     border-radius: 8px;
@@ -12349,31 +12383,31 @@ body.desk-v2-mode #aiChatbotModal {
     word-break: break-word;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-msg__bubble--in {
+#especiais-reclame-aqui .wa-msg__bubble--in , #especiais-procon .wa-msg__bubble--in {
     background: #fff;
     border-radius: 0 8px 8px 8px;
     color: #111b21;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-msg__bubble--out {
+#especiais-reclame-aqui .wa-msg__bubble--out , #especiais-procon .wa-msg__bubble--out {
     background: #DCF8C6;
     border-radius: 8px 0 8px 8px;
     color: #111b21;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-msg__bubble--internal {
+#especiais-reclame-aqui .wa-msg__bubble--internal , #especiais-procon .wa-msg__bubble--internal {
     background: rgba(234, 179, 8, 0.15);
     border: 0.5px solid rgba(234, 179, 8, 0.35);
     border-radius: 8px 0 8px 8px;
     color: #111b21;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-msg__text {
+#especiais-reclame-aqui .wa-msg__text , #especiais-procon .wa-msg__text {
     display: block;
     padding-right: 4px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-msg__time {
+#especiais-reclame-aqui .wa-msg__time , #especiais-procon .wa-msg__time {
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -12385,12 +12419,12 @@ body.desk-v2-mode #aiChatbotModal {
     white-space: nowrap;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-msg__checks {
+#especiais-reclame-aqui .wa-msg__checks , #especiais-procon .wa-msg__checks {
     font-size: 0.82rem;
     color: #53bdeb;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-ia-card {
+#especiais-reclame-aqui .wa-ia-card , #especiais-procon .wa-ia-card {
     align-self: flex-start;
     max-width: 88%;
     background: #fff;
@@ -12401,7 +12435,7 @@ body.desk-v2-mode #aiChatbotModal {
     margin-top: 8px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-ia-card__head {
+#especiais-reclame-aqui .wa-ia-card__head , #especiais-procon .wa-ia-card__head {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -12412,20 +12446,20 @@ body.desk-v2-mode #aiChatbotModal {
     letter-spacing: 0.04em;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-ia-card__text {
+#especiais-reclame-aqui .wa-ia-card__text , #especiais-procon .wa-ia-card__text {
     font-size: 0.82rem;
     line-height: 1.45;
     color: #111b21;
     margin: 0 0 10px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-ia-card__actions {
+#especiais-reclame-aqui .wa-ia-card__actions , #especiais-procon .wa-ia-card__actions {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-ia-card__btn {
+#especiais-reclame-aqui .wa-ia-card__btn , #especiais-procon .wa-ia-card__btn {
     padding: 6px 12px;
     border-radius: 6px;
     font-size: 0.72rem;
@@ -12435,19 +12469,19 @@ body.desk-v2-mode #aiChatbotModal {
     border: 1.5px solid transparent;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-ia-card__btn--primary {
+#especiais-reclame-aqui .wa-ia-card__btn--primary , #especiais-procon .wa-ia-card__btn--primary {
     background: #15A237;
     color: #fff;
     border-color: #15A237;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-ia-card__btn--outline {
+#especiais-reclame-aqui .wa-ia-card__btn--outline , #especiais-procon .wa-ia-card__btn--outline {
     background: #fff;
     color: #15A237;
     border-color: #15A237;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__footer {
+#especiais-reclame-aqui .wa-chat__footer , #especiais-procon .wa-chat__footer {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -12456,7 +12490,7 @@ body.desk-v2-mode #aiChatbotModal {
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__input-bar {
+#especiais-reclame-aqui .wa-chat__input-bar , #especiais-procon .wa-chat__input-bar {
     flex: 1;
     display: flex;
     align-items: center;
@@ -12467,7 +12501,7 @@ body.desk-v2-mode #aiChatbotModal {
     min-width: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__input-icon {
+#especiais-reclame-aqui .wa-chat__input-icon , #especiais-procon .wa-chat__input-icon {
     border: none;
     background: transparent;
     color: #54656f;
@@ -12478,7 +12512,7 @@ body.desk-v2-mode #aiChatbotModal {
     line-height: 1;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__input {
+#especiais-reclame-aqui .wa-chat__input , #especiais-procon .wa-chat__input {
     flex: 1;
     border: none;
     outline: none;
@@ -12489,11 +12523,11 @@ body.desk-v2-mode #aiChatbotModal {
     min-width: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__input::placeholder {
+#especiais-reclame-aqui .wa-chat__input::placeholder , #especiais-procon .wa-chat__input::placeholder {
     color: #8696a0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__send {
+#especiais-reclame-aqui .wa-chat__send , #especiais-procon .wa-chat__send {
     width: 44px;
     height: 44px;
     border: none;
@@ -12508,11 +12542,11 @@ body.desk-v2-mode #aiChatbotModal {
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui, #especiais-procon .wa-chat__send:hover {
+#especiais-reclame-aqui .wa-chat__send:hover , #especiais-procon .wa-chat__send:hover {
     background: #1da851;
 }
 
-#especiais-reclame-aqui, #especiais-procon .ra-crm-wa-wrap .crm-empty-state {
+#especiais-reclame-aqui .ra-crm-wa-wrap .crm-empty-state , #especiais-procon .ra-crm-wa-wrap .crm-empty-state {
     color: #54656f;
     font-size: 0.85rem;
     text-align: center;

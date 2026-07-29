@@ -17,6 +17,14 @@ export const QUEUE_STATUSES = [
   { id: 'resolvidos', name: 'Resolvidos', dot: '#9ca3af', boxes: ['resolvidos'] },
 ];
 
+export const AGENT_DESK_QUEUE_IDS = new Set(['novos', 'em-andamento', 'pendente', 'resolvidos']);
+
+/** Valida fila vinda da URL do Desk; fallback quando ausente ou inválida. */
+export function parseDeskQueueFromUrl(value, fallback = 'novos') {
+  const id = String(value || '').trim();
+  return AGENT_DESK_QUEUE_IDS.has(id) ? id : fallback;
+}
+
 export const SEND_STATUS_OPTIONS_AGENT = [
   { id: 'em-andamento', label: 'Em andamento', cls: 'andamento' },
   { id: 'pendente', label: 'Pendente', cls: 'pendente' },

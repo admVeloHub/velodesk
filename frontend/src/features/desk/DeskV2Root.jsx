@@ -5,6 +5,7 @@
  * — instrumentação enxuta do poll de detalhe (só mudança de mensagens / erros)
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   filterTickets,
   resolveDeskSearchEntries,
@@ -64,7 +65,7 @@ import { resolveAutomaticaConfig } from '../config/workflow/workflowConfigData';
 import { resolveWorkflowForTicket } from '../../services/desk/workflowEngine';
 import { resolveRequisicaoCamposVisiveis } from '../../services/workflow/workflowRequisicao';
 import { getAutoCloseOnSave, getDeskSearchMode, setDeskSearchMode } from '../../services/desk/agentDeskPreferences';
-import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET } from '../../services/desk/constants';
+import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET, parseDeskQueueFromUrl } from '../../services/desk/constants';
 import ProdutosForwardPopover from './components/ProdutosForwardPopover';
 import WorkflowComunicacaoModal from '../workflow/components/WorkflowComunicacaoModal';
 import { replyWorkflowComunicacao } from '../../services/workflow/workflowDecisionHandlers';
@@ -143,9 +144,10 @@ export default function DeskV2Root() {
   const { showNotification } = useNotifications();
   const { user } = useAuth();
   const { config } = useTabulation();
+  const [searchParams] = useSearchParams();
 
   const detailLoadRef = useRef(null);
-  const [activeQueue, setActiveQueue] = useState('novos');
+  const [activeQueue, setActiveQueue] = useState(() => parseDeskQueueFromUrl(searchParams.get('queue')));
   const [activeSort, setActiveSort] = useState('data');
   const [entrySortOldestFirst, setEntrySortOldestFirst] = useState(false);
   const [searchDraft, setSearchDraft] = useState('');
@@ -182,6 +184,15 @@ export default function DeskV2Root() {
   const [workflowStartTemplate, setWorkflowStartTemplate] = useState(null);
   const pendingWorkflowTemplateRef = useRef(null);
   const commitInProgressRef = useRef(false);
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('queue');
+    if (!fromUrl) return;
+    const queue = parseDeskQueueFromUrl(fromUrl);
+    suppressAutoSelectRef.current = true;
+    setActiveQueue((current) => (current === queue ? current : queue));
+    setTableQueueBrowsing(isDeskTableQueue(queue));
+  }, [searchParams]);
 
   useEffect(() => {
     if (!user?.email) {

@@ -7,6 +7,7 @@ import { useNotifications } from '../../../context/NotificationContext';
 import { usePcNovaDemandaModals } from '../../../hooks/usePcNovaDemandaModals';
 import { PC_GROUPS } from '../../../services/especiais/proconData';
 import { loadDemandas } from '../../../services/especiais/proconStore';
+import { matchesTicketCpfSearch } from '../../../services/especiais/especiaisCrmSearch';
 import { fetchPcTicketView } from '../../../services/especiais/proconTicketService';
 import PcQueuePanel from './PcQueuePanel';
 import PcTicketList from './PcTicketList';
@@ -21,6 +22,7 @@ export default function ProconCrmRoot() {
   const [activeGroup, setActiveGroup] = useState(PC_GROUPS[0]?.id || 'vencendo-hoje');
   const [searchDraft, setSearchDraft] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
+  const [listSearchDraft, setListSearchDraft] = useState('');
   const [activeSort, setActiveSort] = useState('data');
   const [queueCollapsed, setQueueCollapsed] = useState(
     () => localStorage.getItem('velodeskPcQueueCollapsed') === '1',
@@ -53,7 +55,10 @@ export default function ProconCrmRoot() {
   }, [allItems]);
 
   const listItems = useMemo(() => {
-    let items = allItems.filter((i) => i.groupKey === activeGroup);
+    const listQuery = listSearchDraft.trim();
+    let items = listQuery
+      ? allItems.filter((i) => matchesTicketCpfSearch(i, listQuery, 'protocoloProcon'))
+      : allItems.filter((i) => i.groupKey === activeGroup);
     if (activeSort === 'sla') {
       items = [...items].sort(
         (a, b) => new Date(a.prazoLegal || 0).getTime() - new Date(b.prazoLegal || 0).getTime(),
@@ -64,7 +69,7 @@ export default function ProconCrmRoot() {
       );
     }
     return items;
-  }, [allItems, activeGroup, activeSort]);
+  }, [allItems, activeGroup, activeSort, listSearchDraft]);
 
   const reloadTicket = useCallback(async () => {
     if (!id) {
@@ -172,9 +177,12 @@ export default function ProconCrmRoot() {
         activeSort={activeSort}
         items={listItems}
         searchActive={!!appliedSearch.trim()}
+        listSearchQuery={listSearchDraft}
         collapsed={listCollapsed}
         onSelectItem={handleSelectItem}
         onSortChange={setActiveSort}
+        onListSearchChange={setListSearchDraft}
+        onListSearchSubmit={() => setListSearchDraft((v) => v.trim())}
         onCollapse={() => handleListCollapse(true)}
         onExpand={() => handleListCollapse(false)}
         onReload={() => setListVersion((v) => v + 1)}

@@ -71,7 +71,7 @@ export default function ClientContactFieldsEditor({
   return (
     <div className="client-contact-fields">
       {showName ? (
-        <>
+        <div className="client-contact-fields__name">
           <label className="client-contact-fields__label" htmlFor={`${idPrefix}Name`}>Nome</label>
           <input
             type="text"
@@ -81,7 +81,7 @@ export default function ClientContactFieldsEditor({
             onChange={(e) => onNameChange(e.target.value)}
             autoComplete="name"
           />
-        </>
+        </div>
       ) : null}
 
       <div className="client-contact-fields__group">

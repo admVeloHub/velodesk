@@ -81,7 +81,7 @@ export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
         onClick={onClose}
       />
       <div
-        className="queue-box-modal queue-box-modal--wide"
+        className="queue-box-modal queue-box-modal--wide register-client-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="registerClientModalTitle"

@@ -1840,33 +1840,48 @@
     background: #0f28cc;
 }
 
-#velodeskDeskV2Root .client-contact-fields {
+#velodeskDeskV2Root .client-contact-fields,
+.queue-box-modal .client-contact-fields {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    min-width: 0;
 }
 
-#velodeskDeskV2Root .client-contact-fields__group {
+#velodeskDeskV2Root .client-contact-fields__name,
+.queue-box-modal .client-contact-fields__name {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-#velodeskDeskV2Root .client-contact-fields__group-head {
+#velodeskDeskV2Root .client-contact-fields__group,
+.queue-box-modal .client-contact-fields__group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#velodeskDeskV2Root .client-contact-fields__group-head,
+.queue-box-modal .client-contact-fields__group-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
 }
 
-#velodeskDeskV2Root .client-contact-fields__label {
+#velodeskDeskV2Root .client-contact-fields__label,
+.queue-box-modal .client-contact-fields__label {
     font-size: var(--desk-fs-caption);
     font-weight: 600;
     color: #6b7280;
 }
 
-#velodeskDeskV2Root .client-contact-fields__input {
+#velodeskDeskV2Root .client-contact-fields__input,
+.queue-box-modal .client-contact-fields__input {
     width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     padding: 8px 10px;
     border: 0.5px solid #E4E6EA;
     border-radius: 6px;
@@ -1876,29 +1891,35 @@
     background: #fff;
 }
 
-#velodeskDeskV2Root .client-contact-fields__input:focus {
+#velodeskDeskV2Root .client-contact-fields__input:focus,
+.queue-box-modal .client-contact-fields__input:focus {
     outline: none;
     border-color: #1634FF;
     box-shadow: 0 0 0 3px rgba(22, 52, 255, 0.12);
 }
 
-#velodeskDeskV2Root .client-contact-fields__input--error {
+#velodeskDeskV2Root .client-contact-fields__input--error,
+.queue-box-modal .client-contact-fields__input--error {
     border-color: #dc2626;
 }
 
-#velodeskDeskV2Root .client-contact-fields__row {
+#velodeskDeskV2Root .client-contact-fields__row,
+.queue-box-modal .client-contact-fields__row {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 6px;
     align-items: center;
 }
 
-#velodeskDeskV2Root .client-contact-fields__row--phone {
-    grid-template-columns: 1fr auto auto;
+#velodeskDeskV2Root .client-contact-fields__row--phone,
+.queue-box-modal .client-contact-fields__row--phone {
+    grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
 #velodeskDeskV2Root .client-contact-fields__add-btn,
-#velodeskDeskV2Root .client-contact-fields__remove-btn {
+#velodeskDeskV2Root .client-contact-fields__remove-btn,
+.queue-box-modal .client-contact-fields__add-btn,
+.queue-box-modal .client-contact-fields__remove-btn {
     border: none;
     background: transparent;
     color: #1634FF;
@@ -1910,18 +1931,23 @@
     gap: 4px;
     padding: 4px 6px;
     border-radius: 6px;
+    flex-shrink: 0;
 }
 
-#velodeskDeskV2Root .client-contact-fields__remove-btn {
+#velodeskDeskV2Root .client-contact-fields__remove-btn,
+.queue-box-modal .client-contact-fields__remove-btn {
     color: #9ca3af;
 }
 
 #velodeskDeskV2Root .client-contact-fields__add-btn:hover,
-#velodeskDeskV2Root .client-contact-fields__remove-btn:hover {
+#velodeskDeskV2Root .client-contact-fields__remove-btn:hover,
+.queue-box-modal .client-contact-fields__add-btn:hover,
+.queue-box-modal .client-contact-fields__remove-btn:hover {
     background: #F3F4F8;
 }
 
-#velodeskDeskV2Root .client-contact-fields__wa {
+#velodeskDeskV2Root .client-contact-fields__wa,
+.queue-box-modal .client-contact-fields__wa {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -1930,18 +1956,22 @@
     color: #16a34a;
     white-space: nowrap;
     cursor: pointer;
+    flex-shrink: 0;
 }
 
-#velodeskDeskV2Root .client-contact-fields__wa.is-disabled {
+#velodeskDeskV2Root .client-contact-fields__wa.is-disabled,
+.queue-box-modal .client-contact-fields__wa.is-disabled {
     opacity: 0.45;
     cursor: not-allowed;
 }
 
-#velodeskDeskV2Root .client-contact-fields__wa input {
+#velodeskDeskV2Root .client-contact-fields__wa input,
+.queue-box-modal .client-contact-fields__wa input {
     margin: 0;
 }
 
-#velodeskDeskV2Root .client-contact-fields__hint {
+#velodeskDeskV2Root .client-contact-fields__hint,
+.queue-box-modal .client-contact-fields__hint {
     margin: 0;
     font-size: 0.68rem;
     color: #9ca3af;
@@ -1949,7 +1979,65 @@
 }
 
 .queue-box-modal--wide {
-    width: min(480px, calc(100vw - 32px));
+    width: min(520px, calc(100vw - 32px));
+    max-height: min(calc(100vh - 32px), 680px);
+}
+
+.register-client-modal .queue-box-modal__body {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding-bottom: 16px;
+}
+
+.register-client-modal .queue-box-modal__field {
+    margin-bottom: 12px;
+}
+
+.register-client-modal .client-contact-fields {
+    gap: 14px;
+}
+
+.register-client-modal .client-contact-fields__label {
+    font-size: 0.75rem;
+    color: #475569;
+}
+
+.register-client-modal .client-contact-fields__input {
+    padding: 9px 11px;
+    border-radius: 8px;
+    border-color: #E2E4E9;
+    font-size: 0.8125rem;
+}
+
+.register-client-modal .client-contact-fields__group {
+    gap: 8px;
+}
+
+.register-client-modal .client-contact-fields__remove-btn {
+    width: 32px;
+    height: 32px;
+    justify-content: center;
+    padding: 0;
+}
+
+.register-client-modal .client-contact-fields__wa {
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: #f0fdf4;
+    border: 0.5px solid #bbf7d0;
+}
+
+.register-client-modal .client-contact-fields__wa.is-disabled {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #94a3b8;
+}
+
+.register-client-modal .queue-box-modal__input[readonly] {
+    background: #f8fafc;
+    color: #64748b;
+    cursor: default;
 }
 
 #velodeskDeskV2Root .ticket-op-progress {

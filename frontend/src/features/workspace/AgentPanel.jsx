@@ -4,7 +4,11 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { buildAgent360View, computeAgent360View } from '../../services/workspace/deskData';
+import {
+  buildAgent360View,
+  computeAgent360View,
+  resolveDeskQueueForWs360Section,
+} from '../../services/workspace/deskData';
 import { useWorkspace360 } from '../../hooks/useWorkspace360';
 import { useTickets } from '../../context/TicketsContext';
 import { getAgentName } from '../../services/clientDb';
@@ -48,8 +52,9 @@ export default function AgentPanel() {
     openTicket(ticketId);
   }, [openTicket]);
 
-  const handleSeeAll = useCallback(() => {
-    navigate('/tickets?desk=v2');
+  const handleSeeAll = useCallback((sectionId) => {
+    const queue = resolveDeskQueueForWs360Section(sectionId);
+    navigate(`/tickets?desk=v2&queue=${encodeURIComponent(queue)}`);
   }, [navigate]);
 
   if (loading && !view) {

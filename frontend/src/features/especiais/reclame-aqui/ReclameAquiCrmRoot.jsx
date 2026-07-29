@@ -7,6 +7,7 @@ import { useNotifications } from '../../../context/NotificationContext';
 import { useRaNovaReclamacaoModals } from '../../../hooks/useRaNovaReclamacaoModals';
 import { RA_GROUPS } from '../../../services/especiais/reclameAquiData';
 import { loadReclamacoes } from '../../../services/especiais/reclameAquiStore';
+import { matchesTicketCpfSearch } from '../../../services/especiais/especiaisCrmSearch';
 import { fetchRaTicketView } from '../../../services/especiais/reclameAquiTicketService';
 import RaQueuePanel from './RaQueuePanel';
 import RaTicketList from './RaTicketList';
@@ -21,6 +22,7 @@ export default function ReclameAquiCrmRoot() {
   const [activeGroup, setActiveGroup] = useState(RA_GROUPS[0]?.id || 'vencendo-hoje');
   const [searchDraft, setSearchDraft] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
+  const [listSearchDraft, setListSearchDraft] = useState('');
   const [activeSort, setActiveSort] = useState('data');
   const [queueCollapsed, setQueueCollapsed] = useState(
     () => localStorage.getItem('velodeskRaQueueCollapsed') === '1',
@@ -56,7 +58,10 @@ export default function ReclameAquiCrmRoot() {
   }, [allItems]);
 
   const listItems = useMemo(() => {
-    let items = allItems.filter((i) => i.groupKey === activeGroup);
+    const listQuery = listSearchDraft.trim();
+    let items = listQuery
+      ? allItems.filter((i) => matchesTicketCpfSearch(i, listQuery, 'protocoloRa'))
+      : allItems.filter((i) => i.groupKey === activeGroup);
     if (activeSort === 'sla') {
       items = [...items].sort(
         (a, b) => new Date(a.prazoRa || 0).getTime() - new Date(b.prazoRa || 0).getTime(),
@@ -67,7 +72,7 @@ export default function ReclameAquiCrmRoot() {
       );
     }
     return items;
-  }, [allItems, activeGroup, activeSort]);
+  }, [allItems, activeGroup, activeSort, listSearchDraft]);
 
   const reloadTicket = useCallback(async () => {
     if (!id) {
@@ -175,9 +180,12 @@ export default function ReclameAquiCrmRoot() {
         activeSort={activeSort}
         items={listItems}
         searchActive={!!appliedSearch.trim()}
+        listSearchQuery={listSearchDraft}
         collapsed={listCollapsed}
         onSelectItem={handleSelectItem}
         onSortChange={setActiveSort}
+        onListSearchChange={setListSearchDraft}
+        onListSearchSubmit={() => setListSearchDraft((v) => v.trim())}
         onCollapse={() => handleListCollapse(true)}
         onExpand={() => handleListCollapse(false)}
         onReload={() => setListVersion((v) => v + 1)}
