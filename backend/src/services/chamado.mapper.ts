@@ -1,4 +1,4 @@
-/** chamado.mapper v2.3.3 — decodifica entidades HTML nas mensagens do ticket */
+/** chamado.mapper v2.5.1 — ciclo status: fila Resolvidos inclui fechado/cancelado */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -16,6 +16,7 @@ import { assertTabulacaoForStatus } from './tabulation.service';
 import { buildLateralWorkflowDto, loadWorkflowDefForChamado, syncLegacyWorkflowFromBody } from './workflowDto.util';
 import { getWorkflowsByIds } from './workflowDefinicao.service';
 import { extractEmailReplyContent } from './emailReplyContent.util';
+import { sanitizeResponsavel, inferResponsavelFromAgentRegistro } from './responsavel.util';
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 
 function normalizeTicketMessageText(raw: string): string {
@@ -110,18 +111,8 @@ function findReclameAquiFromChamado(chamado: IChamadoN1): Record<string, unknown
   return null;
 }
 
-function findLatestWorkflowFromRegistro(chamado: IChamadoN1): Record<string, unknown> | null {
-  if (chamado.workflow?.active && chamado.workflow.workflowId) {
-    return null;
-  }
-  const registros = chamado.registro ?? [];
-  for (let i = registros.length - 1; i >= 0; i -= 1) {
-    const meta = registroMetadados(registros[i]);
-    const workflow = meta.workflow;
-    if (workflow && typeof workflow === 'object' && !Array.isArray(workflow)) {
-      return workflow as Record<string, unknown>;
-    }
-  }
+/** Não reidrata lateralForm.workflow de histórico — evita bloquear novo start após interrupção. */
+function findLatestWorkflowFromRegistro(_chamado: IChamadoN1): Record<string, unknown> | null {
   return null;
 }
 
@@ -428,6 +419,7 @@ const BOX_NAME_BY_STATUS: Record<string, string> = {
   pendente: 'Pendente',
   resolvido: 'Resolvido',
   cancelado: 'Cancelado',
+  fechado: 'Resolvido',
 };
 
 /** Colunas fixas da fila Meus Chamados (registro.status + tabulacao.responsavel) */
@@ -449,21 +441,127 @@ const SLA_TRACKED_STATUSES = new Set(['em-aberto', 'em-andamento']);
 const STATUS_VARIANTS: Record<string, string[]> = {
   novo: ['novo'],
   'em-aberto': ['em-aberto', 'em aberto'],
-  'em-andamento': ['em-andamento', 'em andamento'],
+  'em-andamento': ['em-andamento', 'em andamento', 'em-aberto', 'em aberto'],
   pendente: ['pendente'],
-  resolvido: ['resolvido'],
+  /** Fila Resolvidos: resolvido + fechado + cancelado (badge distingue o status) */
+  resolvido: ['resolvido', 'fechado', 'cancelado'],
   cancelado: ['cancelado'],
   fechado: ['fechado'],
   'em-espera': ['em-espera', 'em espera', 'em-andamento', 'em andamento'],
 };
 
-/** Status terminais — excluídos do snapshot horário do Agente 3 */
-export const GESTAO_TERMINAL_STATUSES = ['resolvido', 'cancelado', 'fechado'] as const;
+/**
+ * Status imutáveis / fora do snapshot ativo do Agente 3.
+ * `resolvido` permanece listável (janela 48h) e não bloqueia reabertura via inbound.
+ */
+export const GESTAO_TERMINAL_STATUSES = ['cancelado', 'fechado'] as const;
+
+/** Destinos de merge e filas que não aceitam novos anexos de negócio. */
+export const MERGE_TERMINAL_STATUSES = ['resolvido', 'cancelado', 'fechado'] as const;
+
+export const RESOLVED_REOPEN_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 export function gestaoTerminalStatusVariants(): string[] {
   return [...new Set(
     GESTAO_TERMINAL_STATUSES.flatMap((status) => STATUS_VARIANTS[status] ?? [status]),
   )];
+}
+
+export function mergeTerminalStatusVariants(): string[] {
+  return [...new Set(
+    MERGE_TERMINAL_STATUSES.flatMap((status) => STATUS_VARIANTS[status] ?? [status]),
+  )];
+}
+
+export class ChamadoClosedError extends Error {
+  status: number;
+
+  constructor(message = 'Ticket fechado — não aceita modificações.', status = 409) {
+    super(message);
+    this.name = 'ChamadoClosedError';
+    this.status = status;
+  }
+}
+
+export function normalizeStatusValue(status: unknown): string {
+  return String(status ?? '').trim().toLowerCase().replace(/\s+/g, '-');
+}
+
+export function isChamadoFechado(chamado: IChamadoN1): boolean {
+  return normalizeStatusValue(currentStatus(chamado)) === 'fechado';
+}
+
+/** Data do último registro com status resolvido (para janela de reabertura 48h). */
+export function getResolvedAt(chamado: IChamadoN1): Date | null {
+  const registros = chamado.registro ?? [];
+  for (let i = registros.length - 1; i >= 0; i -= 1) {
+    if (normalizeStatusValue(registros[i]?.status) === 'resolvido') {
+      const d = registros[i]?.data;
+      return d ? new Date(d) : null;
+    }
+  }
+  return null;
+}
+
+export function isResolvedWithinReopenWindow(
+  chamado: IChamadoN1,
+  windowMs = RESOLVED_REOPEN_WINDOW_MS,
+  now = Date.now(),
+): boolean {
+  if (normalizeStatusValue(currentStatus(chamado)) !== 'resolvido') return false;
+  const resolvedAt = getResolvedAt(chamado);
+  if (!resolvedAt) return false;
+  return now - resolvedAt.getTime() < windowMs;
+}
+
+/**
+ * Inbound: anexar no ticket existente vs criar novo.
+ * - pendente / resolvido&lt;48h → anexar (com transição para em-andamento)
+ * - fechado / cancelado / resolvido≥48h → spawn ticket novo
+ */
+export function shouldSpawnNewTicketOnInbound(
+  chamado: IChamadoN1,
+  windowMs = RESOLVED_REOPEN_WINDOW_MS,
+  now = Date.now(),
+): boolean {
+  const status = normalizeStatusValue(currentStatus(chamado));
+  if (status === 'fechado' || status === 'cancelado') return true;
+  if (status === 'resolvido') {
+    return !isResolvedWithinReopenWindow(chamado, windowMs, now);
+  }
+  return false;
+}
+
+export function assertChamadoModifiable(chamado: IChamadoN1): void {
+  if (isChamadoFechado(chamado)) {
+    throw new ChamadoClosedError();
+  }
+}
+
+export function appendStatusTransition(
+  chamado: IChamadoN1,
+  nextStatus: string,
+  params: {
+    autor?: string;
+    anotacaoInterna?: string;
+    metadados?: Record<string, unknown>;
+    origin?: RegistroOrigin;
+  } = {},
+): void {
+  const status = normalizeStatusValue(nextStatus) || 'em-andamento';
+  if (!chamado.registro) chamado.registro = [];
+  chamado.registro.push({
+    data: new Date(),
+    origin: params.origin ?? 'agente',
+    autor: params.autor ?? 'sistema',
+    mensagemPublica: '',
+    anexosMensagemPublica: [],
+    anotacaoInterna: params.anotacaoInterna ?? '',
+    anexosAnotacaoInterna: [],
+    alteracoes: [{ status }],
+    metadados: params.metadados ?? {},
+    status,
+  });
 }
 
 /** Tickets com último status diferente de resolvido/cancelado/fechado */
@@ -481,9 +579,11 @@ export function activeTicketsStatusFilter(): Record<string, unknown> {
   };
 }
 
-const STATUS_BY_BOX_NAME = Object.fromEntries(
-  Object.entries(BOX_NAME_BY_STATUS).map(([status, name]) => [name, status])
-);
+/** Reverse lookup: nome da box → status canônico (primeiro status que mapeia para o nome). */
+const STATUS_BY_BOX_NAME: Record<string, string> = {};
+for (const [status, name] of Object.entries(BOX_NAME_BY_STATUS)) {
+  if (STATUS_BY_BOX_NAME[name] == null) STATUS_BY_BOX_NAME[name] = status;
+}
 
 /** Campos legados embutidos em cliente[] antes da migraÃ§Ã£o v1.1.0 */
 type LegacyClienteEmbed = IClienteRef & {
@@ -548,7 +648,7 @@ function tabulacaoFromBody(body: Record<string, unknown>, fallbackTitle?: string
     produto: lateral.produto ?? String(body.produto ?? ''),
     motivo: lateral.motivo ?? fallbackTitle ?? String(body.title ?? ''),
     detalhe: lateral.detalhe ?? String(body.description ?? ''),
-    responsavel: lateral.responsavel ?? String(body.responsibleAgent ?? ''),
+    responsavel: sanitizeResponsavel(lateral.responsavel ?? body.responsibleAgent),
     atribuido: lateral.atribuido ?? '',
   };
 }
@@ -682,11 +782,23 @@ export async function createChamadoFromBody(
   };
 }
 
-export async function applyBodyToChamado(
+export interface PrepareChamadoBodyResult {
+  pendingChanges: Record<string, unknown>;
+  targetStatus: string;
+}
+
+function ensureTabulacaoOnChamado(chamado: IChamadoN1): void {
+  if (!chamado.tabulacao?.length) {
+    chamado.tabulacao = [readTabulacaoSnapshot(null)];
+  }
+}
+
+/** Aplica tabulação/cliente/workflow em memória — sem gravar registro. */
+export async function prepareChamadoFromBody(
   chamado: IChamadoN1,
   body: Record<string, unknown>,
-  authUser?: AuthPayload | null
-): Promise<void> {
+): Promise<PrepareChamadoBodyResult> {
+  ensureTabulacaoOnChamado(chamado);
   const beforeTab = readTabulacaoSnapshot(chamado.tabulacao[0]);
   const pendingChanges: Record<string, unknown> = {};
 
@@ -738,22 +850,143 @@ export async function applyBodyToChamado(
     pendingChanges.workflow = nextWorkflow;
   }
 
-  if (body.status !== undefined) {
-    const nextStatus = String(body.status);
-    const current = currentStatus(chamado);
-    if (nextStatus !== current) {
-      await assertTabulacaoForStatus(chamado.tabulacao[0], nextStatus);
+  let targetStatus = currentStatus(chamado);
+  if (body.status !== undefined && String(body.status).trim()) {
+    const nextStatus = String(body.status).trim();
+    if (nextStatus !== targetStatus) {
+      targetStatus = nextStatus;
       pendingChanges.status = nextStatus;
     }
   }
 
+  return { pendingChanges, targetStatus };
+}
+
+function buildAlteracoesFromPending(pendingChanges: Record<string, unknown>): {
+  alteracoes: unknown[];
+  workflowMeta?: Record<string, unknown>;
+} {
+  const alteracoesChanges = { ...pendingChanges };
+  const workflowMeta = alteracoesChanges.workflow;
+  delete alteracoesChanges.status;
+  delete alteracoesChanges.workflow;
+  return {
+    alteracoes: buildAlteracoesItem(alteracoesChanges),
+    workflowMeta: workflowMeta && typeof workflowMeta === 'object' && !Array.isArray(workflowMeta)
+      ? workflowMeta as Record<string, unknown>
+      : undefined,
+  };
+}
+
+export class ChamadoCommitValidationError extends Error {
+  status: number;
+
+  constructor(message: string, status = 400) {
+    super(message);
+    this.name = 'ChamadoCommitValidationError';
+    this.status = status;
+  }
+}
+
+export interface CommitChamadoFromAgentResult {
+  messageResult: AppendRegistroResult;
+  publicText: string;
+  publicRegistroIndex?: number;
+}
+
+/**
+ * Commit atômico do Desk: mensagem pública, nota interna, tabulação, status e responsável
+ * num único chamado.save() (feito na rota).
+ */
+export async function commitChamadoFromAgent(
+  chamado: IChamadoN1,
+  body: Record<string, unknown>,
+  authUser?: AuthPayload | null,
+): Promise<CommitChamadoFromAgentResult> {
+  assertChamadoModifiable(chamado);
+  const { pendingChanges, targetStatus } = await prepareChamadoFromBody(chamado, body);
+  const current = currentStatus(chamado);
+
+  const attachmentList = Array.isArray(body.attachments)
+    ? body.attachments.map((item) => String(item ?? '').trim()).filter(Boolean)
+    : [];
+  const internalAttachmentList = Array.isArray(body.internalAttachments)
+    ? body.internalAttachments.map((item) => String(item ?? '').trim()).filter(Boolean)
+    : [];
+
+  const publicText = String(body.text ?? '').trim();
+  const internalText = String(body.internalText ?? body.anotacaoInterna ?? '').trim();
+  const hasMessage = Boolean(
+    publicText
+    || internalText
+    || attachmentList.length
+    || internalAttachmentList.length,
+  );
+
+  if (hasMessage && (!body.status || !String(body.status).trim())) {
+    throw new ChamadoCommitValidationError('Status obrigatório ao enviar mensagem ao cliente.');
+  }
+
+  if (targetStatus !== current) {
+    await assertTabulacaoForStatus(chamado.tabulacao[0], targetStatus);
+  }
+
+  const { alteracoes, workflowMeta } = buildAlteracoesFromPending(pendingChanges);
+  const authorHint = String(body.author ?? '').trim();
+  let messageResult: AppendRegistroResult = {};
+
+  if (hasMessage) {
+    messageResult = appendRegistroEntry(chamado, {
+      mensagemPublica: publicText,
+      anotacaoInterna: internalText,
+      anexosMensagemPublica: attachmentList,
+      anexosAnotacaoInterna: internalAttachmentList,
+      sender: String(body.sender ?? 'me'),
+      autor: authorHint || undefined,
+      authUser,
+      alteracoes,
+      metadados: workflowMeta ? { workflow: workflowMeta } : {},
+      statusOverride: targetStatus,
+    });
+    if (!messageResult.public && !messageResult.internal) {
+      throw new ChamadoCommitValidationError('Texto da mensagem ou anotação é obrigatório.');
+    }
+  } else if (Object.keys(pendingChanges).length) {
+    chamado.registro.push({
+      data: new Date(),
+      origin: 'agente',
+      autor: resolveRegistroAutor('agente', { authUser, authorHint }),
+      mensagemPublica: '',
+      anexosMensagemPublica: [],
+      anotacaoInterna: '',
+      anexosAnotacaoInterna: [],
+      alteracoes,
+      metadados: workflowMeta ? { workflow: workflowMeta } : {},
+      status: targetStatus,
+    });
+  }
+
+  return {
+    messageResult,
+    publicText,
+    publicRegistroIndex: messageResult.public?.registroIndex,
+  };
+}
+
+export async function applyBodyToChamado(
+  chamado: IChamadoN1,
+  body: Record<string, unknown>,
+  authUser?: AuthPayload | null
+): Promise<void> {
+  assertChamadoModifiable(chamado);
+  const { pendingChanges, targetStatus } = await prepareChamadoFromBody(chamado, body);
+
+  if (pendingChanges.status) {
+    await assertTabulacaoForStatus(chamado.tabulacao[0], targetStatus);
+  }
+
   if (Object.keys(pendingChanges).length) {
-    const nextStatus = String(pendingChanges.status ?? currentStatus(chamado));
-    const tab = chamado.tabulacao[0];
-    const alteracoesChanges = { ...pendingChanges };
-    const workflowMeta = alteracoesChanges.workflow;
-    delete alteracoesChanges.status;
-    delete alteracoesChanges.workflow;
+    const { alteracoes, workflowMeta } = buildAlteracoesFromPending(pendingChanges);
     chamado.registro.push({
       data: new Date(),
       origin: 'agente',
@@ -765,9 +998,9 @@ export async function applyBodyToChamado(
       anexosMensagemPublica: [],
       anotacaoInterna: '',
       anexosAnotacaoInterna: [],
-      alteracoes: buildAlteracoesItem(alteracoesChanges),
+      alteracoes,
       metadados: workflowMeta ? { workflow: workflowMeta } : {},
-      status: nextStatus,
+      status: targetStatus,
     });
   }
 }
@@ -789,21 +1022,23 @@ export function appendRegistroEntry(
     authUser?: AuthPayload | null;
     alteracoes?: unknown[];
     metadados?: Record<string, unknown>;
+    /** Status do registro — usado no commit atômico do Desk. */
+    statusOverride?: string;
   }
 ): AppendRegistroResult {
   const publicText = String(payload.mensagemPublica ?? '').trim();
   const internalText = String(payload.anotacaoInterna ?? '').trim();
-  if (!publicText && !internalText) return {};
-
-  const sender = payload.sender ?? 'me';
-  const origin = originFromSender(sender);
-  const status = currentStatus(chamado);
   const publicAttachments = (payload.anexosMensagemPublica ?? [])
     .map((url) => String(url).trim())
     .filter(Boolean);
   const internalAttachments = (payload.anexosAnotacaoInterna ?? [])
     .map((url) => String(url).trim())
     .filter(Boolean);
+  if (!publicText && !internalText && !publicAttachments.length && !internalAttachments.length) return {};
+
+  const sender = payload.sender ?? 'me';
+  const origin = originFromSender(sender);
+  const status = String(payload.statusOverride ?? currentStatus(chamado)).trim() || currentStatus(chamado);
 
   const regAutor = resolveRegistroAutor(origin, {
     authUser: payload.authUser,
@@ -827,7 +1062,7 @@ export function appendRegistroEntry(
   const index = chamado.registro.length - 1;
 
   const result: AppendRegistroResult = {};
-  if (publicText) {
+  if (publicText || publicAttachments.length) {
     result.public = {
       id: `${index}-pub`,
       text: publicText,
@@ -840,7 +1075,7 @@ export function appendRegistroEntry(
       attachments: publicAttachments,
     };
   }
-  if (internalText) {
+  if (internalText || internalAttachments.length) {
     result.internal = {
       id: `${index}-int`,
       text: internalText,
@@ -862,7 +1097,8 @@ export function appendMessage(
   internal: boolean,
   sender = 'me',
   attachments: string[] = [],
-  metadados: Record<string, unknown> = {}
+  metadados: Record<string, unknown> = {},
+  statusOverride?: string,
 ): TicketMessageDto {
   const safeAttachments = attachments.map((url) => String(url).trim()).filter(Boolean);
   const result = appendRegistroEntry(chamado, {
@@ -872,6 +1108,7 @@ export function appendMessage(
     anexosAnotacaoInterna: internal ? safeAttachments : [],
     sender,
     metadados,
+    statusOverride,
   });
   const dto = result.public ?? result.internal;
   if (!dto) {
@@ -996,7 +1233,7 @@ function buildTicketDtoCore(
         anotacaoInterna: String(reg.anotacaoInterna ?? '').trim() || undefined,
       });
       const regAutor = resolveStoredRegistroAutor(reg, origin, clientName);
-      if (reg.mensagemPublica) {
+      if (reg.mensagemPublica || (reg.anexosMensagemPublica?.length ?? 0) > 0) {
         const meta = registroMetadados(reg);
         const isEmailInbound = String(meta.source ?? '').toLowerCase() === 'email-inbound';
         const publicText = normalizeTicketMessageText(
@@ -1016,7 +1253,7 @@ function buildTicketDtoCore(
           attachments: reg.anexosMensagemPublica ?? [],
         });
       }
-      if (reg.anotacaoInterna) {
+      if (reg.anotacaoInterna || (reg.anexosAnotacaoInterna?.length ?? 0) > 0) {
         internalNotes.push({
           id: `${index}-int`,
           text: normalizeTicketMessageText(reg.anotacaoInterna),
@@ -1037,6 +1274,11 @@ function buildTicketDtoCore(
     || chamado.chamadoProtocolo;
 
   const clientCpf = ref?.clienteCpf || cadastro?.clienteCpf;
+
+  let responsavel = sanitizeResponsavel(tab?.responsavel);
+  if (!responsavel) {
+    responsavel = inferResponsavelFromAgentRegistro(chamado.registro);
+  }
 
   let lateralWorkflow: Record<string, unknown> | undefined = extras.lateralWorkflow;
   if (!lateralWorkflow && chamado.workflow?.active && chamado.workflow.workflowId && listOnly && ctx) {
@@ -1067,7 +1309,7 @@ function buildTicketDtoCore(
     boxId,
     clientName,
     clientCPF: clientCpf,
-    responsibleAgent: tab?.responsavel,
+    responsibleAgent: responsavel,
     workflow: chamado.workflow?.active
       ? {
         active: chamado.workflow.active,
@@ -1108,7 +1350,7 @@ function buildTicketDtoCore(
       produto: tab?.produto,
       motivo: tab?.motivo,
       detalhe: tab?.detalhe,
-      responsavel: tab?.responsavel,
+      responsavel,
       atribuido: tab?.atribuido,
       clienteCpf: clientCpf,
       clienteNome: clientName,

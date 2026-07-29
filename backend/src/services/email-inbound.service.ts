@@ -1,8 +1,14 @@
-﻿/** email-inbound.service v1.7.1 — stripHtml decodifica entidades HTML (&nbsp; etc.) */
+﻿/** email-inbound.service v1.8.0 — ciclo status: pendente/resolvido reabre; fechado gera novo */
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { applyAssignmentIfNeeded } from './assignmentRouter.service';
-import { appendMessage, createChamadoFromBody } from './chamado.mapper';
+import {
+  appendMessage,
+  createChamadoFromBody,
+  currentStatus,
+  normalizeStatusValue,
+  shouldSpawnNewTicketOnInbound,
+} from './chamado.mapper';
 import { normalizeEmail, resolveClienteRefFromEmail } from './cliente.service';
 import { notifyTicketOpenedAsync } from './emailNotification.service';
 import { runInboundAgentPipeline } from './agents/inboundAgentPipeline.service';
@@ -168,8 +174,12 @@ async function runInboundEmailFlow(
   const attachments = attachmentUrls(payload);
 
   const existing = await findChamadoForEmailReply(payload);
-  if (existing) {
-    appendMessage(existing, bodyText, false, 'them', attachments, emailMeta);
+  if (existing && !shouldSpawnNewTicketOnInbound(existing)) {
+    const status = normalizeStatusValue(currentStatus(existing));
+    const statusOverride = (status === 'pendente' || status === 'resolvido')
+      ? 'em-andamento'
+      : undefined;
+    appendMessage(existing, bodyText, false, 'them', attachments, emailMeta, statusOverride);
     await existing.save();
     return {
       action: 'replied',

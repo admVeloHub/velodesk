@@ -1,12 +1,11 @@
 /**
- * DeskRightPanel v1.9.0 — Responder Solicitação (comunicacaoWorkflow)
- * VERSION: v1.9.0 | DATE: 2026-07-24
+ * DeskRightPanel v1.11.0 — ticket fechado somente leitura
+ * VERSION: v1.11.0 | DATE: 2026-07-29
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { DEFAULT_TIPO, hasApplyableTabulation, isTabulationComplete, parseTabulationDisplay } from '../../../services/tabulationConfig';
+import { DEFAULT_TIPO, hasApplyableTabulation, isTabulationComplete, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
 import { useTabulation } from '../../../context/TabulationContext';
-import { useDeskAgents } from '../../../hooks/useDeskAgents';
 import { DeskStatusCommitButton } from './DeskComposePanel';
 import ProcessosPopover from './ProcessosPopover';
 import { DESK_THERMOMETER_UI_ENABLED } from '../../../services/desk/constants';
@@ -98,9 +97,9 @@ export default function DeskRightPanel({
   iaShowSection = false,
   iaAuditScore = null,
   tabulationReadonly = false,
+  ticketReadOnly = false,
 }) {
   const { loading, config, getMotivos, getDetalhes, getProdutoNames, getTipoChamadoOptions, getCanalContatoOptions } = useTabulation();
-  const { currentAgentValue } = useDeskAgents();
   const [processosOpen, setProcessosOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [autoCloseOnSave, setAutoCloseOnSaveState] = useState(() => getAutoCloseOnSave());
@@ -123,11 +122,6 @@ export default function DeskRightPanel({
       return next;
     });
   };
-
-  useEffect(() => {
-    if (!currentAgentValue || String(rightFields.responsavel || '').trim()) return;
-    onFieldChange('responsavel', currentAgentValue);
-  }, [currentAgentValue, rightFields.responsavel, onFieldChange]);
 
   const tipoOptions = getTipoChamadoOptions();
   const canalOptions = getCanalContatoOptions();
@@ -159,7 +153,7 @@ export default function DeskRightPanel({
   );
   const inWorkflow = isTicketInWorkflow(ticket);
   const showThermoUi = DESK_THERMOMETER_UI_ENABLED;
-  const showStartWorkflow = canStartWorkflow && tabulationComplete && !inWorkflow && !tabulationReadonly;
+  const showStartWorkflow = canStartWorkflow && tabulationComplete && !inWorkflow && !tabulationReadonly && !ticketReadOnly;
   const showReplyWorkflow = inWorkflow && ticketHasComunicacaoWorkflow(ticket) && typeof onReplyWorkflowRequest === 'function';
 
   return (
@@ -233,6 +227,18 @@ export default function DeskRightPanel({
               onFieldChange={onFieldChange}
             />
           )}
+          <SelectField
+            id="selResponsavel"
+            label="Responsável"
+            fieldKey="responsavel"
+            value={
+              sanitizeResponsavel(rightFields.responsavel)
+              || sanitizeResponsavel(ticket?.responsibleAgent)
+              || sanitizeResponsavel(ticket?.lateralForm?.responsavel)
+            }
+            readonly
+            onFieldChange={onFieldChange}
+          />
 
           {showIaTabulationPanel ? (
             <div className={'ia-tabulation' + (iaTabulationLoading ? ' ia-tabulation--loading' : '')}>
@@ -358,6 +364,8 @@ export default function DeskRightPanel({
           className={'rp-footer-btn rp-footer-btn--secondary' + (waChatOpen ? ' is-active' : '')}
           id="btnOpenChat"
           onClick={waChatOpen ? onCloseChat : onOpenChat}
+          disabled={ticketReadOnly && !waChatOpen}
+          title={ticketReadOnly && !waChatOpen ? 'Ticket fechado — conversa somente leitura' : undefined}
         >
           <i className="ti ti-message-circle" />
           {waChatOpen ? 'Fechar conversa' : 'Abrir conversa'}
@@ -366,7 +374,7 @@ export default function DeskRightPanel({
           sendStatus={sendStatus}
           onCommitStatus={onCommitStatus}
           variant="panel"
-          disabled={sendDisabled}
+          disabled={sendDisabled || ticketReadOnly}
         />
       </div>
     </aside>

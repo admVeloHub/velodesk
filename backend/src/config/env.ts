@@ -1,4 +1,4 @@
-/** env v1.20.0 — roleta cap-10 + presença TTL */
+/** env v1.21.0 — close resolved job (48h → fechado) */
 import fs from 'fs';
 import path from 'path';
 
@@ -91,6 +91,7 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   enableWhatsapp: process.env.ENABLE_WHATSAPP !== 'false',
   gcpStorageBucket: process.env.GCP_STORAGE_BUCKET || '',
+  inboundAttachmentsDir: (process.env.INBOUND_ATTACHMENTS_DIR || '').trim(),
   inboundEmailEnabled: process.env.INBOUND_EMAIL_ENABLED === 'true',
   inboundEmailProvider: (process.env.INBOUND_EMAIL_PROVIDER || 'generic').toLowerCase(),
   inboundEmailWebhookSecret: process.env.INBOUND_EMAIL_WEBHOOK_SECRET || '',
@@ -167,5 +168,9 @@ export const env = {
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean),
   inboundAppWebhookSecret: (process.env.INBOUND_APP_WEBHOOK_SECRET || '').trim(),
+  /** Intervalo do job que fecha tickets resolvidos (default 1h) */
+  resolvedCloseIntervalMs: parseInt(process.env.RESOLVED_CLOSE_INTERVAL_MS || '3600000', 10),
+  /** Idade mínima em Resolvido antes de virar Fechado (default 48h) */
+  resolvedCloseAfterMs: parseInt(process.env.RESOLVED_CLOSE_AFTER_MS || '172800000', 10),
 };
 

@@ -7,7 +7,7 @@ import type { IChamadoN1 } from '../../models/ChamadoN1';
 import { AgentGestaoAlert } from '../../models/AgentGestaoAlert';
 import { env } from '../../config/env';
 import { applyAssignmentToChamado } from '../assignmentRouter.service';
-import { currentStatus } from '../chamado.mapper';
+import { assertChamadoModifiable, currentStatus } from '../chamado.mapper';
 import type { GestaoHandoffInput, GestaoHandoffResult, NivelCriticidade } from './agentTypes';
 import { sendOutboundEmail } from '../email-outbound.service';
 
@@ -73,6 +73,12 @@ export async function executeGestaoHandoff(input: GestaoHandoffInput): Promise<G
     const chamado = await ChamadoN1.findById(input.ticketId);
     if (!chamado) {
       return { success: false, error: 'Chamado não encontrado' };
+    }
+
+    try {
+      assertChamadoModifiable(chamado);
+    } catch {
+      return { success: false, error: 'Ticket fechado — handoff não aplicado' };
     }
 
     const notificacoes: string[] = [];

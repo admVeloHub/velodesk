@@ -1,9 +1,9 @@
 /**
- * ticketAdapter v1.6.1 — clienteTelefoneWhatsapp no lateralForm
- * VERSION: v1.6.1 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.7.0 — responsável só quando atribuído (roleta/ação manual)
+ * VERSION: v1.7.0 | DATE: 2026-07-28 | AUTHOR: VeloHub Development Team
  */
 import { getAgentName } from '../../services/clientDb';
-import { DEFAULT_TIPO } from '../../services/tabulationConfig';
+import { DEFAULT_TIPO, sanitizeResponsavel } from '../../services/tabulationConfig';
 import { repairUtf8Mojibake } from '../../services/desk/utils';
 
 const MEUS_CHAMADOS_BOX_MAP = {
@@ -115,6 +115,7 @@ export function cockpitTicketToApi(ticket) {
   const phoneList = lf.clienteTelefone ?? (ticket.clientPhone ? [ticket.clientPhone] : []);
   const clientName = ticket.clientName || ticket.solicitante || lf.clienteNome;
   const tipo = String(lf.tipoChamado || lf.classificacaoTipo || DEFAULT_TIPO).trim() || DEFAULT_TIPO;
+  const responsavel = sanitizeResponsavel(lf.responsavel) || sanitizeResponsavel(ticket.responsibleAgent);
   return {
     chamadoProtocolo: ticket.chamadoProtocolo,
     chamadoTitulo: ticket.chamadoTitulo || ticket.title,
@@ -129,13 +130,13 @@ export function cockpitTicketToApi(ticket) {
     clienteId: ticket.clienteId || lf.clienteId,
     clientName,
     clientCPF: ticket.clientCPF || lf.clienteCpf || lf.cpf,
-    responsibleAgent: ticket.responsibleAgent || lf.responsavel,
+    responsibleAgent: responsavel,
     author: ticket.author || getAgentName() || undefined,
     lateralForm: {
       ...lf,
       classificacaoTipo: tipo,
       tipoChamado: tipo,
-      responsavel: String(lf.responsavel ?? ticket.responsibleAgent ?? '').trim(),
+      responsavel,
       cpf: ticket.clientCPF || lf.clienteCpf || lf.cpf,
       clienteCpf: ticket.clientCPF || lf.clienteCpf || lf.cpf,
       clienteNome: clientName || '',

@@ -1,6 +1,6 @@
 /**
- * DeskAiRevisionModal v1.1.0 — revisão de sugestão IA com input do operador (portal)
- * VERSION: v1.1.0 | DATE: 2026-07-28
+ * DeskAiRevisionModal v1.1.1 — texto do operador não é mais apagado durante a digitação
+ * VERSION: v1.1.1 | DATE: 2026-07-28
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -15,9 +15,17 @@ export default function DeskAiRevisionModal({
   const [input, setInput] = useState('');
   const inputRef = useRef(null);
 
+  // Limpa e foca apenas na abertura: depender de onClose/submitting apagaria
+  // o texto a cada re-render do Desk (ticker de SLA, polling) enquanto digita.
   useEffect(() => {
     if (!open) return undefined;
     setInput('');
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
+    return () => window.clearTimeout(focusTimer);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
 
     const onKeyDown = (event) => {
       if (event.key === 'Escape' && !submitting) {
@@ -26,11 +34,7 @@ export default function DeskAiRevisionModal({
       }
     };
     document.addEventListener('keydown', onKeyDown);
-    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      window.clearTimeout(focusTimer);
-    };
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [open, onClose, submitting]);
 
   if (!open) return null;

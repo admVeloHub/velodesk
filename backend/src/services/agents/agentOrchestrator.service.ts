@@ -5,7 +5,7 @@
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
 import { env } from '../../config/env';
-import { appendMessage, currentStatus } from '../chamado.mapper';
+import { appendMessage, assertChamadoModifiable, currentStatus } from '../chamado.mapper';
 import { notifyAgentReplyAsync } from '../emailNotification.service';
 import type {
   AtendimentoInput,
@@ -82,6 +82,7 @@ async function sendAutonomousReply(
   chamado: IChamadoN1,
   messageText: string,
 ): Promise<void> {
+  assertChamadoModifiable(chamado);
   const registroIndex = chamado.registro?.length || 0;
   appendMessage(chamado, messageText, false, 'Agente IA', [], {
     agentAutonomousSend: true,

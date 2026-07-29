@@ -1,6 +1,6 @@
 /**
- * permissionService v1.5.1 — gestão não usa fila meus-chamados
- * VERSION: v1.5.1 | DATE: 2026-07-24
+ * permissionService v1.6.0 — canInterruptWorkflow (suporte/gestão/supervisão)
+ * VERSION: v1.6.0 | DATE: 2026-07-28
  */
 import api from '../../api/client';
 import { normalizeProfileId } from '../../config/profiles';
@@ -336,6 +336,16 @@ export function canActOnTicket(ticket, perm = readCachedPermissions()) {
 
 export function canApproveWorkflow(perm = readCachedPermissions()) {
   return can('workflow', 'aprovar', perm?.permissoes);
+}
+
+const INTERRUPT_WORKFLOW_FUNCOES = ['suporte', 'gestao', 'suporte-supervisao', 'direcao'];
+
+/** Interromper workflow — suporte, supervisão e gestão. */
+export function canInterruptWorkflow(perm = readCachedPermissions()) {
+  if (!perm) return false;
+  if (can('workflow', 'interromper', perm.permissoes)) return true;
+  if (hasPermission(perm.permissoes, 'portal', 'gestao')) return true;
+  return userFuncaoSlugs(perm).some((slug) => INTERRUPT_WORKFLOW_FUNCOES.includes(slug));
 }
 
 export function agentCanDecideTicket(ticket, perm = readCachedPermissions()) {

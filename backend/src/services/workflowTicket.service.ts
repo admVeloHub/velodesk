@@ -1,4 +1,4 @@
-/** workflowTicket.service v1.4.1 — ticketCtx só tabulacao (IChamadoN1 sem lateralForm) */
+/** workflowTicket.service v1.5.0 — cancelWorkflowForChamado (interromper) */
 import { isAutomaticaStep, resolveAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
@@ -384,4 +384,50 @@ export async function advanceWorkflowWithDecision(
 ): Promise<IChamadoN1> {
   setWorkflowPendingDecision(chamado, decision);
   return advanceWorkflowManual(chamado, authUser);
+}
+
+/** Interrompe workflow ativo sem impedir novo start futuro (tabulação intacta). */
+export async function cancelWorkflowForChamado(
+  chamado: IChamadoN1,
+  authUser?: AuthPayload | null,
+  motivo?: string,
+): Promise<IChamadoN1> {
+  const wf = ensureWorkflowState(chamado);
+  if (!wf.active || !wf.workflowId) {
+    throw new WorkflowAdvanceError('Ticket sem workflow ativo', 400);
+  }
+
+  const definicao = await getWorkflowById(String(wf.workflowId));
+  const titulo = definicao?.titulo || 'Workflow';
+  const autor = authUser?.name || authUser?.email || 'Gestão';
+
+  const lateralSnapshot = definicao
+    ? buildLateralWorkflowDto(chamado, definicao)
+    : null;
+
+  wf.active = false;
+  wf.workflowId = null;
+  wf.step = 0;
+  wf.passoId = null;
+  wf.startedAt = null;
+  wf.completedAt = null;
+  wf.pendingDecision = null;
+  delete wf.requisicao;
+
+  const tab = readTabulacaoSnapshot(chamado.tabulacao[0]);
+  chamado.tabulacao = [{ ...tab, atribuido: '' }];
+
+  appendWorkflowRegistro(chamado, {
+    autor,
+    anotacaoInterna: motivo
+      ? `Workflow "${titulo}" interrompido: ${motivo}`
+      : `Workflow "${titulo}" interrompido.`,
+    metadados: {
+      workflowInterrupted: true,
+      workflow: lateralSnapshot,
+    },
+    alteracoes: [{ workflowInterrupted: true, workflowTitulo: titulo }],
+  });
+
+  return chamado;
 }

@@ -1,7 +1,5 @@
-/** seed.service v1.6.0 — purge mock unificado + seed workflow config */
-import bcrypt from 'bcryptjs';
+/** seed.service v1.7.0 — sem seed de usuário admin de fachada */
 import { ChamadoN1 } from '../models/ChamadoN1';
-import { User } from '../models/User';
 import { getClienteModel } from '../models/Cliente';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
 import {
@@ -70,18 +68,6 @@ export async function runDeskConfigMigrations(): Promise<void> {
 
 export async function seedDevelopmentData() {
   if (env.nodeEnv !== 'development') return;
-
-  const admin = await User.findOne({ email: 'admin@velodesk.local' });
-  if (!admin) {
-    const hash = await bcrypt.hash('admin123', 10);
-    await User.create({
-      name: 'Admin Velodesk',
-      email: 'admin@velodesk.local',
-      password: hash,
-      role: 'supervisor',
-    });
-    console.log('Seed: usuário admin@velodesk.local / admin123');
-  }
 
   await seedTabulationConfig();
   await seedFuncoesPermissoes();

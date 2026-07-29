@@ -1,6 +1,6 @@
 /**
- * WorkflowApprovalDetail v1.5.1 — modal comunicacao com thread imediata
- * VERSION: v1.5.0 | DATE: 2026-07-24
+ * WorkflowApprovalDetail v1.6.0 — stepper clicável + modal interromper workflow
+ * VERSION: v1.6.0 | DATE: 2026-07-28
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import WorkflowApprovalKpis from './WorkflowApprovalKpis';
@@ -9,6 +9,9 @@ import WorkflowApprovalSlaBar from './WorkflowApprovalSlaBar';
 import WorkflowApprovalActions from './WorkflowApprovalActions';
 import WorkflowApprovalProdutosApprovePanel from './WorkflowApprovalProdutosApprovePanel';
 import WorkflowComunicacaoModal from './WorkflowComunicacaoModal';
+import TicketWorkflowStepper from '../../desk/components/TicketWorkflowStepper';
+import WorkflowProgressModal from '../../desk/components/WorkflowProgressModal';
+import { isTicketInWorkflow } from '../../../services/desk/utils';
 
 export default function WorkflowApprovalDetail({
   detail,
@@ -21,8 +24,15 @@ export default function WorkflowApprovalDetail({
   onRequestInfoOpen,
   onRequestInfoSubmit,
   onRequestInfoCancel,
+  canManageWorkflow = false,
+  canAdvanceWorkflow = false,
+  onAdvanceWorkflow,
+  onCancelWorkflow,
+  advancingWorkflow = false,
+  cancelingWorkflow = false,
 }) {
   const [approvePanelOpen, setApprovePanelOpen] = useState(false);
+  const [workflowModalOpen, setWorkflowModalOpen] = useState(false);
   const isProdutosTeam = teamId === 'produtos';
 
   useEffect(() => {
@@ -75,6 +85,29 @@ export default function WorkflowApprovalDetail({
         <p className="wf-approval-detail__meta">{detail.metaLine}</p>
         {detail.statusMessage ? (
           <p className="wf-approval-detail__status-msg">{detail.statusMessage}</p>
+        ) : null}
+        {canManageWorkflow && detail.ticket && isTicketInWorkflow(detail.ticket) ? (
+          <div className="wf-approval-detail__workflow-track">
+            <TicketWorkflowStepper
+              ticket={detail.ticket}
+              clickable
+              onClick={() => setWorkflowModalOpen(true)}
+            />
+            <WorkflowProgressModal
+              open={workflowModalOpen}
+              ticket={detail.ticket}
+              onClose={() => setWorkflowModalOpen(false)}
+              onCancelWorkflow={async () => {
+                await onCancelWorkflow?.();
+                setWorkflowModalOpen(false);
+              }}
+              onAdvanceWorkflow={onAdvanceWorkflow}
+              canceling={cancelingWorkflow}
+              advancing={advancingWorkflow}
+              canAdvance={canAdvanceWorkflow}
+              canCancel
+            />
+          </div>
         ) : null}
       </header>
 

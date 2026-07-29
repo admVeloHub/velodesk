@@ -1,11 +1,13 @@
-/** ticketMerge.service v1.0.0 — mesclagem atômica de tickets duplicados (Client360) */
+/** ticketMerge.service v1.1.0 — bloqueia merge em ticket fechado */
 import type { AuthPayload } from '../middleware/auth';
 import { Box } from '../models/Box';
 import { ChamadoN1, IChamadoN1, IRegistro, ITabulacao } from '../models/ChamadoN1';
 import {
+  ChamadoClosedError,
   chamadoToTicket,
   currentStatus,
-  gestaoTerminalStatusVariants,
+  isChamadoFechado,
+  mergeTerminalStatusVariants,
   readTabulacaoSnapshot,
   resolveBoxIdForChamado,
   resolveRegistroAutor,
@@ -38,7 +40,7 @@ function getChamadoCpf(chamado: IChamadoN1): string {
 }
 
 function isTerminalStatus(status: string): boolean {
-  const terminal = new Set(gestaoTerminalStatusVariants());
+  const terminal = new Set(mergeTerminalStatusVariants());
   return terminal.has(status.toLowerCase());
 }
 
@@ -112,6 +114,10 @@ export async function mergeTicketInto(
 
   if (!sourceChamado || !targetChamado) {
     throw new TicketMergeError('Ticket não encontrado.', 404);
+  }
+
+  if (isChamadoFechado(sourceChamado) || isChamadoFechado(targetChamado)) {
+    throw new ChamadoClosedError('Ticket fechado — não é possível mesclar.');
   }
 
   await assertCanActOnTicket(authUser, sourceChamado);

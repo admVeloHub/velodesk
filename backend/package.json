@@ -24,7 +24,8 @@
     "test:gmail-watch": "tsx scripts/test-gmail-watch.ts",
     "test:gmail-inbound": "tsx scripts/test-gmail-inbound.ts",
     "test:mail-rules": "tsx scripts/test-mail-rules.ts",
-    "test:ai-usage": "tsx scripts/test-ai-usage.ts"
+    "test:ai-usage": "tsx scripts/test-ai-usage.ts",
+    "test:status-lifecycle": "tsx scripts/test-status-lifecycle.ts"
   },
   "dependencies": {
     "@google-cloud/pubsub": "^5.0.0",

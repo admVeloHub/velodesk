@@ -1,12 +1,13 @@
 /**
- * ticketsStorage v1.1.0 — facade API + cache local de tickets/boxes (Desk)
- * VERSION: v1.1.0 | DATE: 2026-07-23 | AUTHOR: VeloHub Development Team
+ * ticketsStorage v1.3.0 — fila resolvidos inclui fechado/cancelado
+ * VERSION: v1.3.0 | DATE: 2026-07-29
  */
 import {
   getCachedColumns,
   setCachedColumns,
   loadBoxesFromApi,
   updateTicketViaApi,
+  commitTicketViaApi,
   addMessageViaApi,
   createTicketViaApi,
   createDraftTicketInCache,
@@ -54,7 +55,7 @@ const QUEUE_MAP = {
   novos: ['novos', 'novo'],
   'em-andamento': ['em-andamento', 'em-aberto'],
   pendente: ['em-espera', 'pendentes', 'pendente'],
-  resolvidos: ['resolvidos', 'resolvido'],
+  resolvidos: ['resolvidos', 'resolvido', 'cancelado', 'fechado'],
 };
 
 import { loadCustomQueues } from './desk/customQueueBoxes';
@@ -78,6 +79,8 @@ export function mapTicketQueueId(ticket, boxId) {
 export async function updateTicketInCache(ticketId, updater) {
   return updateTicketViaApi(ticketId, updater);
 }
+
+export { commitTicketViaApi };
 
 export async function sendTicketMessage(ticketId, text, author) {
   return addMessageViaApi(ticketId, { text, internal: false, author });

@@ -1,6 +1,6 @@
 /**
- * API client v1.15.0 — mailRulesApi (config inbound e-mail)
- * VERSION: v1.15.0 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
+ * API client v1.16.0 — POST /tickets/:id/commit (save atômico agente)
+ * VERSION: v1.16.0 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -106,6 +106,7 @@ export const ticketsApi = {
   }),
   create: (data) => api.post('/tickets', data).then((r) => r.data),
   update: (id, data) => api.put(`/tickets/${id}`, data).then((r) => r.data),
+  commit: (id, data) => api.post(`/tickets/${id}/commit`, data).then((r) => r.data),
   delete: (id) => api.delete(`/tickets/${id}`).then((r) => r.data),
   addMessage: (id, data) =>
     api.post(`/tickets/${id}/messages`, data).then((r) => r.data),
@@ -117,6 +118,8 @@ export const ticketsApi = {
     api.post(`/tickets/${sourceId}/merge-into/${targetId}`).then((r) => r.data),
   startWorkflow: (id, body) =>
     api.post(`/tickets/${id}/workflow/start`, body).then((r) => r.data),
+  cancelWorkflow: (id, body = {}) =>
+    api.post(`/tickets/${id}/workflow/cancel`, body).then((r) => r.data),
 };
 
 export const uploadsApi = {

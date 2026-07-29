@@ -1,9 +1,10 @@
 /**
- * TicketWorkflowStepper v1.1.0 — stepper horizontal do workflow ativo (mockup)
+ * TicketWorkflowStepper v1.3.0 — layout headerStack (altura dos botões)
  */
-import React from 'react';
-import { getWorkflowProgress } from '../../../services/desk/utils';
+import React, { useMemo } from 'react';
+import { getWorkflowProgress, isTicketInWorkflow } from '../../../services/desk/utils';
 import { getWorkflowStepSubtitle } from '../../../services/desk/workflowDefinitions';
+import { useWorkflowConfig } from '../../../context/WorkflowConfigContext';
 
 function StepIcon({ step }) {
   if (step.state === 'completed') {
@@ -19,16 +20,96 @@ function connectorClass(prevStep, nextStep) {
   return cls;
 }
 
-export default function TicketWorkflowStepper({ ticket }) {
-  const progress = getWorkflowProgress(ticket);
-  if (!progress) return null;
+function buildStepperClassName({ layout, clickable, loading = false }) {
+  let cls = 'desk-workflow-stepper';
+  cls += layout === 'headerStack'
+    ? ' desk-workflow-stepper--header-stack'
+    : ' desk-workflow-stepper--compact';
+  if (clickable) cls += ' desk-workflow-stepper--clickable';
+  if (loading) cls += ' desk-workflow-stepper--loading';
+  return cls;
+}
+
+export default function TicketWorkflowStepper({ ticket, onClick, clickable = false, layout = 'compact' }) {
+  const { workflows, loading: workflowsLoading } = useWorkflowConfig();
+  const progress = useMemo(
+    () => getWorkflowProgress(ticket),
+    [ticket, workflows],
+  );
+
+  if (!isTicketInWorkflow(ticket)) return null;
+
+  const interactiveProps = clickable ? {
+    onClick,
+    onKeyDown: (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onClick?.();
+      }
+    },
+    role: 'button',
+    tabIndex: 0,
+    title: 'Ver evolução do workflow',
+  } : {};
+
+  if (!progress) {
+    const wf = ticket?.lateralForm?.workflow;
+    const label = wf?.title || wf?.definicaoSlug || wf?.templateId || 'Workflow';
+    if (workflowsLoading) {
+      return (
+        <section
+          className={buildStepperClassName({ layout, clickable, loading: true })}
+          aria-busy="true"
+          aria-label={`Carregando workflow: ${label}`}
+          {...interactiveProps}
+        >
+          <p className="desk-workflow-stepper__eyebrow">
+            <i className="ti ti-arrows-exchange" aria-hidden="true" />
+            {label}
+          </p>
+          <ol className="desk-workflow-stepper__track">
+            <li className="desk-workflow-stepper__step desk-workflow-stepper__step--active">
+              <span className="desk-workflow-stepper__circle">
+                <i className="ti ti-loader" aria-hidden="true" />
+              </span>
+            </li>
+          </ol>
+        </section>
+      );
+    }
+
+    const step = typeof wf?.step === 'number' ? wf.step + 1 : 1;
+    return (
+      <section
+        className={buildStepperClassName({ layout, clickable })}
+        aria-label={`Workflow ativo: ${label}`}
+        {...interactiveProps}
+      >
+        <p className="desk-workflow-stepper__eyebrow">
+          <i className="ti ti-arrows-exchange" aria-hidden="true" />
+          {label}
+        </p>
+        <ol className="desk-workflow-stepper__track">
+          <li
+            className="desk-workflow-stepper__step desk-workflow-stepper__step--active"
+            title={`Etapa ${step}`}
+          >
+            <span className="desk-workflow-stepper__circle">
+              <i className="ti ti-circle-dot" aria-hidden="true" />
+            </span>
+          </li>
+        </ol>
+      </section>
+    );
+  }
 
   const { template, stepsWithState } = progress;
 
   return (
     <section
-      className="desk-workflow-stepper desk-workflow-stepper--compact"
+      className={buildStepperClassName({ layout, clickable })}
       aria-label={`Workflow ativo: ${template.title}`}
+      {...interactiveProps}
     >
       <p className="desk-workflow-stepper__eyebrow" title={`Workflow ativo: ${template.title}`}>
         <i className="ti ti-arrows-exchange" aria-hidden="true" />

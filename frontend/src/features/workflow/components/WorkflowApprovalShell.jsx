@@ -1,6 +1,6 @@
 /**
- * WorkflowApprovalShell v1.7.0 — recarrega detalhe quando comunicacaoPendente sem array
- * VERSION: v1.7.0 | DATE: 2026-07-24
+ * WorkflowApprovalShell v1.8.0 — interromper workflow (gestão/suporte)
+ * VERSION: v1.8.0 | DATE: 2026-07-28
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -11,6 +11,7 @@ import { usePermissionsOptional } from '../../../context/PermissionContext';
 import deskLog from '../../../utils/deskDebugLog';
 import { findTicketEntry, loadTicketDetailFromApi } from '../../../services/ticketsStorage';
 import {
+  canInterruptWorkflow,
   hasWorkflowPortalAccess,
   resolveWorkflowTeamQueueForUser,
 } from '../../../services/permissions/permissionService';
@@ -25,6 +26,9 @@ import {
   rejectWorkflowDecision,
   requestWorkflowInfo,
 } from '../../../services/workflow/workflowDecisionHandlers';
+import { getWorkflowProgress, isTicketInWorkflow } from '../../../services/desk/utils';
+import { resolveAutomaticaConfig } from '../../config/workflow/workflowConfigData';
+import { ticketsApi } from '../../../api/client';
 import WorkflowApprovalQueue from './WorkflowApprovalQueue';
 import WorkflowApprovalDetail from './WorkflowApprovalDetail';
 
@@ -43,6 +47,8 @@ export default function WorkflowApprovalShell() {
   const permsCtx = usePermissionsOptional();
   const [selectedId, setSelectedId] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [advancingWorkflow, setAdvancingWorkflow] = useState(false);
+  const [cancelingWorkflow, setCancelingWorkflow] = useState(false);
   const [demoRevision, setDemoRevision] = useState(0);
   const [detailRevision, setDetailRevision] = useState(0);
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
@@ -134,6 +140,34 @@ export default function WorkflowApprovalShell() {
     [selectedId, teamQueueId, hasWorkflowAccess, refreshKey, demoRevision, detailRevision],
   );
 
+  const selectedTicket = useMemo(
+    () => (selectedId ? findTicketEntry(selectedId)?.ticket : null),
+    [selectedId, refreshKey, detailRevision],
+  );
+
+  const workflowProgress = selectedTicket ? getWorkflowProgress(selectedTicket) : null;
+
+  const canManageWorkflow = useMemo(
+    () => Boolean(
+      selectedTicket
+      && isTicketInWorkflow(selectedTicket)
+      && canInterruptWorkflow(permsCtx?.permissions),
+    ),
+    [selectedTicket, permsCtx?.permissions],
+  );
+
+  const canAdvanceWorkflow = useMemo(() => {
+    if (selectedTicket?.workflow?.pendingPersist) return false;
+    if (!workflowProgress || workflowProgress.workflow?.status === 'completed') return false;
+    const step = workflowProgress.activeStep;
+    if (!step) return false;
+    if (step.acao?.tipo === 'automatica' || step.atribuicao?.tipo === 'sistema') {
+      return resolveAutomaticaConfig(step)?.modo === 'call_to_action';
+    }
+    if (step.acao?.tipo === 'aprovacao') return false;
+    return true;
+  }, [selectedTicket, workflowProgress]);
+
   useEffect(() => {
     if (!detail || !selectedId) return;
     deskLog.workflow('detalhe renderizado', {
@@ -221,6 +255,43 @@ export default function WorkflowApprovalShell() {
     }
   }, [busy, refreshTickets, selectedId, showNotification]);
 
+  const handleAdvanceWorkflow = useCallback(async () => {
+    if (!selectedId || advancingWorkflow) return;
+    setAdvancingWorkflow(true);
+    try {
+      await ticketsApi.advanceWorkflow(selectedId, {});
+      await refreshTickets();
+      setDetailRevision((v) => v + 1);
+      showNotification('Workflow avançado.', 'success');
+    } catch (err) {
+      showNotification(
+        err?.response?.data?.message || 'Não foi possível avançar o workflow.',
+        'warning',
+      );
+    } finally {
+      setAdvancingWorkflow(false);
+    }
+  }, [advancingWorkflow, refreshTickets, selectedId, showNotification]);
+
+  const handleCancelWorkflow = useCallback(async () => {
+    if (!selectedId || cancelingWorkflow) return;
+    setCancelingWorkflow(true);
+    try {
+      const updated = await ticketsApi.cancelWorkflow(selectedId, {});
+      void updated;
+      await refreshTickets();
+      setDetailRevision((v) => v + 1);
+      showNotification('Workflow interrompido.', 'success');
+    } catch (err) {
+      showNotification(
+        err?.response?.data?.message || 'Não foi possível interromper o workflow.',
+        'warning',
+      );
+    } finally {
+      setCancelingWorkflow(false);
+    }
+  }, [cancelingWorkflow, refreshTickets, selectedId, showNotification]);
+
   if (!hasWorkflowAccess) {
     return (
       <div className="wf-approval-shell wf-approval-shell--empty">
@@ -257,6 +328,12 @@ export default function WorkflowApprovalShell() {
         onRequestInfoOpen={handleRequestInfoOpen}
         onRequestInfoSubmit={handleRequestInfoSubmit}
         onRequestInfoCancel={handleRequestInfoCancel}
+        canManageWorkflow={canManageWorkflow}
+        canAdvanceWorkflow={canAdvanceWorkflow}
+        onAdvanceWorkflow={handleAdvanceWorkflow}
+        onCancelWorkflow={handleCancelWorkflow}
+        advancingWorkflow={advancingWorkflow}
+        cancelingWorkflow={cancelingWorkflow}
       />
     </div>
   );

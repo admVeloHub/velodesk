@@ -27,6 +27,7 @@ export const SUB_LABELS = {
   avancar: 'Avançar workflow',
   aprovar: 'Aprovar workflow',
   rejeitar: 'Rejeitar workflow',
+  interromper: 'Interromper workflow',
   visualizar: 'Visualizar configurações',
   formularios_criar: 'Formulários — criar',
   formularios_editar: 'Formulários — editar',

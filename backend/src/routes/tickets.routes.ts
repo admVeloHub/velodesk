@@ -1,4 +1,4 @@
-/** tickets.routes v1.10.1 — GET detalhe sem cache HTTP */
+/** tickets.routes v1.12.0 — bloqueio de mutação em ticket fechado (409) */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -10,7 +10,11 @@ import {
 import {
   appendRegistroEntry,
   applyBodyToChamado,
+  assertChamadoModifiable,
+  ChamadoClosedError,
+  ChamadoCommitValidationError,
   chamadoToTicket,
+  commitChamadoFromAgent,
   createChamadoFromBody,
   lastStatusFilter,
   resolveBoxIdForChamado,
@@ -21,6 +25,7 @@ import { notifyAgentReplyAsync, notifyTicketOpenedAsync } from '../services/emai
 import {
   advanceWorkflowManual,
   advanceWorkflowWithDecision,
+  cancelWorkflowForChamado,
   setWorkflowPendingDecision,
   startWorkflowForChamado,
   WorkflowAdvanceError,
@@ -31,6 +36,7 @@ import {
 } from '../services/workflowRequisicao.service';
 import {
   assertCanActOnTicket,
+  assertCanInterruptWorkflow,
   assertCanWorkflowComunicacao,
   PermissionDeniedError,
 } from '../services/permission.service';
@@ -43,6 +49,34 @@ const router = Router();
 
 async function loadBoxes() {
   return Box.find().sort({ order: 1 });
+}
+
+function handleTicketMutationError(err: unknown, res: Response): boolean {
+  if (err instanceof ChamadoClosedError) {
+    res.status(err.status).json({ message: err.message });
+    return true;
+  }
+  if (err instanceof PermissionDeniedError) {
+    res.status(err.status).json({ message: err.message });
+    return true;
+  }
+  if (err instanceof TabulacaoValidationError) {
+    res.status(400).json({ message: err.message });
+    return true;
+  }
+  if (err instanceof ChamadoCommitValidationError) {
+    res.status(400).json({ message: err.message });
+    return true;
+  }
+  if (err instanceof WorkflowAdvanceError || err instanceof WorkflowRequisicaoError) {
+    res.status(err.status).json({ message: err.message });
+    return true;
+  }
+  if (err instanceof TicketMergeError) {
+    res.status(err.status).json({ message: err.message });
+    return true;
+  }
+  return false;
 }
 
 router.get('/', authMiddleware, async (req, res: Response) => {
@@ -85,15 +119,7 @@ router.post('/:sourceId/merge-into/:targetId', authMiddleware, async (req, res: 
     );
     res.json(result);
   } catch (err) {
-    if (err instanceof TicketMergeError) {
-      return res.status(err.status).json({ message: err.message });
-    }
-    if (err instanceof PermissionDeniedError) {
-      return res.status(err.status).json({ message: err.message });
-    }
-    if (err instanceof TabulacaoValidationError) {
-      return res.status(400).json({ message: err.message });
-    }
+    if (handleTicketMutationError(err, res)) return;
     throw err;
   }
 });
@@ -147,11 +173,10 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
 
   try {
+    assertChamadoModifiable(chamado);
     await assertCanActOnTicket(req.user!, chamado);
   } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return res.status(err.status).json({ message: err.message });
-    }
+    if (handleTicketMutationError(err, res)) return;
     throw err;
   }
 
@@ -172,17 +197,67 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
     const boxes = await loadBoxes();
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
   } catch (err) {
-    if (err instanceof TabulacaoValidationError) {
-      return res.status(400).json({ message: err.message });
-    }
+    if (handleTicketMutationError(err, res)) return;
     throw err;
   }
 });
 
 router.delete('/:id', authMiddleware, async (req, res: Response) => {
-  const chamado = await ChamadoN1.findByIdAndDelete(req.params.id);
+  const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+  try {
+    assertChamadoModifiable(chamado);
+  } catch (err) {
+    if (handleTicketMutationError(err, res)) return;
+    throw err;
+  }
+  await chamado.deleteOne();
   res.json({ success: true });
+});
+
+/** Commit atômico: mensagem + nota + tabulação + status + responsável em um save. */
+router.post('/:id/commit', authMiddleware, async (req, res: Response) => {
+  const chamado = await ChamadoN1.findById(req.params.id);
+  if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+
+  try {
+    assertChamadoModifiable(chamado);
+    await assertCanActOnTicket(req.user!, chamado);
+  } catch (err) {
+    if (handleTicketMutationError(err, res)) return;
+    throw err;
+  }
+
+  if (req.body.boxId && (req.body.status === undefined || String(req.body.status).trim() === '')) {
+    const box = await Box.findById(req.body.boxId);
+    if (box) req.body.status = statusFromBoxName(box.name);
+  }
+
+  if (!String(req.body.author ?? '').trim() && req.user) {
+    req.body.author = req.user.name || req.user.email || '';
+  }
+
+  try {
+    applyManualResponsavelClaim(chamado, req.user);
+    const commitResult = await commitChamadoFromAgent(chamado, req.body, req.user);
+    await chamado.save();
+
+    if (commitResult.messageResult.public && commitResult.publicText.trim()) {
+      await notifyAgentReplyAsync(
+        chamado,
+        commitResult.publicText,
+        undefined,
+        commitResult.publicRegistroIndex,
+      );
+      await chamado.save();
+    }
+
+    const boxes = await loadBoxes();
+    res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  } catch (err) {
+    if (handleTicketMutationError(err, res)) return;
+    throw err;
+  }
 });
 
 router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
@@ -191,11 +266,10 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
 
   try {
+    assertChamadoModifiable(chamado);
     await assertCanActOnTicket(req.user!, chamado);
   } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return res.status(err.status).json({ message: err.message });
-    }
+    if (handleTicketMutationError(err, res)) return;
     throw err;
   }
 
@@ -244,6 +318,7 @@ router.post('/:id/workflow/start', authMiddleware, async (req, res: Response) =>
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
 
   try {
+    assertChamadoModifiable(chamado);
     await assertCanActOnTicket(req.user!, chamado);
     const requisicaoValores = req.body?.requisicao?.valores as Record<string, unknown> | undefined;
     const definicaoSlug = req.body?.definicaoSlug as string | undefined;
@@ -252,12 +327,7 @@ router.post('/:id/workflow/start', authMiddleware, async (req, res: Response) =>
     const boxes = await loadBoxes();
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
   } catch (err) {
-    if (err instanceof WorkflowAdvanceError || err instanceof WorkflowRequisicaoError) {
-      return res.status(err.status).json({ message: err.message });
-    }
-    if (err instanceof PermissionDeniedError) {
-      return res.status(err.status).json({ message: err.message });
-    }
+    if (handleTicketMutationError(err, res)) return;
     throw err;
   }
 });
@@ -268,6 +338,7 @@ router.post('/:id/workflow/advance', authMiddleware, async (req, res: Response) 
 
   const decision = req.body?.decision;
   try {
+    assertChamadoModifiable(chamado);
     if (decision === 'approve' || decision === 'reject') {
       await advanceWorkflowWithDecision(chamado, decision, req.user);
     } else if (req.body?.pendingDecision === 'approve' || req.body?.pendingDecision === 'reject') {
@@ -280,12 +351,26 @@ router.post('/:id/workflow/advance', authMiddleware, async (req, res: Response) 
     const boxes = await loadBoxes();
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
   } catch (err) {
-    if (err instanceof WorkflowAdvanceError) {
-      return res.status(err.status).json({ message: err.message });
-    }
-    if (err instanceof PermissionDeniedError) {
-      return res.status(err.status).json({ message: err.message });
-    }
+    if (handleTicketMutationError(err, res)) return;
+    throw err;
+  }
+});
+
+router.post('/:id/workflow/cancel', authMiddleware, async (req, res: Response) => {
+  const chamado = await ChamadoN1.findById(req.params.id);
+  if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+
+  const motivo = typeof req.body?.motivo === 'string' ? req.body.motivo.trim() : '';
+
+  try {
+    assertChamadoModifiable(chamado);
+    await assertCanInterruptWorkflow(req.user!, chamado);
+    await cancelWorkflowForChamado(chamado, req.user, motivo || undefined);
+    await chamado.save();
+    const boxes = await loadBoxes();
+    res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  } catch (err) {
+    if (handleTicketMutationError(err, res)) return;
     throw err;
   }
 });
@@ -298,15 +383,15 @@ router.post('/:id/workflow/comunicacao', authMiddleware, async (req, res: Respon
   const mensagem = String(req.body?.mensagem ?? '');
 
   try {
+    assertChamadoModifiable(chamado);
     await assertCanWorkflowComunicacao(req.user!, chamado, origem);
+    applyManualResponsavelClaim(chamado, req.user);
     appendComunicacaoWorkflow(chamado, { mensagem, origem }, req.user);
     await chamado.save();
     const boxes = await loadBoxes();
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
   } catch (err) {
-    if (err instanceof WorkflowRequisicaoError || err instanceof PermissionDeniedError) {
-      return res.status(err.status).json({ message: err.message });
-    }
+    if (handleTicketMutationError(err, res)) return;
     throw err;
   }
 });

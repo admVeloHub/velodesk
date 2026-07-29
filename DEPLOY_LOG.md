@@ -1,10 +1,38 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.52.0 | DATE: 2026-07-28 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.53.0 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: ciclo status inbound e-mail + fechamento resolvido 48h
+
+- **Data/Hora**: 2026-07-29
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.53.0
+  - ChamadoN1 v1.8.0, chamado.mapper v2.5.1, email-inbound.service v1.8.0
+  - closeResolvedTickets.service v1.0.1, closeResolvedTickets.job v1.0.0, env v1.21.0, index v1.10.0
+  - tickets.routes v1.12.0, ticketMerge.service v1.1.0
+  - DeskV2Root v3.18.2, desk/utils v3.4.0, DeskComposePanel v1.10.0, DeskClientProfileBar v1.9.2
+  - ticketsStorage v1.3.0, velodesk-crm.css v1.9.1, test-status-lifecycle v1.0.0
+- **Arquivos modificados**:
+  - `backend/src/models/ChamadoN1.ts` — enum `fechado` em `registro.status`
+  - `backend/src/services/chamado.mapper.ts` — helpers ciclo (resolvedAt, assert fechado, spawn inbound, fila Resolvidos)
+  - `backend/src/services/email-inbound.service.ts` — pendente/resolvido&lt;48h → em-andamento; fechado/cancelado/resolvido≥48h → ticket novo
+  - `backend/src/jobs/closeResolvedTickets.job.ts`, `closeResolvedTickets.service.ts` — job horário resolvido → fechado (backfill na 1ª run)
+  - `backend/src/config/env.ts`, `backend/.env.example` — `RESOLVED_CLOSE_INTERVAL_MS`, `RESOLVED_CLOSE_AFTER_MS`
+  - `backend/src/routes/tickets.routes.ts`, `ticketMerge.service.ts`, agents — bloqueio 409 em ticket fechado
+  - `frontend/src/services/desk/utils.js`, `ticketsStorage.js`, `DeskV2Root.jsx` — badge Fechado + Desk somente leitura
+  - `frontend/velodesk-crm.css` — `.status-badge--fechado` e banner compose bloqueado
+  - `backend/scripts/test-status-lifecycle.ts` — script de validação do ciclo
+- **Descrição**: Automação pós-resposta do cliente: pendente vira em-andamento; resolvido reabre se &lt;48h; após 48h job fecha como fechado (imutável); nova resposta gera ticket novo. Fechados permanecem na fila Resolvidos com badge distinta.
+- **Status**: Concluído (push dev + main)
+
+---
 
 ### GitHub Push — Desk: estabilidade, formatação e-mail, Cancelado gestão, links na thread
 

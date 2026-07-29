@@ -1,4 +1,4 @@
-/** assignmentRouter.service v1.2.0 — roleta cap-10 online + adoção manual + flag atribuicaoRoleta */
+/** assignmentRouter.service v1.3.0 — 1ª interação em ticket novo = responsável mandatório */
 import { env } from '../config/env';
 import type { AuthPayload } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -7,6 +7,8 @@ import { listOnlineEligiblePresenceKeys } from './agentPresence.service';
 import { listAgentesDesk } from './agenteDesk.service';
 import { listColaboradoresDesk } from './colaboradoresCadastro.service';
 import { extractFuncoes } from '../utils/normalizeFuncao';
+import { currentStatus } from './chamado.mapper';
+import { isRealResponsavel } from './responsavel.util';
 
 type RoletaPoolAgent = {
   email: string;
@@ -32,11 +34,13 @@ function emailLocalPart(email?: string): string {
   return normalized.split('@')[0] ?? '';
 }
 
-/** Identificador provisório (dev) — alinhado ao Desk/getDeskDisplayName */
+/** Identificador do agente — nome real preferido; fallback e-mail local. */
 export function provisionalResponsavelFromUser(user: { name?: string; email?: string }): string {
+  const name = String(user.name ?? '').trim();
+  if (name && isRealResponsavel(name)) return name;
   const fromEmail = emailLocalPart(user.email);
   if (fromEmail) return fromEmail;
-  return String(user.name ?? '').trim();
+  return name;
 }
 
 export function provisionalResponsavelFromAuth(authUser: AuthPayload): string {
@@ -127,8 +131,33 @@ export function isChamadoAtribuicaoRoleta(chamado: IChamadoN1): boolean {
 
 export function shouldAutoAssign(partial: Partial<IChamadoN1>): boolean {
   if (!env.assignmentRouterEnabled) return false;
-  const responsavel = String(partial.tabulacao?.[0]?.responsavel ?? '').trim();
-  return !responsavel;
+  return !isRealResponsavel(partial.tabulacao?.[0]?.responsavel);
+}
+
+function readLastTabResponsavel(chamado: IChamadoN1): string {
+  const tabulacao = chamado.tabulacao ?? [];
+  const lastTab = tabulacao[tabulacao.length - 1] ?? tabulacao[0];
+  return String(lastTab?.responsavel ?? '').trim();
+}
+
+/** Agente já registrou mensagem/anexo público ou nota interna. */
+export function hasPriorAgentInteraction(chamado: IChamadoN1): boolean {
+  return (chamado.registro ?? []).some((reg) => {
+    if (String(reg.origin ?? '').trim().toLowerCase() !== 'agente') return false;
+    return Boolean(
+      String(reg.mensagemPublica ?? '').trim()
+      || String(reg.anotacaoInterna ?? '').trim()
+      || (reg.anexosMensagemPublica?.length ?? 0) > 0
+      || (reg.anexosAnotacaoInterna?.length ?? 0) > 0,
+    );
+  });
+}
+
+function writeResponsavel(chamado: IChamadoN1, responsavel: string): void {
+  ensureTabulacaoSlot(chamado);
+  const idx = chamado.tabulacao!.length - 1;
+  chamado.tabulacao![idx].responsavel = responsavel;
+  chamado.markModified('tabulacao');
 }
 
 export function applySessionResponsavelIfNeeded(
@@ -136,7 +165,7 @@ export function applySessionResponsavelIfNeeded(
   authUser?: AuthPayload | null
 ): void {
   if (!authUser) return;
-  if (String(partial.tabulacao?.[0]?.responsavel ?? '').trim()) return;
+  if (isRealResponsavel(partial.tabulacao?.[0]?.responsavel)) return;
 
   const responsavel = provisionalResponsavelFromAuth(authUser);
   if (!responsavel) return;
@@ -145,23 +174,30 @@ export function applySessionResponsavelIfNeeded(
   partial.tabulacao![0].responsavel = responsavel;
 }
 
+/**
+ * Regra mandatória: agente que faz a 1ª interação em ticket novo passa a ser o responsável.
+ * Também atribui quando ainda não há responsável real (ex.: placeholder "Agente").
+ * Deve ser chamado antes de appendRegistroEntry na rota de mensagens.
+ */
 export function applyManualResponsavelClaim(
   chamado: IChamadoN1,
   authUser?: AuthPayload | null
 ): boolean {
   if (!authUser) return false;
 
-  const tabulacao = chamado.tabulacao ?? [];
-  const lastTab = tabulacao[tabulacao.length - 1] ?? tabulacao[0];
-  if (String(lastTab?.responsavel ?? '').trim()) return false;
-
   const responsavel = provisionalResponsavelFromAuth(authUser);
   if (!responsavel) return false;
 
-  ensureTabulacaoSlot(chamado);
-  const idx = chamado.tabulacao!.length - 1;
-  chamado.tabulacao![idx].responsavel = responsavel;
-  return true;
+  const status = currentStatus(chamado).toLowerCase();
+  const priorInteraction = hasPriorAgentInteraction(chamado);
+  const mandatoryFirstClaim = status === 'novo' && !priorInteraction;
+
+  if (mandatoryFirstClaim || !isRealResponsavel(readLastTabResponsavel(chamado))) {
+    writeResponsavel(chamado, responsavel);
+    return true;
+  }
+
+  return false;
 }
 
 function roletaTicketMatchExpr(terminalStatuses: string[]) {

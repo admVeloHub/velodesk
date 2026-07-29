@@ -1,4 +1,4 @@
-/** index v1.9.7 — ETag off + rate limit leitura; Cache-Control em /api */
+/** index v1.10.0 — job closeResolvedTickets (resolvido → fechado 48h) */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -49,6 +49,7 @@ import {
 import { seedDevelopmentData, purgeAllMockTickets, runDeskConfigMigrations } from './services/seed.service';
 import { getAgentsStatus } from './services/agents/openaiAgent.util';
 import { startGestaoChamadosJob } from './jobs/gestaoChamados.job';
+import { startCloseResolvedTicketsJob } from './jobs/closeResolvedTickets.job';
 import { bootstrapEmailServices } from './services/emailBootstrap.service';
 import { startChamadoProtocoloWatcher } from './services/chamadoProtocoloWatcher.service';
 
@@ -293,6 +294,7 @@ async function start() {
         });
         startGestaoChamadosJob();
       }
+      startCloseResolvedTicketsJob();
       if (env.enableWhatsapp) {
         console.log('Inicializando WhatsApp Web...');
         whatsapp.initializeWhatsApp();

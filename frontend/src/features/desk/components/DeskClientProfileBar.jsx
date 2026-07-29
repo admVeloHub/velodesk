@@ -1,11 +1,12 @@
 /**
- * DeskClientProfileBar v1.6.0 — múltiplos e-mails/telefones + WhatsApp
- * VERSION: v1.6.0 | DATE: 2026-07-27
+ * DeskClientProfileBar v1.9.1 — bloqueia edição de contato em ticket fechado
+ * VERSION: v1.9.2 | DATE: 2026-07-29
  */
 import React, { useEffect, useState } from 'react';
-import { getClientContactFields, getClientActiveProducts, getProductTagClass, getTicketProtocolLabel, isTicketInWorkflow } from '../../../services/desk/utils';
+import { getClientContactFields, getClientActiveProducts, getProductTagClass, getTicketProtocolLabel, isTicketInWorkflow, isTicketReadOnly } from '../../../services/desk/utils';
 import { useNotifications } from '../../../context/NotificationContext';
 import TicketWorkflowStepper from './TicketWorkflowStepper';
+import WorkflowProgressModal from './WorkflowProgressModal';
 import ClientContactFieldsEditor, {
   buildContactDraftFromFields,
   validateClientContactDraft,
@@ -24,11 +25,15 @@ export default function DeskClientProfileBar({
   onSaveContact,
   onOpenHistory,
   onAdvanceWorkflow,
+  onCancelWorkflow,
   advancingWorkflow = false,
+  cancelingWorkflow = false,
   canAdvanceWorkflow = false,
+  canManageWorkflow = false,
 }) {
   const { showNotification } = useNotifications();
   const [editOpen, setEditOpen] = useState(false);
+  const [workflowModalOpen, setWorkflowModalOpen] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
   const [draft, setDraft] = useState({
     name: '',
@@ -41,8 +46,13 @@ export default function DeskClientProfileBar({
   const activeProducts = getClientActiveProducts(ticket, client);
   const protocolLabel = resolveProtocolLabel(ticket);
   const inWorkflow = isTicketInWorkflow(ticket);
+  const ticketReadOnly = isTicketReadOnly(ticket);
 
   const openEdit = () => {
+    if (ticketReadOnly) {
+      showNotification('Ticket fechado — não aceita modificações.', 'warning');
+      return;
+    }
     setDraft(buildContactDraftFromFields(contact));
     setEmailErrors({});
     setEditOpen(true);
@@ -84,6 +94,18 @@ export default function DeskClientProfileBar({
     return () => document.removeEventListener('keydown', handleKey);
   }, [editOpen]);
 
+  const showInlineAdvance = canAdvanceWorkflow;
+  const historyButton = (
+    <button
+      type="button"
+      className="btn-secondary btn-sm ticket-client-history-btn"
+      id="btnClientHistory"
+      onClick={onOpenHistory}
+    >
+      <i className="fas fa-history" /> Histórico
+    </button>
+  );
+
   return (
     <div className={'crm-client-profile-bar' + (inWorkflow ? ' crm-client-profile-bar--with-workflow' : '')}>
       <section
@@ -117,10 +139,11 @@ export default function DeskClientProfileBar({
               type="button"
               className={'crm-edit-client-btn' + (editOpen ? ' is-active' : '')}
               id="btnEditClient"
-              title="Editar cadastro"
+              title={ticketReadOnly ? 'Ticket fechado — cadastro somente leitura' : 'Editar cadastro'}
               aria-label="Editar cadastro"
               aria-expanded={editOpen}
               aria-controls="clientEditPopover"
+              disabled={ticketReadOnly}
               onClick={openEdit}
             >
               <i className="ti ti-pencil" aria-hidden="true" />
@@ -168,21 +191,6 @@ export default function DeskClientProfileBar({
               </div>
             )}
           </span>
-          {inWorkflow ? (
-            <div className="ticket-client-profile__client-actions">
-              <TicketWorkflowStepper ticket={ticket} />
-              {canAdvanceWorkflow ? (
-                <button
-                  type="button"
-                  className="btn-primary btn-sm desk-workflow-advance-btn ticket-client-advance-btn"
-                  onClick={onAdvanceWorkflow}
-                  disabled={advancingWorkflow}
-                >
-                  {advancingWorkflow ? 'Avançando…' : 'Avançar'}
-                </button>
-              ) : null}
-            </div>
-          ) : null}
         </div>
 
         <div className="ticket-client-profile__protocol-row ticket-client-profile__cell-protocol">
@@ -206,17 +214,54 @@ export default function DeskClientProfileBar({
               ))}
             </div>
           ) : null}
-          <div className="ticket-client-profile__protocol-actions">
-            <button
-              type="button"
-              className="btn-secondary btn-sm ticket-client-history-btn"
-              id="btnClientHistory"
-              onClick={onOpenHistory}
-            >
-              <i className="fas fa-history" /> Histórico
-            </button>
-          </div>
+          {!inWorkflow ? (
+            <div className="ticket-client-profile__protocol-actions">
+              {historyButton}
+            </div>
+          ) : null}
         </div>
+
+        {inWorkflow ? (
+          <div className="ticket-client-profile__header-side ticket-client-profile__cell-side">
+            <div className="ticket-client-profile__header-stepper">
+              <TicketWorkflowStepper
+                ticket={ticket}
+                layout="headerStack"
+                clickable={canManageWorkflow}
+                onClick={() => setWorkflowModalOpen(true)}
+              />
+            </div>
+            <div className="ticket-client-profile__header-side-actions">
+              {showInlineAdvance ? (
+                <button
+                  type="button"
+                  className="btn-primary btn-sm desk-workflow-advance-btn ticket-client-advance-btn"
+                  onClick={onAdvanceWorkflow}
+                  disabled={advancingWorkflow}
+                >
+                  {advancingWorkflow ? 'Avançando…' : 'Avançar'}
+                </button>
+              ) : null}
+              {historyButton}
+            </div>
+            {canManageWorkflow ? (
+              <WorkflowProgressModal
+                open={workflowModalOpen}
+                ticket={ticket}
+                onClose={() => setWorkflowModalOpen(false)}
+                onCancelWorkflow={async () => {
+                  await onCancelWorkflow?.();
+                  setWorkflowModalOpen(false);
+                }}
+                onAdvanceWorkflow={onAdvanceWorkflow}
+                canceling={cancelingWorkflow}
+                advancing={advancingWorkflow}
+                canAdvance={canAdvanceWorkflow}
+                canCancel
+              />
+            ) : null}
+          </div>
+        ) : null}
       </section>
     </div>
   );

@@ -1,9 +1,10 @@
-/** gmailInbound.service v1.2.0 — ponteiro de history monotônico (nunca congela nem descarta backlog) */
+/** gmailInbound.service v1.3.0 — baixa anexos Gmail e associa ao ticket */
 import { env } from '../../config/env';
 import { processInboundEmail } from '../email-inbound.service';
 import type { InboundEmailProcessResult } from '../inbound-email/types';
 import { createGmailClient, GMAIL_SCOPE_READONLY } from './gmailAuth';
 import { gmailMessageToInboundPayload, shouldSkipGmailMessage } from './gmailMessageParser';
+import { downloadGmailAttachments } from './gmailAttachment.service';
 import {
   getStoredHistoryId,
   updateStoredHistoryId,
@@ -105,6 +106,11 @@ export async function processGmailHistory(
           const payload = gmailMessageToInboundPayload(full.data);
           if (!payload) continue;
 
+          const inboundAttachments = await downloadGmailAttachments(gmail, full.data, payload.messageId);
+          if (inboundAttachments.length) {
+            payload.attachments = inboundAttachments;
+          }
+
           try {
             const result = await processInboundEmail(payload);
             results.push(result);
@@ -114,6 +120,7 @@ export async function processGmailHistory(
               messageId: payload.messageId,
               action: result.action,
               protocolo: result.chamadoProtocolo ?? null,
+              anexos: inboundAttachments.length,
             });
           } catch (err) {
             console.error('[gmailInbound] processInboundEmail falhou:', {

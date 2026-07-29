@@ -1,4 +1,4 @@
-/** funcaoPermissaoDefaults v1.1.0 — seed RBAC por função Desk */
+/** funcaoPermissaoDefaults v1.1.1 — workflow.interromper para suporte e gestão */
 
 export type PermissoesMap = Record<string, Record<string, boolean>>;
 
@@ -18,7 +18,7 @@ export const PERMISSION_CATALOG: Record<string, string[]> = {
   portal: ['agente', 'gestao', 'workflow', 'especiais'],
   tickets: ['ver_todos', 'ver_meus', 'atuar_responsavel', 'atuar_atribuido', 'atuar_canal_especial', 'escalonar'],
   workspace: ['painel_360_proprio', 'painel_360_equipe'],
-  workflow: ['avancar', 'aprovar', 'rejeitar'],
+  workflow: ['avancar', 'aprovar', 'rejeitar', 'interromper'],
   config: [
     'visualizar',
     'formularios_criar',
@@ -105,7 +105,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
         automacoes_excluir: true,
         workflows_editar: false,
       },
-      workflow: { aprovar: false },
+      workflow: { aprovar: false, interromper: true },
     }),
   },
   {
@@ -228,7 +228,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       portal: { agente: true, gestao: true, workflow: true, especiais: true },
       tickets: { ver_todos: true, ver_meus: true, atuar_responsavel: true, atuar_atribuido: true, atuar_canal_especial: true, escalonar: true },
       workspace: { painel_360_proprio: true, painel_360_equipe: true },
-      workflow: { avancar: true, aprovar: true, rejeitar: true },
+      workflow: { avancar: true, aprovar: true, rejeitar: true, interromper: true },
       config: {
         visualizar: true,
         formularios_criar: true,

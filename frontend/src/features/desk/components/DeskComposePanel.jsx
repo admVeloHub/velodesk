@@ -1,6 +1,6 @@
 /**
- * DeskComposePanel v1.9.4 — opção Cancelado restaurada para perfil Gestão
- * VERSION: v1.9.4 | DATE: 2026-07-28
+ * DeskComposePanel v1.10.0 — bloqueio total em ticket fechado
+ * VERSION: v1.10.0 | DATE: 2026-07-29
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getSendStatusOptions } from '../../../services/desk/constants';
@@ -172,6 +172,7 @@ function InternalNoteFields({
   placeholder = 'Digite uma anotação interna...',
   attachDisabled = false,
   showNotification,
+  readOnly = false,
 }) {
   const tid = String(ticketId);
   const internalEditorRef = useRef(null);
@@ -237,6 +238,7 @@ function InternalNoteFields({
         placeholder={placeholder}
         value={internalText}
         hasSpellErrors={spell.flaggedErrors.length > 0}
+        readOnly={readOnly}
         onFormatStateChange={internalFormat.handleFormatStateChange}
         onChange={handleInternalChange}
         onKeyDown={handleInternalKeyDown}
@@ -253,7 +255,7 @@ function InternalNoteFields({
             variant="internal"
             embedded
             onImageSelected={handleInternalAttachImage}
-            attachDisabled={attachDisabled}
+            attachDisabled={attachDisabled || readOnly}
           />
         )}
       />
@@ -275,6 +277,7 @@ export default function DeskComposePanel({
   variant = 'full',
   workflowLocked = false,
   workflowTeamLabel = '',
+  ticketReadOnly = false,
 }) {
   const tid = String(ticketId);
   const publicEditorRef = useRef(null);
@@ -286,13 +289,18 @@ export default function DeskComposePanel({
   const [refinarDraft, setRefinarDraft] = useState('');
   const showPublic = variant === 'full' || variant === 'public-only';
   const showInternal = variant === 'full' || variant === 'internal-only';
-  const publicLocked = workflowLocked && composeMode === 'public';
-  const internalPlaceholder = workflowLocked
-    ? `Aguardando ${workflowTeamLabel || 'equipe'} • Você pode adicionar uma nota interna...`
-    : 'Digite uma anotação interna...';
-  const publicPlaceholder = workflowLocked
-    ? `Aguardando ${workflowTeamLabel || 'equipe'} • resposta pública indisponível`
-    : 'Digite sua resposta ao cliente...';
+  const composeLocked = Boolean(workflowLocked || ticketReadOnly);
+  const publicLocked = composeLocked && (ticketReadOnly || composeMode === 'public');
+  const internalPlaceholder = ticketReadOnly
+    ? 'Ticket fechado — anotações indisponíveis'
+    : workflowLocked
+      ? `Aguardando ${workflowTeamLabel || 'equipe'} • Você pode adicionar uma nota interna...`
+      : 'Digite uma anotação interna...';
+  const publicPlaceholder = ticketReadOnly
+    ? 'Ticket fechado — resposta pública indisponível'
+    : workflowLocked
+      ? `Aguardando ${workflowTeamLabel || 'equipe'} • resposta pública indisponível`
+      : 'Digite sua resposta ao cliente...';
 
   const nomeOperador = useMemo(() => {
     const full = String(getDeskDisplayName(user, colaborador) || '').trim();
@@ -358,7 +366,8 @@ export default function DeskComposePanel({
     <div className={
       'crm-ticket-compose'
       + (variant === 'internal-only' ? ' crm-ticket-compose--notes' : '')
-      + (workflowLocked ? ' crm-ticket-compose--workflow-locked' : '')
+      + (composeLocked ? ' crm-ticket-compose--workflow-locked' : '')
+      + (ticketReadOnly ? ' crm-ticket-compose--ticket-closed' : '')
     }>
       <div className="ticket-response octa-comment-panel crm-ticket-response">
         <div className="octa-comment-panel-row">
@@ -370,7 +379,7 @@ export default function DeskComposePanel({
                 className={'response-tab octa-nav-tab octa-tab-public' + (composeMode === 'public' ? ' active' : '')}
                 data-compose="public"
                 onClick={() => onComposeModeChange('public')}
-                disabled={workflowLocked}
+                disabled={composeLocked}
               >
                 <i className="fas fa-envelope" /> Resposta pública
               </button>
@@ -408,6 +417,7 @@ export default function DeskComposePanel({
                     value={composeText}
                     hasSpellErrors={spell.flaggedErrors.length > 0}
                     expandable
+                    readOnly={ticketReadOnly || publicLocked}
                     onFormatStateChange={publicFormat.handleFormatStateChange}
                     onChange={handlePublicChange}
                     onKeyDown={handlePublicKeyDown}
@@ -417,8 +427,8 @@ export default function DeskComposePanel({
                   />
                   <ComposeBottomBar
                     overlay
-                    showAiAssistant
-                    onOpenRefinar={handleOpenRefinar}
+                    showAiAssistant={!ticketReadOnly}
+                    onOpenRefinar={ticketReadOnly ? undefined : handleOpenRefinar}
                     formatToolbar={(
                       <ComposeFormatToolbar
                         applyAction={publicFormat.applyAction}
@@ -426,7 +436,7 @@ export default function DeskComposePanel({
                         variant="public"
                         embedded
                         onImageSelected={handlePublicAttachImage}
-                        attachDisabled={publicLocked}
+                        attachDisabled={publicLocked || ticketReadOnly}
                       />
                     )}
                   />
@@ -445,12 +455,13 @@ export default function DeskComposePanel({
                 <InternalNoteFields
                   ticketId={ticketId}
                   internalText={internalText}
-                  onInternalTextChange={onInternalTextChange}
+                  onInternalTextChange={ticketReadOnly ? () => {} : onInternalTextChange}
                   tabulationConfig={tabulationConfig}
                   spellIgnoredWords={spellIgnoredWords}
                   onIgnoreSpellWord={onIgnoreSpellWord}
                   placeholder={internalPlaceholder}
                   showNotification={showNotification}
+                  readOnly={ticketReadOnly}
                 />
               </div>
               ) : null}
@@ -458,7 +469,12 @@ export default function DeskComposePanel({
           </div>
         </div>
       </div>
-      {workflowLocked ? (
+      {ticketReadOnly ? (
+        <div className="desk-workflow-compose-lock desk-workflow-compose-lock--ticket-closed" role="status">
+          <i className="ti ti-lock" aria-hidden="true" />
+          <span>Ticket fechado — somente leitura</span>
+        </div>
+      ) : workflowLocked ? (
         <div className="desk-workflow-compose-lock" role="status">
           <i className="ti ti-lock" aria-hidden="true" />
           <span>Workflow ativo • aprovação pendente</span>

@@ -371,6 +371,36 @@ export function canApproveWorkflow(resolved: ResolvedUserPermissions): boolean {
   return hasPermission(resolved.permissoes, 'workflow', 'aprovar');
 }
 
+function isSuporteOrSupervisaoFuncao(resolved: ResolvedUserPermissions): boolean {
+  const slugs = userFuncaoSlugs(resolved);
+  return slugs.some((s) => (
+    s === 'suporte'
+    || s === 'gestao'
+    || s === 'suporte-supervisao'
+    || s === 'direcao'
+  ));
+}
+
+/** Interromper workflow — suporte, supervisão e gestão. */
+export function canInterruptWorkflow(resolved: ResolvedUserPermissions): boolean {
+  if (hasPermission(resolved.permissoes, 'workflow', 'interromper')) return true;
+  if (hasPermission(resolved.permissoes, 'portal', 'gestao')) return true;
+  return isSuporteOrSupervisaoFuncao(resolved);
+}
+
+export async function assertCanInterruptWorkflow(
+  authUser: AuthPayload,
+  chamado: IChamadoN1,
+): Promise<void> {
+  const resolved = await resolveUserPermissions(authUser);
+  if (!canInterruptWorkflow(resolved)) {
+    throw new PermissionDeniedError('Sem permissão para interromper workflow', 403);
+  }
+  if (!chamado.workflow?.active) {
+    throw new PermissionDeniedError('Ticket sem workflow ativo', 400);
+  }
+}
+
 /** Pedir informação (WF) ou Responder Solicitação (responsável). */
 export async function canWorkflowComunicacao(
   resolved: ResolvedUserPermissions,

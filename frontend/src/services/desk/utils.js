@@ -1,13 +1,13 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.3.13 | DATE: 2026-07-28
- * — higieniza citação/assinatura em respostas de e-mail na thread
- * — decodifica entidades HTML (&nbsp;) nas mensagens exibidas
+ * VERSION: v3.4.0 | DATE: 2026-07-29
+ * — badge Fechado + isTicketReadOnly (ciclo 48h)
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
 import { ticketMatchesAgentResponsavel, shouldUseMeusChamadosFila, shouldViewAllDeskTickets } from './responsavelSegmentation';
 import { normalizeMessageDisplayText } from '../../utils/htmlText.util';
+import { sanitizeResponsavel } from '../tabulationConfig';
 import {
   MEUS_TICKETS_QUEUE_ID,
   QUEUE_STATUSES,
@@ -211,7 +211,9 @@ export function formatResolvedDateShort(iso) {
 export function getTicketResponsible(ticket) {
   if (!ticket) return '—';
   normalizeTicketForDeskV2(ticket);
-  return String(ticket.responsibleAgent || ticket.lateralForm?.responsavel || '').trim() || '—';
+  const responsavel = sanitizeResponsavel(ticket.responsibleAgent)
+    || sanitizeResponsavel(ticket.lateralForm?.responsavel);
+  return responsavel || '—';
 }
 
 export function getTicketTitle(ticket) {
@@ -408,52 +410,60 @@ function readTicketLateralWorkflow(ticket) {
   }
 
   const persisted = ticket?.workflow;
-  if (!persisted?.active) {
+  if (!persisted?.active && !persisted?.pendingPersist && !ticket?._pendingWorkflowStart) {
     return lateral || null;
   }
 
-  const workflowKey = persisted.workflowId
+  const pendingSlug = ticket?._pendingWorkflowStart?.definicaoSlug;
+  const workflowKey = pendingSlug
+    || persisted?.workflowId
     || lateral?.templateId
     || lateral?.definicaoSlug;
   if (!workflowKey) {
-    return lateral || null;
+    return lateral || {
+      title: ticket?._pendingWorkflowStart?.templateTitle || 'Workflow',
+      definicaoSlug: pendingSlug,
+      templateId: pendingSlug,
+      step: 0,
+      status: 'active',
+      stepHistory: [],
+    };
   }
 
   const template = getWorkflowTemplateById(workflowKey);
-  const templateSlug = template?.id || null;
+  const templateSlug = template?.id || pendingSlug || null;
 
   return {
     ...(lateral || {}),
-    templateId: templateSlug || lateral?.templateId,
-    definicaoSlug: templateSlug || lateral?.definicaoSlug,
-    step: persisted.step ?? lateral?.step ?? 0,
-    passoId: persisted.passoId ?? lateral?.passoId,
-    startedAt: persisted.startedAt ?? lateral?.startedAt,
-    completedAt: persisted.completedAt ?? lateral?.completedAt,
-    status: persisted.completedAt
+    templateId: templateSlug || lateral?.templateId || pendingSlug,
+    definicaoSlug: templateSlug || lateral?.definicaoSlug || pendingSlug,
+    title: lateral?.title || template?.title || ticket?._pendingWorkflowStart?.templateTitle || 'Workflow',
+    step: persisted?.step ?? lateral?.step ?? 0,
+    passoId: persisted?.passoId ?? lateral?.passoId,
+    startedAt: persisted?.startedAt ?? lateral?.startedAt,
+    completedAt: persisted?.completedAt ?? lateral?.completedAt,
+    status: persisted?.completedAt
       ? 'completed'
       : (lateral?.status || 'active'),
-    pendingDecision: persisted.pendingDecision ?? lateral?.pendingDecision ?? null,
+    pendingDecision: persisted?.pendingDecision ?? lateral?.pendingDecision ?? null,
     currentStepId: lateral?.currentStepId,
     stepHistory: lateral?.stepHistory || [],
   };
 }
 
 export function isTicketInWorkflow(ticket) {
-  if (ticket?.workflow?.active === true) return true;
-  const wf = readTicketLateralWorkflow(ticket);
-  return Boolean(wf?.templateId || wf?.definicaoSlug || ticket?.workflow?.workflowId);
+  if (ticket?.workflow?.active) return true;
+  if (ticket?.workflow?.pendingPersist) return true;
+  if (ticket?._pendingWorkflowStart?.definicaoSlug) return true;
+  return false;
 }
 
 export function isTicketWorkflowActive(ticket) {
-  if (ticket?.workflow?.active === true && !ticket?.workflow?.completedAt) {
-    const wf = readTicketLateralWorkflow(ticket);
-    if (wf?.status === 'completed') return false;
-    return true;
-  }
+  if (!isTicketInWorkflow(ticket)) return false;
+  if (ticket?.workflow?.completedAt) return false;
   const wf = readTicketLateralWorkflow(ticket);
-  if (!wf?.templateId && !wf?.definicaoSlug && !ticket?.workflow?.workflowId) return false;
-  return wf?.status !== 'completed';
+  if (wf?.status === 'completed') return false;
+  return true;
 }
 
 export function getWorkflowTemplateForTicket(ticket) {
@@ -478,10 +488,36 @@ function getStepStartedAt(workflow, stepId) {
   return entry?.at || workflow?.startedAt || null;
 }
 
+function buildFallbackWorkflowTemplate(workflow, ticket) {
+  const slug = workflow?.definicaoSlug || workflow?.templateId || ticket?.workflow?.workflowId || 'workflow';
+  const title = workflow?.title || 'Workflow';
+  const stepIndex = typeof workflow?.step === 'number' ? workflow.step : 0;
+  const history = Array.isArray(workflow?.stepHistory) ? workflow.stepHistory : [];
+  const stepCount = Math.max(history.length, stepIndex + 1, 1);
+  const steps = Array.from({ length: stepCount }, (_, index) => ({
+    id: history[index]?.stepId || `step-${index}`,
+    label: history[index]?.label || `Etapa ${index + 1}`,
+    icon: 'ti-circle',
+    team: 'n1',
+  }));
+  return {
+    id: String(slug),
+    title,
+    steps,
+    defaultActiveStepId: steps[Math.min(stepIndex, steps.length - 1)]?.id || steps[0].id,
+  };
+}
+
 export function getWorkflowProgress(ticket) {
+  if (!isTicketInWorkflow(ticket)) return null;
   const workflow = readTicketLateralWorkflow(ticket);
-  const template = getWorkflowTemplateForTicket(ticket);
-  if (!workflow || !template) return null;
+  if (!workflow) return null;
+
+  let template = getWorkflowTemplateForTicket(ticket);
+  if (!template) {
+    template = buildFallbackWorkflowTemplate(workflow, ticket);
+  }
+  if (!template?.steps?.length) return null;
 
   const stepIndex = typeof workflow.step === 'number' ? workflow.step : null;
   const currentStepId = stepIndex != null && template.steps[stepIndex]
@@ -791,9 +827,10 @@ export function normalizeTicketForDeskV2(ticket) {
   if (!ticket.lateralForm.canal && (ticket.channel || ticket.source)) {
     ticket.lateralForm.canal = ticket.channel || ticket.source;
   }
-  if (!ticket.lateralForm.responsavel && ticket.responsibleAgent) {
-    ticket.lateralForm.responsavel = ticket.responsibleAgent;
-  }
+  const responsavel = sanitizeResponsavel(ticket.lateralForm.responsavel)
+    || sanitizeResponsavel(ticket.responsibleAgent);
+  ticket.lateralForm.responsavel = responsavel;
+  ticket.responsibleAgent = responsavel || undefined;
 
   ensureTicketSlaFields(ticket);
 
@@ -1192,11 +1229,12 @@ export function buildRegistroThread(ticket) {
     .filter((m) => {
       if (!m || m.type === 'internal') return false;
       const text = String(m.text || m.message || '').trim();
+      const hasAttachments = Array.isArray(m.attachments) && m.attachments.length > 0;
       if (m.type === 'system') {
         if (shouldHideWorkflowSystemThreadMessage(text)) return false;
-        return Boolean(text);
+        return Boolean(text) || hasAttachments;
       }
-      return Boolean(text);
+      return Boolean(text) || hasAttachments;
     })
     .map((m) => {
       if (m.type === 'system') {
@@ -1246,6 +1284,7 @@ export function buildRegistroThread(ticket) {
       type: bubbleType,
       initials: getInitials(isClient ? ticket.clientName || m.author : authorName),
       text,
+      attachments: Array.isArray(m.attachments) ? m.attachments.filter(Boolean) : [],
       meta: formatMsgMeta(ts, authorName),
       timestamp: ts,
     };
@@ -1277,6 +1316,8 @@ export function getTicketStatusLabel(status) {
     pendente: 'Pendente',
     resolvido: 'Resolvido',
     resolvidos: 'Resolvido',
+    cancelado: 'Cancelado',
+    fechado: 'Fechado',
   };
   return map[status] || status || '—';
 }
@@ -1286,6 +1327,26 @@ const TERMINAL_TICKET_STATUSES = new Set(['resolvido', 'resolvidos', 'cancelado'
 export function isTicketTerminalStatus(ticket) {
   const status = String(ticket?.status || '').trim().toLowerCase();
   return TERMINAL_TICKET_STATUSES.has(status);
+}
+
+/** Ticket fechado: somente leitura no Desk (sem mutação de agente). */
+export function isTicketReadOnly(ticket) {
+  return String(ticket?.status || '').trim().toLowerCase() === 'fechado';
+}
+
+/**
+ * Badge do ticket prioriza status real (ex.: Fechado na fila Resolvidos)
+ * e cai no meta da fila quando o status não tem label próprio.
+ */
+export function getTicketStatusBadgeMeta(ticket, queueId) {
+  const status = String(ticket?.status || '').trim().toLowerCase();
+  if (status === 'fechado') return { label: 'Fechado', cls: 'fechado' };
+  if (status === 'cancelado') return { label: 'Cancelado', cls: 'cancelado' };
+  if (status === 'resolvido' || status === 'resolvidos') return { label: 'Resolvido', cls: 'resolvido' };
+  if (status === 'pendente') return { label: 'Pendente', cls: 'pendente' };
+  if (status === 'novo') return { label: 'Novo', cls: 'novo' };
+  if (status === 'em-andamento' || status === 'em-aberto') return { label: 'Em andamento', cls: 'andamento' };
+  return statusMeta(queueId || 'em-andamento');
 }
 
 export function getTicketCpfDigits(ticket) {
@@ -1353,7 +1414,7 @@ export function copyTabulationFromTicket(source, target) {
     produto: targetLf.produto || '',
     motivo: targetLf.motivo || '',
     detalhe: targetLf.detalhe || '',
-    responsavel: targetLf.responsavel || target.responsibleAgent || '',
+    responsavel: sanitizeResponsavel(targetLf.responsavel) || sanitizeResponsavel(target.responsibleAgent),
     atribuido: targetLf.atribuido || '',
   };
   return {

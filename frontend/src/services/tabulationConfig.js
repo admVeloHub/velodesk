@@ -1,7 +1,47 @@
 /**
- * tabulationConfig v1.6.0 — opções agregadas para gatilho sem bloqueio de cascata
- * VERSION: v1.6.0 | DATE: 2026-07-23 | AUTHOR: VeloHub Development Team
+ * tabulationConfig v1.8.0 — responsável só quando atribuído (roleta/ação manual)
+ * VERSION: v1.8.0 | DATE: 2026-07-28 | AUTHOR: VeloHub Development Team
  */
+
+/** Rótulos de visão/perfil e termos genéricos nunca representam atribuição real. */
+const GENERIC_RESPONSAVEL = new Set([
+  'agente',
+  'agent',
+  'atendimento',
+  'sistema',
+  'system',
+  'admin',
+  'admin velodesk',
+  'administrador',
+  'nenhum',
+  'sem responsavel',
+  'n/a',
+  'na',
+  '-',
+  '--',
+  '—',
+]);
+
+function normalizeResponsavel(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+export function isRealResponsavel(value) {
+  const normalized = normalizeResponsavel(value);
+  if (!normalized) return false;
+  if (normalized.startsWith('visao ')) return false;
+  return !GENERIC_RESPONSAVEL.has(normalized);
+}
+
+/** Responsável real ou string vazia — nunca preenchimento de fachada. */
+export function sanitizeResponsavel(value) {
+  return isRealResponsavel(value) ? String(value).trim() : '';
+}
 
 export const EMPTY_TABULATION = {
   produtos: [],
@@ -139,10 +179,11 @@ export function buildDefaultRightFields(_config, ticket, getAgentName) {
   const produto = hasSavedTabulationValue(lf.produto) ? String(lf.produto).trim() : '';
   const motivo = produto && hasSavedTabulationValue(lf.motivo) ? String(lf.motivo).trim() : '';
   const detalhe = motivo && hasSavedTabulationValue(lf.detalhe) ? String(lf.detalhe).trim() : '';
-  const agent = typeof getAgentName === 'function' ? getAgentName() : '';
   const tipo = String(lf.classificacaoTipo || lf.tipoChamado || DEFAULT_TIPO).trim() || DEFAULT_TIPO;
+  // Sem fallback para agente logado: só preenche se houver atribuição real (roleta/manual)
+  const responsavel = sanitizeResponsavel(lf.responsavel) || sanitizeResponsavel(ticket?.responsibleAgent);
   return {
-    responsavel: lf.responsavel || ticket?.responsibleAgent || agent,
+    responsavel,
     canal: lf.canal || ticket?.channel || 'WhatsApp',
     tipo,
     produto,
@@ -151,12 +192,12 @@ export function buildDefaultRightFields(_config, ticket, getAgentName) {
   };
 }
 
-/** Garante defaults (tipo, responsável, canal) mesmo quando sessão salva veio incompleta */
+/** Garante defaults (tipo, canal) mesmo quando sessão salva veio incompleta — responsável só se já existir no ticket */
 export function mergeRightFieldsWithDefaults(partial, ticket, getAgentName) {
   const defaults = buildDefaultRightFields(null, ticket, getAgentName);
   const merged = { ...defaults, ...(partial || {}) };
   merged.tipo = String(merged.tipo || defaults.tipo || DEFAULT_TIPO).trim() || DEFAULT_TIPO;
-  merged.responsavel = String(merged.responsavel || defaults.responsavel || '').trim() || defaults.responsavel;
+  merged.responsavel = sanitizeResponsavel(merged.responsavel) || defaults.responsavel;
   merged.canal = String(merged.canal || defaults.canal || 'WhatsApp').trim() || defaults.canal;
   return merged;
 }

@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.9.7 — patchTicketInCache grava de fato em box.tickets[]
- * VERSION: v1.9.7 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.10.0 — commit atômico POST /tickets/:id/commit
+ * VERSION: v1.10.0 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -179,8 +179,16 @@ function mergePreservedDetails(prevCols, nextCols) {
         clientName: ticket.clientName ?? prev.clientName,
         responsibleAgent: ticket.responsibleAgent ?? prev.responsibleAgent,
         slaBreached: ticket.slaBreached ?? prev.slaBreached,
-        workflow: mergeTicketWorkflow(prev.workflow, ticket.workflow),
-        lateralForm: mergeLateralFormPreservingWorkflow(prev.lateralForm, ticket.lateralForm),
+        workflow: prev.workflow?.pendingPersist
+          ? prev.workflow
+          : mergeTicketWorkflow(prev.workflow, ticket.workflow),
+        lateralForm: prev.workflow?.pendingPersist
+          ? {
+            ...mergeLateralFormPreservingWorkflow(prev.lateralForm, ticket.lateralForm),
+            workflow: prev.lateralForm?.workflow,
+          }
+          : mergeLateralFormPreservingWorkflow(prev.lateralForm, ticket.lateralForm),
+        _pendingWorkflowStart: prev._pendingWorkflowStart,
         listOnly: false,
         _detailLoaded: true,
       };
@@ -394,6 +402,18 @@ export async function updateTicketViaApi(ticketId, updater) {
   return updated;
 }
 
+export async function commitTicketViaApi(ticketId, payload) {
+  const apiId = String(ticketId);
+  if (useApi && !isDraftTicket({ id: apiId })) {
+    assertApiReady('salvar ticket');
+    await ticketsApi.commit(apiId, payload);
+    await loadBoxesFromApi();
+    const detailed = await loadTicketDetailFromApi(apiId);
+    return detailed || findInColumns(apiId)?.ticket;
+  }
+  return updateTicketViaApi(ticketId, () => apiTicketToCockpit(payload));
+}
+
 export async function addMessageViaApi(ticketId, payload) {
   const apiId = String(ticketId);
   if (useApi && !isDraftTicket({ id: apiId })) {
@@ -515,7 +535,7 @@ export function replaceDraftIdInColumns(oldId, newTicket) {
   let boxId = 'novos';
   if (status === 'em-aberto' || status === 'em-andamento') boxId = 'em-andamento';
   else if (status === 'pendente' || status === 'em-espera') boxId = 'em-espera';
-  else if (status === 'resolvido' || status === 'cancelado') boxId = 'resolvidos';
+  else if (status === 'resolvido' || status === 'cancelado' || status === 'fechado') boxId = 'resolvidos';
   const box = cols.find((c) => c.id === boxId) || cols[0];
   if (box) {
     if (!box.tickets) box.tickets = [];

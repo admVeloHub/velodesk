@@ -9,6 +9,7 @@ import {
   setupGmailWatch,
   startGmailWatchRenewalLoop,
 } from './gmail/gmailWatch.service';
+import { ensureInboundAttachmentDir } from './inboundAttachmentStorage.service';
 
 const DESK_CONFIG_POLL_MS = 500;
 const DESK_CONFIG_MAX_WAIT_MS = 90_000;
@@ -87,6 +88,11 @@ export async function bootstrapEmailServices(): Promise<void> {
       await ensureGmailInboundMessageIndexes();
     } catch (err) {
       console.warn('[emailBootstrap] índice de idempotência inbound:', (err as Error).message);
+    }
+    try {
+      await ensureInboundAttachmentDir();
+    } catch (err) {
+      console.warn('[emailBootstrap] diretório de anexos inbound:', (err as Error).message);
     }
     transportBootstrapDone = true;
   }

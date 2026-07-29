@@ -1,6 +1,20 @@
-/** ChamadoN1 v1.7.0 — requisicao.comunicacaoWorkflow (thread Pedir informação) */
+/** ChamadoN1 v1.8.0 — enum de status em registro (ciclo fechado 48h) */
 import mongoose, { Schema, Document, Types } from 'mongoose';
 import type { IChamadoWorkflowRequisicao } from '../config/workflowRequisicaoDefaults';
+
+/** Valores canônicos de registro.status */
+export const CHAMADO_STATUS_VALUES = [
+  'novo',
+  'em-aberto',
+  'em-andamento',
+  'em-espera',
+  'pendente',
+  'resolvido',
+  'cancelado',
+  'fechado',
+] as const;
+
+export type ChamadoStatus = (typeof CHAMADO_STATUS_VALUES)[number];
 
 export interface IChamadoWorkflow {
   active: boolean;
@@ -84,7 +98,11 @@ const RegistroSchema = new Schema<IRegistro>(
     anexosAnotacaoInterna: { type: [String], default: [] },
     alteracoes: { type: [Schema.Types.Mixed], default: [] },
     metadados: { type: Schema.Types.Mixed, default: {} },
-    status: { type: String, default: 'novo' },
+    status: {
+      type: String,
+      enum: CHAMADO_STATUS_VALUES,
+      default: 'novo',
+    },
   },
   { _id: false }
 );
