@@ -12,7 +12,7 @@ function assert(condition: boolean, message: string) {
 
 function testBuildProtocolSubject() {
   const s = buildProtocolSubject('0100177678', 'Duvida');
-  assert(s === '[0100177678] Duvida', `subject: ${s}`);
+  assert(s === '[0100177678] Atendimento Velotax Numero 0100177678', `subject: ${s}`);
 }
 
 function testBuildRawRfc822() {
@@ -41,8 +41,8 @@ function testComposeHtmlToEmailHtml() {
 function testBuildThreadSubject() {
   const first = buildThreadSubject('0100177678', 'Dúvida', false);
   const reply = buildThreadSubject('0100177678', 'Dúvida', true);
-  assert(first === '[0100177678] Dúvida', `first: ${first}`);
-  assert(reply === 'Re: [0100177678] Dúvida', `reply: ${reply}`);
+  assert(first === '[0100177678] Atendimento Velotax Numero 0100177678', `first: ${first}`);
+  assert(reply === 'Re: [0100177678] Atendimento Velotax Numero 0100177678', `reply: ${reply}`);
 }
 
 function testDecodePubSub() {

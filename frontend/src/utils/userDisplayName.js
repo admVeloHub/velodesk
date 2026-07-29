@@ -1,13 +1,11 @@
 /**
- * userDisplayName v1.1.0 — aliasColaborador ou primeiro+último nome
- * VERSION: v1.1.0 | DATE: 2026-07-27
+ * userDisplayName v1.2.0 — nome do operador só via cadastro do colaborador logado
+ * VERSION: v1.2.0 | DATE: 2026-07-29
+ *
+ * Regra (funcionarios_cadastroColaboradores):
+ * - aliasColaborador preenchido → aliasColaborador
+ * - alias em branco → primeiro + último nome de colaboradorNome
  */
-
-export function getEmailLocalPart(email) {
-  const normalized = String(email || '').trim().toLowerCase();
-  if (!normalized.includes('@')) return normalized || '';
-  return normalized.split('@')[0];
-}
 
 export function resolveFirstLastName(colaboradorNome) {
   const parts = String(colaboradorNome || '').trim().split(/\s+/).filter(Boolean);
@@ -18,39 +16,29 @@ export function resolveFirstLastName(colaboradorNome) {
 
 /**
  * Nome exibido em atendimentos, assinaturas e identificação do agente.
- * Precedência: aliasColaborador → primeiro+último (colaboradorNome) → name → e-mail local.
+ * Fonte: colaborador logado (aliasColaborador ou colaboradorNome).
  */
 export function resolveAgentDisplayName(input = {}) {
   const alias = String(input.aliasColaborador || '').trim();
   if (alias) return alias;
-
-  const fromColaboradorNome = resolveFirstLastName(input.colaboradorNome);
-  if (fromColaboradorNome) return fromColaboradorNome;
-
-  const fromName = String(input.name || '').trim();
-  if (fromName && !fromName.includes('@')) return fromName;
-
-  return getEmailLocalPart(input.email);
+  return resolveFirstLastName(input.colaboradorNome);
 }
 
+/** Nome do operador a partir da sessão (velodesk_colaborador / campos espelhados no user). */
 export function getDeskDisplayName(userOrEmail, colaborador) {
   if (!userOrEmail && !colaborador) return '';
 
-  if (typeof userOrEmail === 'string') {
+  const col = colaborador || {};
+  if (typeof userOrEmail === 'object' && userOrEmail) {
     return resolveAgentDisplayName({
-      email: userOrEmail,
-      aliasColaborador: colaborador?.aliasColaborador,
-      colaboradorNome: colaborador?.colaboradorNome,
+      aliasColaborador: col.aliasColaborador || userOrEmail.aliasColaborador,
+      colaboradorNome: col.colaboradorNome || userOrEmail.colaboradorNome,
     });
   }
 
-  const user = userOrEmail || {};
-  const col = colaborador || {};
   return resolveAgentDisplayName({
-    aliasColaborador: user.aliasColaborador || col.aliasColaborador,
-    colaboradorNome: user.colaboradorNome || col.colaboradorNome,
-    name: user.name,
-    email: user.email || col.userMail,
+    aliasColaborador: col.aliasColaborador,
+    colaboradorNome: col.colaboradorNome,
   });
 }
 

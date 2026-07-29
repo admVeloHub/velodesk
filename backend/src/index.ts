@@ -12,6 +12,7 @@ import {
   isAllMongoReady,
   isCadastrosConnected,
   isDeskConfigConnected,
+  isDeskPreferencesConnected,
   isFuncionariosConnected,
   isMongoConnected,
   tryConnectFuncionarios,
@@ -19,6 +20,7 @@ import {
 import authRoutes from './routes/auth.routes';
 import ticketsRoutes from './routes/tickets.routes';
 import boxesRoutes from './routes/boxes.routes';
+import agentQueueBoxesRoutes from './routes/agentQueueBoxes.routes';
 import usersRoutes from './routes/users.routes';
 import statsRoutes from './routes/stats.routes';
 import uploadsRoutes from './routes/uploads.routes';
@@ -110,6 +112,8 @@ app.get('/api/health', (_req, res) => {
     cadastrosConnected: isCadastrosConnected(),
     deskConfigDbName: env.mongoDeskConfigDbName,
     deskConfigConnected: isDeskConfigConnected(),
+    deskPreferencesDbName: env.mongoDeskPreferencesDbName,
+    deskPreferencesConnected: isDeskPreferencesConnected(),
     funcionariosDbName: env.mongoFuncionariosDbName,
     mongoEnvConfigured: Boolean(getMongoHubCentralUri()),
     funcionariosConnected: isFuncionariosConnected(),
@@ -135,6 +139,8 @@ app.get('/health', (_req, res) => {
     cadastrosConnected: isCadastrosConnected(),
     deskConfigDbName: env.mongoDeskConfigDbName,
     deskConfigConnected: isDeskConfigConnected(),
+    deskPreferencesDbName: env.mongoDeskPreferencesDbName,
+    deskPreferencesConnected: isDeskPreferencesConnected(),
     funcionariosDbName: env.mongoFuncionariosDbName,
     mongoEnvConfigured: Boolean(getMongoHubCentralUri()),
     funcionariosConnected: isFuncionariosConnected(),
@@ -147,6 +153,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/api/tickets', ticketsRoutes);
 app.use('/api/boxes', boxesRoutes);
+app.use('/api/agent-queue-boxes', agentQueueBoxesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/colaboradores', colaboradoresRoutes);
 app.use('/api', statsRoutes);
@@ -193,7 +200,7 @@ async function tryConnectDatabase(uri?: string): Promise<boolean> {
       await runDeskConfigMigrations();
     }
     await startChamadoProtocoloWatcher();
-    console.log('[startup] MongoDB conectado (chamados + cadastros + desk_config).');
+    console.log('[startup] MongoDB conectado (chamados + cadastros + desk_config + desk_preferences).');
     return true;
   } catch (err) {
     const msg = (err as Error).message;

@@ -1,11 +1,12 @@
 /**
- * agents.routes v1.2.0 — presença heartbeat/offline + snapshots Agente 3
- * VERSION: v1.2.0 | DATE: 2026-07-21
+ * agents.routes v1.2.1 — nomeOperador resolvido no servidor pelo colaborador logado
+ * VERSION: v1.2.1 | DATE: 2026-07-29
  */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { supervisorMiddleware } from '../middleware/supervisor';
 import { env } from '../config/env';
+import { resolveOperadorDisplayNameForAuthEmail } from '../services/colaboradoresCadastro.service';
 import { getAgentsStatus, isAgentsConfigured } from '../services/agents/openaiAgent.util';
 import { runAgentPipeline, runRevisarSugestao } from '../services/agents/agentOrchestrator.service';
 import { validateAuditoria } from '../services/agents/auditoriaAgent.service';
@@ -84,7 +85,13 @@ router.post('/pipeline', authMiddleware, async (req: Request, res: Response) => 
   }
 
   const pipelineModo = req.body?.pipelineModo === 'auto_envio' ? 'auto_envio' : 'desk';
-  const result = await runAgentPipeline({ ...parsed.data, pipelineModo, userId: req.user?.userId });
+  const nomeOperador = await resolveOperadorDisplayNameForAuthEmail(req.user?.email || '');
+  const result = await runAgentPipeline({
+    ...parsed.data,
+    nomeOperador: nomeOperador || undefined,
+    pipelineModo,
+    userId: req.user?.userId,
+  });
 
   if (!result.success) {
     return res.status(500).json({ success: false, error: result.error });
@@ -115,8 +122,14 @@ router.post('/revisar-sugestao', authMiddleware, async (req: Request, res: Respo
     return res.status(400).json({ success: false, error: 'respostaAtual e tabulacaoAtual são obrigatórios' });
   }
 
+  const nomeOperador = await resolveOperadorDisplayNameForAuthEmail(req.user?.email || '');
+
   const result = await runRevisarSugestao({
-    input: { ...parsed.data, userId: req.user?.userId },
+    input: {
+      ...parsed.data,
+      nomeOperador: nomeOperador || undefined,
+      userId: req.user?.userId,
+    },
     respostaAtual,
     tabulacaoAtual,
     auditScore: typeof body.auditScore === 'number' ? body.auditScore : undefined,

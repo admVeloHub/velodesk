@@ -1,4 +1,4 @@
-﻿/** email-outbound.service v1.2.0 — headers de thread Gmail */
+﻿/** email-outbound.service v1.3.0 — assunto padronizado Atendimento Velotax Numero {protocolo} */
 import { sendViaGmailApi } from './gmail/gmailApiSend';
 import {
   getEffectiveFromAddress,
@@ -6,6 +6,7 @@ import {
   isEmailTransportReady,
 } from './emailTransport.service';
 import type { OutboundEmailThreadHeaders } from './emailThread.service';
+import { buildClientEmailSubject } from './emailThread.service';
 
 export interface OutboundEmailPayload {
   to: string;
@@ -20,8 +21,8 @@ export interface OutboundEmailResult {
   reason?: string;
 }
 
-export function buildProtocolSubject(protocolo: string, titulo: string): string {
-  return `[${protocolo}] ${titulo}`.trim();
+export function buildProtocolSubject(protocolo: string, _titulo?: string): string {
+  return buildClientEmailSubject(protocolo, false);
 }
 
 function wrapTextAsHtml(text: string): string {

@@ -1,6 +1,6 @@
 /**
- * API client v1.16.0 — POST /tickets/:id/commit (save atômico agente)
- * VERSION: v1.16.0 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team
+ * API client v1.17.0 — agent-queue-boxes (caixas personalizadas do agente)
+ * VERSION: v1.17.0 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -129,6 +129,13 @@ export const uploadsApi = {
 
 export const boxesApi = {
   list: (params) => api.get('/boxes', { params }).then((r) => r.data),
+};
+
+export const agentQueueBoxesApi = {
+  list: () => api.get('/agent-queue-boxes').then((r) => r.data?.boxes || []),
+  create: (payload) => api.post('/agent-queue-boxes', payload).then((r) => r.data?.box),
+  migrate: (boxes) => api.post('/agent-queue-boxes/migrate', { boxes }).then((r) => r.data),
+  remove: (boxId) => api.delete(`/agent-queue-boxes/${encodeURIComponent(boxId)}`).then((r) => r.data),
 };
 
 export const clientsApi = {

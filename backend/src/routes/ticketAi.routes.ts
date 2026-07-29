@@ -1,7 +1,8 @@
-/** ticketAi.routes v1.0.3 — tabulacaoFonte da auditoria */
+/** ticketAi.routes v1.0.4 — nomeOperador resolvido no servidor pelo colaborador logado */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { env } from '../config/env';
+import { resolveOperadorDisplayNameForAuthEmail } from '../services/colaboradoresCadastro.service';
 import {
   generateTicketAiSuggest,
   getOpenAiTicketSuggestStatus,
@@ -41,7 +42,11 @@ router.post('/suggest', authMiddleware, async (req: Request, res: Response) => {
   }
 
   const userId = req.user?.email || req.user?.userId || 'anonymous';
-  const aiResult = await generateTicketAiSuggest(parsed.data, String(userId));
+  const nomeOperador = await resolveOperadorDisplayNameForAuthEmail(req.user?.email || '');
+  const aiResult = await generateTicketAiSuggest(
+    { ...parsed.data, nomeOperador: nomeOperador || undefined },
+    String(userId),
+  );
 
   if (!aiResult.success) {
     return res.status(statusForOpenAiError(aiResult.error)).json({

@@ -1,6 +1,6 @@
 /**
- * useTicketAiSuggestions v1.4.0 — tabulação sugerida pelo Agente de Auditoria
- * VERSION: v1.4.0 | DATE: 2026-07-15
+ * useTicketAiSuggestions v1.5.0 — histórico completo (público + anotações internas) no payload IA
+ * VERSION: v1.5.0 | DATE: 2026-07-29
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ticketAiApi, agentsApi } from '../api/client';
@@ -73,7 +73,7 @@ function hasClientMessage(messages) {
   return (messages || []).some((m) => m.type === 'client');
 }
 
-function buildContextHash({ ticketId, contextSource, messages, internalPlain, produtoHint }) {
+function buildContextHash({ ticketId, contextSource, messages, internalNotesBlock, produtoHint }) {
   const msgKey = (messages || [])
     .map((m) => `${m.type}:${m.text}`)
     .join('|');
@@ -81,15 +81,59 @@ function buildContextHash({ ticketId, contextSource, messages, internalPlain, pr
     ticketId || '',
     contextSource,
     msgKey,
-    internalPlain || '',
+    internalNotesBlock || '',
     produtoHint || '',
   ].join('::');
 }
 
-function resolveAgentFirstName() {
-  const full = String(getAgentName() || '').trim();
-  if (!full) return '';
-  return full.split(/\s+/)[0] || full;
+function collectInternalNotesPlain(ticket, currentDraftPlain) {
+  const notes = [];
+  const seen = new Set();
+
+  (ticket?.internalNotes || []).forEach((note) => {
+    const text = String(note.text || note.message || '').trim();
+    if (!text) return;
+    const key = `${note.timestamp || note.time || ''}:${text}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    notes.push({
+      ts: note.timestamp || note.time,
+      text,
+      author: String(note.author || '').trim() || 'Agente',
+    });
+  });
+
+  (ticket?.registroHistorico || ticket?.registroAlteracoes || []).forEach((entry) => {
+    const text = String(entry.anotacaoInterna ?? '').trim();
+    if (!text) return;
+    const key = `${entry.time || entry.timestamp || ''}:${text}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    notes.push({
+      ts: entry.time || entry.timestamp,
+      text,
+      author: String(entry.autor ?? entry.author ?? '').trim() || 'Agente',
+    });
+  });
+
+  notes.sort((a, b) => new Date(a.ts || 0) - new Date(b.ts || 0));
+
+  const draft = String(currentDraftPlain || '').trim();
+  if (draft) {
+    const lastText = notes.length ? notes[notes.length - 1].text : '';
+    if (draft !== lastText) {
+      notes.push({ ts: null, text: draft, author: 'Rascunho atual' });
+    }
+  }
+
+  if (!notes.length) return '';
+
+  return notes
+    .map((n, i) => {
+      const label = n.author ? `[${n.author}]` : `[Anotação ${i + 1}]`;
+      return `${i + 1}. ${label}: ${n.text}`;
+    })
+    .join('\n');
 }
 
 function resolveClientName(ticket) {
@@ -107,10 +151,10 @@ function resolveClientName(ticket) {
   ).trim();
 }
 
-function buildPayload({ ticket, rightFields, convMsgs, internalPlain, contextSource }) {
+function buildPayload({ ticket, rightFields, convMsgs, internalNotesBlock, contextSource }) {
   const apiMessages = mapConvMsgsToApi(convMsgs);
   const canal = resolveCanal(ticket, rightFields);
-  const nomeOperador = resolveAgentFirstName();
+  const nomeOperador = String(getAgentName() || '').trim();
   const contact = getClientContactFields(ticket);
   const contactNameRaw = contact.name;
   const contactName = Array.isArray(contactNameRaw)
@@ -119,6 +163,7 @@ function buildPayload({ ticket, rightFields, convMsgs, internalPlain, contextSou
       ? contactNameRaw.lista[0]
       : contactNameRaw);
   const clientName = resolveClientName(ticket) || String(contactName || '').trim() || '';
+  const internalNote = String(internalNotesBlock || '').trim() || undefined;
   const base = {
     ticketId: ticket?.id || ticket?._id,
     protocolo: ticket?.chamadoProtocolo || ticket?.protocol,
@@ -127,19 +172,16 @@ function buildPayload({ ticket, rightFields, convMsgs, internalPlain, contextSou
     clientName: clientName || undefined,
     nomeOperador: nomeOperador || undefined,
     produtoHint: String(rightFields?.produto || '').trim() || undefined,
+    contextSource,
+    internalNote,
   };
 
-  if (contextSource === 'internal') {
-    return {
-      ...base,
-      contextSource: 'internal',
-      internalNote: internalPlain,
-    };
+  if (!apiMessages.length) {
+    return base;
   }
 
   return {
     ...base,
-    contextSource: 'public',
     messages: apiMessages,
   };
 }
@@ -197,15 +239,19 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
   const canal = useMemo(() => resolveCanal(ticket, rightFields), [ticket, rightFields]);
   const isPhone = isPhoneChannel(canal);
   const internalPlain = useMemo(() => htmlToPlainText(internalText || '').trim(), [internalText]);
+  const internalNotesBlock = useMemo(
+    () => collectInternalNotesPlain(ticket, internalPlain),
+    [ticket, internalPlain],
+  );
   const contextSource = isPhone ? 'internal' : 'public';
 
   const canFetch = useMemo(() => {
     if (!ticket) return false;
     if (isPhone) {
-      return internalPlain.length >= TICKET_AI_INTERNAL_NOTE_MIN_CHARS;
+      return internalNotesBlock.length >= TICKET_AI_INTERNAL_NOTE_MIN_CHARS;
     }
     return hasClientMessage(convMsgs);
-  }, [ticket, isPhone, internalPlain, convMsgs]);
+  }, [ticket, isPhone, internalNotesBlock, convMsgs]);
 
   const contextHash = useMemo(() => {
     if (!ticket || !canFetch) return '';
@@ -213,10 +259,10 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       ticketId: ticket.id || ticket._id,
       contextSource,
       messages: convMsgs,
-      internalPlain,
+      internalNotesBlock,
       produtoHint: rightFields?.produto,
     });
-  }, [ticket, canFetch, contextSource, convMsgs, internalPlain, rightFields?.produto]);
+  }, [ticket, canFetch, contextSource, convMsgs, internalNotesBlock, rightFields?.produto]);
 
   const waitingMessage = useMemo(() => {
     if (error) return error;
@@ -485,7 +531,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       ticket,
       rightFields,
       convMsgs,
-      internalPlain,
+      internalNotesBlock,
       contextSource,
     });
 
@@ -530,7 +576,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
         ticket,
         rightFields,
         convMsgs,
-        internalPlain,
+        internalNotesBlock,
         contextSource,
       });
 

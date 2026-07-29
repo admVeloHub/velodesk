@@ -1,4 +1,4 @@
-/** emailThread.service v1.1.0 — thread root a partir do Message-Id inbound */
+/** emailThread.service v1.2.0 — assunto fixo Atendimento Velotax Numero {protocolo} */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { getEffectiveFromAddress } from './emailTransport.service';
 
@@ -29,9 +29,15 @@ export function buildOutboundMessageId(protocolo: string, fromAddress?: string):
   return `<desk.${safe}.${token}@${domain}>`;
 }
 
-export function buildThreadSubject(protocolo: string, titulo: string, isReply: boolean): string {
-  const base = `[${protocolo}] ${String(titulo || protocolo).trim()}`.trim();
+/** Assunto padronizado ao cliente — mantém [protocolo] para roteamento inbound. */
+export function buildClientEmailSubject(protocolo: string, isReply = false): string {
+  const safeProtocolo = String(protocolo ?? '').trim();
+  const base = `[${safeProtocolo}] Atendimento Velotax Numero ${safeProtocolo}`.trim();
   return isReply ? `Re: ${base}` : base;
+}
+
+export function buildThreadSubject(protocolo: string, _titulo?: string, isReply = false): string {
+  return buildClientEmailSubject(protocolo, isReply);
 }
 
 export function collectEmailThreadState(chamado: IChamadoN1): EmailThreadState {

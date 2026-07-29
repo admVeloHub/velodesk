@@ -46,7 +46,7 @@ import { useAuth } from '../../context/AuthContext';
 import { usePermissionsOptional } from '../../context/PermissionContext';
 import { canInterruptWorkflow } from '../../services/permissions/permissionService';
 import { hasAtendimentoFuncao } from '../../services/desk/atuacaoVision';
-import { getAllQueueStatuses, restoreCustomBoxes } from '../../services/desk/customQueueBoxes';
+import { getAllQueueStatuses, fetchAndHydrateCustomQueues } from '../../services/desk/customQueueBoxes';
 import CreateTicketPanel from './components/CreateTicketPanel';
 import DeskQueuePanel from './components/DeskQueuePanel';
 import DeskTicketList from './components/DeskTicketList';
@@ -225,7 +225,7 @@ export default function DeskV2Root() {
 
   const syncTicketViews = useCallback(async () => {
     await refreshTickets();
-    restoreCustomBoxes();
+    await fetchAndHydrateCustomQueues();
     setQueueStatuses(getAllQueueStatuses());
   }, [refreshTickets]);
 
@@ -290,9 +290,12 @@ export default function DeskV2Root() {
   const sendDisabledBySpell = composeMode === 'public' && composeSpellErrors.length > 0;
 
   useEffect(() => {
-    restoreCustomBoxes();
-    setQueueStatuses(getAllQueueStatuses());
-  }, []);
+    let cancelled = false;
+    void fetchAndHydrateCustomQueues().then(() => {
+      if (!cancelled) setQueueStatuses(getAllQueueStatuses());
+    });
+    return () => { cancelled = true; };
+  }, [user?.email]);
 
   useEffect(() => {
     loadSpellEngine().catch(() => {});

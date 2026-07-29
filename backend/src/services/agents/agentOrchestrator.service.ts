@@ -1,6 +1,6 @@
 /**
- * agentOrchestrator.service v1.0.2 — tabulação sugerida pelo Agente de Auditoria no Desk
- * VERSION: v1.0.2 | DATE: 2026-07-15
+ * agentOrchestrator.service v1.0.3 — contexto de auditoria inclui anotações internas
+ * VERSION: v1.0.3 | DATE: 2026-07-29
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -49,8 +49,9 @@ function auditModoFromPipeline(modo: PipelineInput['pipelineModo']): AuditModo {
 }
 
 function buildClientContext(input: PipelineInput): string {
-  if (input.contextSource === 'internal') return input.internalNote || '';
-  return (input.messages || []).map((m) => m.text).join('\n');
+  const publicPart = (input.messages || []).map((m) => m.text).join('\n');
+  const internalPart = String(input.internalNote || '').trim();
+  return [publicPart, internalPart].filter(Boolean).join('\n\n---\n\n');
 }
 
 function countThreadMessages(chamado?: IChamadoN1 | null): number {

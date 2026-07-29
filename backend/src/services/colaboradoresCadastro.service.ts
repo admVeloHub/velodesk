@@ -1,7 +1,7 @@
 /**
- * colaboradoresCadastro.service v1.3.0 — aliasColaborador para exibição no Desk
+ * colaboradoresCadastro.service v1.3.1 — nome do operador só via alias ou colaboradorNome
  * Campos de login: userMail, password, CPF, colaboradorNome, aliasColaborador
- * VERSION: v1.3.0 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.3.1 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team
  */
 import { env } from '../config/env';
 import { getFuncionariosConnection, isFuncionariosConnected } from '../config/database';
@@ -88,20 +88,21 @@ function resolveFirstLastName(colaboradorNome: string): string {
   return `${parts[0]} ${parts[parts.length - 1]}`;
 }
 
-/** Nome exibido em atendimentos — aliasColaborador ou primeiro+último nome. */
+/** Nome exibido em atendimentos — aliasColaborador ou primeiro+último de colaboradorNome. */
 export function resolveColaboradorDisplayName(
   colaborador: Pick<ColaboradorDeskPublico, 'aliasColaborador' | 'colaboradorNome'> | null | undefined,
-  emailFallback = '',
 ): string {
   const alias = String(colaborador?.aliasColaborador || '').trim();
   if (alias) return alias;
+  return resolveFirstLastName(String(colaborador?.colaboradorNome || ''));
+}
 
-  const fromNome = resolveFirstLastName(String(colaborador?.colaboradorNome || ''));
-  if (fromNome) return fromNome;
-
-  const email = String(emailFallback || '').trim().toLowerCase();
-  if (email.includes('@')) return email.split('@')[0] ?? email;
-  return email;
+/** Nome do operador autenticado — cadastro funcionarios_cadastroColaboradores. */
+export async function resolveOperadorDisplayNameForAuthEmail(email: string): Promise<string> {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized) return '';
+  const colaborador = await findColaboradorByEmail(normalized);
+  return resolveColaboradorDisplayName(colaborador);
 }
 
 function mapPublico(doc: Record<string, unknown> | null): ColaboradorDeskPublico | null {

@@ -1,6 +1,6 @@
 /**
- * AuthContext v1.8.2 — nome de exibição via aliasColaborador
- * VERSION: v1.8.2 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
+ * AuthContext v1.8.3 — nome de exibição só via cadastro do colaborador
+ * VERSION: v1.8.3 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import { isGoogleDeskAuthMode, isGoogleDeskSession } from '../config/deskAuthMode';
@@ -61,7 +61,7 @@ function readInitialAuth() {
         clearStoredAuthSession();
         return { authStatus: 'pending', user: null, colaborador: null, token: null };
       }
-      const displayName = getDeskDisplayName(user, colaborador) || user.email;
+      const displayName = getDeskDisplayName(user, colaborador);
       const normalizedUser = { ...user, name: displayName };
       return {
         authStatus: 'authorized',
@@ -122,8 +122,6 @@ export function AuthProvider({ children }) {
     const displayName = resolveAgentDisplayName({
       aliasColaborador: colaboradorPayload?.aliasColaborador,
       colaboradorNome: colaboradorPayload?.colaboradorNome,
-      name: result.user?.name,
-      email: result.user?.email,
     });
     const enrichedUser = {
       ...result.user,

@@ -1,4 +1,4 @@
-/** tickets.routes v1.12.0 — bloqueio de mutação em ticket fechado (409) */
+/** tickets.routes v1.12.1 — e-mail de criação inclui 1ª mensagem pública do agente */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -21,7 +21,7 @@ import {
   statusFromBoxName,
 } from '../services/chamado.mapper';
 import { TabulacaoValidationError } from '../services/tabulation.service';
-import { notifyAgentReplyAsync, notifyTicketOpenedAsync } from '../services/emailNotification.service';
+import { notifyAgentReplyAsync, notifyChamadoCreatedAsync } from '../services/emailNotification.service';
 import {
   advanceWorkflowManual,
   advanceWorkflowWithDecision,
@@ -157,7 +157,7 @@ router.post('/', authMiddleware, async (req, res: Response) => {
     const partial = await createChamadoFromBody(req.body, status, req.user);
     applySessionResponsavelIfNeeded(partial, req.user);
     const chamado = await ChamadoN1.create(partial);
-    await notifyTicketOpenedAsync(chamado);
+    await notifyChamadoCreatedAsync(chamado);
     const ticket = await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes));
     res.status(201).json(ticket);
   } catch (err) {

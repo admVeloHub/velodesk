@@ -1,7 +1,7 @@
-/** emailNotification.service v1.2.0 — outbound para ticket sem cliente cadastrado */
+/** emailNotification.service v1.3.1 — assunto de e-mail padronizado ao cliente */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { loadDadosForRef } from './cliente.service';
-import { buildProtocolSubject, sendOutboundEmail } from './email-outbound.service';
+import { sendOutboundEmail } from './email-outbound.service';
 import { composeHtmlToEmailHtml, escapeHtmlAttribute, htmlToPlainTextForEmail } from './emailHtml.util';
 import {
   buildOutboundMessageId,
@@ -53,7 +53,7 @@ export async function sendTicketOpenedEmail(
 
   const protocolo = chamado.chamadoProtocolo;
   const titulo = chamado.chamadoTitulo || protocolo;
-  const subject = buildThreadSubject(protocolo, titulo, false);
+  const subject = buildThreadSubject(protocolo, undefined, false);
   const messageId = buildOutboundMessageId(protocolo);
   const headers = buildOutboundThreadHeaders(chamado, messageId);
 
@@ -91,8 +91,7 @@ export async function sendAgentReplyEmail(
   if (!to || !messageText.trim()) return;
 
   const protocolo = chamado.chamadoProtocolo;
-  const titulo = chamado.chamadoTitulo || protocolo;
-  const subject = buildThreadSubject(protocolo, titulo, true);
+  const subject = buildThreadSubject(protocolo, undefined, true);
   const plainMessage = htmlToPlainTextForEmail(messageText);
   const messageHtml = composeHtmlToEmailHtml(messageText);
   const safeProtocolo = escapeHtmlAttribute(protocolo);
@@ -120,6 +119,39 @@ export async function sendAgentReplyEmail(
   }
 
   persistOutboundEmailMeta(chamado, messageId, registroIndex);
+}
+
+function findFirstPublicAgentMessage(chamado: IChamadoN1): { text: string; registroIndex: number } | null {
+  for (let i = 0; i < (chamado.registro ?? []).length; i += 1) {
+    const reg = chamado.registro![i];
+    if (String(reg.origin ?? '').trim().toLowerCase() !== 'agente') continue;
+    const text = String(reg.mensagemPublica ?? '').trim();
+    if (text) return { text, registroIndex: i };
+  }
+  return null;
+}
+
+/** Criação de ticket: envia a 1ª mensagem pública do agente ou confirmação genérica. */
+export async function notifyChamadoCreatedAsync(
+  chamado: IChamadoN1,
+  clienteEmail?: string,
+): Promise<void> {
+  try {
+    const firstAgentPublic = findFirstPublicAgentMessage(chamado);
+    if (firstAgentPublic) {
+      await sendAgentReplyEmail(
+        chamado,
+        firstAgentPublic.text,
+        clienteEmail,
+        firstAgentPublic.registroIndex,
+      );
+    } else {
+      await sendTicketOpenedEmail(chamado, clienteEmail, 0);
+    }
+    await chamado.save();
+  } catch (err) {
+    console.warn('[emailNotification] notifyChamadoCreated:', (err as Error).message);
+  }
 }
 
 /** Fail-soft: não propaga erro */

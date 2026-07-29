@@ -1,6 +1,6 @@
 /**
  * Modal — criar nova caixa na fila de atendimento
- * VERSION: v1.0.0 | DATE: 2026-06-19
+ * VERSION: v1.1.0 | DATE: 2026-07-29
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -35,7 +35,7 @@ export default function CreateQueueBoxModal({ open, onClose, onCreated }) {
 
   if (!open) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       setNameError(true);
       showNotification('Informe o nome da caixa.', 'error');
@@ -45,12 +45,12 @@ export default function CreateQueueBoxModal({ open, onClose, onCreated }) {
 
     setSaving(true);
     try {
-      const box = createCustomQueueBox({ name, action });
+      const box = await createCustomQueueBox({ name, action });
       onCreated?.(box);
       showNotification('Caixa adicionada', 'success');
       onClose();
-    } catch {
-      showNotification('Não foi possível criar a caixa.', 'error');
+    } catch (err) {
+      showNotification(err?.response?.data?.message || err?.message || 'Não foi possível criar a caixa.', 'error');
     } finally {
       setSaving(false);
     }

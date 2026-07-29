@@ -1,4 +1,4 @@
-/** env v1.21.0 — close resolved job (48h → fechado) */
+/** env v1.22.0 — desk_preferences (caixas personalizadas do agente) */
 import fs from 'fs';
 import path from 'path';
 
@@ -51,7 +51,7 @@ export function cleanMongoUri(raw: string): string {
     .replace(/(@[^/?]+)\/\?/, '$1?');
 }
 
-/** Cluster Desk (b2c_chamados, b2c_cadastros, desk_config) — MONGO_URI / MONGODB_URI */
+/** Cluster Desk (b2c_chamados, b2c_cadastros, desk_config, desk_preferences) — MONGO_URI / MONGODB_URI */
 export function getMongoDeskUri(): string {
   return cleanMongoUri(process.env.MONGODB_URI || process.env.MONGO_URI || '');
 }
@@ -82,6 +82,7 @@ export const env = {
   mongoDbName: process.env.MONGODB_DB_NAME || 'b2c_chamados',
   mongoCadastrosDbName: process.env.MONGODB_CADASTROS_DB_NAME || 'b2c_cadastros',
   mongoDeskConfigDbName: process.env.MONGODB_DESK_CONFIG_DB_NAME || 'desk_config',
+  mongoDeskPreferencesDbName: process.env.MONGODB_DESK_PREFERENCES_DB_NAME || 'desk_preferences',
   /** VeloHubCentral — console_funcionarios.funcionarios_cadastroColaboradores (leitura via MONGO_ENV) */
   mongoFuncionariosUri: resolveMongoFuncionariosUri(),
   mongoFuncionariosDbName: process.env.MONGODB_FUNCIONARIOS_DB_NAME || 'console_funcionarios',

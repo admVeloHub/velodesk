@@ -1,6 +1,6 @@
 /**
- * DeskComposePanel v1.10.0 — bloqueio total em ticket fechado
- * VERSION: v1.10.0 | DATE: 2026-07-29
+ * DeskComposePanel v1.10.4 — Revisor de Texto sem ícone no botão
+ * VERSION: v1.10.4 | DATE: 2026-07-29
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getSendStatusOptions } from '../../../services/desk/constants';
@@ -152,8 +152,14 @@ function ComposeBottomBar({
         <>
           <span className="crm-compose-bottom-bar__sep" aria-hidden="true" />
           <div className="crm-compose-bottom-bar__tools">
-            <button type="button" className="btn-secondary crm-compose-bottom-bar__ai" id="btnCrmAiAssistant" onClick={onOpenRefinar}>
-              <i className="fas fa-robot" /> Assistente IA
+            <button
+              type="button"
+              className="btn-secondary crm-compose-bottom-bar__ai"
+              id="btnCrmTextReviewer"
+              aria-label="Revisor de Texto"
+              onClick={onOpenRefinar}
+            >
+              <span className="crm-compose-bottom-bar__ai-label">Revisor de Texto</span>
             </button>
           </div>
         </>
@@ -302,11 +308,10 @@ export default function DeskComposePanel({
       ? `Aguardando ${workflowTeamLabel || 'equipe'} • resposta pública indisponível`
       : 'Digite sua resposta ao cliente...';
 
-  const nomeOperador = useMemo(() => {
-    const full = String(getDeskDisplayName(user, colaborador) || '').trim();
-    if (!full) return '';
-    return full.split(/\s+/)[0] || full;
-  }, [user, colaborador]);
+  const nomeOperador = useMemo(
+    () => String(getDeskDisplayName(user, colaborador) || '').trim(),
+    [user, colaborador],
+  );
 
   const handlePublicReplace = useCallback((startIndex, deleteCount, insertText) => {
     publicEditorRef.current?.replacePlainRange(startIndex, deleteCount, insertText);

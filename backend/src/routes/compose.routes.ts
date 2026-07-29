@@ -1,6 +1,7 @@
-/** compose.routes v1.0.1 — refinar rascunho (Gemini) para o compose do Desk */
+/** compose.routes v1.0.2 — nomeOperador resolvido no servidor pelo colaborador logado */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
+import { resolveOperadorDisplayNameForAuthEmail } from '../services/colaboradoresCadastro.service';
 import {
   generateRefinarRascunhoWithGemini,
   isGeminiRefinarConfigured,
@@ -29,7 +30,7 @@ router.post('/refinar-rascunho', authMiddleware, async (req: Request, res: Respo
     });
   }
 
-  const nomeOperador = req.body?.nomeOperador != null ? String(req.body.nomeOperador) : '';
+  const nomeOperador = await resolveOperadorDisplayNameForAuthEmail(req.user?.email || '');
   const userId = req.user?.email || req.user?.userId || 'anonymous';
 
   const aiResult = await generateRefinarRascunhoWithGemini({

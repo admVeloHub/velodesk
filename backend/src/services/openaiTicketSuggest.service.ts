@@ -1,6 +1,6 @@
 /**
- * openaiTicketSuggest.service v1.1.0 — delegação ao orquestrador de agentes
- * VERSION: v1.1.0 | DATE: 2026-07-13
+ * openaiTicketSuggest.service v1.2.0 — prompt legado inclui anotações internas junto ao histórico público
+ * VERSION: v1.2.0 | DATE: 2026-07-29
  */
 import OpenAI from 'openai';
 import { env } from '../config/env';
@@ -162,8 +162,8 @@ export function validateTicketAiInput(body: unknown):
       clientName: trimStr(b.clientName, 200) || undefined,
       nomeOperador: trimStr(b.nomeOperador, 120) || undefined,
       contextSource,
-      messages: contextSource === 'public' ? messages : undefined,
-      internalNote: contextSource === 'internal' ? internalNote : undefined,
+      messages: messages.length ? messages : undefined,
+      internalNote: internalNote || undefined,
       produtoHint: trimStr(b.produtoHint, 200) || undefined,
     },
   };
@@ -228,7 +228,7 @@ function buildUserBlock(params: TicketAiSuggestInput, tabulationCatalog: string)
   parts.push('', '## Lista fechada de tabulação (usar SOMENTE estes valores)', '', tabulationCatalog);
   parts.push('', '## Tipos permitidos', '', 'Reclamação, Solicitação, Dúvida, Informação');
 
-  if (params.contextSource === 'public' && params.messages?.length) {
+  if (params.messages?.length) {
     parts.push('', '## Mensagens públicas do atendimento', '', formatMessagesBlock(params.messages));
     const firstClient = params.messages.find((m) => m.role === 'cliente');
     if (firstClient) {
@@ -236,12 +236,12 @@ function buildUserBlock(params: TicketAiSuggestInput, tabulationCatalog: string)
     }
   }
 
-  if (params.contextSource === 'internal' && params.internalNote) {
+  if (params.internalNote?.trim()) {
     parts.push(
       '',
-      '## Registro interno do agente (NÃO repetir literalmente na resposta ao cliente)',
+      '## Anotações internas do agente (contexto operacional — NÃO repetir literalmente na resposta ao cliente)',
       '',
-      params.internalNote,
+      params.internalNote.trim(),
     );
   }
 

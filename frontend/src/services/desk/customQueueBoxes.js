@@ -1,9 +1,12 @@
 /**
- * Caixas customizadas — fila de atendimento (localStorage)
- * VERSION: v1.0.0 | DATE: 2026-06-19
+ * Caixas customizadas — fila de atendimento (desk_preferences.desk_agent_boxex + cache local)
+ * VERSION: v2.0.0 | DATE: 2026-07-29
  */
 import { QUEUE_STATUSES } from './constants';
 import { addCustomBox } from '../ticketsCache';
+import { agentQueueBoxesApi } from '../../api/client';
+import { isApiMode } from '../ticketsCache';
+import { isBackendJwtUsable } from '../../utils/backendJwt';
 
 const STORAGE_KEY = 'velodeskCustomQueues';
 
@@ -25,6 +28,9 @@ const ACTION_DOTS = {
   notificar: '#ea580c',
 };
 
+let queuesCache = null;
+let hydratePromise = null;
+
 function slugify(value) {
   return String(value || 'caixa')
     .normalize('NFD')
@@ -35,7 +41,7 @@ function slugify(value) {
     .slice(0, 24) || 'caixa';
 }
 
-export function loadCustomQueues() {
+function readStorageOnly() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
@@ -45,8 +51,47 @@ export function loadCustomQueues() {
   }
 }
 
-export function saveCustomQueues(list) {
+function writeStorage(list) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+function normalizeBox(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id || raw.boxId || '').trim();
+  const name = String(raw.name || '').trim();
+  if (!id || !name) return null;
+  const action = QUEUE_BOX_ACTIONS.some((item) => item.id === raw.action) ? raw.action : 'em-andamento';
+  const actionMeta = QUEUE_BOX_ACTIONS.find((item) => item.id === action);
+  return {
+    id,
+    name,
+    action,
+    actionLabel: String(raw.actionLabel || actionMeta?.label || action),
+    dot: String(raw.dot || ACTION_DOTS[action] || '#6366f1'),
+    boxes: Array.isArray(raw.boxes) && raw.boxes.length ? raw.boxes.map(String) : [id],
+    isCustom: raw.isCustom !== false,
+  };
+}
+
+function setQueuesCache(list) {
+  queuesCache = (list || []).map(normalizeBox).filter(Boolean);
+  writeStorage(queuesCache);
+  return queuesCache;
+}
+
+function canUseRemotePersistence() {
+  const token = localStorage.getItem('velodesk_token');
+  return isApiMode() && isBackendJwtUsable(token);
+}
+
+export function loadCustomQueues() {
+  if (Array.isArray(queuesCache)) return queuesCache;
+  queuesCache = readStorageOnly().map(normalizeBox).filter(Boolean);
+  return queuesCache;
+}
+
+export function saveCustomQueues(list) {
+  return setQueuesCache(list);
 }
 
 export function getAllQueueStatuses() {
@@ -57,13 +102,12 @@ export function getCustomQueueById(queueId) {
   return loadCustomQueues().find((item) => item.id === queueId) || null;
 }
 
-export function createCustomQueueBox({ name, action }) {
+function buildLocalBox({ name, action, boxId }) {
   const trimmedName = String(name || '').trim();
   const actionId = QUEUE_BOX_ACTIONS.some((item) => item.id === action) ? action : 'em-andamento';
-  const id = `custom-${slugify(trimmedName)}-${Date.now().toString(36)}`;
+  const id = String(boxId || '').trim() || `custom-${slugify(trimmedName)}-${Date.now().toString(36)}`;
   const actionMeta = QUEUE_BOX_ACTIONS.find((item) => item.id === actionId);
-
-  const box = {
+  return {
     id,
     name: trimmedName,
     action: actionId,
@@ -72,8 +116,65 @@ export function createCustomQueueBox({ name, action }) {
     boxes: [id],
     isCustom: true,
   };
+}
 
-  saveCustomQueues([...loadCustomQueues(), box]);
+export async function fetchAndHydrateCustomQueues() {
+  if (hydratePromise) return hydratePromise;
+
+  hydratePromise = (async () => {
+    const local = readStorageOnly().map(normalizeBox).filter(Boolean);
+
+    if (!canUseRemotePersistence()) {
+      setQueuesCache(local);
+      restoreCustomBoxes();
+      return loadCustomQueues();
+    }
+
+    try {
+      let remote = await agentQueueBoxesApi.list();
+      remote = (remote || []).map(normalizeBox).filter(Boolean);
+
+      if (!remote.length && local.length) {
+        const migrated = await agentQueueBoxesApi.migrate(
+          local.map((box) => ({ boxId: box.id, name: box.name, action: box.action })),
+        );
+        remote = (migrated?.boxes || []).map(normalizeBox).filter(Boolean);
+      }
+
+      setQueuesCache(remote);
+      restoreCustomBoxes();
+      return loadCustomQueues();
+    } catch (err) {
+      console.warn('[customQueueBoxes] falha ao carregar do servidor — usando cache local', err?.message || err);
+      setQueuesCache(local);
+      restoreCustomBoxes();
+      return loadCustomQueues();
+    } finally {
+      hydratePromise = null;
+    }
+  })();
+
+  return hydratePromise;
+}
+
+export async function createCustomQueueBox({ name, action }) {
+  const trimmedName = String(name || '').trim();
+  if (!trimmedName) throw new Error('Nome da caixa é obrigatório');
+
+  let box = buildLocalBox({ name: trimmedName, action });
+
+  if (canUseRemotePersistence()) {
+    const saved = await agentQueueBoxesApi.create({
+      boxId: box.id,
+      name: box.name,
+      action: box.action,
+    });
+    const normalized = normalizeBox(saved);
+    if (normalized) box = normalized;
+  }
+
+  const next = [...loadCustomQueues().filter((item) => item.id !== box.id), box];
+  saveCustomQueues(next);
   addCustomBox({ id: box.id, name: box.name, action: box.action });
 
   return box;

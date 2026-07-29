@@ -1,4 +1,4 @@
-/** auth.routes v1.5.0 — display name via aliasColaborador */
+/** auth.routes v1.5.1 — display name só via aliasColaborador ou colaboradorNome */
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { User } from '../models/User';
@@ -45,7 +45,7 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(access.status).json({ message: access.reason });
     }
 
-    const name = resolveColaboradorDisplayName(access.colaborador, normalizedEmail);
+    const name = resolveColaboradorDisplayName(access.colaborador);
 
     let user = await User.findOne({ email: normalizedEmail });
     if (!user) {
@@ -121,7 +121,7 @@ router.post('/auth/google', async (req: Request, res: Response) => {
       return res.status(access.status).json({ message: access.reason });
     }
 
-    const name = resolveColaboradorDisplayName(access.colaborador, googleUser.email);
+    const name = resolveColaboradorDisplayName(access.colaborador);
 
     let user = await User.findOne({ email: googleUser.email });
     if (!user) {

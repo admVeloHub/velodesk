@@ -1,10 +1,35 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.53.0 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.54.0 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: caixas personalizadas, IA composição, assunto e-mail e nome operador
+
+- **Data/Hora**: 2026-07-29
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.54.0
+  - database v1.8.3, env v1.22.0, DeskAgentQueueBox v1.1.0, agentQueueBox.service v1.0.1, agentQueueBoxes.routes v1.0.1
+  - agentTabulation.util v1.2.0, agentOrchestrator v1.0.3, atendimentoPersona v1.2.0, openaiTicketSuggest v1.2.0
+  - colaboradoresCadastro v1.3.1, emailThread v1.2.0, email-outbound v1.3.0, emailNotification v1.3.1, tickets.routes v1.12.1
+  - useTicketAiSuggestions v1.5.0, customQueueBoxes v2.0.0, DeskComposePanel v1.10.4, userDisplayName v1.2.0, AuthContext v1.8.3
+- **Arquivos modificados**:
+  - `backend/src/config/database.ts`, `env.ts`, `index.ts` — conexão `desk_preferences` + health
+  - `backend/src/models/DeskAgentQueueBox.ts`, `services/agentQueueBox.service.ts`, `routes/agentQueueBoxes.routes.ts` — caixas personalizadas em `desk_preferences.desk_agent_boxex` (GET/POST/migrate/DELETE)
+  - `frontend/src/services/desk/customQueueBoxes.js`, `DeskV2Root.jsx`, `CreateQueueBoxModal.jsx`, `api/client.js` — hidratação e persistência API (substitui só localStorage)
+  - `frontend/src/hooks/useTicketAiSuggestions.js`, `backend/.../agentTabulation.util.ts`, `openaiTicketSuggest.service.ts`, `atendimentoPersona.ts` — agente de composição com histórico público + anotações internas
+  - `backend/src/services/emailThread.service.ts`, `emailNotification.service.ts`, `tickets.routes.ts` — assunto padronizado `Atendimento Velotax Numero {protocolo}`; criação manual envia 1ª mensagem pública do agente
+  - `colaboradoresCadastro.service.ts`, rotas `ticketAi/agents/compose/auth` — `nomeOperador` resolvido no servidor (alias ou primeiro+último de colaboradorNome)
+  - `DeskComposePanel.jsx` — botão renomeado para **Revisor de Texto**; `userDisplayName.js`, `AuthContext.js`, `clientDb.js`
+- **Descrição**: Caixas “Nova caixa” persistem por agente no Mongo; sugestão IA considera thread completa incluindo anotações internas; e-mails ao cliente deixam de usar nome do cliente no assunto; identificação do operador nas respostas IA vem do cadastro do colaborador logado.
+- **Status**: Concluído (push dev)
+
+---
 
 ### GitHub Push — Desk: ciclo status inbound e-mail + fechamento resolvido 48h
 

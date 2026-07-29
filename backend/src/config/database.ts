@@ -1,4 +1,4 @@
-/** database v1.8.2 — MONGO_ENV runtime (VeloHubCentral / colaboradores) */
+/** database v1.8.3 — conexão desk_preferences (preferências pessoais do agente) */
 import path from 'path';
 import mongoose, { Connection } from 'mongoose';
 import { env, envFile, getMongoDeskUri, getMongoHubCentralUri } from './env';
@@ -6,12 +6,13 @@ import { MONGO_DRIVER_OPTIONS } from './mongoUri';
 import { maskMongoUri, resolveAtlasSrvUri } from './resolveAtlasUri';
 
 /**
- * Conexões deste serviço (cluster VeloDesk): b2c_chamados, b2c_cadastros, desk_config.
+ * Conexões deste serviço (cluster VeloDesk): b2c_chamados, b2c_cadastros, desk_config, desk_preferences.
  * Cadastro colaboradores: cluster VeloHubCentral → console_funcionarios (somente leitura).
  * VeloNews continua via API VeloHub (console_conteudo).
  */
 let cadastrosConnection: Connection | null = null;
 let deskConfigConnection: Connection | null = null;
+let deskPreferencesConnection: Connection | null = null;
 let funcionariosConnection: Connection | null = null;
 
 export function isMongoConnected(): boolean {
@@ -24,6 +25,10 @@ export function isCadastrosConnected(): boolean {
 
 export function isDeskConfigConnected(): boolean {
   return deskConfigConnection?.readyState === 1;
+}
+
+export function isDeskPreferencesConnected(): boolean {
+  return deskPreferencesConnection?.readyState === 1;
 }
 
 export function isFuncionariosConnected(): boolean {
@@ -42,6 +47,13 @@ export function getDeskConfigConnection(): Connection {
     throw new Error('Conexão desk_config indisponível');
   }
   return deskConfigConnection;
+}
+
+export function getDeskPreferencesConnection(): Connection {
+  if (!deskPreferencesConnection || deskPreferencesConnection.readyState !== 1) {
+    throw new Error('Conexão desk_preferences indisponível');
+  }
+  return deskPreferencesConnection;
 }
 
 export function getFuncionariosConnection(): Connection {
@@ -70,7 +82,10 @@ function maskUri(uri: string): string {
 }
 
 export function isAllMongoReady(): boolean {
-  return isMongoConnected() && isCadastrosConnected() && isDeskConfigConnected();
+  return isMongoConnected()
+    && isCadastrosConnected()
+    && isDeskConfigConnected()
+    && isDeskPreferencesConnected();
 }
 
 async function resetConnection(conn: Connection | null): Promise<void> {
@@ -112,6 +127,22 @@ async function connectDeskConfig(uri: string): Promise<void> {
   });
   await deskConfigConnection.asPromise();
   console.log(`Atlas desk_config conectado: ${env.mongoDeskConfigDbName}`);
+}
+
+async function connectDeskPreferences(uri: string): Promise<void> {
+  if (deskPreferencesConnection?.readyState === 1) return;
+
+  if (deskPreferencesConnection) {
+    await resetConnection(deskPreferencesConnection);
+    deskPreferencesConnection = null;
+  }
+
+  deskPreferencesConnection = mongoose.createConnection(uri, {
+    dbName: env.mongoDeskPreferencesDbName,
+    ...MONGO_DRIVER_OPTIONS,
+  });
+  await deskPreferencesConnection.asPromise();
+  console.log(`Atlas desk_preferences conectado: ${env.mongoDeskPreferencesDbName}`);
 }
 
 async function connectFuncionarios(): Promise<void> {
@@ -182,6 +213,7 @@ export async function connectDatabase(uriOverride?: string): Promise<void> {
 
   await connectCadastros(atlasUri);
   await connectDeskConfig(atlasUri);
+  await connectDeskPreferences(atlasUri);
   await tryConnectFuncionarios();
 }
 
@@ -193,6 +225,10 @@ export async function disconnectDatabase(): Promise<void> {
   if (deskConfigConnection) {
     await deskConfigConnection.close();
     deskConfigConnection = null;
+  }
+  if (deskPreferencesConnection) {
+    await deskPreferencesConnection.close();
+    deskPreferencesConnection = null;
   }
   if (cadastrosConnection) {
     await cadastrosConnection.close();

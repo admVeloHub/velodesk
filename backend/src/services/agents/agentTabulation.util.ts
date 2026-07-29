@@ -1,6 +1,6 @@
 /**
- * agentTabulation.util v1.1.0 — tabulação sugerida pelo Agente de Auditoria
- * VERSION: v1.1.0 | DATE: 2026-07-15
+ * agentTabulation.util v1.2.0 — histórico público + anotações internas no prompt de composição
+ * VERSION: v1.2.0 | DATE: 2026-07-29
  */
 import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from '../tabulation.service';
 import type { TicketAiMessageInput, TicketAiTabulationResult, AuditoriaInput } from './agentTypes';
@@ -91,12 +91,17 @@ export function buildAtendimentoUserBlock(
   parts.push('', '## Catálogo de tabulação (lista fechada)', '', tabulationCatalog);
   parts.push('', '## Tipos permitidos', '', 'Reclamação, Solicitação, Dúvida, Informação');
 
-  if (params.contextSource === 'public' && params.messages?.length) {
-    parts.push('', '## Histórico', '', formatMessagesBlock(params.messages));
+  if (params.messages?.length) {
+    parts.push('', '## Histórico da conversa (mensagens públicas)', '', formatMessagesBlock(params.messages));
   }
 
-  if (params.contextSource === 'internal' && params.internalNote) {
-    parts.push('', '## Registro interno (NÃO repetir literalmente)', '', params.internalNote);
+  if (params.internalNote?.trim()) {
+    parts.push(
+      '',
+      '## Anotações internas (contexto do agente — NÃO repetir literalmente na resposta ao cliente)',
+      '',
+      params.internalNote.trim(),
+    );
   }
 
   if (params.feedbackExamples?.trim()) {
@@ -120,11 +125,11 @@ export function buildAuditoriaUserBlock(
     `Status: ${params.status || 'não informado'}`,
   ];
 
-  if (params.contextSource === 'public' && params.messages?.length) {
-    parts.push('', '## Contexto original do cliente', '', formatMessagesBlock(params.messages));
+  if (params.messages?.length) {
+    parts.push('', '## Contexto original do cliente (mensagens públicas)', '', formatMessagesBlock(params.messages));
   }
-  if (params.contextSource === 'internal' && params.internalNote) {
-    parts.push('', '## Contexto original (anotação interna)', '', params.internalNote);
+  if (params.internalNote?.trim()) {
+    parts.push('', '## Anotações internas do agente (contexto operacional)', '', params.internalNote.trim());
   }
   if (params.ultimaMensagemCliente) {
     parts.push('', '## Última mensagem do cliente', '', params.ultimaMensagemCliente);
