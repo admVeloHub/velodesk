@@ -10,6 +10,8 @@ import TabulationFormsSection from './components/TabulationFormsSection';
 import FuncoesPermissoesSection from './funcoes/FuncoesPermissoesSection';
 import WorkflowsConfigSection from './workflow/WorkflowsConfigSection';
 import EmailConfigSection from './email/EmailConfigSection';
+import ApiExternaConfigSection from './api/ApiExternaConfigSection';
+import TicketIaConfigSection from './ai/TicketIaConfigSection';
 import { usePermissions } from '../../context/PermissionContext';
 
 export default function ConfigView() {
@@ -101,6 +103,10 @@ export default function ConfigView() {
                 <FuncoesPermissoesSection />
               ) : section === 'email' ? (
                 <EmailConfigSection />
+              ) : section === 'api' ? (
+                <ApiExternaConfigSection />
+              ) : section === 'ticket-ia' ? (
+                <TicketIaConfigSection />
               ) : (
                 <p className="config-placeholder-msg">
                   Editor de {active?.label?.toLowerCase()} — em desenvolvimento.

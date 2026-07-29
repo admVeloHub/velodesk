@@ -158,6 +158,10 @@ export const env = {
     .map((item) => item.trim())
     .filter(Boolean),
   gestaoAlertWhatsapp: (process.env.GESTAO_ALERT_WHATSAPP || '').trim(),
+  chamadoIaAnaliseEnabled: process.env.CHAMADO_IA_ANALISE_ENABLED !== 'false',
+  chamadoIaAnaliseModel: (process.env.CHAMADO_IA_ANALISE_MODEL || 'gpt-5-mini').trim(),
+  chamadoIaAnaliseIntervalMs: parseInt(process.env.CHAMADO_IA_ANALISE_INTERVAL_MS || '900000', 10),
+  chamadoIaAnaliseMaxPerCycle: parseInt(process.env.CHAMADO_IA_ANALISE_MAX_PER_CYCLE || '60', 10),
   ticketSequenceFloor: (process.env.TICKET_SEQUENCE_FLOOR || '100177678').trim(),
   /** Ativo por padrão; desligar com ASSIGNMENT_ROUTER_ENABLED=false */
   assignmentRouterEnabled: process.env.ASSIGNMENT_ROUTER_ENABLED !== 'false',
@@ -173,5 +177,8 @@ export const env = {
   resolvedCloseIntervalMs: parseInt(process.env.RESOLVED_CLOSE_INTERVAL_MS || '3600000', 10),
   /** Idade mínima em Resolvido antes de virar Fechado (default 48h) */
   resolvedCloseAfterMs: parseInt(process.env.RESOLVED_CLOSE_AFTER_MS || '172800000', 10),
+  inboundTelephonyEnabled: process.env.INBOUND_TELEPHONY_ENABLED !== 'false',
+  inboundTelephonyWebhookSecret: (process.env.INBOUND_TELEPHONY_WEBHOOK_SECRET || '').trim(),
+  telephonyAutoCreateTicket: process.env.TELEPHONY_AUTO_CREATE_TICKET === 'true',
 };
 

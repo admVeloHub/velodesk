@@ -1,6 +1,7 @@
 ﻿/** email-inbound.service v1.8.0 — ciclo status: pendente/resolvido reabre; fechado gera novo */
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
+import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
 import { applyAssignmentIfNeeded } from './assignmentRouter.service';
 import {
   appendMessage,
@@ -181,6 +182,10 @@ async function runInboundEmailFlow(
       : undefined;
     appendMessage(existing, bodyText, false, 'them', attachments, emailMeta, statusOverride);
     await existing.save();
+    await ChamadoIaAnalise.updateOne(
+      { chamadoId: existing._id, origem: { $ne: 'manual' } },
+      { $set: { needsReanalysis: true } },
+    );
     return {
       action: 'replied',
       chamadoProtocolo: existing.chamadoProtocolo,

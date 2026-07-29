@@ -2,13 +2,18 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { env } from '../config/env';
-import { inboundAppAuthMiddleware, inboundEmailAuthMiddleware } from '../middleware/inboundAuth';
+import { inboundAppAuthMiddleware, inboundEmailAuthMiddleware, inboundTelephonyAuthMiddleware } from '../middleware/inboundAuth';
 import { processAppNotify } from '../services/app-inbound.service';
 import { isAllowedRecipient, processInboundEmail } from '../services/email-inbound.service';
 import { parseInboundEmailPayload } from '../services/inbound-email/adapters';
 import { handleGmailPubSubPush } from '../services/gmail/gmailInbound.service';
 import { getGmailWatchHealth } from '../services/gmail/gmailWatch.service';
 import { isEmailTransportReady } from '../services/emailTransport.service';
+import {
+  getInboundTelephonyRecados,
+  processInboundTelephonyCall,
+} from '../services/telephony-inbound/telephonyInbound.service';
+import { countActiveRecados, getLatestActiveRecadoUpdatedAt } from '../services/telephonyRecado.service';
 
 const router = Router();
 const upload = multer({
@@ -96,9 +101,41 @@ router.post('/gmail/pubsub', async (req: Request, res: Response) => {
   }
 });
 
-/** Fase 2 — telefonia (stub) */
-router.post('/telephony', (_req, res: Response) => {
-  res.status(501).json({ message: 'Inbound telefonia ainda não implementado' });
+/** Telefonia IA — health check para parceira */
+router.get('/telephony/health', async (_req, res: Response) => {
+  const activeRecados = await countActiveRecados();
+  const lastRecadoUpdate = await getLatestActiveRecadoUpdatedAt();
+  res.json({
+    status: 'ok',
+    enabled: env.inboundTelephonyEnabled,
+    activeRecados,
+    lastRecadoUpdate,
+  });
+});
+
+router.post('/telephony/calls', inboundTelephonyAuthMiddleware, async (req, res: Response) => {
+  try {
+    const result = await processInboundTelephonyCall(req.body as Record<string, unknown>);
+    const statusCode = result.action === 'created' ? 201 : 200;
+    return res.status(statusCode).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/obrigatório|Informe/i.test(message)) {
+      return res.status(400).json({ message });
+    }
+    console.error('[inbound/telephony/calls]', err);
+    return res.status(500).json({ message: 'Falha ao processar ligação inbound' });
+  }
+});
+
+router.get('/telephony/recados', inboundTelephonyAuthMiddleware, async (_req, res: Response) => {
+  try {
+    const result = await getInboundTelephonyRecados();
+    return res.json(result);
+  } catch (err) {
+    console.error('[inbound/telephony/recados]', err);
+    return res.status(500).json({ message: 'Falha ao carregar recados ativos' });
+  }
 });
 
 router.post('/app-notify', inboundAppAuthMiddleware, async (req, res: Response) => {

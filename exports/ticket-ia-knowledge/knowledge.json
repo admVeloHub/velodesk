@@ -1,0 +1,92 @@
+{
+  "metadata": {
+    "exportedAt": "2026-07-28T18:57:25.877Z",
+    "sourceProject": "wfm_atendimento",
+    "sourceSupabaseUrl": "https://pxnfdqkyboreqdrckczp.supabase.co",
+    "contextoVersao": 56,
+    "counts": {
+      "taxonomiaMotivos": 27,
+      "motivoAliases": 8,
+      "exemplosContexto": 0,
+      "instrucoesOutrosChars": 3752,
+      "contextoEmpresaChars": 5647
+    },
+    "defaults": {
+      "maxTicketsPorChamada": 200,
+      "modeloOpenAi": "gpt-5-mini",
+      "maxExemplosPorMotivoNoPrompt": 3,
+      "maxExemplosTotalNoPrompt": 60
+    },
+    "notas": [
+      "Aliases são só para sinônimo puro de rótulo; ensinar contexto use exemplos de contexto + correção manual.",
+      "Não importe cegamente o cache histórico octadesk_ticket_ia_analise — parte foi gerado com aliases errados antes da revisão de 28/07/2026.",
+      "Renomeie chaves octadesk_ia_* para ticket_ia_* (ou equivalente) no projeto destino."
+    ]
+  },
+  "contextoEmpresa": "# Resumo da Empresa – Velotax\n\n## Sobre a Velotax\n\nA Velotax é uma fintech de crédito especializada em oferecer soluções financeiras para clientes das classes C e D. Toda a comunicação deve utilizar linguagem simples, clara e acessível, seguindo os princípios da metodologia de escrita simples de Heloisa Fischer. As respostas devem evitar termos técnicos sempre que possível e explicar cada processo de forma didática.\n\nO cadastro no aplicativo é simples e realizado por meio de e-mail e telefone, que são validados no primeiro acesso. Após o cadastro, o próprio cliente pode alterar informações como nome, telefone, e-mail e data de nascimento diretamente pelo aplicativo.\n\n---\n\n## Produtos Ativos\n\n### 1. Empréstimo Pessoal (Produto Principal)\n\nO empréstimo pessoal é atualmente o principal produto da empresa.\n\nSeu processo funciona da seguinte forma:\n\n* O cliente solicita o crédito pelo aplicativo.\n* A análise é realizada por meio da autorização do Open Finance.\n* A conexão do Open Finance é feita pela parceira Klavi.\n* Após aprovação, o valor é enviado para a chave PIX CPF do cliente em até 30 minutos.\n\n### Principais motivos de atendimento\n\n* Dificuldade para conectar o Open Finance.\n* Cliente não consegue concluir a autorização junto à Klavi.\n* Erros no aplicativo durante a contratação.\n* Cliente questiona a demora do crédito antes do prazo de 30 minutos.\n* Cliente não encontra os boletos para pagamento.\n* Solicitação de renegociação da dívida.\n* Dúvidas sobre parcelas, vencimentos ou pagamentos.\n* Em julho/2025 houve instabilidade no Open Finance: o app não concluía alguns empréstimos. Relatos desse tipo (do período) são erro de Open Finance, não recusa de crédito.\n\n---\n\n### 2. Antecipação da Restituição do Imposto de Renda\n\nEmbora não seja mais o principal produto, ainda gera grande volume de atendimentos.\n\nNesse produto, o cliente recebe um empréstimo utilizando como garantia sua restituição do Imposto de Renda.\n\nFuncionamento:\n\n* O cliente cadastra uma chave PIX vinculada ao banco parceiro Celcoin.\n* Essa chave é informada na declaração do Imposto de Renda.\n* Quando a Receita Federal realiza o pagamento da restituição, o empréstimo é quitado automaticamente.\n* Caso exista saldo após a quitação, ele permanece disponível na conta do cliente.\n\n### Principais motivos de atendimento\n\n* Solicitação de devolução da chave PIX para outro banco.\n* Dúvidas sobre juros cobrados.\n* Pagamento antecipado do empréstimo.\n* Renegociação da dívida.\n* Dúvidas sobre o contrato.\n* Pedidos de contratar a Antecipação da Restituição do IR (ex.: \"Antecipação IR\") são diferentes de dúvidas sobre a restituição em si (quando vai receber, qual lote, quanto deve, malha fina) — ver taxonomia específica para cada caso.\n\n---\n\n### 3. Antecipação de Salário (produto novo)\n\nLançado recentemente e já disponível no aplicativo (não está mais indisponível).\n\n* É um adiantamento de parte do salário do cliente, contratado direto pelo app.\n* Não deve ser confundido com a Antecipação da Restituição do Imposto de Renda — são produtos diferentes, com público e regras diferentes.\n* Pedidos de contratação desse produto específico têm taxonomia própria (ver abaixo). Pedidos de empréstimo em geral, sem menção a esse produto, seguem como pedido de crédito comum.\n\n---\n\n## Conta Digital\n\nComo consequência da Antecipação da Restituição, muitos clientes possuem conta digital vinculada ao banco parceiro Celcoin.\n\nOs principais assuntos relacionados à conta são:\n\n* Entrada ou saída de valores.\n* PIX não recebido.\n* Extrato da conta.\n* Limite diário de transferências, especialmente no período noturno.\n* Cancelamento da conta.\n* Conta bloqueada por determinação judicial ou por mecanismo MED (Banco Central).\n* Encerramento de conta feito pelo próprio banco (Celcoin) para diversos clientes: nesses casos, some a opção \"conta\" do aplicativo e a chave PIX CPF do cliente deixa de ficar vinculada ao nosso banco. Reclamações e pedidos de recadastro de chave PIX motivados por esse encerramento têm taxonomia própria (ver abaixo).\n\n---\n\n## Clube Velotax\n\nClientes que pagam seus empréstimos em dia, ou cumprem acordos de renegociação, podem receber cupons de desconto para utilização em lojas parceiras.\n\nCaracterísticas:\n\n* Todo o processo é automático.\n* Não há intervenção humana.\n* A antiga funcionalidade de compra de cupons foi descontinuada.\n* Dúvidas ou reclamações sobre cupons (não conseguir trocar, etc.) são deste tema.\n\n---\n\n## Produtos Descontinuados\n\n### Crédito ao Trabalhador\n\nProduto não comercializado atualmente.\n\nOs atendimentos normalmente envolvem:\n\n* Dúvidas sobre pagamentos.\n* Parcelas.\n* Quitação.\n\n### Seguros\n\nProduto descontinuado.\n\nOs principais questionamentos são:\n\n* Parcelas pagas.\n* Vigência da cobertura.\n* Diferença entre pagamento mensal e anual.\n\nRegra importante:\n\n* Seguro mensal possui cobertura somente durante o período em que as mensalidades estiverem sendo pagas.\n* Seguro anual mantém a cobertura até o final do período contratado.\n\n---\n\n## Diretrizes para interpretação dos chamados\n\nAo analisar qualquer chamado, considere que:\n\n* O cliente normalmente possui pouco conhecimento financeiro e tecnológico.\n* As respostas devem ser simples, objetivas e acolhedoras.\n* Muitos clientes demonstram ansiedade durante o processo de contratação, principalmente aguardando a liberação do crédito.\n* Sempre que possível, identifique a qual produto o chamado pertence antes de analisar o problema.\n* Em caso de dúvidas sobre empréstimos, pagamentos, PIX, renegociação ou conta digital, considere primeiro os cenários descritos neste documento, pois representam a maior parte dos atendimentos da empresa.",
+  "instrucoesOutros": "Regras de classificação (usar para desambiguar antes de cair em \"Outros\"):\n\n- \"Quero um empréstimo\", \"me libera\", \"solicitar empréstimo\" e demais pedidos de crédito comuns (sem menção ao produto Antecipação de Salário) → Quero contratar\n- Pedidos de contratação do produto Antecipação de Salário (novo, já disponível no app) → Contratação Antecipação de salário. Não confundir com Antecipação da Restituição do IR.\n- Pedidos de contratar a Antecipação da Restituição do IR (\"Antecipação IR\", \"quero antecipar minha restituição\", etc.) → Contratar Antecipação de IR. Não confundir com Antecipação de Salário.\n- Dúvidas sobre a restituição do IR em si (quando vai receber, qual lote da Receita, quanto está devendo, caiu na malha fina, como a Receita paga) → Dúvidas gerais Antecipação de IR\n- Cliente sem chave PIX cadastrada, questionando isso para conseguir contratar um empréstimo (não é sobre encerramento de conta) → Quero contratar\n- Pedido de antecipação do pagamento de parcela de empréstimo já contratado → Quero a parcela / quitação / boleto\n- Reclamações e pedidos de recadastro de chave PIX motivados pelo encerramento de conta feito pelo banco (Celcoin) → Reclamações sobre encerramento conta Celcoin\n- Reclamações de que não está visualizando a opção de conta no aplicativo → Reclamações sobre encerramento conta Celcoin\n- Reclamações de que precisa do extrato ou saldo da conta e não está aparecendo, ou então o cliente diz que não consegue ver seu saldo  → Reclamações sobre encerramento conta Celcoin\n- Cupons, troca de cupons, \"não consigo trocar meu cupom\" → Clube Velotax\n- Dívidas, \"fui negativado\", nome no SPC/Serasa, \"desconheço essa dívida\" → Renegociação/Cobrança (esta taxonomia substitui \"Negociação\" e \"Negativação — fui negativado\"; não usar mais esses dois rótulos)\n- \"Trocar de banco\" no contexto de análise de crédito / Open Finance → Open Finance - Dúvidas\n- \"Trocar de banco\" para levar a chave PIX para outra instituição → Portabilidade de chave Pix / erro na portabilidade\n- Pedidos de \"excluir dados\" que na prática são sobre excluir/remover a chave PIX → Portabilidade de chave Pix / erro na portabilidade\n- Pedidos de exclusão de dados ou da conta em si (LGPD, \"quero excluir minha conta/meus dados\") → Excluir dados/Conta\n- Cliente alega golpe/fraude alegando estar em dívida sem ter contratado nada → Questionamento de suspeita de fraude\n- Cliente alega golpe/fraude, mas na prática é reprovação de crédito, falta de oferta disponível, ou empréstimo não liberado → Não fui aprovado / não elegível — análise de crédito\n- Título/descrição contendo apenas \"teste\", \"testes\" ou variações claras de teste interno (sem relato real de problema) → Ticket de teste (desconsiderar). Não classificar como Outros nem como nenhum motivo real; é ruído de teste, não atendimento de cliente.\n- Cliente ansioso perguntando por que o empréstimo já aprovado ainda não caiu/entrou na conta → Status da proposta — contratei e ainda não recebi. Não é \"Conta Digital\" nem \"Não recebi um PIX\" (esses são sobre PIX de terceiros ou movimentação da conta, não sobre o próprio crédito contratado).\n- Clientes que não localizam o boleto para pagamento → Quero a parcela / quitação / boleto\n- Clientes que questionam que querem antecipar as parcelas pagas - diferente de clientes que estão devendo → Quero a parcela / quitação / boleto\n- Menções de: \"Não acho a opção de antecipar\", \"Quero quitar toda a dívida\", \"Não consigo quitar o empréstimo\" → Quero a parcela / quitação / boleto\n- Clientes que mencionam: \"SPC\", \"Serasa\", \"Negativação\", \"Quero renegociar\", \"Quero negociar\", \"Sujaram meu nome\", \"Protesto\", \"Estou devendo\", \"Fiquei desempregado e não fiz o pagamento\", entre outras menções a dívida em atraso  → Renegociação/Cobrança\n-",
+  "taxonomiaMotivos": [
+    "Quero a parcela / quitação / boleto",
+    "Renegociação/Cobrança",
+    "Open Finance / não redireciona para o banco",
+    "App travando ao contratar",
+    "App travando ao enviar um PIX (problema na conta corrente)",
+    "Não recebi um PIX (problema na conta corrente)",
+    "PIX enviado entre 22h e 06h (limite de PIX noturno)",
+    "Portabilidade de chave Pix / erro na portabilidade",
+    "Senha de acesso / não acessa o app / alteração de e-mail ou telefone",
+    "Status da proposta — contratei e ainda não recebi",
+    "Não fui aprovado / não elegível — análise de crédito",
+    "Dúvida sobre taxas / valores",
+    "Seguros em geral",
+    "Reclamação sobre atendimento",
+    "Outros",
+    "Reclamações sobre encerramento conta Celcoin",
+    "Quero contratar",
+    "Contratação Antecipação de salário",
+    "Contratar Antecipação de IR",
+    "Dúvidas gerais Antecipação de IR",
+    "Clube Velotax",
+    "Open Finance - Dúvidas",
+    "Excluir dados/Conta",
+    "Questionamento de suspeita de fraude",
+    "Ticket de teste (desconsiderar)",
+    "Solicita retorno Humano",
+    "Dúvidas contratação"
+  ],
+  "motivoAliases": [
+    {
+      "de": "Não estou vendo meu saldo",
+      "para": "Reclamações sobre encerramento conta Celcoin"
+    },
+    {
+      "de": "App travando ao enviar um PIX (problema na conta corrente)",
+      "para": "Não recebi um PIX (problema na conta corrente)"
+    },
+    {
+      "de": "Erro ao enviar PIX",
+      "para": "Não recebi um PIX (problema na conta corrente)"
+    },
+    {
+      "de": "Ver saldo da conta",
+      "para": "Reclamações sobre encerramento conta Celcoin"
+    },
+    {
+      "de": "Pix celular - depósito",
+      "para": "Não recebi um PIX (problema na conta corrente)"
+    },
+    {
+      "de": "Não sei em qual conta vai cair meu pix",
+      "para": "Status da proposta — contratei e ainda não recebi"
+    },
+    {
+      "de": "Queria um extrato",
+      "para": "Reclamações sobre encerramento conta Celcoin"
+    },
+    {
+      "de": "Alterar nome",
+      "para": "Senha de acesso / não acessa o app / alteração de e-mail ou telefone"
+    }
+  ],
+  "exemplosContexto": []
+}

@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
+import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
 import { Box } from '../models/Box';
 import {
   applyManualResponsavelClaim,
@@ -171,6 +172,7 @@ router.post('/', authMiddleware, async (req, res: Response) => {
 router.put('/:id', authMiddleware, async (req, res: Response) => {
   const chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+  const titleBefore = chamado.chamadoTitulo;
 
   try {
     assertChamadoModifiable(chamado);
@@ -193,6 +195,12 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
     applyManualResponsavelClaim(chamado, req.user);
     await applyBodyToChamado(chamado, req.body, req.user);
     await chamado.save();
+    if (chamado.chamadoTitulo !== titleBefore) {
+      await ChamadoIaAnalise.updateOne(
+        { chamadoId: chamado._id, origem: { $ne: 'manual' } },
+        { $set: { needsReanalysis: true } },
+      );
+    }
 
     const boxes = await loadBoxes();
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
@@ -300,6 +308,12 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
   }
 
   await chamado.save();
+  if (!isInternalOnly && publicText.trim() && String(sender ?? 'me') === 'them') {
+    await ChamadoIaAnalise.updateOne(
+      { chamadoId: chamado._id, origem: { $ne: 'manual' } },
+      { $set: { needsReanalysis: true } },
+    );
+  }
 
   if (!isInternalOnly && publicText.trim()) {
     await notifyAgentReplyAsync(chamado, publicText, undefined, result.public?.registroIndex);

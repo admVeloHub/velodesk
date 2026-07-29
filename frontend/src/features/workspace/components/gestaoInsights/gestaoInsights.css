@@ -65,6 +65,167 @@
     align-items: stretch;
 }
 
+.gestao-insights-row--risco {
+    grid-template-columns: 1fr;
+}
+
+.gestao-customer-voice__head {
+    align-items: flex-start;
+}
+
+.gestao-customer-voice__head p {
+    margin: 0.25rem 0 0;
+    color: #64748b;
+    font-size: 0.78rem;
+}
+
+.gestao-customer-voice__coverage {
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(22, 52, 255, 0.09);
+    color: var(--eco-blue, #1634FF);
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.gestao-customer-voice__grid {
+    display: grid;
+    grid-template-columns: 1.25fr 1fr 0.85fr;
+    gap: 1rem;
+}
+
+.gestao-customer-voice__panel {
+    min-width: 0;
+    padding: 0.85rem;
+    border-radius: 12px;
+    background: var(--eco-surface, #F3F7FC);
+}
+
+.gestao-customer-voice__panel h5,
+.gestao-customer-drill h5 {
+    margin: 0 0 0.75rem;
+    color: var(--eco-navy, #000058);
+    font-size: 0.8rem;
+}
+
+.gestao-customer-voice__panel > button {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding: 0 0 0.32rem;
+    border: 0;
+    background: transparent;
+    color: var(--eco-carbon, #272A30);
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.gestao-customer-voice__panel > button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.76rem;
+}
+
+.gestao-customer-voice__panel > button strong {
+    color: var(--eco-navy, #000058);
+    font-size: 0.74rem;
+}
+
+.gestao-customer-voice__panel > button i {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--eco-blue, #1634FF);
+}
+
+.gestao-customer-voice__panel > button.is-critico i,
+.gestao-customer-voice__panel > button.is-irritado i {
+    background: #C4291F;
+}
+
+.gestao-customer-voice__panel > button.is-confuso i {
+    background: var(--eco-yellow, #FCC200);
+}
+
+.gestao-customer-voice__metrics > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid rgba(0, 0, 88, 0.08);
+    color: #64748b;
+    font-size: 0.74rem;
+}
+
+.gestao-customer-voice__metrics strong {
+    color: var(--eco-navy, #000058);
+}
+
+.gestao-customer-voice__metrics .is-warning strong {
+    color: #C4291F;
+}
+
+.gestao-customer-drill__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.gestao-customer-drill__list article {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem;
+    border-radius: 10px;
+    background: var(--eco-surface, #F3F7FC);
+}
+
+.gestao-customer-drill__main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 0.2rem;
+    font-size: 0.76rem;
+    color: #64748b;
+}
+
+.gestao-customer-drill__main strong {
+    color: var(--eco-navy, #000058);
+}
+
+.gestao-customer-drill__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.gestao-customer-drill__actions input {
+    max-width: 180px;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid rgba(0, 0, 88, 0.16);
+    border-radius: 7px;
+}
+
+@media (max-width: 960px) {
+    .gestao-customer-voice__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .gestao-customer-drill__list article {
+        flex-direction: column;
+    }
+}
+
 @media (max-width: 900px) {
     .gestao-insights-row--chart,
     .gestao-insights-row--summary {
@@ -599,6 +760,107 @@
     right: 0.6rem;
     font-size: 0.85rem;
     color: #94a3b8;
+}
+
+/* ── Card de risco de caso especial (alerta precoce de IA) ── */
+.gestao-risco-card__hint {
+    margin: 0;
+    font-size: 0.78rem;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+.gestao-risco-card__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.gestao-risco-card__item {
+    --risco-accent: var(--eco-navy, #000058);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.7rem 0.85rem;
+    border-radius: var(--eco-radius-sm, 12px);
+    background: var(--eco-surface, #F3F7FC);
+    border-left: 4px solid var(--risco-accent);
+}
+
+.gestao-risco-card__item--red { --risco-accent: #C4291F; }
+.gestao-risco-card__item--amber { --risco-accent: var(--eco-yellow, #FCC200); }
+.gestao-risco-card__item--blue { --risco-accent: var(--eco-blue, #1634FF); }
+.gestao-risco-card__item--navy { --risco-accent: var(--eco-navy, #000058); }
+
+.gestao-risco-card__info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.gestao-risco-card__top {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.78rem;
+}
+
+.gestao-risco-card__tipo {
+    background: rgba(0, 0, 88, 0.08);
+    color: var(--risco-accent, var(--eco-navy, #000058));
+    font-weight: 700;
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.gestao-risco-card__top strong {
+    color: var(--eco-navy, #000058);
+}
+
+.gestao-risco-card__age {
+    color: #64748b;
+    font-size: 0.72rem;
+}
+
+.gestao-risco-card__titulo {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--eco-carbon, #272A30);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gestao-risco-card__trecho {
+    margin: 0;
+    font-size: 0.76rem;
+    color: #64748b;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gestao-risco-card__open {
+    flex-shrink: 0;
+    border: none;
+    background: var(--eco-blue, #1634FF);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+    cursor: pointer;
 }
 
 @media (max-width: 640px) {

@@ -753,10 +753,14 @@ export async function createChamadoFromBody(
       });
     }
   } else {
+    const requestedOrigin = String(body.messageOrigin ?? '').trim().toLowerCase();
+    const initialOrigin: RegistroOrigin = requestedOrigin === 'cliente' || body.sender === 'them'
+      ? 'cliente'
+      : 'agente';
     registro = [{
       data: new Date(),
-      origin: 'agente',
-      autor: resolveRegistroAutor('agente', {
+      origin: initialOrigin,
+      autor: resolveRegistroAutor(initialOrigin, {
         authUser,
         authorHint: String(body.author ?? '').trim(),
         clientName,
@@ -766,7 +770,10 @@ export async function createChamadoFromBody(
       anotacaoInterna: internal ? text : '',
       anexosAnotacaoInterna: internal ? attachments : [],
       alteracoes: [],
-      metadados: {},
+      metadados: {
+        source: String(body.source ?? body.channel ?? '').trim() || 'velodesk',
+        sourceQuality: initialOrigin === 'cliente' ? 'direto_cliente' : 'resumo_atendente',
+      },
       status,
     }];
   }
