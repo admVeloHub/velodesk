@@ -39,6 +39,8 @@ import permissionsRoutes from './routes/permissions.routes';
 import funcoesPermissoesRoutes from './routes/funcoesPermissoes.routes';
 import agentesDeskRoutes from './routes/agentesDesk.routes';
 import mailRulesRoutes from './routes/mailRules.routes';
+import ticketIaAnalysisRoutes from './routes/ticketIaAnalysis.routes';
+import telephonyRoutes from './routes/telephony.routes';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
@@ -50,6 +52,7 @@ import { seedDevelopmentData, purgeAllMockTickets, runDeskConfigMigrations } fro
 import { getAgentsStatus } from './services/agents/openaiAgent.util';
 import { startGestaoChamadosJob } from './jobs/gestaoChamados.job';
 import { startCloseResolvedTicketsJob } from './jobs/closeResolvedTickets.job';
+import { startChamadoIaAnaliseJob } from './jobs/chamadoIaAnalise.job';
 import { bootstrapEmailServices } from './services/emailBootstrap.service';
 import { startChamadoProtocoloWatcher } from './services/chamadoProtocoloWatcher.service';
 
@@ -162,6 +165,8 @@ app.use('/api/permissions', permissionsRoutes);
 app.use('/api/funcoes-permissoes', funcoesPermissoesRoutes);
 app.use('/api/agentes-desk', agentesDeskRoutes);
 app.use('/api/mail-rules', mailRulesRoutes);
+app.use('/api/ticket-ia-analysis', ticketIaAnalysisRoutes);
+app.use('/api/telephony', telephonyRoutes);
 
 if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);
@@ -293,6 +298,7 @@ async function start() {
           autonomy: env.agentsAutonomyEnabled,
         });
         startGestaoChamadosJob();
+        startChamadoIaAnaliseJob();
       }
       startCloseResolvedTicketsJob();
       if (env.enableWhatsapp) {

@@ -20,6 +20,7 @@ export const AI_MODEL_PRICING: Record<string, AiModelPricing> = {
   'gpt-4.1': { provider: 'openai', inputPer1M: 2.00, outputPer1M: 8.00 },
   'gpt-4o-mini': { provider: 'openai', inputPer1M: 0.15, outputPer1M: 0.60 },
   'gpt-4o': { provider: 'openai', inputPer1M: 2.50, outputPer1M: 10.00 },
+  'gpt-5-mini': { provider: 'openai', inputPer1M: 0.25, outputPer1M: 2.00 },
 
   // Gemini — Generative AI API (USD / 1M tokens, faixa de contexto padrão)
   'gemini-2.5-flash': { provider: 'gemini', inputPer1M: 0.30, outputPer1M: 2.50 },

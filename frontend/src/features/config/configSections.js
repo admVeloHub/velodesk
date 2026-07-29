@@ -32,6 +32,13 @@ export const CONFIG_SECTIONS = [
     icon: 'ti-mail',
   },
   {
+    id: 'ticket-ia',
+    label: 'IA de tickets',
+    menuDesc: 'Contexto, taxonomia e aprendizado',
+    cardDesc: 'Configure a visão real do cliente',
+    icon: 'ti-sparkles',
+  },
+  {
     id: 'automations',
     label: 'Automações',
     menuDesc: 'Rotinas e ações automáticas',

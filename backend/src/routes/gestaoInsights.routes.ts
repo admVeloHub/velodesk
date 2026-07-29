@@ -11,6 +11,11 @@ import {
   getVolumeSummary,
   GestaoInsightsQuery,
 } from '../services/gestaoInsights.service';
+import {
+  getCustomerVoiceInsights,
+  getCustomerVoiceTickets,
+  getRiscosCasoEspecial,
+} from '../services/chamadoIaAnalise.service';
 
 const router = Router();
 
@@ -95,6 +100,44 @@ router.get('/casos-especiais/:orgao', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[gestao-insights] GET /casos-especiais/:orgao falhou:', err);
     return res.status(500).json({ message: 'Erro ao carregar detalhe de casos especiais' });
+  }
+});
+
+router.get('/risco-casos-especiais', async (req: Request, res: Response) => {
+  if (!isMongoConnected()) {
+    return res.status(503).json({ message: 'Banco de chamados indisponível' });
+  }
+  try {
+    const limit = Math.max(1, Math.min(50, parseInt(String(req.query.limit ?? '10'), 10) || 10));
+    const result = await getRiscosCasoEspecial(limit);
+    return res.json({ items: result });
+  } catch (err) {
+    console.error('[gestao-insights] GET /risco-casos-especiais falhou:', err);
+    return res.status(500).json({ message: 'Erro ao carregar risco de casos especiais' });
+  }
+});
+
+router.get('/voz-cliente', async (req: Request, res: Response) => {
+  try {
+    return res.json(await getCustomerVoiceInsights(parseQuery(req)));
+  } catch (err) {
+    console.error('[gestao-insights] GET /voz-cliente falhou:', err);
+    return res.status(500).json({ message: 'Erro ao carregar a visão do cliente por IA' });
+  }
+});
+
+router.get('/voz-cliente/tickets', async (req: Request, res: Response) => {
+  try {
+    const result = await getCustomerVoiceTickets({
+      query: parseQuery(req),
+      motivo: typeof req.query.motivo === 'string' ? req.query.motivo : undefined,
+      sentimento: typeof req.query.sentimento === 'string' ? req.query.sentimento : undefined,
+      limit: parseInt(String(req.query.limit ?? '100'), 10) || 100,
+    });
+    return res.json({ items: result });
+  } catch (err) {
+    console.error('[gestao-insights] GET /voz-cliente/tickets falhou:', err);
+    return res.status(500).json({ message: 'Erro ao carregar tickets da visão do cliente' });
   }
 });
 

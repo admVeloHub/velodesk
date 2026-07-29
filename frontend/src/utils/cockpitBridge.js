@@ -6,6 +6,7 @@ const PAGE_ROUTES = {
   workspace: '/workspace',
   dashboard: '/dashboard',
   tickets: '/tickets?desk=v2',
+  'atendimento-ia-telefonico': '/atendimento-ia-telefonico',
   'alteracoes-cadastrais': '/alteracoes-cadastrais',
   especiais: '/workspace',
   'especiais-reclame-aqui': '/especiais/reclame-aqui',

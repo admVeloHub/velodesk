@@ -18,6 +18,8 @@ import GestaoVolumeCard from './components/gestaoInsights/GestaoVolumeCard';
 import GestaoVolumeStatsCard from './components/gestaoInsights/GestaoVolumeStatsCard';
 import GestaoMotivosCard from './components/gestaoInsights/GestaoMotivosCard';
 import GestaoCasosEspeciaisCard from './components/gestaoInsights/GestaoCasosEspeciaisCard';
+import GestaoRiscoCasoEspecialCard from './components/gestaoInsights/GestaoRiscoCasoEspecialCard';
+import GestaoCustomerVoiceCard from './components/gestaoInsights/GestaoCustomerVoiceCard';
 import GestaoPeriodFilter from './components/gestaoInsights/GestaoPeriodFilter';
 import AiUsageCostCard from './components/aiUsage/AiUsageCostCard';
 
@@ -140,6 +142,14 @@ export default function GestaoPanel() {
         <div className="gestao-tiles-row">
           <GestaoCasosEspeciaisCard />
           <AiUsageCostCard />
+        </div>
+
+        <div className="gestao-insights-row gestao-insights-row--risco">
+          <GestaoCustomerVoiceCard
+            period={insightsPeriod}
+            onOpenTicket={handleOpenEscalatedTicket}
+          />
+          <GestaoRiscoCasoEspecialCard onOpenTicket={handleOpenEscalatedTicket} />
         </div>
       </div>
 

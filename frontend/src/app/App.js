@@ -50,6 +50,7 @@ import ReclameAquiChannelPage from '../features/especiais/ReclameAquiChannelPage
 import ProconChannelPage from '../features/especiais/ProconChannelPage';
 import CasoEspecialDetailPage from '../features/workspace/components/gestaoDetail/CasoEspecialDetailPage';
 import AiUsageDetailPage from '../features/workspace/components/gestaoDetail/AiUsageDetailPage';
+import AtendimentoIaTelefonicoPage from '../pages/AtendimentoIaTelefonicoPage';
 import { PermissionProvider } from '../context/PermissionContext';
 
 import { initCockpitGlobals } from '../config/cockpitConfig';
@@ -105,6 +106,8 @@ function AppRoutes() {
             { path: 'chat', element: React.createElement(ChatPage) },
 
             { path: 'config', element: React.createElement(ConfigPage) },
+
+            { path: 'atendimento-ia-telefonico/*', element: React.createElement(AtendimentoIaTelefonicoPage) },
 
             { path: 'client-portal', element: React.createElement(ClientPortalPage) },
 

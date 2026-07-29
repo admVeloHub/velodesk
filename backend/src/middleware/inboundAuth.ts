@@ -48,6 +48,31 @@ export function inboundEmailAuthMiddleware(req: Request, res: Response, next: Ne
   next();
 }
 
+export function inboundTelephonyAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (!env.inboundTelephonyEnabled) {
+    res.status(503).json({ message: 'Inbound telefonia desabilitado' });
+    return;
+  }
+
+  const secret = env.inboundTelephonyWebhookSecret;
+  if (!secret) {
+    if (env.nodeEnv !== 'production') {
+      next();
+      return;
+    }
+    res.status(503).json({ message: 'Inbound telefonia desabilitado — secret ausente' });
+    return;
+  }
+
+  const header = String(req.headers['x-inbound-secret'] ?? '').trim();
+  if (header !== secret) {
+    res.status(401).json({ message: 'Secret inbound telefonia inválido' });
+    return;
+  }
+
+  next();
+}
+
 export function inboundAppAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
   const secret = env.inboundAppWebhookSecret;
   if (!secret) {

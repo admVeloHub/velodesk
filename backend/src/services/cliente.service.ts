@@ -86,6 +86,24 @@ export async function findClienteByCpf(cpfRaw: unknown): Promise<ICliente | null
   return Cliente.findOne({ 'clienteDados.clienteCpf': cpf });
 }
 
+function normalizePhoneDigits(value: unknown): string {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+export async function findClienteByPhone(phoneRaw: unknown): Promise<ICliente | null> {
+  const phone = normalizePhoneDigits(phoneRaw);
+  if (!phone || phone.length < 8) return null;
+  const Cliente = getClienteModel();
+  const suffix = phone.slice(-8);
+  return Cliente.findOne({
+    $or: [
+      { 'clienteDados.clienteTelefone.lista': phone },
+      { 'clienteDados.clienteTelefone.lista': { $regex: new RegExp(`${suffix}$`) } },
+      { 'clienteDados.clienteTelefone.whatsapp': phone },
+    ],
+  });
+}
+
 export async function findClienteByEmail(emailRaw: unknown): Promise<ICliente | null> {
   const email = normalizeEmail(emailRaw);
   if (!email) return null;

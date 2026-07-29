@@ -25,7 +25,10 @@
     "test:gmail-inbound": "tsx scripts/test-gmail-inbound.ts",
     "test:mail-rules": "tsx scripts/test-mail-rules.ts",
     "test:ai-usage": "tsx scripts/test-ai-usage.ts",
-    "test:status-lifecycle": "tsx scripts/test-status-lifecycle.ts"
+    "test:status-lifecycle": "tsx scripts/test-status-lifecycle.ts",
+    "test:ticket-ia": "tsx scripts/test-ticket-ia-adapter.ts",
+    "test:telephony-inbound": "tsx scripts/test-telephony-inbound.ts",
+    "backfill:ticket-ia": "tsx scripts/backfill-ticket-ia.ts"
   },
   "dependencies": {
     "@google-cloud/pubsub": "^5.0.0",

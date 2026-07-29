@@ -155,6 +155,21 @@ export const gestaoInsightsApi = {
   casosEspeciais: (params) => api.get('/gestao-insights/casos-especiais', { params }).then((r) => r.data),
   casoEspecialDetail: (orgao, params) =>
     api.get(`/gestao-insights/casos-especiais/${orgao}`, { params }).then((r) => r.data),
+  riscoCasosEspeciais: (params) =>
+    api.get('/gestao-insights/risco-casos-especiais', { params }).then((r) => r.data),
+  vozCliente: (params) =>
+    api.get('/gestao-insights/voz-cliente', { params }).then((r) => r.data),
+  vozClienteTickets: (params) =>
+    api.get('/gestao-insights/voz-cliente/tickets', { params }).then((r) => r.data),
+};
+
+export const ticketIaAnalysisApi = {
+  getSettings: () => api.get('/ticket-ia-analysis/settings').then((r) => r.data),
+  updateSettings: (data) => api.put('/ticket-ia-analysis/settings', data).then((r) => r.data),
+  updateExample: (id, data) =>
+    api.patch(`/ticket-ia-analysis/examples/${encodeURIComponent(id)}`, data).then((r) => r.data),
+  reanalyze: (data) => api.post('/ticket-ia-analysis/reanalyze', data).then((r) => r.data),
+  correctReason: (data) => api.post('/ticket-ia-analysis/correct-reason', data).then((r) => r.data),
 };
 
 export const aiUsageApi = {
@@ -244,6 +259,17 @@ export const agentsApi = {
   pipeline: (payload) => api.post('/agents/pipeline', payload).then((r) => r.data),
   revisarSugestao: (payload) => api.post('/agents/revisar-sugestao', payload).then((r) => r.data),
   gestaoAlerts: (params) => api.get('/agents/gestao/alerts', { params }).then((r) => r.data),
+};
+
+export const telephonyApi = {
+  integrationInfo: () => api.get('/telephony/integration-info').then((r) => r.data),
+  listCalls: (params) => api.get('/telephony/calls', { params }).then((r) => r.data),
+  getCall: (id) => api.get(`/telephony/calls/${encodeURIComponent(id)}`).then((r) => r.data),
+  stats: (params) => api.get('/telephony/calls/stats', { params }).then((r) => r.data),
+  listRecados: () => api.get('/telephony/recados').then((r) => r.data),
+  createRecado: (data) => api.post('/telephony/recados', data).then((r) => r.data),
+  patchRecado: (id, data) => api.patch(`/telephony/recados/${encodeURIComponent(id)}`, data).then((r) => r.data),
+  removeRecado: (id) => api.delete(`/telephony/recados/${encodeURIComponent(id)}`).then((r) => r.data),
 };
 
 export const mailRulesApi = {

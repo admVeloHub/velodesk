@@ -11,7 +11,8 @@ export type AiUsageFeature =
   | 'auditoria'
   | 'gestao_chamados'
   | 'ticket_suggest_legacy'
-  | 'refinar_rascunho';
+  | 'refinar_rascunho'
+  | 'chamado_ia_analise';
 
 export interface IAiUsageLog extends Document {
   provider: AiUsageProvider;

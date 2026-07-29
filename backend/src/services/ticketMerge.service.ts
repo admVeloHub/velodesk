@@ -2,6 +2,7 @@
 import type { AuthPayload } from '../middleware/auth';
 import { Box } from '../models/Box';
 import { ChamadoN1, IChamadoN1, IRegistro, ITabulacao } from '../models/ChamadoN1';
+import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
 import {
   ChamadoClosedError,
   chamadoToTicket,
@@ -180,6 +181,16 @@ export async function mergeTicketInto(
   });
 
   await Promise.all([sourceChamado.save(), targetChamado.save()]);
+  await Promise.all([
+    ChamadoIaAnalise.updateOne(
+      { chamadoId: sourceChamado._id, origem: { $ne: 'manual' } },
+      { $set: { needsReanalysis: true } },
+    ),
+    ChamadoIaAnalise.updateOne(
+      { chamadoId: targetChamado._id, origem: { $ne: 'manual' } },
+      { $set: { needsReanalysis: true } },
+    ),
+  ]);
 
   const boxes = await Box.find().sort({ order: 1 });
   const [sourceTicket, targetTicket] = await Promise.all([
