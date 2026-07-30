@@ -131,6 +131,7 @@ function buildDefaultSessionFromTicket(ticket, config) {
     composeMode: 'public',
     composeText: '',
     internalText: '',
+    composeAttachments: [],
     sendStatus: 'em-andamento',
     rightFields: buildDefaultRightFields(config, ticket, getAgentName),
     waChatOpen: false,
@@ -172,6 +173,7 @@ export default function DeskV2Root() {
   const [composeMode, setComposeMode] = useState('public');
   const [composeText, setComposeText] = useState('');
   const [internalText, setInternalText] = useState('');
+  const [composeAttachments, setComposeAttachments] = useState([]);
   const [sendStatus, setSendStatus] = useState('em-andamento');
   const [rightFields, setRightFields] = useState({});
   const [waChatOpen, setWaChatOpen] = useState(false);
@@ -255,12 +257,13 @@ export default function DeskV2Root() {
       composeMode,
       composeText,
       internalText,
+      composeAttachments,
       sendStatus,
       rightFields,
       waChatOpen,
       spellIgnoredWords: Array.from(spellIgnoredWords),
     };
-  }, [mainTab, composeMode, composeText, internalText, sendStatus, rightFields, waChatOpen, spellIgnoredWords]);
+  }, [mainTab, composeMode, composeText, internalText, composeAttachments, sendStatus, rightFields, waChatOpen, spellIgnoredWords]);
 
   const restoreTabSession = useCallback((ticketId) => {
     const ticketEntry = findTicketEntry(ticketId);
@@ -280,6 +283,7 @@ export default function DeskV2Root() {
     setComposeMode(session.composeMode ?? defaults.composeMode);
     setComposeText(session.composeText ?? defaults.composeText);
     setInternalText(session.internalText ?? defaults.internalText);
+    setComposeAttachments(Array.isArray(session.composeAttachments) ? session.composeAttachments : defaults.composeAttachments);
     setSendStatus(session.sendStatus ?? defaults.sendStatus);
     setRightFields(nextRightFields);
     setWaChatOpen(session.waChatOpen ?? defaults.waChatOpen);
@@ -679,6 +683,10 @@ export default function DeskV2Root() {
     const internalNoteHtml = String(internalText || '').trim();
     const messageText = htmlToPlainText(messageHtml).trim();
     const internalNoteText = htmlToPlainText(internalNoteHtml).trim();
+    const attachmentUrls = (composeAttachments || [])
+      .map((item) => String(item?.url || '').trim())
+      .filter(Boolean);
+    const hasPublicPayload = Boolean(messageText || attachmentUrls.length);
     const messagePayload = messageHtml || '';
     const internalNotePayload = internalNoteHtml || '';
 
@@ -734,7 +742,7 @@ export default function DeskV2Root() {
         const regKey = Date.now();
         const ts = new Date().toISOString();
         const author = getAgentName();
-        if (messageText) {
+        if (hasPublicPayload) {
           if (!prepared.messages) prepared.messages = [];
           prepared.messages.push({
             id: `${regKey}-pub`,
@@ -742,6 +750,7 @@ export default function DeskV2Root() {
             fromClient: false,
             origin: 'agente',
             text: messagePayload,
+            attachments: attachmentUrls,
             timestamp: ts,
             author,
           });
@@ -757,15 +766,16 @@ export default function DeskV2Root() {
             author,
           });
         }
-        const persisted = await persistDraftTicket(prepared, messageText || internalNoteText);
+        const persisted = await persistDraftTicket(prepared, messageText || internalNoteText || attachmentUrls.length);
         const newId = persisted.id || persisted._id;
         delete tabSessionsRef.current[draftId];
         if (session) {
           tabSessionsRef.current[String(newId)] = {
             ...session,
             sendStatus: status,
-            composeText: messageText ? '' : session.composeText,
+            composeText: hasPublicPayload ? '' : session.composeText,
             internalText: internalNoteText ? '' : session.internalText,
+            composeAttachments: hasPublicPayload ? [] : session.composeAttachments,
           };
         }
         replaceOpenTabId(draftId, newId, {
@@ -774,10 +784,11 @@ export default function DeskV2Root() {
           ticketLabel: getTicketProtocolLabel(persisted) || 'Rascunho',
         });
         setSendStatus(status);
-        if (messageText) setComposeText('');
+        if (hasPublicPayload) setComposeText('');
         if (internalNoteText) setInternalText('');
+        if (hasPublicPayload) setComposeAttachments([]);
         showNotification(
-          messageText || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
+          hasPublicPayload || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
           'success',
         );
         await syncTicketViews();
@@ -797,6 +808,7 @@ export default function DeskV2Root() {
         text: messagePayload,
         internalText: internalNotePayload,
         author: getAgentName(),
+        ...(attachmentUrls.length ? { attachments: attachmentUrls } : {}),
       });
 
       const entryAfterSave = findTicketEntry(ticket.id);
@@ -819,21 +831,23 @@ export default function DeskV2Root() {
       }
 
       setSendStatus(status);
-      if (messageText) setComposeText('');
+      if (hasPublicPayload) setComposeText('');
       if (internalNoteText) setInternalText('');
+      if (hasPublicPayload) setComposeAttachments([]);
       if (activeTabId) {
         const sessionKey = String(activeTabId);
         const session = tabSessionsRef.current[sessionKey];
         if (session) {
           tabSessionsRef.current[sessionKey] = {
             ...session,
-            composeText: messageText ? '' : session.composeText,
+            composeText: hasPublicPayload ? '' : session.composeText,
             internalText: internalNoteText ? '' : session.internalText,
+            composeAttachments: hasPublicPayload ? [] : session.composeAttachments,
           };
         }
       }
       showNotification(
-        messageText || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
+        hasPublicPayload || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
         'success',
       );
       await syncTicketViews();
@@ -1437,6 +1451,8 @@ export default function DeskV2Root() {
                         composeMode={composeMode}
                         composeText={composeText}
                         internalText={internalText}
+                        composeAttachments={composeAttachments}
+                        onComposeAttachmentsChange={setComposeAttachments}
                         onComposeModeChange={setComposeMode}
                         onComposeTextChange={setComposeText}
                         onInternalTextChange={setInternalText}

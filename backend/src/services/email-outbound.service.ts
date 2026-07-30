@@ -1,5 +1,5 @@
-﻿/** email-outbound.service v1.3.0 — assunto padronizado Atendimento Velotax Numero {protocolo} */
-import { sendViaGmailApi } from './gmail/gmailApiSend';
+﻿/** email-outbound.service v1.5.0 — inline logo CID + anexos MIME */
+import { sendViaGmailApi, type GmailInlineImage, type GmailOutboundAttachment } from './gmail/gmailApiSend';
 import {
   getEffectiveFromAddress,
   getEmailTransportSnapshot,
@@ -14,6 +14,8 @@ export interface OutboundEmailPayload {
   text: string;
   html?: string;
   headers?: OutboundEmailThreadHeaders;
+  inlineImages?: GmailInlineImage[];
+  attachments?: GmailOutboundAttachment[];
 }
 
 export interface OutboundEmailResult {
@@ -63,6 +65,8 @@ export async function sendOutboundEmail(payload: OutboundEmailPayload): Promise<
         messageId: payload.headers?.messageId,
         inReplyTo: payload.headers?.inReplyTo,
         references: payload.headers?.references,
+        inlineImages: payload.inlineImages,
+        attachments: payload.attachments,
       }
     );
     return { sent: true };

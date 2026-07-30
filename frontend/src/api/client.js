@@ -1,6 +1,6 @@
 /**
- * API client v1.17.0 — agent-queue-boxes (caixas personalizadas do agente)
- * VERSION: v1.17.0 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team
+ * API client v1.18.0 — uploadsApi.uploadSent (anexos do agente no GCS)
+ * VERSION: v1.18.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -125,6 +125,15 @@ export const ticketsApi = {
 export const uploadsApi = {
   getSignedUrl: (data) =>
     api.post('/uploads/signed-url', data).then((r) => r.data),
+  /** Anexos do agente → gs://velodesk_storage/desk_ticket_sent_attachments/… */
+  uploadSent: (ticketId, files) => {
+    const form = new FormData();
+    form.append('ticketId', String(ticketId));
+    (files || []).forEach((file) => form.append('files', file));
+    return api.post('/uploads/sent', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data);
+  },
 };
 
 export const boxesApi = {

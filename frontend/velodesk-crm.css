@@ -3006,6 +3006,20 @@
   background: #eef4ff;
 }
 
+#velodeskDeskV2Root .msg-bubble__attachment-link--error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+#velodeskDeskV2Root .msg-bubble__attachment-error {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--desk-fs-caption);
+  color: #b91c1c;
+  line-height: 1.35;
+}
+
 #velodeskDeskV2Root .msg-bubble--system {
     border: 1px dashed #d1d5db;
     background: transparent;
@@ -3777,6 +3791,63 @@
 #velodeskDeskV2Root .crm-compose-bottom-bar__ai {
     flex-shrink: 0;
     font-size: var(--desk-fs-sm);
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar__attach {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--desk-fs-sm);
+}
+
+#velodeskDeskV2Root .crm-compose-bottom-bar__attach-label {
+    white-space: nowrap;
+}
+
+#velodeskDeskV2Root .crm-compose-pending-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.35rem 0.65rem 0;
+    margin: 0;
+    list-style: none;
+}
+
+#velodeskDeskV2Root .crm-compose-pending-attachments__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    max-width: 100%;
+    padding: 0.2rem 0.45rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: #f8fafc;
+    font-size: var(--desk-fs-xs);
+    color: #334155;
+}
+
+#velodeskDeskV2Root .crm-compose-pending-attachments__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 14rem;
+}
+
+#velodeskDeskV2Root .crm-compose-pending-attachments__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    line-height: 1;
+}
+
+#velodeskDeskV2Root .crm-compose-pending-attachments__remove:hover {
+    color: #0f172a;
 }
 
 /* ?? Modal refinar rascunho (Gemini) ?? */

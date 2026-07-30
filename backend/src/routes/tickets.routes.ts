@@ -250,14 +250,23 @@ router.post('/:id/commit', authMiddleware, async (req, res: Response) => {
     const commitResult = await commitChamadoFromAgent(chamado, req.body, req.user);
     await chamado.save();
 
-    if (commitResult.messageResult.public && commitResult.publicText.trim()) {
-      await notifyAgentReplyAsync(
-        chamado,
-        commitResult.publicText,
-        undefined,
-        commitResult.publicRegistroIndex,
+    if (commitResult.messageResult.public) {
+      const publicAttachments = (commitResult.messageResult.public.attachments ?? [])
+        .map((item) => String(item ?? '').trim())
+        .filter(Boolean);
+      const shouldNotifyClient = Boolean(
+        commitResult.publicText.trim() || publicAttachments.length,
       );
-      await chamado.save();
+      if (shouldNotifyClient) {
+        await notifyAgentReplyAsync(
+          chamado,
+          commitResult.publicText,
+          undefined,
+          commitResult.publicRegistroIndex,
+          publicAttachments,
+        );
+        await chamado.save();
+      }
     }
 
     const boxes = await loadBoxes();
@@ -315,8 +324,14 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
     );
   }
 
-  if (!isInternalOnly && publicText.trim()) {
-    await notifyAgentReplyAsync(chamado, publicText, undefined, result.public?.registroIndex);
+  if (!isInternalOnly && (publicText.trim() || attachmentList.length)) {
+    await notifyAgentReplyAsync(
+      chamado,
+      publicText,
+      undefined,
+      result.public?.registroIndex,
+      attachmentList,
+    );
     await chamado.save();
   }
 

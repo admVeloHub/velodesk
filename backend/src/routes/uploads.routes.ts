@@ -1,12 +1,41 @@
-/** uploads.routes v1.1.0 — signed URL GCP + download anexos inbound */
-import fs from 'fs/promises';
+/** uploads.routes v1.3.0 — inbound + sent (agente) no bucket velodesk_storage */
 import path from 'path';
-import { Router, Response } from 'express';
+import multer from 'multer';
+import { Router, Response, Request } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { env } from '../config/env';
-import { resolveInboundAttachmentPath } from '../services/inboundAttachmentStorage.service';
+import { openInboundAttachment } from '../services/inboundAttachmentStorage.service';
+import {
+  openSentAttachment,
+  persistSentAttachment,
+} from '../services/sentAttachmentStorage.service';
 
 const router = Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 10 },
+});
+
+function sendOpenedAttachment(res: Response, opened: NonNullable<Awaited<ReturnType<typeof openInboundAttachment>>>) {
+  const safeName = opened.filename.replace(/"/g, '');
+  res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+
+  if (opened.source === 'disk' && opened.filePath) {
+    return res.sendFile(path.resolve(opened.filePath));
+  }
+
+  if (opened.stream) {
+    if (opened.contentType) res.setHeader('Content-Type', opened.contentType);
+    opened.stream.on('error', () => {
+      if (!res.headersSent) {
+        res.status(404).json({ message: 'Falha ao ler anexo no bucket GCP.' });
+      }
+    });
+    return opened.stream.pipe(res);
+  }
+
+  return res.status(404).json({ message: 'Anexo não encontrado' });
+}
 
 router.post('/signed-url', authMiddleware, async (req, res: Response) => {
   const fileName = String(req.body?.fileName ?? '').trim();
@@ -23,24 +52,73 @@ router.post('/signed-url', authMiddleware, async (req, res: Response) => {
   }
 
   return res.status(501).json({
-    message: 'Geração de signed URL pendente de configuração do bucket GCP.',
+    message: 'Use POST /api/uploads/sent com multipart para anexos do agente.',
     bucket: env.gcpStorageBucket,
+    prefix: env.gcpStorageSentAttachmentsPrefix,
     fileName,
     contentType,
   });
 });
 
-router.get('/inbound/:storageKey', authMiddleware, async (req, res: Response) => {
+/** Anexo enviado pelo agente durante o atendimento → desk_ticket_sent_attachments/ */
+router.post('/sent', authMiddleware, upload.array('files', 10), async (req: Request, res: Response) => {
   try {
-    const filePath = resolveInboundAttachmentPath(String(req.params.storageKey ?? ''));
-    const stat = await fs.stat(filePath);
-    if (!stat.isFile()) {
-      return res.status(404).json({ message: 'Anexo não encontrado' });
+    const ticketId = String(req.body?.ticketId ?? req.body?.ticket_id ?? '').trim();
+    if (!ticketId) {
+      return res.status(400).json({ message: 'ticketId é obrigatório' });
     }
 
-    const filename = path.basename(filePath);
-    res.setHeader('Content-Disposition', `inline; filename="${filename.replace(/"/g, '')}"`);
-    res.sendFile(filePath);
+    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+    if (!files.length) {
+      return res.status(400).json({ message: 'Envie ao menos um arquivo no campo "files"' });
+    }
+
+    const uploaded = [];
+    for (const file of files) {
+      const saved = await persistSentAttachment({
+        ticketId,
+        filename: file.originalname,
+        contentType: file.mimetype,
+        buffer: file.buffer,
+      });
+      uploaded.push(saved);
+    }
+
+    return res.status(201).json({
+      success: true,
+      attachments: uploaded,
+      urls: uploaded.map((item) => item.url),
+    });
+  } catch (err) {
+    console.error('[uploads/sent]', err);
+    return res.status(500).json({ message: (err as Error).message || 'Falha ao enviar anexo' });
+  }
+});
+
+router.get('/inbound/:storageKey', authMiddleware, async (req, res: Response) => {
+  try {
+    const opened = await openInboundAttachment(String(req.params.storageKey ?? ''));
+    if (!opened) {
+      const hasGcs = Boolean(String(env.gcpStorageBucket || '').trim());
+      return res.status(404).json({
+        message: hasGcs
+          ? 'Anexo inbound não encontrado no servidor nem no bucket GCP.'
+          : 'Anexo inbound não encontrado.',
+      });
+    }
+    return sendOpenedAttachment(res, opened);
+  } catch {
+    return res.status(404).json({ message: 'Anexo não encontrado' });
+  }
+});
+
+router.get('/sent/:storageKey', authMiddleware, async (req, res: Response) => {
+  try {
+    const opened = await openSentAttachment(String(req.params.storageKey ?? ''));
+    if (!opened) {
+      return res.status(404).json({ message: 'Anexo do agente não encontrado no bucket GCP.' });
+    }
+    return sendOpenedAttachment(res, opened);
   } catch {
     return res.status(404).json({ message: 'Anexo não encontrado' });
   }

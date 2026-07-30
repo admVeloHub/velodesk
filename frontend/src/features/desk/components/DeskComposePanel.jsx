@@ -1,8 +1,9 @@
 /**
- * DeskComposePanel v1.10.4 — Revisor de Texto sem ícone no botão
- * VERSION: v1.10.4 | DATE: 2026-07-29
+ * DeskComposePanel v1.11.0 — botão Anexo ao lado do Revisor de Texto
+ * VERSION: v1.11.0 | DATE: 2026-07-30
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { uploadsApi } from '../../../api/client';
 import { getSendStatusOptions } from '../../../services/desk/constants';
 import { useProfile } from '../../../context/ProfileContext';
 import { shouldViewAllDeskTickets } from '../../../services/desk/responsavelSegmentation';
@@ -132,12 +133,53 @@ export function DeskStatusCommitButton({ sendStatus, onCommitStatus, variant = '
 /** @deprecated use DeskStatusCommitButton */
 export const DeskComposeFooter = DeskStatusCommitButton;
 
+function ComposePendingAttachments({ items, onRemove, disabled = false }) {
+  if (!items?.length) return null;
+  return (
+    <ul className="crm-compose-pending-attachments" aria-label="Anexos pendentes">
+      {items.map((item) => (
+        <li key={item.url} className="crm-compose-pending-attachments__chip">
+          <i className="ti ti-paperclip" aria-hidden="true" />
+          <span className="crm-compose-pending-attachments__name" title={item.name}>{item.name}</span>
+          {!disabled ? (
+            <button
+              type="button"
+              className="crm-compose-pending-attachments__remove"
+              aria-label={`Remover anexo ${item.name}`}
+              onClick={() => onRemove(item.url)}
+            >
+              <i className="ti ti-x" aria-hidden="true" />
+            </button>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ComposeBottomBar({
   formatToolbar,
   showAiAssistant = false,
   onOpenRefinar,
+  onAttachFiles,
+  attachUploading = false,
+  attachDisabled = false,
   overlay = false,
 }) {
+  const fileInputRef = useRef(null);
+
+  const handleAttachClick = useCallback(() => {
+    if (attachDisabled || attachUploading) return;
+    fileInputRef.current?.click();
+  }, [attachDisabled, attachUploading]);
+
+  const handleFileChange = useCallback((event) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!files.length || !onAttachFiles) return;
+    void onAttachFiles(files);
+  }, [onAttachFiles]);
+
   return (
     <div
       className={
@@ -154,13 +196,37 @@ function ComposeBottomBar({
           <div className="crm-compose-bottom-bar__tools">
             <button
               type="button"
+              className="btn-secondary crm-compose-bottom-bar__attach"
+              id="btnCrmAttachFile"
+              aria-label="Anexar arquivo"
+              title="Anexar arquivo"
+              disabled={attachDisabled || attachUploading}
+              onClick={handleAttachClick}
+            >
+              <i className="ti ti-paperclip" aria-hidden="true" />
+              <span className="crm-compose-bottom-bar__attach-label">
+                {attachUploading ? 'Enviando…' : 'Anexo'}
+              </span>
+            </button>
+            <button
+              type="button"
               className="btn-secondary crm-compose-bottom-bar__ai"
               id="btnCrmTextReviewer"
               aria-label="Revisor de Texto"
+              disabled={attachDisabled}
               onClick={onOpenRefinar}
             >
               <span className="crm-compose-bottom-bar__ai-label">Revisor de Texto</span>
             </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="crm-compose-toolbar__file-input"
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={handleFileChange}
+            />
           </div>
         </>
       ) : null}
@@ -274,6 +340,8 @@ export default function DeskComposePanel({
   composeMode,
   composeText,
   internalText,
+  composeAttachments = [],
+  onComposeAttachmentsChange,
   onComposeModeChange,
   onComposeTextChange,
   onInternalTextChange,
@@ -293,6 +361,7 @@ export default function DeskComposePanel({
   const { showNotification } = useNotifications();
   const [refinarOpen, setRefinarOpen] = useState(false);
   const [refinarDraft, setRefinarDraft] = useState('');
+  const [attachUploading, setAttachUploading] = useState(false);
   const showPublic = variant === 'full' || variant === 'public-only';
   const showInternal = variant === 'full' || variant === 'internal-only';
   const composeLocked = Boolean(workflowLocked || ticketReadOnly);
@@ -367,6 +436,50 @@ export default function DeskComposePanel({
     void attachImageToEditor(publicEditorRef, file, showNotification);
   }, [showNotification]);
 
+  const handleRemoveAttachment = useCallback((url) => {
+    if (!onComposeAttachmentsChange) return;
+    onComposeAttachmentsChange((composeAttachments || []).filter((item) => item.url !== url));
+  }, [composeAttachments, onComposeAttachmentsChange]);
+
+  const handleAttachFiles = useCallback(async (files) => {
+    if (!onComposeAttachmentsChange || ticketReadOnly || publicLocked) return;
+    const ticketKey = String(ticketId || '').trim();
+    if (!ticketKey) {
+      showNotification('Salve o ticket antes de anexar arquivos.', 'warning');
+      return;
+    }
+    setAttachUploading(true);
+    try {
+      const result = await uploadsApi.uploadSent(ticketKey, files);
+      const uploaded = Array.isArray(result?.attachments) ? result.attachments : [];
+      const nextItems = uploaded.map((item, index) => ({
+        url: String(item?.url || result?.urls?.[index] || '').trim(),
+        name: String(item?.filename || files[index]?.name || 'Anexo').trim(),
+      })).filter((item) => item.url);
+      if (!nextItems.length) {
+        showNotification('Não foi possível enviar o anexo.', 'error');
+        return;
+      }
+      onComposeAttachmentsChange([...(composeAttachments || []), ...nextItems]);
+      showNotification(
+        nextItems.length === 1 ? 'Anexo adicionado.' : `${nextItems.length} anexos adicionados.`,
+        'success',
+      );
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Falha ao enviar anexo.';
+      showNotification(msg, 'error');
+    } finally {
+      setAttachUploading(false);
+    }
+  }, [
+    composeAttachments,
+    onComposeAttachmentsChange,
+    publicLocked,
+    showNotification,
+    ticketId,
+    ticketReadOnly,
+  ]);
+
   return (
     <div className={
       'crm-ticket-compose'
@@ -430,10 +543,18 @@ export default function DeskComposePanel({
                     onSelect={spell.handleSelect}
                     onClick={spell.handleClick}
                   />
+                  <ComposePendingAttachments
+                    items={composeAttachments}
+                    onRemove={handleRemoveAttachment}
+                    disabled={ticketReadOnly || publicLocked}
+                  />
                   <ComposeBottomBar
                     overlay
                     showAiAssistant={!ticketReadOnly}
                     onOpenRefinar={ticketReadOnly ? undefined : handleOpenRefinar}
+                    onAttachFiles={ticketReadOnly || publicLocked ? undefined : handleAttachFiles}
+                    attachUploading={attachUploading}
+                    attachDisabled={publicLocked || ticketReadOnly}
                     formatToolbar={(
                       <ComposeFormatToolbar
                         applyAction={publicFormat.applyAction}

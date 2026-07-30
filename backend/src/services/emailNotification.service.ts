@@ -1,7 +1,8 @@
-/** emailNotification.service v1.3.1 — assunto de e-mail padronizado ao cliente */
+/** emailNotification.service v1.5.0 — thread única + header gradiente Velotax */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { loadDadosForRef } from './cliente.service';
 import { sendOutboundEmail } from './email-outbound.service';
+import { buildEmailHeaderHtml, loadVelotaxLogoInline } from './emailBrand.util';
 import { composeHtmlToEmailHtml, escapeHtmlAttribute, htmlToPlainTextForEmail } from './emailHtml.util';
 import {
   buildOutboundMessageId,
@@ -9,21 +10,25 @@ import {
   buildThreadSubject,
   persistOutboundEmailMeta,
 } from './emailThread.service';
+import { loadSentAttachmentsForEmail } from './sentAttachmentStorage.service';
 
-function baseTemplate(title: string, bodyHtml: string): string {
+function buildBrandEmailHtml(title: string, bodyHtml: string): string {
+  const logo = loadVelotaxLogoInline();
+  const header = buildEmailHeaderHtml(title, Boolean(logo));
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head>
-<body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;margin:0;padding:0">
-  <div style="max-width:600px;margin:0 auto;padding:20px">
-    <div style="background:#1634FF;color:#fff;padding:16px 20px;border-radius:8px 8px 0 0">
-      <h2 style="margin:0;font-size:18px">${title}</h2>
-    </div>
-    <div style="background:#f9f9f9;padding:20px;border-radius:0 0 8px 8px">
-      ${bodyHtml}
-      <p style="margin-top:24px;font-size:12px;color:#666">VeloDesk — VeloHub</p>
-    </div>
+<body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;margin:0;padding:16px 24px">
+  ${header}
+  <div style="padding:0;margin:0">
+    ${bodyHtml}
+    <p style="margin-top:24px;font-size:12px;color:#666">VeloDesk — VeloHub</p>
   </div>
 </body></html>`;
+}
+
+function buildOutboundEmailExtras() {
+  const logo = loadVelotaxLogoInline();
+  return logo ? { inlineImages: [logo] } : {};
 }
 
 export async function resolveClienteEmailFromChamado(chamado: IChamadoN1): Promise<string | null> {
@@ -53,7 +58,7 @@ export async function sendTicketOpenedEmail(
 
   const protocolo = chamado.chamadoProtocolo;
   const titulo = chamado.chamadoTitulo || protocolo;
-  const subject = buildThreadSubject(protocolo, undefined, false);
+  const subject = buildThreadSubject(protocolo);
   const messageId = buildOutboundMessageId(protocolo);
   const headers = buildOutboundThreadHeaders(chamado, messageId);
 
@@ -69,8 +74,9 @@ export async function sendTicketOpenedEmail(
     to,
     subject,
     text: `Protocolo ${protocolo} — ${titulo}`,
-    html: baseTemplate('Chamado registrado', body),
+    html: buildBrandEmailHtml('Chamado registrado', body),
     headers,
+    ...buildOutboundEmailExtras(),
   });
 
   if (!result.sent) {
@@ -79,29 +85,40 @@ export async function sendTicketOpenedEmail(
   }
 
   persistOutboundEmailMeta(chamado, messageId, registroIndex);
+  await chamado.save();
 }
 
 export async function sendAgentReplyEmail(
   chamado: IChamadoN1,
   messageText: string,
   clienteEmail?: string,
-  registroIndex?: number
+  registroIndex?: number,
+  attachmentUrls: string[] = [],
 ): Promise<void> {
   const to = clienteEmail ?? (await resolveClienteEmailFromChamado(chamado));
-  if (!to || !messageText.trim()) return;
+  const publicText = String(messageText ?? '').trim();
+  const safeAttachmentUrls = (attachmentUrls || [])
+    .map((item) => String(item ?? '').trim())
+    .filter(Boolean);
+  if (!to || (!publicText && !safeAttachmentUrls.length)) return;
 
   const protocolo = chamado.chamadoProtocolo;
-  const subject = buildThreadSubject(protocolo, undefined, true);
-  const plainMessage = htmlToPlainTextForEmail(messageText);
-  const messageHtml = composeHtmlToEmailHtml(messageText);
+  const subject = buildThreadSubject(protocolo);
+  const plainMessage = publicText
+    ? htmlToPlainTextForEmail(publicText)
+    : `Anexo(s) referente(s) ao chamado ${protocolo}.`;
+  const messageHtml = publicText
+    ? composeHtmlToEmailHtml(publicText)
+    : '<p>Segue(m) anexo(s) referente(s) ao seu chamado.</p>';
   const safeProtocolo = escapeHtmlAttribute(protocolo);
   const messageId = buildOutboundMessageId(protocolo);
   const headers = buildOutboundThreadHeaders(chamado, messageId);
+  const emailAttachments = await loadSentAttachmentsForEmail(safeAttachmentUrls);
 
   const body = `
     <p>Olá,</p>
     <p>Há uma nova mensagem sobre seu chamado <strong>${safeProtocolo}</strong>:</p>
-    <div style="background:#fff;padding:12px;border-left:4px solid #1634FF;margin:12px 0">${messageHtml}</div>
+    <div style="margin:16px 0">${messageHtml}</div>
     <p>Responda este e-mail para continuar o atendimento.</p>
   `;
 
@@ -109,8 +126,10 @@ export async function sendAgentReplyEmail(
     to,
     subject,
     text: plainMessage,
-    html: baseTemplate('Nova mensagem no seu chamado', body),
+    html: buildBrandEmailHtml('Nova mensagem no seu chamado', body),
     headers,
+    attachments: emailAttachments,
+    ...buildOutboundEmailExtras(),
   });
 
   if (!result.sent) {
@@ -119,6 +138,7 @@ export async function sendAgentReplyEmail(
   }
 
   persistOutboundEmailMeta(chamado, messageId, registroIndex);
+  await chamado.save();
 }
 
 function findFirstPublicAgentMessage(chamado: IChamadoN1): { text: string; registroIndex: number } | null {
@@ -139,11 +159,16 @@ export async function notifyChamadoCreatedAsync(
   try {
     const firstAgentPublic = findFirstPublicAgentMessage(chamado);
     if (firstAgentPublic) {
+      const reg = chamado.registro?.[firstAgentPublic.registroIndex];
+      const attachmentUrls = (reg?.anexosMensagemPublica ?? [])
+        .map((item) => String(item ?? '').trim())
+        .filter(Boolean);
       await sendAgentReplyEmail(
         chamado,
         firstAgentPublic.text,
         clienteEmail,
         firstAgentPublic.registroIndex,
+        attachmentUrls,
       );
     } else {
       await sendTicketOpenedEmail(chamado, clienteEmail, 0);
@@ -168,10 +193,17 @@ export async function notifyAgentReplyAsync(
   chamado: IChamadoN1,
   messageText: string,
   clienteEmail?: string,
-  registroIndex?: number
+  registroIndex?: number,
+  attachmentUrls: string[] = [],
 ): Promise<void> {
   try {
-    await sendAgentReplyEmail(chamado, messageText, clienteEmail, registroIndex);
+    await sendAgentReplyEmail(
+      chamado,
+      messageText,
+      clienteEmail,
+      registroIndex,
+      attachmentUrls,
+    );
   } catch (err) {
     console.warn('[emailNotification] notifyAgentReply:', (err as Error).message);
   }

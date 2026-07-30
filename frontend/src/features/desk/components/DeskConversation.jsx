@@ -1,6 +1,6 @@
 /**
- * DeskConversation v1.5.5 — anexos de e-mail inbound na bolha da mensagem
- * VERSION: v1.5.5 | DATE: 2026-07-29
+ * DeskConversation v1.5.7 — oculta logo Velotax inline de anexos inbound
+ * VERSION: v1.5.7 | DATE: 2026-07-30
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
@@ -26,46 +26,87 @@ function attachmentLabelFromUrl(url) {
   return withoutUuid.replace(/__/g, '/').split('/').pop() || 'Anexo';
 }
 
+function isBrandInlineAttachmentUrl(url) {
+  const label = attachmentLabelFromUrl(url).toLowerCase();
+  return label.includes('simbolo_velotax')
+    || label.includes('velodesk-brand')
+    || /^logo\.(png|jpe?g|gif|webp)$/i.test(label);
+}
+
 function MessageAttachments({ attachments }) {
-  const items = (attachments || []).map((item) => String(item || '').trim()).filter(Boolean);
-  if (!items.length) return null;
+  const items = (attachments || [])
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .filter((url) => !isBrandInlineAttachmentUrl(url));
+  const [loadingUrl, setLoadingUrl] = useState('');
+  const [errorUrl, setErrorUrl] = useState('');
 
   const openAttachment = useCallback(async (url) => {
-    const href = url.startsWith('/api/') ? url : `/api${url.startsWith('/') ? url : `/${url}`}`;
-    const token = localStorage.getItem('velodesk_token');
-    const res = await fetch(href, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) throw new Error('Falha ao abrir anexo');
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = objectUrl;
-    anchor.target = '_blank';
-    anchor.rel = 'noopener noreferrer';
-    const disp = res.headers.get('content-disposition') || '';
-    const match = /filename="([^"]+)"/i.exec(disp);
-    if (match?.[1]) anchor.download = match[1];
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    setErrorUrl('');
+    setLoadingUrl(url);
+    try {
+      const href = url.startsWith('/api/') ? url : `/api${url.startsWith('/') ? url : `/${url}`}`;
+      const token = localStorage.getItem('velodesk_token');
+      const res = await fetch(href, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        let detail = 'Não foi possível abrir o anexo.';
+        try {
+          const data = await res.json();
+          if (data?.message) detail = data.message;
+        } catch {
+          // resposta não-JSON
+        }
+        throw new Error(detail);
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      const disp = res.headers.get('content-disposition') || '';
+      const match = /filename="([^"]+)"/i.exec(disp);
+      if (match?.[1]) anchor.download = match[1];
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (err) {
+      setErrorUrl(url);
+      console.warn('[DeskConversation] anexo:', err?.message || err);
+    } finally {
+      setLoadingUrl('');
+    }
   }, []);
+
+  if (!items.length) return null;
 
   return (
     <ul className="msg-bubble__attachments">
-      {items.map((url) => (
-        <li key={url}>
-          <button
-            type="button"
-            className="msg-bubble__attachment-link"
-            onClick={() => { openAttachment(url).catch(() => {}); }}
-          >
-            <i className="ti ti-paperclip" aria-hidden="true" />
-            {attachmentLabelFromUrl(url)}
-          </button>
-        </li>
-      ))}
+      {items.map((url) => {
+        const isLoading = loadingUrl === url;
+        const hasError = errorUrl === url;
+        return (
+          <li key={url}>
+            <button
+              type="button"
+              className={`msg-bubble__attachment-link${hasError ? ' msg-bubble__attachment-link--error' : ''}`}
+              disabled={isLoading}
+              onClick={() => { openAttachment(url); }}
+            >
+              <i className="ti ti-paperclip" aria-hidden="true" />
+              {isLoading ? 'Abrindo…' : attachmentLabelFromUrl(url)}
+            </button>
+            {hasError ? (
+              <span className="msg-bubble__attachment-error" role="alert">
+                Anexo indisponível no servidor. Se o e-mail entrou por outro ambiente, o arquivo pode não ter sido sincronizado.
+              </span>
+            ) : null}
+          </li>
+        );
+      })}
     </ul>
   );
 }

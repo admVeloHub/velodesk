@@ -1,10 +1,40 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.54.0 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.55.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: anexos GCS, thread de e-mail, header brand e compose anexo
+
+- **Data/Hora**: 2026-07-30
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.55.0
+  - env v1.24.0, gcsAttachmentStorage v1.3.0, inboundAttachmentStorage v1.3.0, sentAttachmentStorage v1.1.0
+  - gmailAttachment v1.2.0, attachmentFilter v1.0.0, uploads.routes v1.3.0
+  - emailThread v1.3.0, emailNotification v1.5.0, email-outbound v1.5.0, gmailApiSend v1.3.0, emailBrand v1.0.0
+  - chamado.mapper (filtro anexos marca), tickets.routes (notify com attachments)
+  - DeskComposePanel v1.11.0, DeskConversation v1.5.7, DeskV2Root (composeAttachments), client.js v1.18.0
+  - Dockerfile (raiz + backend) — assets/email com logo Velotax
+- **Arquivos modificados**:
+  - `backend/src/services/gcsAttachmentStorage.service.ts` — upload/leitura GCS (prefixos inbound/sent)
+  - `backend/src/services/inboundAttachmentStorage.service.ts` — await GCS + path flat em `desk_ticket_attachments/`
+  - `backend/src/services/sentAttachmentStorage.service.ts` — anexos do agente flat em `desk_ticket_sent_attachments/`
+  - `backend/src/services/gmail/gmailAttachment.service.ts` — ignora inline/CID e logo de marca no inbound
+  - `backend/src/services/attachmentFilter.util.ts`, `emailBrand.util.ts` — filtro + header gradiente/logo
+  - `backend/src/services/emailThread.service.ts` — thread única (In-Reply-To/References + âncora por protocolo)
+  - `backend/src/services/emailNotification.service.ts`, `email-outbound.service.ts`, `gmail/gmailApiSend.ts` — layout brand, anexos MIME, logo CID
+  - `backend/src/routes/uploads.routes.ts`, `tickets.routes.ts`, `config/env.ts`, Dockerfiles
+  - `frontend/.../DeskComposePanel.jsx`, `DeskV2Root.jsx`, `DeskConversation.jsx`, `api/client.js`, `velodesk-crm.css`
+  - `public/simbolo_velotax_ajustada_branco.png`, `backend/assets/email/`
+- **Descrição**: Anexos inbound/outbound no bucket `velodesk_storage` sem subpastas; respostas do agente na mesma thread Gmail; e-mail ao cliente com header gradiente (azul escuro→médio→opaco) e logo Velotax; botão Anexo no compose ao lado do Revisor de Texto; logo/inline deixam de aparecer como anexo do cliente.
+- **Status**: Concluído (push dev)
+
+---
 
 ### GitHub Push — Desk: caixas personalizadas, IA composição, assunto e-mail e nome operador
 

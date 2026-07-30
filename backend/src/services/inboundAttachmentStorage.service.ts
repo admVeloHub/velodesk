@@ -1,9 +1,16 @@
-/** inboundAttachmentStorage v1.0.0 — persiste anexos de e-mail inbound em disco */
+/** inboundAttachmentStorage v1.3.0 — arquivos flat no prefixo inbound (sem subpasta por mensagem) */
 import fs from 'fs/promises';
+import { createReadStream } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { env } from '../config/env';
-
+import {
+  buildGcsObjectUri,
+  getInboundAttachmentsPrefix,
+  isGcsAttachmentStorageConfigured,
+  readInboundAttachmentFromGcs,
+  uploadInboundAttachmentToGcs,
+} from './gcsAttachmentStorage.service';
 const STORAGE_KEY_SEP = '__';
 
 function resolveBaseDir(): string {
@@ -15,11 +22,6 @@ function resolveBaseDir(): string {
 function sanitizeFilename(name: string): string {
   const base = path.basename(String(name || 'anexo').trim()) || 'anexo';
   return base.replace(/[^\w.\-()+\s]/g, '_').slice(0, 180);
-}
-
-function normalizeMessageFolder(messageId: string): string {
-  const hash = crypto.createHash('sha1').update(String(messageId || 'msg')).digest('hex').slice(0, 16);
-  return hash;
 }
 
 function decodeStorageKey(rawKey: string): string {
@@ -39,31 +41,49 @@ export interface PersistInboundAttachmentInput {
 
 export interface StoredInboundAttachment {
   url: string;
+  gcsUri: string;
   filename: string;
   contentType: string;
   storageKey: string;
+}
+
+export function buildInboundAttachmentApiUrl(storageKey: string): string {
+  const encodedKey = storageKey.replace(/\//g, STORAGE_KEY_SEP);
+  return `/api/uploads/inbound/${encodeURIComponent(encodedKey)}`;
 }
 
 export async function persistInboundAttachment(
   input: PersistInboundAttachmentInput,
 ): Promise<StoredInboundAttachment> {
   const safeName = sanitizeFilename(input.filename);
-  const folder = normalizeMessageFolder(input.messageId);
-  const storageKey = `${folder}/${crypto.randomUUID()}-${safeName}`;
+  const storageKey = `${crypto.randomUUID()}-${safeName}`;
+
+  const gcsUploaded = await uploadInboundAttachmentToGcs(
+    storageKey,
+    input.buffer,
+    input.contentType,
+  );
+  if (isGcsAttachmentStorageConfigured() && !gcsUploaded) {
+    throw new Error(`Falha ao enviar anexo "${safeName}" para o bucket ${env.gcpStorageBucket}`);
+  }
+
   const fullPath = path.join(resolveBaseDir(), storageKey);
+  try {
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, input.buffer);
+  } catch (err) {
+    if (!gcsUploaded) throw err;
+    console.warn('[inboundAttachment] cache local falhou (GCS ok):', (err as Error).message);
+  }
 
-  await fs.mkdir(path.dirname(fullPath), { recursive: true });
-  await fs.writeFile(fullPath, input.buffer);
-
-  const encodedKey = storageKey.replace(/\//g, STORAGE_KEY_SEP);
   return {
-    url: `/api/uploads/inbound/${encodeURIComponent(encodedKey)}`,
+    url: buildInboundAttachmentApiUrl(storageKey),
+    gcsUri: buildGcsObjectUri(getInboundAttachmentsPrefix(), storageKey),
     filename: safeName,
     contentType: String(input.contentType || 'application/octet-stream').trim(),
     storageKey,
   };
 }
-
 export function resolveInboundAttachmentPath(storageKey: string): string {
   const relative = decodeStorageKey(storageKey);
   const base = resolveBaseDir();
@@ -72,6 +92,50 @@ export function resolveInboundAttachmentPath(storageKey: string): string {
     throw new Error('Caminho de anexo inválido');
   }
   return fullPath;
+}
+
+export function decodeInboundStorageKeyParam(rawKey: string): string {
+  return decodeStorageKey(rawKey);
+}
+
+export async function openInboundAttachment(storageKey: string): Promise<{
+  source: 'disk' | 'gcs';
+  filePath?: string;
+  stream?: NodeJS.ReadableStream;
+  contentType?: string;
+  filename: string;
+} | null> {
+  const relative = decodeStorageKey(storageKey);
+  const filePath = resolveInboundAttachmentPath(storageKey);
+
+  try {
+    const stat = await fs.stat(filePath);
+    if (stat.isFile()) {
+      return {
+        source: 'disk',
+        filePath,
+        filename: path.basename(relative),
+      };
+    }
+  } catch {
+    // tenta GCS
+  }
+
+  const gcs = await readInboundAttachmentFromGcs(relative);
+  if (gcs) {
+    return {
+      source: 'gcs',
+      stream: gcs.stream,
+      contentType: gcs.contentType,
+      filename: path.basename(relative),
+    };
+  }
+
+  return null;
+}
+
+export function createDiskReadStream(filePath: string) {
+  return createReadStream(filePath);
 }
 
 export async function ensureInboundAttachmentDir(): Promise<void> {

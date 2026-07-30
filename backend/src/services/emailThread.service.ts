@@ -1,9 +1,11 @@
-/** emailThread.service v1.2.0 — assunto fixo Atendimento Velotax Numero {protocolo} */
+/** emailThread.service v1.3.0 — thread única por chamado (In-Reply-To/References + assunto fixo) */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { getEffectiveFromAddress } from './emailTransport.service';
 
 export function normalizeEmailMessageId(value: unknown): string {
-  return String(value ?? '').trim().replace(/^<|>$/g, '');
+  const raw = String(value ?? '').trim().replace(/^<|>$/g, '');
+  if (!raw) return '';
+  return raw.includes('@') ? `<${raw}>` : raw;
 }
 
 export interface EmailThreadState {
@@ -29,6 +31,13 @@ export function buildOutboundMessageId(protocolo: string, fromAddress?: string):
   return `<desk.${safe}.${token}@${domain}>`;
 }
 
+/** Âncora estável da thread por protocolo — garante encadeamento mesmo sem e-mail inbound. */
+export function buildProtocolThreadRootId(protocolo: string, fromAddress?: string): string {
+  const domain = domainFromAddress(fromAddress || getEffectiveFromAddress());
+  const safe = String(protocolo ?? '').replace(/[^a-zA-Z0-9]/g, '') || 'ticket';
+  return `<desk.thread.${safe}@${domain}>`;
+}
+
 /** Assunto padronizado ao cliente — mantém [protocolo] para roteamento inbound. */
 export function buildClientEmailSubject(protocolo: string, isReply = false): string {
   const safeProtocolo = String(protocolo ?? '').trim();
@@ -36,8 +45,9 @@ export function buildClientEmailSubject(protocolo: string, isReply = false): str
   return isReply ? `Re: ${base}` : base;
 }
 
-export function buildThreadSubject(protocolo: string, _titulo?: string, isReply = false): string {
-  return buildClientEmailSubject(protocolo, isReply);
+/** Assunto único por chamado — todas as respostas do agente usam o mesmo formato (Re:). */
+export function buildThreadSubject(protocolo: string, _titulo?: string, _isReply = false): string {
+  return buildClientEmailSubject(protocolo, true);
 }
 
 export function collectEmailThreadState(chamado: IChamadoN1): EmailThreadState {
@@ -55,6 +65,10 @@ export function collectEmailThreadState(chamado: IChamadoN1): EmailThreadState {
     if (inbound && !rootId) rootId = inbound;
   }
 
+  if (!rootId && chamado.chamadoProtocolo) {
+    rootId = buildProtocolThreadRootId(chamado.chamadoProtocolo);
+  }
+
   if (!rootId && referenceIds.length) {
     rootId = referenceIds[0];
   }
@@ -64,16 +78,22 @@ export function collectEmailThreadState(chamado: IChamadoN1): EmailThreadState {
 
 export function buildOutboundThreadHeaders(
   chamado: IChamadoN1,
-  messageId: string
+  messageId: string,
 ): OutboundEmailThreadHeaders {
+  const protocolRoot = chamado.chamadoProtocolo
+    ? buildProtocolThreadRootId(chamado.chamadoProtocolo)
+    : '';
   const { rootId, referenceIds } = collectEmailThreadState(chamado);
+  const effectiveRoot = rootId || protocolRoot;
 
-  if (!rootId) {
+  if (!effectiveRoot) {
     return { messageId };
   }
 
-  const inReplyTo = referenceIds[referenceIds.length - 1] || rootId;
-  const references = [...new Set([rootId, ...referenceIds])];
+  const inReplyTo = referenceIds.length
+    ? referenceIds[referenceIds.length - 1]
+    : effectiveRoot;
+  const references = [...new Set([effectiveRoot, ...referenceIds].filter(Boolean))];
 
   return {
     messageId,
@@ -85,7 +105,7 @@ export function buildOutboundThreadHeaders(
 export function persistOutboundEmailMeta(
   chamado: IChamadoN1,
   messageId: string,
-  registroIndex?: number
+  registroIndex?: number,
 ): void {
   const normalized = normalizeEmailMessageId(messageId);
   if (!normalized) return;
@@ -97,12 +117,16 @@ export function persistOutboundEmailMeta(
   if (!reg) return;
 
   const meta = { ...(reg.metadados ?? {}) } as Record<string, unknown>;
-  meta.emailOutboundMessageId = normalized;
+  meta.emailOutboundMessageId = normalized.replace(/^<|>$/g, '');
 
+  const protocolRoot = chamado.chamadoProtocolo
+    ? buildProtocolThreadRootId(chamado.chamadoProtocolo).replace(/^<|>$/g, '')
+    : '';
   const existingRoot = normalizeEmailMessageId(meta.emailThreadRootId)
-    || collectEmailThreadState(chamado).rootId;
+    || collectEmailThreadState(chamado).rootId?.replace(/^<|>$/g, '')
+    || protocolRoot;
 
-  meta.emailThreadRootId = existingRoot || normalized;
+  meta.emailThreadRootId = existingRoot || normalized.replace(/^<|>$/g, '');
   reg.metadados = meta;
 }
 
@@ -113,7 +137,9 @@ function resolveRegistroIndexForOutbound(chamado: IChamadoN1, registroIndex?: nu
 
   for (let i = (chamado.registro?.length ?? 0) - 1; i >= 0; i -= 1) {
     const reg = chamado.registro[i];
-    if (String(reg?.mensagemPublica ?? '').trim()) return i;
+    const hasPublicText = Boolean(String(reg?.mensagemPublica ?? '').trim());
+    const hasPublicAttachments = (reg?.anexosMensagemPublica?.length ?? 0) > 0;
+    if (hasPublicText || hasPublicAttachments) return i;
   }
 
   return chamado.registro?.length ? 0 : -1;

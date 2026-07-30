@@ -18,6 +18,7 @@ import { getWorkflowsByIds } from './workflowDefinicao.service';
 import { extractEmailReplyContent } from './emailReplyContent.util';
 import { sanitizeResponsavel, inferResponsavelFromAgentRegistro } from './responsavel.util';
 import { decodeBasicHtmlEntities } from './emailHtml.util';
+import { filterRealAttachmentUrls } from './attachmentFilter.util';
 
 function normalizeTicketMessageText(raw: string): string {
   return decodeBasicHtmlEntities(String(raw ?? '').trim());
@@ -1035,12 +1036,8 @@ export function appendRegistroEntry(
 ): AppendRegistroResult {
   const publicText = String(payload.mensagemPublica ?? '').trim();
   const internalText = String(payload.anotacaoInterna ?? '').trim();
-  const publicAttachments = (payload.anexosMensagemPublica ?? [])
-    .map((url) => String(url).trim())
-    .filter(Boolean);
-  const internalAttachments = (payload.anexosAnotacaoInterna ?? [])
-    .map((url) => String(url).trim())
-    .filter(Boolean);
+  const publicAttachments = filterRealAttachmentUrls(payload.anexosMensagemPublica);
+  const internalAttachments = filterRealAttachmentUrls(payload.anexosAnotacaoInterna);
   if (!publicText && !internalText && !publicAttachments.length && !internalAttachments.length) return {};
 
   const sender = payload.sender ?? 'me';
@@ -1257,7 +1254,7 @@ function buildTicketDtoCore(
           type: 'public',
           time: reg.data,
           registroIndex: index,
-          attachments: reg.anexosMensagemPublica ?? [],
+          attachments: filterRealAttachmentUrls(reg.anexosMensagemPublica),
         });
       }
       if (reg.anotacaoInterna || (reg.anexosAnotacaoInterna?.length ?? 0) > 0) {
@@ -1270,7 +1267,7 @@ function buildTicketDtoCore(
           type: 'internal',
           time: reg.data,
           registroIndex: index,
-          attachments: reg.anexosAnotacaoInterna ?? [],
+          attachments: filterRealAttachmentUrls(reg.anexosAnotacaoInterna),
         });
       }
     });

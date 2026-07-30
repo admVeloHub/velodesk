@@ -13,6 +13,8 @@ RUN npm ci
 COPY backend/tsconfig.json ./
 COPY backend/scripts ./scripts
 COPY backend/src ./src
+COPY backend/assets ./assets
+COPY public/simbolo_velotax_ajustada_branco.png ./assets/email/simbolo_velotax_ajustada_branco.png
 COPY exports/ticket-ia-knowledge/knowledge.json ./knowledge/knowledge.json
 RUN npm run build && npm prune --omit=dev
 
@@ -37,6 +39,7 @@ COPY --from=api-build /app/package.json /app/package-lock.json ./
 COPY --from=api-build /app/node_modules ./node_modules
 COPY --from=api-build /app/dist ./dist
 COPY --from=api-build /app/knowledge ./knowledge
+COPY --from=api-build /app/assets ./assets
 
 COPY --from=web-build /app/dist /usr/share/nginx/html
 COPY docker/nginx-cloudrun.conf.template /etc/nginx/templates/default.conf.template

@@ -1,4 +1,4 @@
-/** env v1.22.0 — desk_preferences (caixas personalizadas do agente) */
+/** env v1.24.0 — prefixos GCS inbound (desk_ticket_attachments) e sent (desk_ticket_sent_attachments) */
 import fs from 'fs';
 import path from 'path';
 
@@ -91,8 +91,19 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET || 'velodesk-dev-secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   enableWhatsapp: process.env.ENABLE_WHATSAPP !== 'false',
-  gcpStorageBucket: process.env.GCP_STORAGE_BUCKET || '',
+  gcpStorageBucket: (process.env.GCP_STORAGE_BUCKET || 'velodesk_storage').trim(),
+  /** E-mail recebido (inbound Gmail) */
+  gcpStorageInboundAttachmentsPrefix: (
+    process.env.GCP_STORAGE_INBOUND_ATTACHMENTS_PREFIX
+    || process.env.GCP_STORAGE_ATTACHMENTS_PREFIX
+    || 'desk_ticket_attachments'
+  ).trim().replace(/^\/+|\/+$/g, ''),
+  /** Anexo enviado pelo agente no atendimento */
+  gcpStorageSentAttachmentsPrefix: (
+    process.env.GCP_STORAGE_SENT_ATTACHMENTS_PREFIX || 'desk_ticket_sent_attachments'
+  ).trim().replace(/^\/+|\/+$/g, ''),
   inboundAttachmentsDir: (process.env.INBOUND_ATTACHMENTS_DIR || '').trim(),
+  sentAttachmentsDir: (process.env.SENT_ATTACHMENTS_DIR || '').trim(),
   inboundEmailEnabled: process.env.INBOUND_EMAIL_ENABLED === 'true',
   inboundEmailProvider: (process.env.INBOUND_EMAIL_PROVIDER || 'generic').toLowerCase(),
   inboundEmailWebhookSecret: process.env.INBOUND_EMAIL_WEBHOOK_SECRET || '',

@@ -1,6 +1,19 @@
-/** gmailApiSend v1.1.0 — Message-ID / In-Reply-To / References */
+/** gmailApiSend v1.3.0 — MIME multipart com anexos + imagens inline (logo CID) */
 import { google } from 'googleapis';
 import type { IServiceAccountJson } from '../../models/EmailTransportConfig';
+
+export interface GmailOutboundAttachment {
+  filename: string;
+  contentType: string;
+  buffer: Buffer;
+}
+
+export interface GmailInlineImage {
+  cid: string;
+  filename: string;
+  contentType: string;
+  buffer: Buffer;
+}
 
 export interface GmailSendParams {
   from: string;
@@ -10,6 +23,8 @@ export interface GmailSendParams {
   messageId?: string;
   inReplyTo?: string;
   references?: string[];
+  inlineImages?: GmailInlineImage[];
+  attachments?: GmailOutboundAttachment[];
 }
 
 export interface GmailAuthParams {
@@ -24,6 +39,109 @@ function mimeEncodeSubject(subject: string): string {
   return `=?UTF-8?B?${Buffer.from(s, 'utf8').toString('base64')}?=`;
 }
 
+function wrapBase64Lines(base64: string): string {
+  return base64.match(/.{1,76}/g)?.join('\r\n') ?? base64;
+}
+
+function mimeEncodeFilename(filename: string): string {
+  const safe = String(filename || 'anexo').replace(/[\r\n"]/g, '_');
+  if (/^[\x20-\x7E]+$/.test(safe)) {
+    return `filename="${safe.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  }
+  return `filename*=UTF-8''${encodeURIComponent(safe)}`;
+}
+
+function appendHtmlPart(body: string[], boundary: string, htmlBody: string): void {
+  body.push(`--${boundary}\r\n`);
+  body.push('Content-Type: text/html; charset=UTF-8\r\n');
+  body.push('Content-Transfer-Encoding: base64\r\n\r\n');
+  body.push(`${wrapBase64Lines(Buffer.from(htmlBody, 'utf8').toString('base64'))}\r\n`);
+}
+
+function appendInlineImagePart(body: string[], boundary: string, image: GmailInlineImage): void {
+  body.push(`--${boundary}\r\n`);
+  body.push(`Content-Type: ${String(image.contentType || 'image/png').trim()}; ${mimeEncodeFilename(image.filename)}\r\n`);
+  body.push(`Content-Transfer-Encoding: base64\r\n`);
+  body.push(`Content-Disposition: inline; ${mimeEncodeFilename(image.filename)}\r\n`);
+  body.push(`Content-ID: <${String(image.cid || 'inline-image').trim()}>\r\n\r\n`);
+  body.push(`${wrapBase64Lines(image.buffer.toString('base64'))}\r\n`);
+}
+
+function appendFileAttachmentPart(body: string[], boundary: string, attachment: GmailOutboundAttachment): void {
+  body.push(`--${boundary}\r\n`);
+  body.push(`Content-Type: ${String(attachment.contentType || 'application/octet-stream').trim()}; ${mimeEncodeFilename(attachment.filename)}\r\n`);
+  body.push(`Content-Disposition: attachment; ${mimeEncodeFilename(attachment.filename)}\r\n`);
+  body.push('Content-Transfer-Encoding: base64\r\n\r\n');
+  body.push(`${wrapBase64Lines(attachment.buffer.toString('base64'))}\r\n`);
+}
+
+function buildRelatedSection(htmlBody: string, inlineImages: GmailInlineImage[]): { contentType: string; body: string } {
+  const boundary = `velodesk_rel_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const parts: string[] = [];
+  appendHtmlPart(parts, boundary, htmlBody);
+  for (const image of inlineImages) {
+    appendInlineImagePart(parts, boundary, image);
+  }
+  parts.push(`--${boundary}--\r\n`);
+  return {
+    contentType: `multipart/related; boundary="${boundary}"`,
+    body: parts.join(''),
+  };
+}
+
+function buildMimeBody({
+  html,
+  inlineImages = [],
+  attachments = [],
+}: Pick<GmailSendParams, 'html' | 'inlineImages' | 'attachments'>): { contentType: string; body: string } {
+  const htmlBody = String(html || '').replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
+  const safeInlines = (inlineImages || []).filter((item) => item.buffer?.length);
+  const safeAttachments = (attachments || []).filter((item) => item.buffer?.length);
+
+  if (!safeInlines.length && !safeAttachments.length) {
+    return {
+      contentType: 'text/html; charset=UTF-8',
+      body: htmlBody,
+    };
+  }
+
+  if (safeInlines.length && !safeAttachments.length) {
+    return buildRelatedSection(htmlBody, safeInlines);
+  }
+
+  if (!safeInlines.length && safeAttachments.length) {
+    const boundary = `velodesk_mix_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const parts: string[] = [];
+    appendHtmlPart(parts, boundary, htmlBody);
+    for (const attachment of safeAttachments) {
+      appendFileAttachmentPart(parts, boundary, attachment);
+    }
+    parts.push(`--${boundary}--\r\n`);
+    return {
+      contentType: `multipart/mixed; boundary="${boundary}"`,
+      body: parts.join(''),
+    };
+  }
+
+  const mixedBoundary = `velodesk_mix_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const related = buildRelatedSection(htmlBody, safeInlines);
+  const parts: string[] = [];
+
+  parts.push(`--${mixedBoundary}\r\n`);
+  parts.push(`Content-Type: ${related.contentType}\r\n\r\n`);
+  parts.push(`${related.body}\r\n`);
+
+  for (const attachment of safeAttachments) {
+    appendFileAttachmentPart(parts, mixedBoundary, attachment);
+  }
+  parts.push(`--${mixedBoundary}--\r\n`);
+
+  return {
+    contentType: `multipart/mixed; boundary="${mixedBoundary}"`,
+    body: parts.join(''),
+  };
+}
+
 export function buildRawRfc822({
   from,
   to,
@@ -32,9 +150,11 @@ export function buildRawRfc822({
   messageId,
   inReplyTo,
   references,
+  inlineImages,
+  attachments,
 }: GmailSendParams): string {
   const subjectHeader = mimeEncodeSubject(subject);
-  const body = html || '';
+  const mime = buildMimeBody({ html, inlineImages, attachments });
   let msg =
     `From: ${from}\r\n` +
     `To: ${to}\r\n` +
@@ -51,10 +171,10 @@ export function buildRawRfc822({
   }
 
   msg +=
-    `MIME-Version: 1.0\r\n` +
-    `Content-Type: text/html; charset=UTF-8\r\n` +
-    `\r\n` +
-    body.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
+    'MIME-Version: 1.0\r\n' +
+    `Content-Type: ${mime.contentType}\r\n` +
+    '\r\n' +
+    mime.body;
 
   const b64 = Buffer.from(msg, 'utf8').toString('base64');
   return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -86,6 +206,8 @@ export async function sendViaGmailApi(
     messageId: mail.messageId,
     inReplyTo: mail.inReplyTo,
     references: mail.references,
+    inlineImages: mail.inlineImages,
+    attachments: mail.attachments,
   });
 
   await gmail.users.messages.send({

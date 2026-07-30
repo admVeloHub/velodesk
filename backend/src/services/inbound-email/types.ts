@@ -1,9 +1,9 @@
-﻿/** inbound-email/types v1.1.0 — action skipped (spam/ignorado) */
-
-export interface InboundEmailAttachment {
+﻿/** inbound-email/types v1.2.0 — gcsUri do anexo persistido no bucket */export interface InboundEmailAttachment {
   filename: string;
   contentType: string;
   url?: string;
+  gcsUri?: string;
+  storageKey?: string;
 }
 
 export interface InboundEmailPayload {

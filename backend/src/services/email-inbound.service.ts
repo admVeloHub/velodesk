@@ -1,4 +1,4 @@
-﻿/** email-inbound.service v1.8.0 — ciclo status: pendente/resolvido reabre; fechado gera novo */
+﻿/** email-inbound.service v1.9.0 — anexos persistidos no GCS com gcsUri no registro */
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
@@ -106,6 +106,32 @@ function attachmentUrls(payload: InboundEmailPayload): string[] {
     .filter((url): url is string => Boolean(url));
 }
 
+function buildAttachmentMetadados(payload: InboundEmailPayload): Record<string, unknown> {
+  const items = (payload.attachments ?? [])
+    .filter((item) => item.url || item.gcsUri)
+    .map((item) => ({
+      filename: item.filename,
+      url: item.url,
+      gcsUri: item.gcsUri,
+      storageKey: item.storageKey,
+    }));
+  return items.length ? { emailAttachments: items } : {};
+}
+
+function appendAttachmentReferencesToBody(bodyText: string, payload: InboundEmailPayload): string {
+  const lines = (payload.attachments ?? [])
+    .filter((item) => item.gcsUri || item.url)
+    .map((item) => {
+      const label = String(item.filename || 'anexo').trim();
+      const ref = String(item.gcsUri || item.url || '').trim();
+      return `[Anexo: ${label}] ${ref}`;
+    });
+  if (!lines.length) return bodyText;
+  const block = lines.join('\n');
+  const base = String(bodyText || '').trim();
+  return base ? `${base}\n\n${block}` : block;
+}
+
 export async function processInboundEmail(payload: InboundEmailPayload): Promise<InboundEmailProcessResult> {
   const messageId = normalizeMessageId(payload.messageId);
   if (!messageId) {
@@ -170,8 +196,11 @@ async function runInboundEmailFlow(
     };
   }
 
-  const bodyText = resolveEmailBody(payload);
-  const emailMeta = buildEmailMetadados(payload);
+  const bodyText = appendAttachmentReferencesToBody(resolveEmailBody(payload), payload);
+  const emailMeta = {
+    ...buildEmailMetadados(payload),
+    ...buildAttachmentMetadados(payload),
+  };
   const attachments = attachmentUrls(payload);
 
   const existing = await findChamadoForEmailReply(payload);

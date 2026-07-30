@@ -1,6 +1,7 @@
-/** gmailAttachment.service v1.0.0 — baixa anexos Gmail e persiste para o ticket */
+/** gmailAttachment.service v1.2.0 — ignora inline/CID e logo Velotax em anexos inbound */
 import type { gmail_v1 } from 'googleapis';
 import type { InboundEmailAttachment } from '../inbound-email/types';
+import { isBrandInlineAttachmentFilename } from '../attachmentFilter.util';
 import { persistInboundAttachment } from '../inboundAttachmentStorage.service';
 
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
@@ -16,6 +17,33 @@ function decodeBase64Url(data: string): Buffer {
   return Buffer.from(normalized, 'base64');
 }
 
+function getPartHeader(part: gmail_v1.Schema$MessagePart, name: string): string {
+  const found = part.headers?.find(
+    (header) => String(header.name ?? '').toLowerCase() === name.toLowerCase(),
+  );
+  return String(found?.value ?? '').trim();
+}
+
+function shouldSkipGmailAttachmentPart(part: gmail_v1.Schema$MessagePart): boolean {
+  const filename = String(part.filename ?? '').trim();
+  if (!filename) return true;
+
+  if (isBrandInlineAttachmentFilename(filename)) {
+    return true;
+  }
+
+  const disposition = getPartHeader(part, 'Content-Disposition').toLowerCase();
+  if (disposition.includes('inline') && !disposition.includes('attachment')) {
+    return true;
+  }
+
+  if (getPartHeader(part, 'Content-ID')) {
+    return true;
+  }
+
+  return false;
+}
+
 export function listGmailAttachmentParts(
   part: gmail_v1.Schema$MessagePart | undefined,
   acc: GmailAttachmentPartRef[] = [],
@@ -24,7 +52,7 @@ export function listGmailAttachmentParts(
 
   const filename = String(part.filename ?? '').trim();
   const attachmentId = String(part.body?.attachmentId ?? '').trim();
-  if (filename && attachmentId) {
+  if (filename && attachmentId && !shouldSkipGmailAttachmentPart(part)) {
     acc.push({
       filename,
       mimeType: String(part.mimeType ?? 'application/octet-stream').trim(),
@@ -82,6 +110,8 @@ export async function downloadGmailAttachments(
         filename: saved.filename,
         contentType: saved.contentType,
         url: saved.url,
+        gcsUri: saved.gcsUri,
+        storageKey: saved.storageKey,
       });
     } catch (err) {
       console.warn('[gmailAttachment] falha ao baixar anexo', {

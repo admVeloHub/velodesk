@@ -1,0 +1,215 @@
+/** sentAttachmentStorage v1.1.0 — arquivos flat no prefixo sent (sem subpasta por ticket) */
+import fs from 'fs/promises';
+import { createReadStream } from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { Readable } from 'stream';
+import { env } from '../config/env';
+import {
+  buildGcsObjectUri,
+  getSentAttachmentsPrefix,
+  isGcsAttachmentStorageConfigured,
+  readSentAttachmentFromGcs,
+  uploadSentAttachmentToGcs,
+} from './gcsAttachmentStorage.service';
+
+const STORAGE_KEY_SEP = '__';
+const MAX_SENT_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+
+function resolveBaseDir(): string {
+  const configured = String(env.sentAttachmentsDir || '').trim();
+  if (configured) return path.resolve(configured);
+  return path.resolve(process.cwd(), 'data', 'sent-attachments');
+}
+
+function sanitizeFilename(name: string): string {
+  const base = path.basename(String(name || 'anexo').trim()) || 'anexo';
+  return base.replace(/[^\w.\-()+\s]/g, '_').slice(0, 180);
+}
+
+async function streamToBuffer(stream: Readable): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+function decodeStorageKey(rawKey: string): string {
+  const decoded = decodeURIComponent(String(rawKey || '').trim());
+  if (!decoded || decoded.includes('..') || decoded.includes('\\') || decoded.startsWith('/')) {
+    throw new Error('Chave de anexo inválida');
+  }
+  return decoded.replace(new RegExp(STORAGE_KEY_SEP, 'g'), '/');
+}
+
+export interface PersistSentAttachmentInput {
+  ticketId: string;
+  filename: string;
+  contentType: string;
+  buffer: Buffer;
+}
+
+export interface StoredSentAttachment {
+  url: string;
+  gcsUri: string;
+  filename: string;
+  contentType: string;
+  storageKey: string;
+}
+
+export function buildSentAttachmentApiUrl(storageKey: string): string {
+  const encodedKey = storageKey.replace(/\//g, STORAGE_KEY_SEP);
+  return `/api/uploads/sent/${encodeURIComponent(encodedKey)}`;
+}
+
+export function parseSentAttachmentStorageKeyFromApiUrl(apiUrl: string): string | null {
+  const raw = String(apiUrl || '').trim();
+  const match = raw.match(/\/(?:api\/)?uploads\/sent\/([^?#]+)/i);
+  if (!match?.[1]) return null;
+  try {
+    return decodeStorageKey(decodeURIComponent(match[1]));
+  } catch {
+    return null;
+  }
+}
+
+export async function readSentAttachmentBuffer(
+  storageKey: string,
+): Promise<{ buffer: Buffer; filename: string; contentType: string } | null> {
+  const relative = decodeStorageKey(storageKey);
+
+  try {
+    const filePath = resolveSentAttachmentPath(storageKey);
+    const stat = await fs.stat(filePath);
+    if (stat.isFile()) {
+      return {
+        buffer: await fs.readFile(filePath),
+        filename: path.basename(relative),
+        contentType: 'application/octet-stream',
+      };
+    }
+  } catch {
+    // tenta GCS
+  }
+
+  const gcs = await readSentAttachmentFromGcs(relative);
+  if (gcs?.stream) {
+    return {
+      buffer: await streamToBuffer(gcs.stream as Readable),
+      filename: path.basename(relative),
+      contentType: gcs.contentType || 'application/octet-stream',
+    };
+  }
+
+  return null;
+}
+
+export async function loadSentAttachmentsForEmail(
+  apiUrls: string[],
+): Promise<Array<{ filename: string; contentType: string; buffer: Buffer }>> {
+  const loaded = [];
+  for (const apiUrl of apiUrls) {
+    const storageKey = parseSentAttachmentStorageKeyFromApiUrl(apiUrl);
+    if (!storageKey) continue;
+    const item = await readSentAttachmentBuffer(storageKey);
+    if (!item) {
+      console.warn('[sentAttachment] anexo indisponível para e-mail:', apiUrl);
+      continue;
+    }
+    const filename = item.filename.replace(/^[0-9a-f-]{36}-/i, '') || item.filename;
+    loaded.push({
+      filename,
+      contentType: item.contentType,
+      buffer: item.buffer,
+    });
+  }
+  return loaded;
+}
+
+export async function persistSentAttachment(
+  input: PersistSentAttachmentInput,
+): Promise<StoredSentAttachment> {
+  if (input.buffer.length > MAX_SENT_ATTACHMENT_BYTES) {
+    throw new Error(`Anexo excede o limite de ${MAX_SENT_ATTACHMENT_BYTES / (1024 * 1024)}MB`);
+  }
+
+  const safeName = sanitizeFilename(input.filename);
+  const storageKey = `${crypto.randomUUID()}-${safeName}`;
+
+  const gcsUploaded = await uploadSentAttachmentToGcs(storageKey, input.buffer, input.contentType);
+  if (isGcsAttachmentStorageConfigured() && !gcsUploaded) {
+    throw new Error(`Falha ao enviar anexo "${safeName}" para o bucket ${env.gcpStorageBucket}`);
+  }
+
+  const fullPath = path.join(resolveBaseDir(), storageKey);
+  try {
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, input.buffer);
+  } catch (err) {
+    if (!gcsUploaded) throw err;
+    console.warn('[sentAttachment] cache local falhou (GCS ok):', (err as Error).message);
+  }
+
+  return {
+    url: buildSentAttachmentApiUrl(storageKey),
+    gcsUri: buildGcsObjectUri(getSentAttachmentsPrefix(), storageKey),
+    filename: safeName,
+    contentType: String(input.contentType || 'application/octet-stream').trim(),
+    storageKey,
+  };
+}
+
+function resolveSentAttachmentPath(storageKey: string): string {
+  const relative = decodeStorageKey(storageKey);
+  const base = resolveBaseDir();
+  const fullPath = path.resolve(base, relative);
+  if (!fullPath.startsWith(base + path.sep) && fullPath !== base) {
+    throw new Error('Caminho de anexo inválido');
+  }
+  return fullPath;
+}
+
+export async function openSentAttachment(storageKey: string): Promise<{
+  source: 'disk' | 'gcs';
+  filePath?: string;
+  stream?: NodeJS.ReadableStream;
+  contentType?: string;
+  filename: string;
+} | null> {
+  const relative = decodeStorageKey(storageKey);
+
+  try {
+    const filePath = resolveSentAttachmentPath(storageKey);
+    const stat = await fs.stat(filePath);
+    if (stat.isFile()) {
+      return {
+        source: 'disk',
+        filePath,
+        filename: path.basename(relative),
+      };
+    }
+  } catch {
+    // tenta GCS
+  }
+
+  const gcs = await readSentAttachmentFromGcs(relative);
+  if (gcs) {
+    return {
+      source: 'gcs',
+      stream: gcs.stream,
+      contentType: gcs.contentType,
+      filename: path.basename(relative),
+    };
+  }
+
+  return null;
+}
+
+export function createSentDiskReadStream(filePath: string) {
+  return createReadStream(filePath);
+}
+
+export async function ensureSentAttachmentDir(): Promise<void> {
+  await fs.mkdir(resolveBaseDir(), { recursive: true });
+}
