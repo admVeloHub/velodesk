@@ -89,6 +89,81 @@ function findProconFromChamado(chamado: IChamadoN1): Record<string, unknown> | n
   return null;
 }
 
+function normalizeCanalValue(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function isProconCanalFromBody(body: Record<string, unknown>): boolean {
+  if (readProconFromBody(body)) return true;
+  const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
+  if (normalizeCanalValue(lf.canal).includes('procon')) return true;
+  const channel = normalizeCanalValue(body.channel ?? body.source);
+  return channel === 'procon';
+}
+
+export function isProconChamado(chamado: IChamadoN1): boolean {
+  return Boolean(findProconFromChamado(chamado));
+}
+
+function buildMinimalProconMeta(
+  chamado: IChamadoN1,
+  body?: Record<string, unknown>,
+): Record<string, unknown> {
+  const lf = (body?.lateralForm ?? {}) as Record<string, unknown>;
+  const existing = readProconFromBody(body ?? {}) || findProconFromChamado(chamado);
+  if (existing) return existing;
+  const tab = readTabulacaoSnapshot(chamado.tabulacao?.[0]);
+  return {
+    protocoloProcon: String(chamado.chamadoProtocolo ?? '').trim() || undefined,
+    consumidor: String(body?.clientName ?? tab.motivo ?? chamado.chamadoTitulo ?? '').trim(),
+    assunto: String(chamado.chamadoTitulo ?? body?.title ?? '').trim(),
+    descricao: String(body?.text ?? body?.description ?? '').trim(),
+    cpf: String(lf.cpf ?? lf.clienteCpf ?? body?.clientCPF ?? '').trim(),
+    produto: tab.produto,
+    tipo: tab.tipoChamado,
+    motivo: tab.motivo,
+    statusPc: 'nao-respondida',
+  };
+}
+
+function ensureProconChannelStamp(
+  chamado: IChamadoN1,
+  body?: Record<string, unknown>,
+  status = 'novo',
+): void {
+  if (findProconFromChamado(chamado)) return;
+  if (body && !isProconCanalFromBody(body)) return;
+
+  const pcMeta = buildMinimalProconMeta(chamado, body);
+  const metadados: Record<string, unknown> = { source: 'procon', procon: pcMeta };
+  const registro = chamado.registro ?? [];
+  const targetStatus = currentStatus(chamado) || status;
+  const clienteIdx = registro.findIndex((reg) => String(reg.origin ?? '').toLowerCase() === 'cliente');
+
+  if (clienteIdx >= 0) {
+    const reg = registro[clienteIdx];
+    const existingMeta = registroMetadados(reg);
+    if (String(existingMeta.source ?? '').toLowerCase() !== 'procon') {
+      reg.metadados = { ...existingMeta, ...metadados };
+    }
+    return;
+  }
+
+  registro.unshift({
+    data: new Date(),
+    origin: 'cliente',
+    autor: String(body?.clientName ?? chamado.chamadoTitulo ?? 'Consumidor').trim() || 'Consumidor',
+    mensagemPublica: '',
+    anexosMensagemPublica: [],
+    anotacaoInterna: '',
+    anexosAnotacaoInterna: [],
+    alteracoes: [],
+    metadados,
+    status: targetStatus,
+  });
+  chamado.registro = registro;
+}
+
 function readReclameAquiFromBody(body: Record<string, unknown>): Record<string, unknown> | null {
   const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
   const ra = lf.reclameAqui;
@@ -781,13 +856,15 @@ export async function createChamadoFromBody(
 
   await assertTabulacaoForStatus(tab, status);
 
-  return {
+  const partial: Partial<IChamadoN1> = {
     chamadoProtocolo: protocoloInformed || await generateProtocolo(),
     chamadoTitulo: titulo,
     cliente,
     tabulacao: [tab],
     registro,
   };
+  ensureProconChannelStamp(partial as IChamadoN1, body, status);
+  return partial;
 }
 
 export interface PrepareChamadoBodyResult {
@@ -974,6 +1051,8 @@ export async function commitChamadoFromAgent(
     });
   }
 
+  ensureProconChannelStamp(chamado, body);
+
   return {
     messageResult,
     publicText,
@@ -1011,6 +1090,8 @@ export async function applyBodyToChamado(
       status: targetStatus,
     });
   }
+
+  ensureProconChannelStamp(chamado, body);
 }
 
 export interface AppendRegistroResult {
@@ -1295,10 +1376,12 @@ function buildTicketDtoCore(
     lateralWorkflow = findLatestWorkflowFromRegistro(chamado) ?? undefined;
   }
   const persistedApproval = listOnly ? undefined : (extras.persistedApproval ?? findLatestApprovalFromRegistro(chamado) ?? undefined);
-  const reclameAqui = listOnly ? null : (extras.reclameAqui ?? findReclameAquiFromChamado(chamado));
-  const procon = listOnly ? null : (extras.procon ?? findProconFromChamado(chamado));
-  const especialChannel = reclameAqui ? 'reclame-aqui' : procon ? 'procon' : null;
-  const especialSource = reclameAqui ? 'reclame-aqui' : procon ? 'procon' : 'velodesk';
+  const reclameAquiMeta = extras.reclameAqui ?? findReclameAquiFromChamado(chamado);
+  const proconMeta = extras.procon ?? findProconFromChamado(chamado);
+  const reclameAqui = listOnly ? null : reclameAquiMeta;
+  const procon = listOnly ? null : proconMeta;
+  const especialChannel = reclameAquiMeta ? 'reclame-aqui' : proconMeta ? 'procon' : null;
+  const especialSource = reclameAquiMeta ? 'reclame-aqui' : proconMeta ? 'procon' : 'velodesk';
 
   return {
     _id: chamado._id.toString(),
@@ -1362,7 +1445,7 @@ function buildTicketDtoCore(
       clienteTelefone: listOnly ? [] : (cadastro?.clienteTelefone?.lista ?? []),
       clienteTelefoneWhatsapp: listOnly ? undefined : (cadastro?.clienteTelefone?.whatsapp ?? undefined),
       cpf: clientCpf,
-      canal: reclameAqui ? 'Reclame Aqui' : procon ? 'Procon' : undefined,
+      canal: reclameAquiMeta ? 'Reclame Aqui' : proconMeta ? 'Procon' : undefined,
       reclameAqui: reclameAqui ?? undefined,
       procon: procon ?? undefined,
       workflow: lateralWorkflow,

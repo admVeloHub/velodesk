@@ -32,6 +32,16 @@ export default function ProconCrmRoot() {
   );
   const [listVersion, setListVersion] = useState(0);
 
+  useEffect(() => {
+    const bumpList = () => setListVersion((v) => v + 1);
+    window.addEventListener('velodesk:procon-sync', bumpList);
+    window.addEventListener('velodesk:refresh-tickets', bumpList);
+    return () => {
+      window.removeEventListener('velodesk:procon-sync', bumpList);
+      window.removeEventListener('velodesk:refresh-tickets', bumpList);
+    };
+  }, []);
+
   const { openNovaDemandaFlow, modals: demandaModals } = usePcNovaDemandaModals({ navigate });
 
   const [ticketLoading, setTicketLoading] = useState(true);

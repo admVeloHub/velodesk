@@ -360,6 +360,15 @@ export function getDemandaById(id) {
   return { ...found, ...buildRegistroDefaults(found) };
 }
 
+export function getDemandaByTicketId(ticketId) {
+  if (!ticketId) return null;
+  const id = String(ticketId);
+  const items = loadAllDemandas();
+  const found = items.find((i) => String(i.ticketId || '') === id);
+  if (!found) return null;
+  return { ...found, ...buildRegistroDefaults(found) };
+}
+
 function upsertDemanda(item) {
   const items = loadAllDemandas();
   const idx = items.findIndex((i) => i.id === item.id);
@@ -396,5 +405,23 @@ export function registerDemanda(item) {
     prazoLegal,
     slaPct: sla.slaPct,
     slaTone: sla.slaTone,
+  });
+}
+
+/** Espelha ticket Procon externo na caixa sem iniciar workflow. */
+export function mirrorDemandaFromTicket(item) {
+  const prazoLegal = item.prazoLegal || daysFromNow(10, 18);
+  const sla = computeSlaFromPrazo(prazoLegal);
+  return upsertDemanda({
+    ...item,
+    isDraft: false,
+    workflowAtivo: item.workflowAtivo || false,
+    statusPc: item.statusPc || PC_STATUS.NAO_RESPONDIDA,
+    groupKey: item.groupKey || 'nao-respondidas',
+    aberta: item.aberta !== false,
+    respostaAction: item.respostaAction || 'responder',
+    prazoLegal,
+    slaPct: item.slaPct ?? sla.slaPct,
+    slaTone: item.slaTone || sla.slaTone,
   });
 }

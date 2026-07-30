@@ -1,9 +1,10 @@
 /**
- * DeskMyTicketsTable v1.2.1 — seção Em andamento retrátil restaurada
- * VERSION: v1.2.1 | DATE: 2026-07-24
+ * DeskMyTicketsTable v1.3.0 — busca por ticket/CPF no cabeçalho
+ * VERSION: v1.3.0 | DATE: 2026-07-30
  */
 import React, { useMemo, useState } from 'react';
 import {
+  filterEntriesByDeskSearch,
   formatTicketSlaRemaining,
   getSlaClass,
   getTicketProtocolLabel,
@@ -12,7 +13,7 @@ import {
   normalizeTicketForDeskV2,
   sortTicketEntries,
 } from '../../../services/desk/utils';
-import { SLA_SHORT_LABELS } from '../../../services/desk/constants';
+import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET, SLA_SHORT_LABELS } from '../../../services/desk/constants';
 
 const MY_TICKETS_SECTIONS_WITHOUT_HEADER = new Set(['pendente', 'resolvidos']);
 
@@ -66,13 +67,25 @@ function TicketGrid({ id, children }) {
 
 export default function DeskMyTicketsTable({
   entries = [],
-  searchActive = false,
+  searchActive: externalSearchActive = false,
   onSelectTicket,
   onReload,
   refreshing = false,
 }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState(DESK_SEARCH_MODE_CPF);
+
+  const isTicketMode = searchMode === DESK_SEARCH_MODE_TICKET;
+  const localSearchActive = Boolean(searchQuery.trim());
+  const searchActive = localSearchActive || externalSearchActive;
+
+  const filteredEntries = useMemo(
+    () => filterEntriesByDeskSearch(entries, searchQuery, searchMode),
+    [entries, searchQuery, searchMode],
+  );
+
   const { headerSections, flatEntries } = useMemo(() => {
-    const grouped = groupMyTicketsByStatus(entries);
+    const grouped = groupMyTicketsByStatus(filteredEntries);
     const withoutHeader = grouped.filter((section) => MY_TICKETS_SECTIONS_WITHOUT_HEADER.has(section.id));
     const withHeader = grouped.filter((section) => !MY_TICKETS_SECTIONS_WITHOUT_HEADER.has(section.id));
     const mergedFlat = sortTicketEntries(
@@ -82,9 +95,9 @@ export default function DeskMyTicketsTable({
     );
 
     return { headerSections: withHeader, flatEntries: mergedFlat };
-  }, [entries]);
+  }, [filteredEntries]);
 
-  const total = entries.length;
+  const total = filteredEntries.length;
   const [collapsedSections, setCollapsedSections] = useState(() => new Set());
 
   const toggleSection = (sectionId) => {
@@ -100,9 +113,45 @@ export default function DeskMyTicketsTable({
     <div className="desk-my-tickets-table" id="deskMyTicketsTable">
       <header className="desk-my-tickets-table__header">
         <div className="desk-my-tickets-table__heading">
-          <h2 className="desk-my-tickets-table__title">Meus Tickets</h2>
+          <div className="desk-my-tickets-table__title-row">
+            <h2 className="desk-my-tickets-table__title">Meus Tickets</h2>
+            <div
+              className="queue-search queue-search--my-tickets-table"
+              role="search"
+            >
+              <i className="ti ti-search" aria-hidden="true" />
+              <input
+                type="text"
+                id="deskMyTicketsSearch"
+                name="deskMyTicketsSearch"
+                autoComplete="off"
+                spellCheck={false}
+                inputMode={isTicketMode ? 'text' : 'numeric'}
+                placeholder={isTicketMode ? 'Buscar por protocolo…' : 'Buscar por CPF…'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label={isTicketMode ? 'Buscar por protocolo do ticket' : 'Buscar por CPF do cliente'}
+              />
+              <button
+                type="button"
+                className="queue-search__mode"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setSearchMode((prev) => (
+                    prev === DESK_SEARCH_MODE_CPF ? DESK_SEARCH_MODE_TICKET : DESK_SEARCH_MODE_CPF
+                  ));
+                }}
+                title={isTicketMode ? 'Buscar por protocolo do ticket' : 'Buscar por CPF do cliente'}
+                aria-pressed={isTicketMode}
+              >
+                {isTicketMode ? 'Ticket' : 'CPF'}
+              </button>
+            </div>
+          </div>
           <span className="desk-my-tickets-table__subtitle">
-            {total === 0 ? 'Nenhum ticket atribuído a você' : `${total} ticket${total === 1 ? '' : 's'} · ordenados por SLA`}
+            {total === 0
+              ? (searchActive ? 'Nenhum ticket encontrado na busca' : 'Nenhum ticket atribuído a você')
+              : `${total} ticket${total === 1 ? '' : 's'} · ordenados por SLA`}
           </span>
         </div>
         <div className="desk-my-tickets-table__header-actions">

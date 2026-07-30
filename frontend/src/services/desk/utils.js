@@ -934,6 +934,13 @@ function matchesTicketSearch(entry, q, searchMode = DESK_SEARCH_MODE_CPF) {
   return matchesTicketByCpf(t, q);
 }
 
+/** Filtra entradas já carregadas por protocolo (modo ticket) ou CPF (modo cpf). */
+export function filterEntriesByDeskSearch(entries, rawQuery, searchMode = DESK_SEARCH_MODE_CPF) {
+  const q = String(rawQuery || '').trim();
+  if (!q) return entries || [];
+  return (entries || []).filter((entry) => matchesTicketSearch(entry, q, searchMode));
+}
+
 function filterMyTicketsEntries(searchQuery) {
   const q = (searchQuery || '').toLowerCase();
   const activeQueues = new Set(['novos', 'em-andamento', 'pendente', 'resolvidos']);

@@ -10,6 +10,8 @@ import {
   buildRegistroDefaults,
   registerDemanda,
   getDemandaById,
+  getDemandaByTicketId,
+  mirrorDemandaFromTicket,
 } from './proconStore';
 
 const PC_WORKFLOW_SLUG = 'procon-tratativa';
@@ -218,4 +220,83 @@ export function formatPcDeadlineLabel(iso) {
     return `${days} dia${days > 1 ? 's' : ''} e ${hours} hora${hours !== 1 ? 's' : ''}`;
   }
   return `${hours} hora${hours !== 1 ? 's' : ''}`;
+}
+
+function normalizeCanal(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+export function isProconChannelTicket(ticket) {
+  if (!ticket) return false;
+  const channel = normalizeCanal(ticket.channel ?? ticket.source);
+  if (channel === 'procon') return true;
+  const lf = ticket.lateralForm || {};
+  if (normalizeCanal(lf.canal).includes('procon')) return true;
+  const pc = lf.procon;
+  return Boolean(pc && typeof pc === 'object' && !Array.isArray(pc));
+}
+
+export function buildDemandaFromTicket(ticket) {
+  const lf = ticket.lateralForm || {};
+  const pc = (lf.procon && typeof lf.procon === 'object' && !Array.isArray(lf.procon))
+    ? lf.procon
+    : {};
+  const ticketId = String(ticket.id || ticket._id || '');
+  const consumidor = String(
+    pc.consumidor || ticket.clientName || lf.clienteNome || '',
+  ).trim();
+  const assunto = String(
+    pc.assunto || ticket.chamadoTitulo || ticket.title || 'Demanda Procon',
+  ).trim();
+  const cpf = String(pc.cpf || ticket.clientCPF || lf.clienteCpf || lf.cpf || '').trim();
+  const prazoLegal = pc.prazoLegal || null;
+  const defaults = buildRegistroDefaults({
+    protocoloProcon: pc.protocoloProcon || ticket.chamadoProtocolo || undefined,
+    consumidor,
+    assunto,
+    cpf,
+    descricao: String(pc.descricao || ticket.description || ticket.text || '').trim(),
+    idDemanda: pc.idDemanda || '',
+    dataDemanda: pc.dataDemanda || ticket.createdAt,
+    orgaoProcon: pc.orgaoProcon || '',
+    cidade: pc.cidade || '',
+    uf: pc.uf || '',
+    produto: pc.produto || lf.produto || 'Empréstimo',
+    tipo: pc.tipo || lf.tipoChamado || lf.classificacaoTipo || 'Reclamação',
+    motivo: pc.motivo || lf.motivo || assunto,
+    prazoLegal,
+    statusPc: pc.statusPc || PC_STATUS.NAO_RESPONDIDA,
+    tabulacao: lf.produto || pc.produto || '—',
+    atendente: lf.responsavel || ticket.responsibleAgent || '—',
+    ticketId,
+    chamadoProtocolo: ticket.chamadoProtocolo || '',
+    groupKey: 'nao-respondidas',
+    aberta: true,
+    workflowAtivo: false,
+    respostaAction: 'responder',
+  });
+
+  return {
+    ...defaults,
+    id: `pc-ticket-${ticketId}`,
+    ticketId,
+    chamadoProtocolo: ticket.chamadoProtocolo || defaults.chamadoProtocolo,
+  };
+}
+
+export function syncProconDemandaFromTicket(ticket) {
+  if (!isProconChannelTicket(ticket)) return null;
+  const ticketId = String(ticket.id || ticket._id || '');
+  if (!ticketId) return null;
+  if (getDemandaByTicketId(ticketId)) return null;
+  return mirrorDemandaFromTicket(buildDemandaFromTicket(ticket));
+}
+
+export function syncProconDemandasFromTickets(tickets = []) {
+  let synced = 0;
+  (tickets || []).forEach((entry) => {
+    const ticket = entry?.ticket ?? entry;
+    if (syncProconDemandaFromTicket(ticket)) synced += 1;
+  });
+  return synced;
 }

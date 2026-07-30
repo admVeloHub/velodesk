@@ -9,7 +9,7 @@ import {
   listFuncoesPermissoes,
   resolveEffectivePermissoes,
 } from './funcaoPermissao.service';
-import { buildResponsavelCandidates, readTabulacaoSnapshot } from './chamado.mapper';
+import { buildResponsavelCandidates, isProconChamado, readTabulacaoSnapshot } from './chamado.mapper';
 import {
   CANAL_ORIGEM_BY_FUNCAO,
   derivePortalVisivelFromPermissoes,
@@ -164,6 +164,7 @@ function readTicketTabulacao(chamado: IChamadoN1) {
 }
 
 function ticketCanalMatches(chamado: IChamadoN1, canalSlug: string): boolean {
+  if (canalSlug === 'procon' && isProconChamado(chamado)) return true;
   const tab = readTicketTabulacao(chamado);
   const text = [
     tab.tipoChamado,

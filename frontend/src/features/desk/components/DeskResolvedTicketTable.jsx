@@ -1,8 +1,10 @@
 /**
  * DeskResolvedTicketTable — lista tabular de tickets finalizados
+ * VERSION: v1.1.0 | DATE: 2026-07-30
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  filterEntriesByDeskSearch,
   formatResolvedDateShort,
   getTicketProtocolLabel,
   getTicketResolvedAt,
@@ -10,6 +12,7 @@ import {
   getTicketTitle,
   sortTicketEntries,
 } from '../../../services/desk/utils';
+import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET } from '../../../services/desk/constants';
 
 const PAGE_SIZE = 20;
 
@@ -29,7 +32,7 @@ function buildPageNumbers(current, total) {
 
 export default function DeskResolvedTicketTable({
   entries = [],
-  searchActive = false,
+  searchActive: externalSearchActive = false,
   onSelectTicket,
   onReload,
   refreshing = false,
@@ -37,10 +40,21 @@ export default function DeskResolvedTicketTable({
   const [page, setPage] = useState(1);
   const [sortField, setSortField] = useState('finalizacao');
   const [sortDir, setSortDir] = useState('desc');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState(DESK_SEARCH_MODE_CPF);
+
+  const isTicketMode = searchMode === DESK_SEARCH_MODE_TICKET;
+  const localSearchActive = Boolean(searchQuery.trim());
+  const searchActive = localSearchActive || externalSearchActive;
+
+  const filteredEntries = useMemo(
+    () => filterEntriesByDeskSearch(entries, searchQuery, searchMode),
+    [entries, searchQuery, searchMode],
+  );
 
   const sortedEntries = useMemo(
-    () => sortTicketEntries(entries, sortField, sortDir),
-    [entries, sortField, sortDir],
+    () => sortTicketEntries(filteredEntries, sortField, sortDir),
+    [filteredEntries, sortField, sortDir],
   );
 
   const total = sortedEntries.length;
@@ -48,7 +62,7 @@ export default function DeskResolvedTicketTable({
 
   useEffect(() => {
     setPage(1);
-  }, [entries.length, sortField, sortDir, searchActive]);
+  }, [filteredEntries.length, sortField, sortDir, searchActive]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -71,7 +85,41 @@ export default function DeskResolvedTicketTable({
   return (
     <div className="desk-resolved-table" id="deskResolvedTable">
       <header className="desk-resolved-table__header">
-        <h2 className="desk-resolved-table__title">Finalizados</h2>
+        <div className="desk-resolved-table__title-row">
+          <h2 className="desk-resolved-table__title">Finalizados</h2>
+          <div
+            className="queue-search queue-search--resolved-table"
+            role="search"
+          >
+            <i className="ti ti-search" aria-hidden="true" />
+            <input
+              type="text"
+              id="deskResolvedSearch"
+              name="deskResolvedSearch"
+              autoComplete="off"
+              spellCheck={false}
+              inputMode={isTicketMode ? 'text' : 'numeric'}
+              placeholder={isTicketMode ? 'Buscar por protocolo…' : 'Buscar por CPF…'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label={isTicketMode ? 'Buscar por protocolo do ticket' : 'Buscar por CPF do cliente'}
+            />
+            <button
+              type="button"
+              className="queue-search__mode"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setSearchMode((prev) => (
+                  prev === DESK_SEARCH_MODE_CPF ? DESK_SEARCH_MODE_TICKET : DESK_SEARCH_MODE_CPF
+                ));
+              }}
+              title={isTicketMode ? 'Buscar por protocolo do ticket' : 'Buscar por CPF do cliente'}
+              aria-pressed={isTicketMode}
+            >
+              {isTicketMode ? 'Ticket' : 'CPF'}
+            </button>
+          </div>
+        </div>
         <div className="desk-resolved-table__header-actions">
           <span className="desk-resolved-table__range">
             {total === 0 ? '0 tickets' : `${pageStart} - ${pageEnd} de ${total} tickets`}

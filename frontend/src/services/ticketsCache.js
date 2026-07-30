@@ -14,6 +14,7 @@ import {
 } from '../api/adapters/ticketAdapter';
 import { readDeskProfileId, shouldUseMeusChamadosFila, ticketMatchesAgentResponsavel } from './desk/responsavelSegmentation';
 import { getAgentName } from './clientDb';
+import { syncProconDemandasFromTickets } from './especiais/proconTicketService';
 
 const BOXES_CACHE_KEY = 'velodesk_boxes_cache_v2';
 const BOXES_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -337,6 +338,13 @@ export async function loadBoxesFromApi(userEmail = '') {
         valores: t.workflow.requisicao.valores,
       })),
     });
+    const cockpitEntries = columns.flatMap((box) =>
+      (box.tickets || []).map((ticket) => ({ ticket, boxId: box.id })),
+    );
+    syncProconDemandasFromTickets(cockpitEntries);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('velodesk:procon-sync'));
+    }
   } catch (err) {
     const message = err?.response?.data?.message || err?.message || 'Erro desconhecido';
     deskLog.error('TICKETS', 'loadBoxesFromApi → falhou', {
