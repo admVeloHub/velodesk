@@ -1,6 +1,10 @@
-/** gmailInbound.service v1.3.0 — baixa anexos Gmail e associa ao ticket */
+/** gmailInbound.service v1.4.0 — dedupe anexos contra ticket antes do upload GCS */
 import { env } from '../../config/env';
-import { processInboundEmail } from '../email-inbound.service';
+import {
+  findChamadoForEmailReply,
+  processInboundEmail,
+} from '../email-inbound.service';
+import { collectChamadoAttachmentFingerprints } from '../attachmentFilter.util';
 import type { InboundEmailProcessResult } from '../inbound-email/types';
 import { createGmailClient, GMAIL_SCOPE_READONLY } from './gmailAuth';
 import { gmailMessageToInboundPayload, shouldSkipGmailMessage } from './gmailMessageParser';
@@ -106,7 +110,14 @@ export async function processGmailHistory(
           const payload = gmailMessageToInboundPayload(full.data);
           if (!payload) continue;
 
-          const inboundAttachments = await downloadGmailAttachments(gmail, full.data, payload.messageId);
+          const existingForThread = await findChamadoForEmailReply(payload);
+          const knownFingerprints = collectChamadoAttachmentFingerprints(existingForThread);
+          const inboundAttachments = await downloadGmailAttachments(
+            gmail,
+            full.data,
+            payload.messageId,
+            knownFingerprints,
+          );
           if (inboundAttachments.length) {
             payload.attachments = inboundAttachments;
           }

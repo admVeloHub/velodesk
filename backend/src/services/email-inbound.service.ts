@@ -1,4 +1,4 @@
-﻿/** email-inbound.service v1.9.0 — anexos persistidos no GCS com gcsUri no registro */
+﻿/** email-inbound.service v1.10.0 — anexos só da mensagem atual (sem acumular thread) */
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
@@ -20,7 +20,12 @@ import {
   markInboundMessageFailed,
 } from './inboundDedupe.service';
 import { extractEmailReplyContent } from './emailReplyContent.util';
+import {
+  attachmentMatchesKnownFingerprints,
+  collectChamadoAttachmentFingerprints,
+} from './attachmentFilter.util';
 import type { InboundEmailPayload, InboundEmailProcessResult } from './inbound-email/types';
+import type { IChamadoN1 } from '../models/ChamadoN1';
 
 export const LEGACY_PROTOCOL_PATTERN = /VD-\d{8}-\d{4}/i;
 export const NUMERIC_PROTOCOL_PATTERN = /\[(\d{8,10})\]/;
@@ -106,6 +111,26 @@ function attachmentUrls(payload: InboundEmailPayload): string[] {
     .filter((url): url is string => Boolean(url));
 }
 
+/** Remove anexos já presentes em mensagens anteriores do mesmo ticket. */
+function retainOnlyNewAttachments(
+  payload: InboundEmailPayload,
+  chamado: IChamadoN1 | null | undefined,
+): void {
+  const attachments = payload.attachments ?? [];
+  if (!attachments.length || !chamado) return;
+
+  const known = collectChamadoAttachmentFingerprints(chamado);
+  const kept = attachments.filter((item) => !attachmentMatchesKnownFingerprints(item, known));
+  if (kept.length !== attachments.length) {
+    console.info('[email-inbound] anexos da thread anterior removidos da mensagem atual', {
+      antes: attachments.length,
+      depois: kept.length,
+      protocolo: chamado.chamadoProtocolo,
+    });
+  }
+  payload.attachments = kept;
+}
+
 function buildAttachmentMetadados(payload: InboundEmailPayload): Record<string, unknown> {
   const items = (payload.attachments ?? [])
     .filter((item) => item.url || item.gcsUri)
@@ -114,6 +139,8 @@ function buildAttachmentMetadados(payload: InboundEmailPayload): Record<string, 
       url: item.url,
       gcsUri: item.gcsUri,
       storageKey: item.storageKey,
+      contentHash: item.contentHash,
+      bytes: item.bytes,
     }));
   return items.length ? { emailAttachments: items } : {};
 }
@@ -196,6 +223,9 @@ async function runInboundEmailFlow(
     };
   }
 
+  const existing = await findChamadoForEmailReply(payload);
+  retainOnlyNewAttachments(payload, existing);
+
   const bodyText = appendAttachmentReferencesToBody(resolveEmailBody(payload), payload);
   const emailMeta = {
     ...buildEmailMetadados(payload),
@@ -203,7 +233,6 @@ async function runInboundEmailFlow(
   };
   const attachments = attachmentUrls(payload);
 
-  const existing = await findChamadoForEmailReply(payload);
   if (existing && !shouldSpawnNewTicketOnInbound(existing)) {
     const status = normalizeStatusValue(currentStatus(existing));
     const statusOverride = (status === 'pendente' || status === 'resolvido')

@@ -1,10 +1,23 @@
-/** gmailAttachment.service v1.2.0 — ignora inline/CID e logo Velotax em anexos inbound */
+/** gmailAttachment.service v1.3.0 — ignora nested rfc822 + dedupe por fingerprint */
+import crypto from 'crypto';
 import type { gmail_v1 } from 'googleapis';
 import type { InboundEmailAttachment } from '../inbound-email/types';
-import { isBrandInlineAttachmentFilename } from '../attachmentFilter.util';
+import {
+  attachmentHashFingerprint,
+  attachmentMatchesKnownFingerprints,
+  attachmentNameFingerprint,
+  attachmentSizeNameFingerprint,
+  isBrandInlineAttachmentFilename,
+} from '../attachmentFilter.util';
 import { persistInboundAttachment } from '../inboundAttachmentStorage.service';
 
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+const NESTED_MESSAGE_MIME = new Set([
+  'message/rfc822',
+  'message/global',
+  'message/partial',
+  'message/external-body',
+]);
 
 export interface GmailAttachmentPartRef {
   filename: string;
@@ -50,6 +63,12 @@ export function listGmailAttachmentParts(
 ): GmailAttachmentPartRef[] {
   if (!part) return acc;
 
+  const mimeType = String(part.mimeType ?? '').trim().toLowerCase();
+  if (NESTED_MESSAGE_MIME.has(mimeType)) {
+    // Anexos de mensagens citadas/encaminhadas aninhadas — não pertencem a esta resposta.
+    return acc;
+  }
+
   const filename = String(part.filename ?? '').trim();
   const attachmentId = String(part.body?.attachmentId ?? '').trim();
   if (filename && attachmentId && !shouldSkipGmailAttachmentPart(part)) {
@@ -70,6 +89,7 @@ export async function downloadGmailAttachments(
   gmail: gmail_v1.Gmail,
   message: gmail_v1.Schema$Message,
   messageIdForStorage: string,
+  knownFingerprints: Set<string> = new Set(),
 ): Promise<InboundEmailAttachment[]> {
   const gmailId = String(message.id ?? '').trim();
   if (!gmailId) return [];
@@ -78,6 +98,7 @@ export async function downloadGmailAttachments(
   if (!parts.length) return [];
 
   const stored: InboundEmailAttachment[] = [];
+  const seenInMessage = new Set<string>();
 
   for (const part of parts) {
     try {
@@ -99,6 +120,32 @@ export async function downloadGmailAttachments(
         continue;
       }
 
+      const contentHash = crypto.createHash('sha256').update(buffer).digest('hex');
+      const fingerprints = [
+        attachmentHashFingerprint(contentHash),
+        attachmentSizeNameFingerprint(part.filename, buffer.length),
+        attachmentNameFingerprint(part.filename),
+      ];
+
+      if (fingerprints.some((fp) => seenInMessage.has(fp))) {
+        console.info('[gmailAttachment] anexo duplicado na mesma mensagem — ignorado', {
+          filename: part.filename,
+          messageId: messageIdForStorage,
+        });
+        continue;
+      }
+
+      if (attachmentMatchesKnownFingerprints(
+        { filename: part.filename, contentHash, bytes: buffer.length },
+        knownFingerprints,
+      )) {
+        console.info('[gmailAttachment] anexo já presente no ticket — ignorado', {
+          filename: part.filename,
+          messageId: messageIdForStorage,
+        });
+        continue;
+      }
+
       const saved = await persistInboundAttachment({
         messageId: messageIdForStorage,
         filename: part.filename,
@@ -106,12 +153,19 @@ export async function downloadGmailAttachments(
         buffer,
       });
 
+      for (const fp of fingerprints) {
+        seenInMessage.add(fp);
+        knownFingerprints.add(fp);
+      }
+
       stored.push({
         filename: saved.filename,
         contentType: saved.contentType,
         url: saved.url,
         gcsUri: saved.gcsUri,
         storageKey: saved.storageKey,
+        contentHash,
+        bytes: buffer.length,
       });
     } catch (err) {
       console.warn('[gmailAttachment] falha ao baixar anexo', {

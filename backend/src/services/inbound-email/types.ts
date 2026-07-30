@@ -1,9 +1,12 @@
-﻿/** inbound-email/types v1.2.0 — gcsUri do anexo persistido no bucket */export interface InboundEmailAttachment {
+﻿/** inbound-email/types v1.3.0 — gcsUri + fingerprint para dedupe por mensagem */
+export interface InboundEmailAttachment {
   filename: string;
   contentType: string;
   url?: string;
   gcsUri?: string;
   storageKey?: string;
+  contentHash?: string;
+  bytes?: number;
 }
 
 export interface InboundEmailPayload {

@@ -1,10 +1,31 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.55.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.56.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: dedupe anexos inbound por mensagem (sem acumular thread)
+
+- **Data/Hora**: 2026-07-30
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.56.0
+  - attachmentFilter v1.1.0, gmailAttachment v1.3.0, gmailInbound v1.4.0
+  - email-inbound.service v1.10.0, inbound-email/types v1.3.0
+- **Arquivos modificados**:
+  - `backend/src/services/attachmentFilter.util.ts` — fingerprints (hash/nome/tamanho) e coleta no chamado
+  - `backend/src/services/gmail/gmailAttachment.service.ts` — ignora `message/rfc822` aninhado; dedupe antes do upload GCS
+  - `backend/src/services/gmail/gmailInbound.service.ts` — carrega fingerprints do ticket antes de baixar anexos
+  - `backend/src/services/email-inbound.service.ts` — safety net `retainOnlyNewAttachments` na resposta
+  - `backend/src/services/inbound-email/types.ts` — `contentHash` / `bytes` no anexo inbound
+- **Descrição**: Cada mensagem do cliente passa a registrar apenas anexos novos daquela mensagem; anexos reenviados pelo Gmail na thread deixam de ser acumulados nas mensagens seguintes.
+- **Status**: Concluído (push dev + main)
+
+---
 
 ### GitHub Push — Desk: anexos GCS, thread de e-mail, header brand e compose anexo
 
