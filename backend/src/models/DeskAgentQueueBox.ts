@@ -1,6 +1,13 @@
-/** DeskAgentQueueBox v1.1.0 — desk_preferences.desk_agent_boxex (caixas pessoais do agente) */
+/** DeskAgentQueueBox v1.2.0 — desk_agent_boxex com criterios[] de filtro */
 import { Schema, Document, Model } from 'mongoose';
 import { getDeskPreferencesConnection } from '../config/database';
+
+export interface IDeskAgentQueueBoxCriterio {
+  tipo: string;
+  campo?: string;
+  operador?: string;
+  valor: string;
+}
 
 export interface IDeskAgentQueueBox extends Document {
   boxId: string;
@@ -12,9 +19,20 @@ export interface IDeskAgentQueueBox extends Document {
   dot: string;
   order: number;
   isCustom: boolean;
+  criterios: IDeskAgentQueueBoxCriterio[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+const CriterioSchema = new Schema<IDeskAgentQueueBoxCriterio>(
+  {
+    tipo: { type: String, required: true, trim: true },
+    campo: { type: String, default: '', trim: true },
+    operador: { type: String, default: 'equals', trim: true },
+    valor: { type: String, default: '', trim: true },
+  },
+  { _id: false },
+);
 
 const DeskAgentQueueBoxSchema = new Schema<IDeskAgentQueueBox>(
   {
@@ -22,11 +40,12 @@ const DeskAgentQueueBoxSchema = new Schema<IDeskAgentQueueBox>(
     email: { type: String, required: true, trim: true, lowercase: true },
     userId: { type: String, default: '' },
     name: { type: String, required: true, trim: true },
-    action: { type: String, required: true, trim: true },
+    action: { type: String, default: 'em-andamento', trim: true },
     actionLabel: { type: String, default: '' },
     dot: { type: String, default: '#6366f1' },
     order: { type: Number, default: 0 },
     isCustom: { type: Boolean, default: true },
+    criterios: { type: [CriterioSchema], default: [] },
   },
   {
     timestamps: true,

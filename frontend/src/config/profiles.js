@@ -1,6 +1,6 @@
 /**
  * Perfis operacionais — Agente / Gestão / Workflow / Especiais
- * VERSION: v1.5.0 | DATE: 2026-07-16 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.6.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team
  */
 export const PROFILES = {
   agent: {
@@ -9,7 +9,7 @@ export const PROFILES = {
     icon: 'fa-headset',
     color: '#1634FF',
     desc: 'Tickets, fila operacional e registro rápido',
-    nav: ['workspace', 'tickets', 'atendimento-ia-telefonico', 'chat'],
+    nav: ['workspace', 'tickets', 'preferencias', 'atendimento-ia-telefonico', 'chat'],
     defaultPage: 'workspace',
   },
   gestao: {
@@ -18,7 +18,7 @@ export const PROFILES = {
     icon: 'fa-user-tie',
     color: '#000058',
     desc: 'SLA, performance da equipe e escalonamentos',
-    nav: ['workspace', 'dashboard', 'tickets', 'atendimento-ia-telefonico', 'config'],
+    nav: ['workspace', 'dashboard', 'tickets', 'preferencias', 'atendimento-ia-telefonico', 'config'],
     defaultPage: 'workspace',
   },
   workflow: {
@@ -54,6 +54,13 @@ export const NAV_ITEMS = [
   { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: 'ti-dashboard', tooltip: 'Dashboard' },
   { id: 'reports', path: '/reports', label: 'Relatórios', icon: 'ti-chart-bar', tooltip: 'Relatórios' },
   { id: 'tickets', path: '/tickets', label: 'Tickets', icon: 'ti-ticket', tooltip: 'Tickets' },
+  {
+    id: 'preferencias',
+    path: '/preferencias',
+    label: 'Preferências',
+    icon: 'ti-adjustments',
+    tooltip: 'Preferências do agente',
+  },
   {
     id: 'atendimento-ia-telefonico',
     path: '/atendimento-ia-telefonico',

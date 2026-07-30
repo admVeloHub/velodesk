@@ -1,6 +1,6 @@
 /**
- * API client v1.18.0 — uploadsApi.uploadSent (anexos do agente no GCS)
- * VERSION: v1.18.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team
+ * API client v1.19.0 — agentQueueBoxesApi.update (criterios de caixas)
+ * VERSION: v1.19.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -143,6 +143,7 @@ export const boxesApi = {
 export const agentQueueBoxesApi = {
   list: () => api.get('/agent-queue-boxes').then((r) => r.data?.boxes || []),
   create: (payload) => api.post('/agent-queue-boxes', payload).then((r) => r.data?.box),
+  update: (boxId, payload) => api.put(`/agent-queue-boxes/${encodeURIComponent(boxId)}`, payload).then((r) => r.data?.box),
   migrate: (boxes) => api.post('/agent-queue-boxes/migrate', { boxes }).then((r) => r.data),
   remove: (boxId) => api.delete(`/agent-queue-boxes/${encodeURIComponent(boxId)}`).then((r) => r.data),
 };

@@ -1,6 +1,6 @@
 /**
  * App raiz — providers + rotas
- * VERSION: v2.5.1 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * VERSION: v2.6.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team
  */
 
 import React, { useEffect } from 'react';
@@ -38,6 +38,8 @@ import TicketsPage from '../pages/TicketsPage';
 import ChatPage from '../pages/ChatPage';
 
 import ConfigPage from '../pages/ConfigPage';
+
+import PreferenciasPage from '../pages/PreferenciasPage';
 
 import ReportsPage from '../pages/ReportsPage';
 
@@ -106,6 +108,8 @@ function AppRoutes() {
             { path: 'chat', element: React.createElement(ChatPage) },
 
             { path: 'config', element: React.createElement(ConfigPage) },
+
+            { path: 'preferencias', element: React.createElement(PreferenciasPage) },
 
             { path: 'atendimento-ia-telefonico/*', element: React.createElement(AtendimentoIaTelefonicoPage) },
 

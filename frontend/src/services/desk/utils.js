@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.4.0 | DATE: 2026-07-29
- * — badge Fechado + isTicketReadOnly (ciclo 48h)
+ * VERSION: v3.5.0 | DATE: 2026-07-30
+ * — caixas personalizadas: filtro virtual por criterios AND
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
@@ -16,6 +16,8 @@ import {
   DESK_SEARCH_MODE_TICKET,
 } from './constants';
 import { lookupClient, getAgentName } from '../clientDb';
+import { getCustomQueueById } from './customQueueBoxes';
+import { ticketMatchesQueueCriterios } from './customQueueBoxCriteria';
 import {
   advanceWorkflowStep,
   advanceWorkflowByDecision,
@@ -1003,10 +1005,28 @@ function matchesMyTicketsStatusSection(entry, sectionId) {
   return status === 'em-aberto' || status === 'em-andamento' || status === 'em andamento';
 }
 
+function filterCustomQueueEntries(customBox, searchQuery) {
+  const q = (searchQuery || '').toLowerCase();
+  return getAllCockpitTickets().filter((entry) => {
+    if (!shouldViewAllDeskTickets() && !ticketMatchesAgentResponsavel(entry.ticket)) return false;
+    if (!ticketMatchesQueueCriterios(entry.ticket, customBox.criterios)) return false;
+    return matchesTicketSearch(entry, q);
+  });
+}
+
 export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOldestFirst = false) {
   const q = (searchQuery || '').toLowerCase();
   if (isMeusTicketsQueue(activeQueue)) {
     return sortTicketEntries(filterMyTicketsEntries(q), 'sla', 'asc');
+  }
+  const customBox = getCustomQueueById(activeQueue);
+  if (customBox) {
+    return sortTicketEntries(
+      filterCustomQueueEntries(customBox, searchQuery),
+      activeSort,
+      'desc',
+      entrySortOldestFirst,
+    );
   }
   const filterByResponsavel = shouldFilterByAgentResponsavel(activeQueue);
   const trustBackendQueues = shouldUseMeusChamadosFila();
@@ -1047,6 +1067,10 @@ export function resolveDeskSearchEntries(
 export function countByQueue(queueId) {
   if (isMeusTicketsQueue(queueId)) {
     return filterMyTicketsEntries('').length;
+  }
+  const customBox = getCustomQueueById(queueId);
+  if (customBox) {
+    return filterCustomQueueEntries(customBox, '').length;
   }
   const filterByResponsavel = shouldFilterByAgentResponsavel(queueId);
   const trustBackendQueues = shouldUseMeusChamadosFila();

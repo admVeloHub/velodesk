@@ -6,25 +6,34 @@
 
 ## Deploys e pushes realizados
 
-### GitHub Push + GCP — Desk: fix anexos inbound (inline/CID + GCS obrigatório)
+### GitHub Push — Desk: módulo Preferências (caixas por critérios) + correção do fluxo de anexos inbound
 
 - **Data/Hora**: 2026-07-30
-- **Tipo**: GitHub Push + GCP Cloud Run (velodesk)
+- **Tipo**: GitHub Push
 - **Repositório**: https://github.com/admVeloHub/velodesk
-- **Branch**: dev
+- **Branch**: dev + main
 - **Versão (componentes)**:
   - DEPLOY_LOG v1.57.0
-  - gmailAttachment v1.4.0, attachmentFilter v1.2.0, gmailInbound v1.4.1
-  - inboundAttachmentStorage v1.3.2, gcsAttachmentStorage v1.3.1, email-inbound.service v1.10.1
-  - test-inbound-attachments-filter v1.0.0
+  - **Preferências / caixas por critérios (backend)**: funcaoPermissaoDefaults v1.2.0, funcaoPermissao.service v1.2.0, DeskAgentQueueBox v1.2.0, agentQueueBox.service v1.1.0, agentQueueBoxes.routes v1.1.0
+  - **Preferências / caixas por critérios (frontend)**: PreferenciasPage v1.0.0, PreferenciasView v1.0.1, QueueBoxCriteriaEditor v1.0.0, CreateQueueBoxModal v2.0.0, customQueueBoxCriteria v1.0.1, customQueueBoxes v2.1.0, desk/utils v3.5.0, App v2.6.0, profiles v1.6.0, cockpitBridge v2.3.0, client.js v1.19.0, funcaoPermissoesLabels v1.2.1, DeskV2Root v3.19.0, DeskRightPanel v1.12.0, DeskQueuePanel v1.4.0
+  - **Correção anexos inbound**: attachmentFilter.util v1.2.0, gmailAttachment.service v1.4.1, gmailInbound.service v1.4.0, inboundAttachmentStorage v1.4.1, email-inbound.service v1.10.1, uploads.routes v1.3.1
+  - **Correção atribuição 1ª interação**: tabulation.service v1.5.0, chamado.mapper v2.5.2, tickets.routes v1.12.2
 - **Arquivos modificados**:
-  - `backend/src/services/gmail/gmailAttachment.service.ts` — não descarta mais anexos `inline`/Content-ID do cliente; só filtra logo Velotax; logs de persistência
-  - `backend/src/services/attachmentFilter.util.ts` — dedupe por hash/tamanho+nome (nome sozinho não bloqueia reenvio)
-  - `backend/src/services/inboundAttachmentStorage.service.ts` — com bucket configurado, upload GCS obrigatório (Cloud Run não grava só em disco efêmero)
-  - `backend/src/services/gcsAttachmentStorage.service.ts` — `No such object` tratado como miss silencioso na leitura
-  - `backend/scripts/test-inbound-attachments-filter.ts` — smoke test inline/CID + fingerprints
-- **Descrição**: Corrige regressão em que prints/anexos do Gmail (inline + CID) eram ignorados e nunca iam ao bucket; links 404 em anexos antigos (path messageId/uuid) permanecem irrecuperáveis sem reenvio do cliente.
-- **Status**: Pendente (commit local; push + deploy aguardando confirmação)
+  - `backend/src/config/funcaoPermissaoDefaults.ts`, `services/funcaoPermissao.service.ts` — módulo `preferencias.visualizar` no catálogo RBAC + backfill nas funções já existentes
+  - `backend/src/models/DeskAgentQueueBox.ts`, `services/agentQueueBox.service.ts`, `routes/agentQueueBoxes.routes.ts` — campo `criterios[]` (tipo/campo/operador/valor) e PUT de atualização
+  - `frontend/src/pages/PreferenciasPage.js`, `features/preferencias/PreferenciasView.jsx`, `features/preferencias/components/QueueBoxCriteriaEditor.jsx` — nova página com comportamento ao salvar + CRUD de caixas personalizadas
+  - `frontend/src/app/App.js`, `config/profiles.js`, `utils/cockpitBridge.js`, `features/config/funcoes/funcaoPermissoesLabels.js` — rota `/preferencias` com gate de permissão e navegação via bridge do Cockpit
+  - `frontend/src/services/desk/customQueueBoxCriteria.js`, `customQueueBoxes.js`, `utils.js` — filtro AND por critérios em `filterTickets`/`countByQueue` (visão virtual)
+  - `frontend/src/features/desk/DeskV2Root.jsx`, `components/CreateQueueBoxModal.jsx`, `DeskQueuePanel.jsx`, `DeskRightPanel.jsx`, `styles.css`, `velodesk-crm.css` — modal multi-critério; remoção do botão "Nova caixa" e do popover de settings migrados para Preferências
+  - `backend/src/services/attachmentFilter.util.ts` — dedupe por `contentHash` ou `bytes+filename`; fingerprint por nome isolado descontinuada
+  - `backend/src/services/gmail/gmailAttachment.service.ts` — `Content-ID` deixa de bloquear parte com `Content-Disposition: attachment`; `message/rfc822` percorrido (container `.eml` e anexos aninhados)
+  - `backend/src/services/inboundAttachmentStorage.service.ts` — lookup tolerante a chave legada (`messageId/arquivo`) e a `__` literal no nome; fim do double-decode da storageKey; GCS obrigatório em produção
+  - `backend/src/services/gmail/gmailInbound.service.ts`, `email-inbound.service.ts`, `routes/uploads.routes.ts` — alinhamento com o novo dedupe e fallback de chaves no download
+  - `backend/src/services/tabulation.service.ts`, `chamado.mapper.ts`, `routes/tickets.routes.ts` — responsável deixa de ser exigido como tabulação; merge do body não apaga claim automático na 1ª interação
+- **Descrição**: Novo módulo Preferências concentra o comportamento ao salvar e as caixas personalizadas, agora com filtros multi-critério reais (tabulação, status, workflow, atribuição e SLA) aplicados como visão virtual sobre a fila. No fluxo de anexos recebidos, corrige quatro defeitos que faziam anexos legítimos serem descartados ou retornarem 404: dedupe por nome de arquivo (bloqueava homônimos com conteúdo distinto), descarte de partes com `Content-ID` mesmo marcadas como attachment, perda de `.eml` encaminhado e de anexos aninhados, e incompatibilidade de leitura entre a chave legada com subpasta e o layout flat no bucket. Corrige loop na 1ª interação em que o agente não conseguia salvar porque o backend exigia Responsável na tabulação enquanto o merge do commit apagava a atribuição automática.
+- **Validação**: 27 verificações locais do fluxo inbound com round-trip real de gravação/leitura no bucket `velodesk_storage` (anexos homônimos, chave legada, 404 legítimo, path traversal bloqueado); `tsc --noEmit` e lint sem erros. Artefatos de teste removidos do bucket após a execução.
+- **Observação**: anexos recebidos antes desta correção existiram apenas no disco efêmero do Cloud Run e permanecem irrecuperáveis (404); a garantia vale a partir do próximo e-mail processado.
+- **Status**: Concluído (push dev + main)
 
 ---
 

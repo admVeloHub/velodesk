@@ -1,4 +1,4 @@
-/** chamado.mapper v2.5.1 — ciclo status: fila Resolvidos inclui fechado/cancelado */
+/** chamado.mapper v2.5.2 — preserva responsável atribuído quando body envia vazio */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -902,14 +902,23 @@ export async function prepareChamadoFromBody(
   }
 
   if (body.lateralForm || body.title || body.chamadoTitulo || body.description || body.responsibleAgent) {
+    const bodyLf = (body.lateralForm ?? {}) as Record<string, unknown>;
+    const lateralFormMerged: Record<string, unknown> = {
+      ...beforeTab,
+      tipoChamado: beforeTab.tipoChamado,
+      classificacaoTipo: beforeTab.tipoChamado,
+      ...bodyLf,
+    };
+    // Claim/roleta preenche responsável antes do merge; o Desk envia vazio (campo readonly).
+    const existingResponsavel = sanitizeResponsavel(beforeTab.responsavel);
+    const incomingResponsavel = sanitizeResponsavel(bodyLf.responsavel ?? body.responsibleAgent);
+    if (!incomingResponsavel && existingResponsavel) {
+      lateralFormMerged.responsavel = existingResponsavel;
+    }
+
     const merged = readTabulacaoSnapshot(tabulacaoFromBody(
       {
-        lateralForm: {
-          ...beforeTab,
-          tipoChamado: beforeTab.tipoChamado,
-          classificacaoTipo: beforeTab.tipoChamado,
-          ...(body.lateralForm as object),
-        },
+        lateralForm: lateralFormMerged,
         ...body,
       },
       resolveChamadoTitulo(body, chamado.chamadoTitulo || beforeTab.motivo)

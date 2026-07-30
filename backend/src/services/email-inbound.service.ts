@@ -1,4 +1,4 @@
-﻿/** email-inbound.service v1.10.1 — anexos só da mensagem atual (dedupe hash/tamanho+nome) */
+﻿/** email-inbound.service v1.10.1 — dedupe só por hash/tamanho (não nome isolado) */
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';

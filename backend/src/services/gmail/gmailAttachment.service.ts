@@ -1,23 +1,16 @@
-/** gmailAttachment.service v1.4.0 — aceita inline/CID com filename; só filtra logo da marca */
+/** gmailAttachment.service v1.4.1 — Content-ID não bloqueia attachment; percorre message/rfc822 */
 import crypto from 'crypto';
 import type { gmail_v1 } from 'googleapis';
 import type { InboundEmailAttachment } from '../inbound-email/types';
 import {
   attachmentHashFingerprint,
   attachmentMatchesKnownFingerprints,
-  attachmentNameFingerprint,
   attachmentSizeNameFingerprint,
   isBrandInlineAttachmentFilename,
 } from '../attachmentFilter.util';
 import { persistInboundAttachment } from '../inboundAttachmentStorage.service';
 
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-const NESTED_MESSAGE_MIME = new Set([
-  'message/rfc822',
-  'message/global',
-  'message/partial',
-  'message/external-body',
-]);
 
 export interface GmailAttachmentPartRef {
   filename: string;
@@ -37,14 +30,27 @@ function getPartHeader(part: gmail_v1.Schema$MessagePart, name: string): string 
   return String(found?.value ?? '').trim();
 }
 
-/**
- * Gmail costuma marcar prints/imagens do cliente como inline + Content-ID.
- * Não dá para descartar por disposition/CID — só a logo da marca Velotax.
- */
 function shouldSkipGmailAttachmentPart(part: gmail_v1.Schema$MessagePart): boolean {
   const filename = String(part.filename ?? '').trim();
   if (!filename) return true;
-  return isBrandInlineAttachmentFilename(filename);
+
+  if (isBrandInlineAttachmentFilename(filename)) {
+    return true;
+  }
+
+  const disposition = getPartHeader(part, 'Content-Disposition').toLowerCase();
+  const isExplicitAttachment = disposition.includes('attachment');
+
+  if (disposition.includes('inline') && !isExplicitAttachment) {
+    return true;
+  }
+
+  // Content-ID indica inline (logo/CID) — mas não quando disposition=attachment
+  if (!isExplicitAttachment && getPartHeader(part, 'Content-ID')) {
+    return true;
+  }
+
+  return false;
 }
 
 export function listGmailAttachmentParts(
@@ -53,29 +59,16 @@ export function listGmailAttachmentParts(
 ): GmailAttachmentPartRef[] {
   if (!part) return acc;
 
-  const mimeType = String(part.mimeType ?? '').trim().toLowerCase();
-  if (NESTED_MESSAGE_MIME.has(mimeType)) {
-    // Anexos de mensagens citadas/encaminhadas aninhadas — não pertencem a esta resposta.
-    return acc;
-  }
-
+  // message/rfc822 (e-mail encaminhado) não interrompe a descida: o container pode ser
+  // o próprio .eml anexado e/ou trazer anexos aninhados nas sub-partes.
   const filename = String(part.filename ?? '').trim();
   const attachmentId = String(part.body?.attachmentId ?? '').trim();
-  if (filename && attachmentId) {
-    if (shouldSkipGmailAttachmentPart(part)) {
-      console.info('[gmailAttachment] parte ignorada (logo/marca)', {
-        filename,
-        mimeType,
-        disposition: getPartHeader(part, 'Content-Disposition') || null,
-        contentId: getPartHeader(part, 'Content-ID') || null,
-      });
-    } else {
-      acc.push({
-        filename,
-        mimeType: String(part.mimeType ?? 'application/octet-stream').trim(),
-        attachmentId,
-      });
-    }
+  if (filename && attachmentId && !shouldSkipGmailAttachmentPart(part)) {
+    acc.push({
+      filename,
+      mimeType: String(part.mimeType ?? 'application/octet-stream').trim(),
+      attachmentId,
+    });
   }
 
   for (const child of part.parts ?? []) {
@@ -94,20 +87,7 @@ export async function downloadGmailAttachments(
   if (!gmailId) return [];
 
   const parts = listGmailAttachmentParts(message.payload ?? undefined);
-  if (!parts.length) {
-    console.info('[gmailAttachment] nenhuma parte com filename+attachmentId', {
-      messageId: messageIdForStorage,
-      gmailId,
-    });
-    return [];
-  }
-
-  console.info('[gmailAttachment] partes candidatas', {
-    messageId: messageIdForStorage,
-    gmailId,
-    count: parts.length,
-    filenames: parts.map((part) => part.filename),
-  });
+  if (!parts.length) return [];
 
   const stored: InboundEmailAttachment[] = [];
   const seenInMessage = new Set<string>();
@@ -120,13 +100,7 @@ export async function downloadGmailAttachments(
         id: part.attachmentId,
       });
       const raw = String(res.data.data ?? '').trim();
-      if (!raw) {
-        console.warn('[gmailAttachment] attachmentId sem payload', {
-          filename: part.filename,
-          messageId: messageIdForStorage,
-        });
-        continue;
-      }
+      if (!raw) continue;
 
       const buffer = decodeBase64Url(raw);
       if (buffer.length > MAX_ATTACHMENT_BYTES) {
@@ -139,10 +113,10 @@ export async function downloadGmailAttachments(
       }
 
       const contentHash = crypto.createHash('sha256').update(buffer).digest('hex');
+      // Sem fingerprint por nome isolado: arquivos homônimos com conteúdo distinto são anexos válidos.
       const fingerprints = [
         attachmentHashFingerprint(contentHash),
         attachmentSizeNameFingerprint(part.filename, buffer.length),
-        attachmentNameFingerprint(part.filename),
       ];
 
       if (fingerprints.some((fp) => seenInMessage.has(fp))) {
@@ -159,8 +133,6 @@ export async function downloadGmailAttachments(
       )) {
         console.info('[gmailAttachment] anexo já presente no ticket — ignorado', {
           filename: part.filename,
-          contentHash: contentHash.slice(0, 12),
-          bytes: buffer.length,
           messageId: messageIdForStorage,
         });
         continue;
@@ -187,16 +159,8 @@ export async function downloadGmailAttachments(
         contentHash,
         bytes: buffer.length,
       });
-
-      console.info('[gmailAttachment] anexo persistido', {
-        filename: saved.filename,
-        storageKey: saved.storageKey,
-        gcsUri: saved.gcsUri,
-        bytes: buffer.length,
-        messageId: messageIdForStorage,
-      });
     } catch (err) {
-      console.error('[gmailAttachment] falha ao baixar/persistir anexo', {
+      console.warn('[gmailAttachment] falha ao baixar anexo', {
         filename: part.filename,
         messageId: messageIdForStorage,
         error: (err as Error).message,

@@ -1,4 +1,4 @@
-/** tickets.routes v1.12.1 — e-mail de criação inclui 1ª mensagem pública do agente */
+/** tickets.routes v1.12.2 — claim de responsável após merge da tabulação no commit/put */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -194,6 +194,7 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
   try {
     applyManualResponsavelClaim(chamado, req.user);
     await applyBodyToChamado(chamado, req.body, req.user);
+    applyManualResponsavelClaim(chamado, req.user);
     await chamado.save();
     if (chamado.chamadoTitulo !== titleBefore) {
       await ChamadoIaAnalise.updateOne(
@@ -248,6 +249,7 @@ router.post('/:id/commit', authMiddleware, async (req, res: Response) => {
   try {
     applyManualResponsavelClaim(chamado, req.user);
     const commitResult = await commitChamadoFromAgent(chamado, req.body, req.user);
+    applyManualResponsavelClaim(chamado, req.user);
     await chamado.save();
 
     if (commitResult.messageResult.public) {

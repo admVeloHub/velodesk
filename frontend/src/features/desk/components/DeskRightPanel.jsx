@@ -1,53 +1,18 @@
 /**
- * DeskRightPanel v1.11.0 — ticket fechado somente leitura
- * VERSION: v1.11.0 | DATE: 2026-07-29
+ * DeskRightPanel v1.12.0 — preferências de salvar movidas para /preferencias
+ * VERSION: v1.12.0 | DATE: 2026-07-30
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState } from 'react';
 import { DEFAULT_TIPO, hasApplyableTabulation, isTabulationComplete, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
 import { useTabulation } from '../../../context/TabulationContext';
 import { DeskStatusCommitButton } from './DeskComposePanel';
 import ProcessosPopover from './ProcessosPopover';
 import { DESK_THERMOMETER_UI_ENABLED } from '../../../services/desk/constants';
 import { isTicketInWorkflow } from '../../../services/desk/utils';
-import { getAutoCloseOnSave, setAutoCloseOnSave } from '../../../services/desk/agentDeskPreferences';
 import { ticketHasComunicacaoWorkflow } from '../../../services/workflow/workflowDecisionHandlers';
 
 const CANAL_OPTIONS_FALLBACK = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
 const TIPO_OPTIONS_FALLBACK = ['Reclamação', 'Solicitação', 'Dúvida', 'Informação'];
-
-function useAgentSettingsPopoverPosition(open, anchorRef) {
-  const [layout, setLayout] = useState(null);
-
-  useEffect(() => {
-    if (!open) {
-      setLayout(null);
-      return undefined;
-    }
-
-    const update = () => {
-      const btn = anchorRef.current;
-      if (!btn) return;
-      const rect = btn.getBoundingClientRect();
-      setLayout({
-        popover: {
-          right: `${Math.max(12, window.innerWidth - rect.right)}px`,
-          bottom: `${Math.max(12, window.innerHeight - rect.top + 8)}px`,
-        },
-      });
-    };
-
-    update();
-    window.addEventListener('resize', update);
-    window.addEventListener('scroll', update, true);
-    return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('scroll', update, true);
-    };
-  }, [open, anchorRef]);
-
-  return layout;
-}
 
 function SelectField({ id, label, fieldKey, value, options, readonly, onFieldChange, showPlaceholder = false, optionItems = null }) {
   return (
@@ -101,27 +66,6 @@ export default function DeskRightPanel({
 }) {
   const { loading, config, getMotivos, getDetalhes, getProdutoNames, getTipoChamadoOptions, getCanalContatoOptions } = useTabulation();
   const [processosOpen, setProcessosOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [autoCloseOnSave, setAutoCloseOnSaveState] = useState(() => getAutoCloseOnSave());
-  const settingsBtnRef = useRef(null);
-  const settingsPopoverLayout = useAgentSettingsPopoverPosition(settingsOpen, settingsBtnRef);
-
-  useEffect(() => {
-    if (!settingsOpen) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') setSettingsOpen(false);
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [settingsOpen]);
-
-  const toggleAutoCloseOnSave = () => {
-    setAutoCloseOnSaveState((prev) => {
-      const next = !prev;
-      setAutoCloseOnSave(next);
-      return next;
-    });
-  };
 
   const tipoOptions = getTipoChamadoOptions();
   const canalOptions = getCanalContatoOptions();
@@ -307,57 +251,6 @@ export default function DeskRightPanel({
           />
         </section>
       </div>
-      <div className="crm-right-panel__settings-bar">
-        <div className="crm-right-panel__settings-wrap">
-          <button
-            ref={settingsBtnRef}
-            type="button"
-            className={'crm-right-panel__settings-btn' + (settingsOpen ? ' is-open' : '')}
-            id="btnDeskAgentSettings"
-            aria-label="Configurações do atendimento"
-            aria-expanded={settingsOpen}
-            aria-haspopup="dialog"
-            onClick={() => setSettingsOpen((open) => !open)}
-          >
-            <i className="ti ti-settings" aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-      {settingsOpen && settingsPopoverLayout
-        ? createPortal(
-          <div className="crm-agent-settings-layer" id="deskAgentSettingsLayer">
-            <button
-              type="button"
-              className="crm-agent-settings-backdrop"
-              aria-label="Fechar configurações"
-              onClick={() => setSettingsOpen(false)}
-            />
-            <div
-              className="crm-agent-settings-popover"
-              id="deskAgentSettingsPopover"
-              style={settingsPopoverLayout.popover}
-              role="dialog"
-              aria-label="Configurações do atendimento"
-            >
-              <div className="crm-agent-settings-popover__title">Comportamento ao Salvar</div>
-              <div className="crm-agent-settings-popover__row">
-                <button
-                  type="button"
-                  className={
-                    'crm-agent-settings-popover__toggle'
-                    + (autoCloseOnSave ? ' is-close' : ' is-keep')
-                  }
-                  aria-pressed={autoCloseOnSave}
-                  onClick={toggleAutoCloseOnSave}
-                >
-                  {autoCloseOnSave ? 'Fechar' : 'Manter'}
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )
-        : null}
       <div className="crm-right-panel__footer">
         <button
           type="button"

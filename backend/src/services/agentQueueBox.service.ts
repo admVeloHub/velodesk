@@ -1,8 +1,8 @@
 /**
- * agentQueueBox.service v1.0.1 — desk_preferences.desk_agent_boxex
- * VERSION: v1.0.0 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team
+ * agentQueueBox.service v1.1.0 — caixas com criterios[] de filtro
+ * VERSION: v1.1.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team
  */
-import { getDeskAgentQueueBoxModel, type IDeskAgentQueueBox } from '../models/DeskAgentQueueBox';
+import { getDeskAgentQueueBoxModel, type IDeskAgentQueueBox, type IDeskAgentQueueBoxCriterio } from '../models/DeskAgentQueueBox';
 
 export const QUEUE_BOX_ACTIONS = [
   { id: 'novos', label: 'Receber tickets novos' },
@@ -22,6 +22,15 @@ const ACTION_DOTS: Record<string, string> = {
   notificar: '#ea580c',
 };
 
+const CRITERIO_TIPOS = new Set(['tabulacao', 'status', 'workflow', 'atribuido', 'sla']);
+
+export interface AgentQueueBoxCriterioDto {
+  tipo: string;
+  campo?: string;
+  operador?: string;
+  valor: string;
+}
+
 export interface AgentQueueBoxDto {
   id: string;
   name: string;
@@ -31,6 +40,7 @@ export interface AgentQueueBoxDto {
   boxes: string[];
   isCustom: boolean;
   order: number;
+  criterios: AgentQueueBoxCriterioDto[];
 }
 
 function normalizeEmail(email: string): string {
@@ -57,6 +67,26 @@ function resolveActionMeta(action: string) {
   };
 }
 
+function normalizeCriterios(raw: unknown): IDeskAgentQueueBoxCriterio[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const row = item as Record<string, unknown>;
+      const tipo = String(row.tipo || '').trim().toLowerCase();
+      if (!CRITERIO_TIPOS.has(tipo)) return null;
+      const valor = String(row.valor ?? '').trim();
+      if (!valor && tipo !== 'atribuido') return null;
+      return {
+        tipo,
+        campo: String(row.campo || '').trim(),
+        operador: String(row.operador || 'equals').trim() || 'equals',
+        valor,
+      };
+    })
+    .filter(Boolean) as IDeskAgentQueueBoxCriterio[];
+}
+
 function toDto(doc: IDeskAgentQueueBox): AgentQueueBoxDto {
   const boxId = String(doc.boxId || '').trim();
   return {
@@ -68,6 +98,14 @@ function toDto(doc: IDeskAgentQueueBox): AgentQueueBoxDto {
     boxes: [boxId],
     isCustom: doc.isCustom !== false,
     order: typeof doc.order === 'number' ? doc.order : 0,
+    criterios: Array.isArray(doc.criterios)
+      ? doc.criterios.map((c) => ({
+        tipo: String(c.tipo || ''),
+        campo: String(c.campo || ''),
+        operador: String(c.operador || 'equals'),
+        valor: String(c.valor || ''),
+      }))
+      : [],
   };
 }
 
@@ -82,8 +120,10 @@ export async function listAgentQueueBoxes(email: string): Promise<AgentQueueBoxD
 
 export interface CreateAgentQueueBoxInput {
   name: string;
-  action: string;
+  action?: string;
   boxId?: string;
+  criterios?: unknown;
+  dot?: string;
 }
 
 export async function createAgentQueueBox(
@@ -97,13 +137,24 @@ export async function createAgentQueueBox(
   const trimmedName = String(input.name || '').trim();
   if (!trimmedName) throw new Error('Nome da caixa é obrigatório');
 
-  const meta = resolveActionMeta(String(input.action || ''));
+  const criterios = normalizeCriterios(input.criterios);
+  if (!criterios.length) throw new Error('Informe ao menos um critério de filtragem');
+
+  const meta = resolveActionMeta(String(input.action || 'em-andamento'));
   const boxId = String(input.boxId || '').trim()
     || `custom-${slugify(trimmedName)}-${Date.now().toString(36)}`;
 
   const Model = getDeskAgentQueueBoxModel();
   const existing = await Model.findOne({ email: normalized, boxId });
-  if (existing) return toDto(existing);
+  if (existing) {
+    existing.name = trimmedName;
+    existing.criterios = criterios;
+    existing.dot = String(input.dot || existing.dot || meta.dot);
+    existing.action = meta.action;
+    existing.actionLabel = meta.actionLabel;
+    await existing.save();
+    return toDto(existing);
+  }
 
   const count = await Model.countDocuments({ email: normalized });
   const doc = await Model.create({
@@ -113,11 +164,43 @@ export async function createAgentQueueBox(
     name: trimmedName,
     action: meta.action,
     actionLabel: meta.actionLabel,
-    dot: meta.dot,
+    dot: String(input.dot || meta.dot),
     order: count,
     isCustom: true,
+    criterios,
   });
 
+  return toDto(doc);
+}
+
+export async function updateAgentQueueBox(
+  email: string,
+  boxId: string,
+  input: CreateAgentQueueBoxInput,
+): Promise<AgentQueueBoxDto | null> {
+  const normalized = normalizeEmail(email);
+  const id = String(boxId || '').trim();
+  if (!normalized || !id) return null;
+
+  const Model = getDeskAgentQueueBoxModel();
+  const doc = await Model.findOne({ email: normalized, boxId: id });
+  if (!doc) return null;
+
+  const trimmedName = String(input.name || doc.name || '').trim();
+  if (!trimmedName) throw new Error('Nome da caixa é obrigatório');
+
+  const criterios = input.criterios !== undefined
+    ? normalizeCriterios(input.criterios)
+    : (doc.criterios || []);
+  if (!criterios.length) throw new Error('Informe ao menos um critério de filtragem');
+
+  const meta = resolveActionMeta(String(input.action || doc.action || 'em-andamento'));
+  doc.name = trimmedName;
+  doc.criterios = criterios;
+  doc.action = meta.action;
+  doc.actionLabel = meta.actionLabel;
+  if (input.dot) doc.dot = String(input.dot);
+  await doc.save();
   return toDto(doc);
 }
 
@@ -139,7 +222,12 @@ export async function migrateAgentQueueBoxes(
   const created: AgentQueueBoxDto[] = [];
   for (const box of boxes) {
     try {
-      const saved = await createAgentQueueBox(email, userId, box);
+      const saved = await createAgentQueueBox(email, userId, {
+        ...box,
+        criterios: Array.isArray(box.criterios) && box.criterios.length
+          ? box.criterios
+          : [{ tipo: 'status', campo: 'status', operador: 'equals', valor: 'em-andamento' }],
+      });
       created.push(saved);
     } catch (err) {
       console.warn('[agentQueueBox] falha ao migrar caixa:', (err as Error)?.message);

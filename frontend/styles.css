@@ -531,7 +531,7 @@ body {
 }
 
 /* Páginas com conteúdo longo: rolagem só no main-content, não no body */
-.main-content:has(.page.active:not(#tickets):not(#chat):not(#config):not(#especiais-reclame-aqui):not(#especiais-procon):not(#workflow)) {
+.main-content:has(.page.active:not(#tickets):not(#chat):not(#config):not(#preferencias):not(#especiais-reclame-aqui):not(#especiais-procon):not(#workflow)) {
     overflow-y: auto;
     overflow-x: hidden;
     padding-top: var(--velo-chrome-top);
@@ -539,7 +539,7 @@ body {
 }
 
 /* Ajustar padding apenas para páginas que não são tickets, chat, reports ou config */
-.main-content .page:not(#tickets):not(#chat):not(#reports):not(#config):not(#especiais-reclame-aqui):not(#especiais-procon):not(#workflow) {
+.main-content .page:not(#tickets):not(#chat):not(#reports):not(#config):not(#preferencias):not(#especiais-reclame-aqui):not(#especiais-procon):not(#workflow) {
     padding: 0.5rem 1rem;
     padding-top: 0.25rem;
 }
@@ -711,6 +711,14 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 #config.active.page {
     display: flex !important;
     flex-direction: column;
+    min-height: 0;
+}
+
+#preferencias.page.active,
+#preferencias.active.page {
+    display: flex !important;
+    flex-direction: column;
+    flex: 1 1 auto;
     min-height: 0;
 }
 
@@ -16820,5 +16828,232 @@ body.velodesk-dark .sidebar {
 @media (max-width: 900px) {
     .btn-header-quick span { display: none; }
     .header-global-search { min-width: 140px; }
+}
+
+/* ============================================
+   PREFERÊNCIAS — v1.0.0 | DATE: 2026-07-30
+   ============================================ */
+#preferencias.preferencias-page {
+    --pref-bg: #f0f4f8;
+    --pref-surface: #F3F7FC;
+    --pref-border: rgba(0, 0, 88, 0.08);
+    --pref-muted: #64748b;
+    display: flex !important;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+    padding: 0 !important;
+    overflow: auto;
+    background: var(--pref-bg);
+    box-sizing: border-box;
+}
+
+.main-content:has(#preferencias.active) {
+    overflow: hidden !important;
+    padding: 0 !important;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.preferencias-layout {
+    max-width: 820px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.preferencias-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+}
+
+.preferencias-header__icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #000058, #1634FF);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+
+.preferencias-header__title {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #000058;
+    letter-spacing: -0.02em;
+}
+
+.preferencias-header__subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    color: var(--pref-muted);
+    line-height: 1.4;
+}
+
+.preferencias-section {
+    background: var(--pref-surface);
+    border: 1px solid var(--pref-border);
+    border-radius: 14px;
+    padding: 1.15rem 1.25rem 1.25rem;
+}
+
+.preferencias-section__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.85rem;
+}
+
+.preferencias-section__title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #000058;
+}
+
+.preferencias-section__desc {
+    margin: 0.35rem 0 0;
+    font-size: 0.8rem;
+    color: var(--pref-muted);
+    line-height: 1.45;
+}
+
+.preferencias-save-row {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.preferencias-save-row__label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.preferencias-save-toggle {
+    min-width: 92px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.preferencias-save-toggle.is-close {
+    background: transparent;
+    border: 1.5px solid #006AB9;
+    color: #006AB9;
+}
+
+.preferencias-save-toggle.is-keep {
+    background: #000058;
+    border: 1.5px solid #000058;
+    color: #fff;
+}
+
+.preferencias-add-box {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.preferencias-boxes {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.preferencias-boxes__empty {
+    margin: 0.5rem 0 0;
+    font-size: 0.85rem;
+    color: var(--pref-muted);
+}
+
+.preferencias-box-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid var(--pref-border);
+}
+
+.preferencias-box-item__dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.preferencias-box-item__main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.preferencias-box-item__name {
+    font-size: 0.9rem;
+    color: #0f172a;
+}
+
+.preferencias-box-item__summary {
+    font-size: 0.75rem;
+    color: var(--pref-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preferencias-box-item__actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.preferencias-box-item__btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.preferencias-box-item__btn:hover {
+    background: #EEF6FC;
+    color: #1634FF;
+}
+
+.preferencias-box-item__btn--danger:hover {
+    background: #fef2f2;
+    color: #E24B4A;
 }
 

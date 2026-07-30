@@ -1,4 +1,4 @@
-/** tabulation.service v1.4.0 — opções dinâmicas tipo/canal no GET /api/tabulation */
+/** tabulation.service v1.5.0 — responsável é atribuição, não tabulação */
 import type { ITabulacao } from '../models/ChamadoN1';
 import type { ITabulacaoDetalhe, ITabulacaoMotivo, ITabulacaoProduto } from '../models/TabulacaoProduto';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
@@ -178,13 +178,11 @@ export async function assertTabulacaoForStatus(tab: ITabulacao | undefined, stat
   const missing: string[] = [];
   const produto = String(tab?.produto ?? '').trim();
   const tipo = String(tab?.tipoChamado ?? '').trim();
-  const responsavel = String(tab?.responsavel ?? '').trim();
   const motivo = String(tab?.motivo ?? '').trim();
   const detalhe = String(tab?.detalhe ?? '').trim();
 
   if (!produto) missing.push('Produto');
   if (!tipo) missing.push('Tipo');
-  if (!responsavel) missing.push('Responsável');
 
   if (produto) {
     const config = await getActiveTabulation();

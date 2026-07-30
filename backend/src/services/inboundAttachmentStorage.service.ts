@@ -1,4 +1,4 @@
-/** inboundAttachmentStorage v1.3.2 — flat no prefixo inbound; exige GCS quando bucket configurado */
+/** inboundAttachmentStorage v1.4.1 — lookup legado (subpasta) + flat no GCS, sem double-decode */
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import path from 'path';
@@ -25,11 +25,39 @@ function sanitizeFilename(name: string): string {
 }
 
 function decodeStorageKey(rawKey: string): string {
-  const decoded = decodeURIComponent(String(rawKey || '').trim());
+  const raw = String(rawKey || '').trim();
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    // Nome com '%' literal — Express já entregou o valor decodificado.
+    decoded = raw;
+  }
   if (!decoded || decoded.includes('..') || decoded.includes('\\') || decoded.startsWith('/')) {
     throw new Error('Chave de anexo inválida');
   }
   return decoded.replace(new RegExp(STORAGE_KEY_SEP, 'g'), '/');
+}
+
+/**
+ * Chaves alternativas para a mesma chave lógica, em ordem de tentativa.
+ *
+ * O separador `__` da URL é ambíguo: pode ser a subpasta do layout legado
+ * (`messageId/uuid-nome`) ou `__` literal do nome do arquivo no layout flat atual.
+ * Por isso testamos as duas leituras antes de desistir.
+ */
+export function expandInboundStorageKeyCandidates(relative: string): string[] {
+  const normalized = String(relative || '').trim().replace(/\\/g, '/');
+  if (!normalized) return [];
+
+  const out = new Set<string>([normalized]);
+
+  if (normalized.includes('/')) {
+    out.add(normalized.replace(/\//g, STORAGE_KEY_SEP));
+    out.add(normalized.split('/').filter(Boolean).pop() as string);
+  }
+
+  return [...out].filter(Boolean);
 }
 
 export interface PersistInboundAttachmentInput {
@@ -58,28 +86,18 @@ export async function persistInboundAttachment(
   const safeName = sanitizeFilename(input.filename);
   const storageKey = `${crypto.randomUUID()}-${safeName}`;
 
-  const bucket = String(env.gcpStorageBucket || '').trim();
-  // Em Cloud Run o disco é efêmero: com bucket definido o upload GCS é obrigatório.
-  if (bucket && !isGcsAttachmentStorageConfigured()) {
-    throw new Error(
-      `GCS bucket "${bucket}" definido, mas transport/credencial indisponível — anexo "${safeName}" não pode ser persistido só em disco`,
-    );
-  }
-
-  const gcsConfigured = isGcsAttachmentStorageConfigured();
   const gcsUploaded = await uploadInboundAttachmentToGcs(
     storageKey,
     input.buffer,
     input.contentType,
   );
-  if (gcsConfigured && !gcsUploaded) {
-    throw new Error(`Falha ao enviar anexo "${safeName}" para o bucket ${bucket}`);
+  if (isGcsAttachmentStorageConfigured() && !gcsUploaded) {
+    throw new Error(`Falha ao enviar anexo "${safeName}" para o bucket ${env.gcpStorageBucket}`);
   }
-  if (!gcsConfigured) {
-    console.warn('[inboundAttachment] GCS sem bucket — persistindo só em disco local (dev)', {
-      storageKey,
-      filename: safeName,
-    });
+  if (env.nodeEnv === 'production' && !gcsUploaded) {
+    throw new Error(
+      `GCS indisponível em produção — anexo "${safeName}" não persistido (configure GCP_STORAGE_BUCKET e transport Gmail).`,
+    );
   }
 
   const fullPath = path.join(resolveBaseDir(), storageKey);
@@ -95,8 +113,8 @@ export async function persistInboundAttachment(
     storageKey,
     filename: safeName,
     bytes: input.buffer.length,
-    gcsUploaded,
-    gcsUri: buildGcsObjectUri(getInboundAttachmentsPrefix(), storageKey),
+    gcs: gcsUploaded,
+    messageId: String(input.messageId || '').slice(0, 32),
   });
 
   return {
@@ -107,18 +125,48 @@ export async function persistInboundAttachment(
     storageKey,
   };
 }
-export function resolveInboundAttachmentPath(storageKey: string): string {
-  const relative = decodeStorageKey(storageKey);
+
+/** Path em disco a partir de uma chave JÁ decodificada (não reaplica decode). */
+function resolveDiskPathFromRelative(relative: string): string {
+  const normalized = String(relative || '').trim().replace(/\\/g, '/');
+  if (!normalized || normalized.includes('..') || normalized.startsWith('/')) {
+    throw new Error('Chave de anexo inválida');
+  }
   const base = resolveBaseDir();
-  const fullPath = path.resolve(base, relative);
+  const fullPath = path.resolve(base, normalized);
   if (!fullPath.startsWith(base + path.sep) && fullPath !== base) {
     throw new Error('Caminho de anexo inválido');
   }
   return fullPath;
 }
 
+export function resolveInboundAttachmentPath(storageKey: string): string {
+  return resolveDiskPathFromRelative(decodeStorageKey(storageKey));
+}
+
 export function decodeInboundStorageKeyParam(rawKey: string): string {
   return decodeStorageKey(rawKey);
+}
+
+async function tryOpenFromDisk(relative: string): Promise<{
+  source: 'disk';
+  filePath: string;
+  filename: string;
+} | null> {
+  try {
+    const filePath = resolveDiskPathFromRelative(relative);
+    const stat = await fs.stat(filePath);
+    if (stat.isFile()) {
+      return {
+        source: 'disk',
+        filePath,
+        filename: path.basename(relative),
+      };
+    }
+  } catch {
+    // próximo candidato
+  }
+  return null;
 }
 
 export async function openInboundAttachment(storageKey: string): Promise<{
@@ -129,31 +177,24 @@ export async function openInboundAttachment(storageKey: string): Promise<{
   filename: string;
 } | null> {
   const relative = decodeStorageKey(storageKey);
-  const filePath = resolveInboundAttachmentPath(storageKey);
+  const candidates = expandInboundStorageKeyCandidates(relative);
 
-  try {
-    const stat = await fs.stat(filePath);
-    if (stat.isFile()) {
+  for (const key of candidates) {
+    const disk = await tryOpenFromDisk(key);
+    if (disk) return disk;
+
+    const gcs = await readInboundAttachmentFromGcs(key);
+    if (gcs) {
       return {
-        source: 'disk',
-        filePath,
-        filename: path.basename(relative),
+        source: 'gcs',
+        stream: gcs.stream,
+        contentType: gcs.contentType,
+        filename: path.basename(key),
       };
     }
-  } catch {
-    // tenta GCS
   }
 
-  const gcs = await readInboundAttachmentFromGcs(relative);
-  if (gcs) {
-    return {
-      source: 'gcs',
-      stream: gcs.stream,
-      contentType: gcs.contentType,
-      filename: path.basename(relative),
-    };
-  }
-
+  console.warn('[inboundAttachment] não encontrado', { storageKey: relative, tried: candidates });
   return null;
 }
 

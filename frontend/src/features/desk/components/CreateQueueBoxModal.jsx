@@ -1,28 +1,40 @@
 /**
- * Modal — criar nova caixa na fila de atendimento
- * VERSION: v1.1.0 | DATE: 2026-07-29
+ * Modal — criar/editar caixa personalizada com critérios
+ * VERSION: v2.0.0 | DATE: 2026-07-30
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNotifications } from '../../../context/NotificationContext';
 import {
-  QUEUE_BOX_ACTIONS,
   createCustomQueueBox,
+  updateCustomQueueBox,
 } from '../../../services/desk/customQueueBoxes';
+import QueueBoxCriteriaEditor from '../../preferencias/components/QueueBoxCriteriaEditor';
 
-export default function CreateQueueBoxModal({ open, onClose, onCreated }) {
+function defaultCriterios() {
+  return [{ tipo: 'status', campo: 'status', operador: 'equals', valor: 'em-andamento' }];
+}
+
+export default function CreateQueueBoxModal({ open, onClose, onSaved, initialBox = null }) {
   const { showNotification } = useNotifications();
   const nameRef = useRef(null);
   const [name, setName] = useState('');
-  const [action, setAction] = useState('em-andamento');
+  const [criterios, setCriterios] = useState(defaultCriterios);
   const [nameError, setNameError] = useState(false);
+  const [criteriaError, setCriteriaError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const isEdit = Boolean(initialBox?.id);
 
   useEffect(() => {
     if (!open) return undefined;
-    setName('');
-    setAction('em-andamento');
+    setName(String(initialBox?.name || ''));
+    setCriterios(
+      Array.isArray(initialBox?.criterios) && initialBox.criterios.length
+        ? initialBox.criterios.map((c) => ({ ...c }))
+        : defaultCriterios(),
+    );
     setNameError(false);
+    setCriteriaError(false);
     setSaving(false);
     nameRef.current?.focus();
 
@@ -31,7 +43,7 @@ export default function CreateQueueBoxModal({ open, onClose, onCreated }) {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open, onClose, initialBox]);
 
   if (!open) return null;
 
@@ -42,15 +54,30 @@ export default function CreateQueueBoxModal({ open, onClose, onCreated }) {
       nameRef.current?.focus();
       return;
     }
+    const validCriterios = (criterios || []).filter((c) => {
+      if (!c?.tipo) return false;
+      const valor = String(c.valor || '').trim();
+      if (c.tipo === 'atribuido') {
+        return valor === '__me__' || valor === '__empty__' || Boolean(valor);
+      }
+      return Boolean(valor);
+    });
+    if (!validCriterios.length) {
+      setCriteriaError(true);
+      showNotification('Informe ao menos um critério de filtragem.', 'error');
+      return;
+    }
 
     setSaving(true);
     try {
-      const box = await createCustomQueueBox({ name, action });
-      onCreated?.(box);
-      showNotification('Caixa adicionada', 'success');
+      const box = isEdit
+        ? await updateCustomQueueBox(initialBox.id, { name, criterios: validCriterios })
+        : await createCustomQueueBox({ name, criterios: validCriterios });
+      onSaved?.(box);
+      showNotification(isEdit ? 'Caixa atualizada' : 'Caixa adicionada', 'success');
       onClose();
     } catch (err) {
-      showNotification(err?.response?.data?.message || err?.message || 'Não foi possível criar a caixa.', 'error');
+      showNotification(err?.response?.data?.message || err?.message || 'Não foi possível salvar a caixa.', 'error');
     } finally {
       setSaving(false);
     }
@@ -61,11 +88,11 @@ export default function CreateQueueBoxModal({ open, onClose, onCreated }) {
       <button
         type="button"
         className="queue-box-modal__backdrop"
-        aria-label="Fechar criação de caixa"
+        aria-label="Fechar modal de caixa"
         onClick={onClose}
       />
       <div
-        className="queue-box-modal"
+        className="queue-box-modal queue-box-modal--wide"
         role="dialog"
         aria-modal="true"
         aria-labelledby="queueBoxModalTitle"
@@ -77,10 +104,10 @@ export default function CreateQueueBoxModal({ open, onClose, onCreated }) {
             </span>
             <div>
               <h2 className="queue-box-modal__title" id="queueBoxModalTitle">
-                Nova caixa
+                {isEdit ? 'Editar caixa' : 'Nova caixa'}
               </h2>
               <p className="queue-box-modal__subtitle">
-                Defina o nome e a ação automática da caixa na fila.
+                Defina o nome e os critérios de filtragem (combinados com E).
               </p>
             </div>
           </div>
@@ -109,34 +136,25 @@ export default function CreateQueueBoxModal({ open, onClose, onCreated }) {
                 setName(event.target.value);
                 if (nameError) setNameError(false);
               }}
-              placeholder="Ex.: Retenção VIP, N2 Financeiro"
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  handleSave();
-                }
-              }}
+              placeholder="Ex.: Meus VIP, SLA crítico, Pendentes N2"
             />
           </div>
 
           <div className="queue-box-modal__field">
-            <label className="queue-box-modal__label" htmlFor="queueBoxAction">
-              Ação
+            <label className="queue-box-modal__label">
+              Critérios <span className="queue-box-modal__req">*</span>
             </label>
-            <select
-              id="queueBoxAction"
-              className="queue-box-modal__select"
-              value={action}
-              onChange={(event) => setAction(event.target.value)}
-            >
-              {QUEUE_BOX_ACTIONS.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
+            <div className={criteriaError ? 'queue-box-criteria--error' : ''}>
+              <QueueBoxCriteriaEditor
+                criterios={criterios}
+                onChange={(next) => {
+                  setCriterios(next);
+                  if (criteriaError) setCriteriaError(false);
+                }}
+              />
+            </div>
             <p className="queue-box-modal__hint">
-              A ação define o comportamento padrão dos tickets nesta caixa.
+              A caixa lista os tickets visíveis ao agente que atendem todos os critérios.
             </p>
           </div>
         </div>
@@ -156,7 +174,7 @@ export default function CreateQueueBoxModal({ open, onClose, onCreated }) {
             onClick={handleSave}
             disabled={saving}
           >
-            {saving ? 'Criando…' : 'Salvar e criar caixa'}
+            {saving ? 'Salvando…' : (isEdit ? 'Salvar alterações' : 'Salvar e criar caixa')}
           </button>
         </footer>
       </div>

@@ -1,4 +1,7 @@
-/** funcaoPermissao.service v1.1.1 — merge lean sem exigir Document no replace */
+/**
+ * funcaoPermissao.service v1.2.0 — backfill preferencias.visualizar em seeds existentes
+ * VERSION: v1.2.0 | DATE: 2026-07-30
+ */
 import {
   DEFAULT_FUNCOES_PERMISSOES,
   derivePortalVisivelFromPermissoes,
@@ -91,19 +94,55 @@ export async function getEffectivePermissionsForSlug(slug: string): Promise<{
   };
 }
 
+function defaultPreferenciasVisualizar(slug: string): boolean {
+  const item = DEFAULT_FUNCOES_PERMISSOES.find((entry) => entry.slug === slug);
+  if (item?.permissoes?.preferencias?.visualizar === false) return false;
+  if (item?.permissoes?.preferencias?.visualizar === true) return true;
+  // Funções de atendimento/gestão (e herdeiras) ganham acesso; só workflow puro nega no default.
+  return slug !== 'financeiro' && slug !== 'produtos';
+}
+
+async function backfillPreferenciasVisualizar(): Promise<number> {
+  const Model = getDeskFuncaoPermissaoModel();
+  const docs = await Model.find({
+    $or: [
+      { 'permissoes.preferencias': { $exists: false } },
+      { 'permissoes.preferencias.visualizar': { $exists: false } },
+    ],
+  });
+
+  let updated = 0;
+  for (const doc of docs) {
+    if (!doc.permissoes) doc.permissoes = {};
+    if (!doc.permissoes.preferencias) doc.permissoes.preferencias = {};
+    doc.permissoes.preferencias.visualizar = defaultPreferenciasVisualizar(doc.slug);
+    doc.markModified('permissoes');
+    await doc.save();
+    updated += 1;
+  }
+  return updated;
+}
+
 export async function seedFuncoesPermissoes(): Promise<void> {
   const Model = getDeskFuncaoPermissaoModel();
   const count = await Model.countDocuments();
-  if (count > 0) return;
+  if (count === 0) {
+    await Model.insertMany(
+      DEFAULT_FUNCOES_PERMISSOES.map((item) => ({
+        ...item,
+        updatedBy: 'seed',
+      })),
+    );
+    invalidateFuncaoPermissaoCache();
+    console.log(`Seed: ${DEFAULT_FUNCOES_PERMISSOES.length} função(ões) de permissão Desk criadas`);
+    return;
+  }
 
-  await Model.insertMany(
-    DEFAULT_FUNCOES_PERMISSOES.map((item) => ({
-      ...item,
-      updatedBy: 'seed',
-    })),
-  );
-  invalidateFuncaoPermissaoCache();
-  console.log(`Seed: ${DEFAULT_FUNCOES_PERMISSOES.length} função(ões) de permissão Desk criadas`);
+  const backfilled = await backfillPreferenciasVisualizar();
+  if (backfilled > 0) {
+    invalidateFuncaoPermissaoCache();
+    console.log(`Seed: backfill preferencias.visualizar em ${backfilled} função(ões)`);
+  }
 }
 
 export async function replaceFuncaoPermissao(

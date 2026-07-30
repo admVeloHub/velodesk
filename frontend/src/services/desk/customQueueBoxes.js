@@ -1,6 +1,6 @@
 /**
- * Caixas customizadas — fila de atendimento (desk_preferences.desk_agent_boxex + cache local)
- * VERSION: v2.0.0 | DATE: 2026-07-29
+ * Caixas customizadas — filtros multi-critério (desk_agent_boxex)
+ * VERSION: v2.1.0 | DATE: 2026-07-30
  */
 import { QUEUE_STATUSES } from './constants';
 import { addCustomBox } from '../ticketsCache';
@@ -55,6 +55,23 @@ function writeStorage(list) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
 
+function normalizeCriterios(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const tipo = String(item.tipo || '').trim().toLowerCase();
+      if (!tipo) return null;
+      return {
+        tipo,
+        campo: String(item.campo || '').trim(),
+        operador: String(item.operador || 'equals').trim() || 'equals',
+        valor: String(item.valor ?? '').trim(),
+      };
+    })
+    .filter(Boolean);
+}
+
 function normalizeBox(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const id = String(raw.id || raw.boxId || '').trim();
@@ -62,6 +79,7 @@ function normalizeBox(raw) {
   if (!id || !name) return null;
   const action = QUEUE_BOX_ACTIONS.some((item) => item.id === raw.action) ? raw.action : 'em-andamento';
   const actionMeta = QUEUE_BOX_ACTIONS.find((item) => item.id === action);
+  const criterios = normalizeCriterios(raw.criterios);
   return {
     id,
     name,
@@ -70,6 +88,8 @@ function normalizeBox(raw) {
     dot: String(raw.dot || ACTION_DOTS[action] || '#6366f1'),
     boxes: Array.isArray(raw.boxes) && raw.boxes.length ? raw.boxes.map(String) : [id],
     isCustom: raw.isCustom !== false,
+    criterios,
+    virtual: true,
   };
 }
 
@@ -102,7 +122,11 @@ export function getCustomQueueById(queueId) {
   return loadCustomQueues().find((item) => item.id === queueId) || null;
 }
 
-function buildLocalBox({ name, action, boxId }) {
+export function isCustomQueueId(queueId) {
+  return Boolean(getCustomQueueById(queueId));
+}
+
+function buildLocalBox({ name, action, boxId, criterios, dot }) {
   const trimmedName = String(name || '').trim();
   const actionId = QUEUE_BOX_ACTIONS.some((item) => item.id === action) ? action : 'em-andamento';
   const id = String(boxId || '').trim() || `custom-${slugify(trimmedName)}-${Date.now().toString(36)}`;
@@ -112,9 +136,11 @@ function buildLocalBox({ name, action, boxId }) {
     name: trimmedName,
     action: actionId,
     actionLabel: actionMeta?.label || actionId,
-    dot: ACTION_DOTS[actionId] || '#6366f1',
+    dot: String(dot || ACTION_DOTS[actionId] || '#6366f1'),
     boxes: [id],
     isCustom: true,
+    criterios: normalizeCriterios(criterios),
+    virtual: true,
   };
 }
 
@@ -136,7 +162,14 @@ export async function fetchAndHydrateCustomQueues() {
 
       if (!remote.length && local.length) {
         const migrated = await agentQueueBoxesApi.migrate(
-          local.map((box) => ({ boxId: box.id, name: box.name, action: box.action })),
+          local.map((box) => ({
+            boxId: box.id,
+            name: box.name,
+            action: box.action,
+            criterios: box.criterios?.length
+              ? box.criterios
+              : [{ tipo: 'status', campo: 'status', operador: 'equals', valor: 'em-andamento' }],
+          })),
         );
         remote = (migrated?.boxes || []).map(normalizeBox).filter(Boolean);
       }
@@ -157,17 +190,21 @@ export async function fetchAndHydrateCustomQueues() {
   return hydratePromise;
 }
 
-export async function createCustomQueueBox({ name, action }) {
+export async function createCustomQueueBox({ name, action, criterios, dot }) {
   const trimmedName = String(name || '').trim();
   if (!trimmedName) throw new Error('Nome da caixa é obrigatório');
+  const normalizedCriterios = normalizeCriterios(criterios);
+  if (!normalizedCriterios.length) throw new Error('Informe ao menos um critério de filtragem');
 
-  let box = buildLocalBox({ name: trimmedName, action });
+  let box = buildLocalBox({ name: trimmedName, action, criterios: normalizedCriterios, dot });
 
   if (canUseRemotePersistence()) {
     const saved = await agentQueueBoxesApi.create({
       boxId: box.id,
       name: box.name,
       action: box.action,
+      criterios: box.criterios,
+      dot: box.dot,
     });
     const normalized = normalizeBox(saved);
     if (normalized) box = normalized;
@@ -178,6 +215,45 @@ export async function createCustomQueueBox({ name, action }) {
   addCustomBox({ id: box.id, name: box.name, action: box.action });
 
   return box;
+}
+
+export async function updateCustomQueueBox(boxId, { name, action, criterios, dot }) {
+  const id = String(boxId || '').trim();
+  if (!id) throw new Error('Caixa inválida');
+  const trimmedName = String(name || '').trim();
+  if (!trimmedName) throw new Error('Nome da caixa é obrigatório');
+  const normalizedCriterios = normalizeCriterios(criterios);
+  if (!normalizedCriterios.length) throw new Error('Informe ao menos um critério de filtragem');
+
+  let box = buildLocalBox({ name: trimmedName, action, boxId: id, criterios: normalizedCriterios, dot });
+
+  if (canUseRemotePersistence()) {
+    const saved = await agentQueueBoxesApi.update(id, {
+      name: box.name,
+      action: box.action,
+      criterios: box.criterios,
+      dot: box.dot,
+    });
+    const normalized = normalizeBox(saved);
+    if (normalized) box = normalized;
+  }
+
+  const next = loadCustomQueues().map((item) => (item.id === id ? box : item));
+  if (!next.some((item) => item.id === id)) next.push(box);
+  saveCustomQueues(next);
+  addCustomBox({ id: box.id, name: box.name, action: box.action });
+  return box;
+}
+
+export async function deleteCustomQueueBox(boxId) {
+  const id = String(boxId || '').trim();
+  if (!id) return false;
+  if (canUseRemotePersistence()) {
+    await agentQueueBoxesApi.remove(id);
+  }
+  const next = loadCustomQueues().filter((item) => item.id !== id);
+  saveCustomQueues(next);
+  return true;
 }
 
 export function getQueueActionLabel(queueId) {

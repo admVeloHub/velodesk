@@ -1,4 +1,4 @@
-/** attachmentFilter.util v1.2.0 — dedupe por hash/tamanho+nome (não só nome) */
+/** attachmentFilter.util v1.2.0 — dedupe por hash/conteúdo, não só por nome */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 
 const BRAND_INLINE_FILENAME_PATTERNS = [
@@ -27,6 +27,10 @@ export function attachmentLabelFromUrl(url: string): string {
   return withoutUuid.replace(/__/g, '/').split('/').pop() || 'Anexo';
 }
 
+/**
+ * @deprecated Não usar em dedupe: dois anexos distintos podem ter o mesmo nome.
+ * Preferir attachmentHashFingerprint ou attachmentSizeNameFingerprint.
+ */
 export function attachmentNameFingerprint(filename: string): string {
   return `name:${String(filename || '').trim().toLowerCase()}`;
 }
@@ -39,7 +43,7 @@ export function attachmentSizeNameFingerprint(filename: string, bytes: number): 
   return `size:${bytes}|name:${String(filename || '').trim().toLowerCase()}`;
 }
 
-/** Coleta fingerprints já presentes no ticket para não reanexar arquivos da thread. */
+/** Coleta fingerprints já presentes no ticket (hash e tamanho+nome — não só nome). */
 export function collectChamadoAttachmentFingerprints(chamado: IChamadoN1 | null | undefined): Set<string> {
   const fingerprints = new Set<string>();
   if (!chamado?.registro?.length) return fingerprints;
@@ -63,11 +67,6 @@ export function collectChamadoAttachmentFingerprints(chamado: IChamadoN1 | null 
   return fingerprints;
 }
 
-/**
- * Match só por conteúdo (hash) ou tamanho+nome.
- * Nome sozinho NÃO basta — o Gmail/clientes reusam nomes (calendar.png, image.png)
- * e links mortos no ticket não podem bloquear um arquivo novo.
- */
 export function attachmentMatchesKnownFingerprints(
   item: { filename?: string; contentHash?: string; bytes?: number },
   known: Set<string>,

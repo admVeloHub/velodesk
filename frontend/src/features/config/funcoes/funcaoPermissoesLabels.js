@@ -1,12 +1,13 @@
-/** Labels do catálogo RBAC por função — v1.1.0 */
+/** Labels do catálogo RBAC por função — v1.2.1 | DATE: 2026-07-30 */
 import { derivePortalVisivelFromPermissoes } from '../../../services/permissions/permissionService';
-export const MODULO_ORDER = ['portal', 'tickets', 'workspace', 'workflow', 'config', 'especiais'];
+export const MODULO_ORDER = ['portal', 'tickets', 'workspace', 'workflow', 'preferencias', 'config', 'especiais'];
 
 export const MODULO_LABELS = {
   portal: 'Portal',
   tickets: 'Tickets',
   workspace: 'Workspace 360°',
   workflow: 'Workflow',
+  preferencias: 'Preferências',
   config: 'Configurações',
   especiais: 'Canais Especiais',
 };
@@ -28,7 +29,7 @@ export const SUB_LABELS = {
   aprovar: 'Aprovar workflow',
   rejeitar: 'Rejeitar workflow',
   interromper: 'Interromper workflow',
-  visualizar: 'Visualizar configurações',
+  visualizar: 'Visualizar',
   formularios_criar: 'Formulários — criar',
   formularios_editar: 'Formulários — editar',
   formularios_excluir: 'Formulários — excluir',

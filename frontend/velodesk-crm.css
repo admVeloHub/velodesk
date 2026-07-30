@@ -1,4 +1,4 @@
-/* Velodesk CRM v1.9.1 — badge Fechado + compose lock ticket fechado */
+/* Velodesk CRM v1.10.0 — settings bar removida (Preferências); critérios de caixa */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -2031,8 +2031,111 @@
 }
 
 .queue-box-modal--wide {
-    width: min(520px, calc(100vw - 32px));
-    max-height: min(calc(100vh - 32px), 680px);
+    width: min(720px, calc(100vw - 32px));
+    max-height: min(calc(100vh - 32px), 780px);
+}
+
+.queue-box-modal--wide .queue-box-modal__body {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.queue-box-criteria {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.queue-box-criteria__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.queue-box-criteria__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: flex-start;
+}
+
+.queue-box-criteria__row > .queue-box-criteria__control,
+.queue-box-criteria__row > .queue-box-criteria__atribuido {
+    flex: 1 1 120px;
+    min-width: 110px;
+}
+
+.queue-box-criteria__control--op {
+    flex: 0 1 100px;
+    max-width: 120px;
+}
+
+.queue-box-criteria__atribuido {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.queue-box-criteria__control {
+    width: 100%;
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 0.5px solid #E2E4E9;
+    background: #fff;
+    color: #1A1A2E;
+    font-size: 0.78rem;
+    font-family: inherit;
+}
+
+.queue-box-criteria__remove {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #6b7280;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.queue-box-criteria__remove:hover {
+    background: #fef2f2;
+    color: #E24B4A;
+}
+
+.queue-box-criteria__add {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    background: transparent;
+    color: #1634FF;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 0;
+    font-family: inherit;
+}
+
+.queue-box-criteria__empty {
+    margin: 0;
+    font-size: 0.78rem;
+    color: #6b7280;
+}
+
+.queue-box-criteria--error {
+    outline: 1px solid #E24B4A;
+    border-radius: 8px;
+    padding: 6px;
 }
 
 .register-client-modal .queue-box-modal__body {
@@ -5654,137 +5757,6 @@
     flex-direction: column;
     gap: 6px;
     border-top: 0.5px solid #f0f1f5;
-}
-
-#velodeskDeskV2Root .crm-right-panel__settings-bar {
-    position: relative;
-    z-index: 2;
-    flex-shrink: 0;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    padding: 6px 14px 0;
-    border-top: 0.5px solid #f0f1f5;
-}
-
-#velodeskDeskV2Root .crm-right-panel__settings-wrap {
-    position: relative;
-}
-
-#velodeskDeskV2Root .crm-right-panel__settings-btn {
-    width: 32px;
-    height: 32px;
-    border: 0.5px solid #E4E6EA;
-    border-radius: 8px;
-    background: #fff;
-    color: #006AB9;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-#velodeskDeskV2Root .crm-right-panel__settings-btn .ti {
-    font-size: 17px;
-}
-
-#velodeskDeskV2Root .crm-right-panel__settings-btn:hover,
-#velodeskDeskV2Root .crm-right-panel__settings-btn.is-open {
-    background: #EEF6FC;
-    border-color: #006AB9;
-    color: #006AB9;
-}
-
-/* Popover config agente — portal fixed acima de todo o Desk */
-.crm-agent-settings-layer {
-    position: fixed;
-    inset: 0;
-    z-index: 8300;
-    pointer-events: none;
-}
-
-.crm-agent-settings-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 8299;
-    pointer-events: auto;
-    border: none;
-    padding: 0;
-    margin: 0;
-    background: rgba(15, 23, 42, 0.28);
-    cursor: default;
-}
-
-.crm-agent-settings-popover {
-    position: fixed;
-    z-index: 8301;
-    pointer-events: auto;
-    min-width: 240px;
-    background: #fff;
-    border: 0.5px solid #E4E6EA;
-    border-radius: 10px;
-    box-shadow: 0 16px 40px rgba(0, 0, 88, 0.18);
-    padding: 14px 16px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    font-family: 'Poppins', sans-serif;
-}
-
-.crm-agent-settings-popover__title {
-    font-size: 14px;
-    font-weight: 700;
-    color: #000058;
-    line-height: 1.3;
-}
-
-.crm-agent-settings-popover__row {
-    display: flex;
-    justify-content: flex-end;
-}
-
-.crm-agent-settings-popover__toggle {
-    min-width: 92px;
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 700;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.crm-agent-settings-popover__toggle.is-close {
-    background: transparent;
-    border: 1.5px solid #006AB9;
-    color: #006AB9;
-}
-
-.crm-agent-settings-popover__toggle.is-close:hover {
-    background: #EEF6FC;
-}
-
-.crm-agent-settings-popover__toggle.is-keep {
-    background: #000058;
-    border: 1.5px solid #000058;
-    color: #fff;
-}
-
-.crm-agent-settings-popover__toggle.is-keep:hover {
-    background: #001a7a;
-    border-color: #001a7a;
-}
-
-body.velodesk-dark .crm-agent-settings-popover {
-    background: #1a1d2e;
-    border-color: #2d3148;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
-}
-
-body.velodesk-dark .crm-agent-settings-popover__title {
-    color: #e8eaf0;
 }
 
 #velodeskDeskV2Root .rp-footer-btn {

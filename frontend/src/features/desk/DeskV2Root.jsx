@@ -1,6 +1,6 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.18.2 | DATE: 2026-07-29
+ * VERSION: v3.19.0 | DATE: 2026-07-30
  * — ticket fechado somente leitura + badge Fechado
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -961,14 +961,6 @@ export default function DeskV2Root() {
     showNotification('Ticket criado.', 'success');
   };
 
-  const handleQueueBoxCreated = (box) => {
-    setQueueStatuses(getAllQueueStatuses());
-    setActiveQueue(box.id);
-    suppressAutoSelectRef.current = true;
-    setTableQueueBrowsing(isDeskTableQueue(box.id));
-    syncTicketViews();
-  };
-
   const convMsgs = ticket ? buildRegistroThread(ticket) : [];
   const threadLen = convMsgs.length;
   const activeTicketId = ticket?.id ? String(ticket.id) : '';
@@ -1281,7 +1273,6 @@ export default function DeskV2Root() {
         onCollapse={() => handleQueueCollapse(true)}
         onExpand={() => handleQueueCollapse(false)}
         onCreateTicket={() => setCreateOpen(true)}
-        onQueueBoxCreated={handleQueueBoxCreated}
       />
 
       {!isTableQueueView ? (

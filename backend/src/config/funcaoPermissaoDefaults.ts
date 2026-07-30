@@ -1,4 +1,4 @@
-/** funcaoPermissaoDefaults v1.1.1 — workflow.interromper para suporte e gestão */
+/** funcaoPermissaoDefaults v1.2.0 — módulo preferencias.visualizar */
 
 export type PermissoesMap = Record<string, Record<string, boolean>>;
 
@@ -19,6 +19,7 @@ export const PERMISSION_CATALOG: Record<string, string[]> = {
   tickets: ['ver_todos', 'ver_meus', 'atuar_responsavel', 'atuar_atribuido', 'atuar_canal_especial', 'escalonar'],
   workspace: ['painel_360_proprio', 'painel_360_equipe'],
   workflow: ['avancar', 'aprovar', 'rejeitar', 'interromper'],
+  preferencias: ['visualizar'],
   config: [
     'visualizar',
     'formularios_criar',
@@ -42,6 +43,7 @@ const BASE_ATENDIMENTO = P({
   tickets: { ver_todos: false, ver_meus: true, atuar_responsavel: true, atuar_atribuido: false, atuar_canal_especial: false, escalonar: false },
   workspace: { painel_360_proprio: true, painel_360_equipe: false },
   workflow: { avancar: true, aprovar: false, rejeitar: false },
+  preferencias: { visualizar: true },
   config: {
     visualizar: false,
     formularios_criar: false,
@@ -171,6 +173,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       tickets: { ver_todos: false, ver_meus: false, atuar_responsavel: false, atuar_atribuido: true, atuar_canal_especial: false },
       workspace: { painel_360_proprio: true, painel_360_equipe: false },
       workflow: { avancar: true, aprovar: true, rejeitar: true },
+      preferencias: { visualizar: false },
       config: {
         visualizar: false,
         formularios_criar: false,
@@ -200,6 +203,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       tickets: { ver_todos: false, ver_meus: false, atuar_responsavel: false, atuar_atribuido: true, atuar_canal_especial: false },
       workspace: { painel_360_proprio: true, painel_360_equipe: false },
       workflow: { avancar: true, aprovar: true, rejeitar: true },
+      preferencias: { visualizar: false },
       config: {
         visualizar: false,
         formularios_criar: false,
@@ -229,6 +233,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       tickets: { ver_todos: true, ver_meus: true, atuar_responsavel: true, atuar_atribuido: true, atuar_canal_especial: true, escalonar: true },
       workspace: { painel_360_proprio: true, painel_360_equipe: true },
       workflow: { avancar: true, aprovar: true, rejeitar: true, interromper: true },
+      preferencias: { visualizar: true },
       config: {
         visualizar: true,
         formularios_criar: true,

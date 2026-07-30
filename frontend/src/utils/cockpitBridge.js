@@ -1,11 +1,12 @@
 ﻿/**
  * Ponte global — navegação e ações do cockpit ↔ React Router
- * VERSION: v2.2.0 | DATE: 2026-07-22
+ * VERSION: v2.3.0 | DATE: 2026-07-30
  */
 const PAGE_ROUTES = {
   workspace: '/workspace',
   dashboard: '/dashboard',
   tickets: '/tickets?desk=v2',
+  preferencias: '/preferencias',
   'atendimento-ia-telefonico': '/atendimento-ia-telefonico',
   'alteracoes-cadastrais': '/alteracoes-cadastrais',
   especiais: '/workspace',
@@ -33,9 +34,20 @@ export function installCockpitBridge(navigate, showNotification, ticketActions =
   const profileId = ticketActions.profileId || 'agent';
 
   window.navigateToPage = function navigateToPage(page) {
-    document.querySelectorAll('.page').forEach((p) => {
-      p.classList.remove('active', 'ticket-tab-open');
-    });
+    if (page === 'tickets' && profileId === 'workflow') {
+      navigate('/workflow');
+      return;
+    }
+
+    const route = PAGE_ROUTES[page] || '/workspace';
+    const targetPath = String(route).split('?')[0];
+
+    // Só remove .active quando a rota muda — evita tela em branco se cair no fallback /workspace
+    if (targetPath !== window.location.pathname) {
+      document.querySelectorAll('.page').forEach((p) => {
+        p.classList.remove('active', 'ticket-tab-open');
+      });
+    }
 
     const mainContent = document.querySelector('.main-content');
     if (mainContent) {
@@ -48,12 +60,7 @@ export function installCockpitBridge(navigate, showNotification, ticketActions =
       }
     }
 
-    if (page === 'tickets' && profileId === 'workflow') {
-      navigate('/workflow');
-      return;
-    }
-
-    navigate(PAGE_ROUTES[page] || '/workspace');
+    navigate(route);
   };
 
   window.navigateToPageMobile = window.navigateToPage;
