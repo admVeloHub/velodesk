@@ -1,4 +1,4 @@
-/** attachmentFilter.util v1.1.0 — marca + dedupe de anexos por mensagem */
+/** attachmentFilter.util v1.2.0 — dedupe por hash/tamanho+nome (não só nome) */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 
 const BRAND_INLINE_FILENAME_PATTERNS = [
@@ -45,15 +45,6 @@ export function collectChamadoAttachmentFingerprints(chamado: IChamadoN1 | null 
   if (!chamado?.registro?.length) return fingerprints;
 
   for (const reg of chamado.registro) {
-    for (const url of reg.anexosMensagemPublica ?? []) {
-      const label = attachmentLabelFromUrl(String(url));
-      if (label) fingerprints.add(attachmentNameFingerprint(label));
-    }
-    for (const url of reg.anexosAnotacaoInterna ?? []) {
-      const label = attachmentLabelFromUrl(String(url));
-      if (label) fingerprints.add(attachmentNameFingerprint(label));
-    }
-
     const meta = (reg.metadados ?? {}) as Record<string, unknown>;
     const emailAttachments = Array.isArray(meta.emailAttachments) ? meta.emailAttachments : [];
     for (const raw of emailAttachments) {
@@ -62,7 +53,6 @@ export function collectChamadoAttachmentFingerprints(chamado: IChamadoN1 | null 
       const filename = String(item.filename ?? '').trim();
       const contentHash = String(item.contentHash ?? '').trim();
       const bytes = Number(item.bytes);
-      if (filename) fingerprints.add(attachmentNameFingerprint(filename));
       if (contentHash) fingerprints.add(attachmentHashFingerprint(contentHash));
       if (filename && Number.isFinite(bytes) && bytes > 0) {
         fingerprints.add(attachmentSizeNameFingerprint(filename, bytes));
@@ -73,6 +63,11 @@ export function collectChamadoAttachmentFingerprints(chamado: IChamadoN1 | null 
   return fingerprints;
 }
 
+/**
+ * Match só por conteúdo (hash) ou tamanho+nome.
+ * Nome sozinho NÃO basta — o Gmail/clientes reusam nomes (calendar.png, image.png)
+ * e links mortos no ticket não podem bloquear um arquivo novo.
+ */
 export function attachmentMatchesKnownFingerprints(
   item: { filename?: string; contentHash?: string; bytes?: number },
   known: Set<string>,
@@ -86,6 +81,5 @@ export function attachmentMatchesKnownFingerprints(
     && known.has(attachmentSizeNameFingerprint(filename, bytes))) {
     return true;
   }
-  if (filename && known.has(attachmentNameFingerprint(filename))) return true;
   return false;
 }

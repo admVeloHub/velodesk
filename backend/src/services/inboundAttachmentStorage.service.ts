@@ -1,4 +1,4 @@
-/** inboundAttachmentStorage v1.3.0 — arquivos flat no prefixo inbound (sem subpasta por mensagem) */
+/** inboundAttachmentStorage v1.3.2 — flat no prefixo inbound; exige GCS quando bucket configurado */
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import path from 'path';
@@ -58,13 +58,28 @@ export async function persistInboundAttachment(
   const safeName = sanitizeFilename(input.filename);
   const storageKey = `${crypto.randomUUID()}-${safeName}`;
 
+  const bucket = String(env.gcpStorageBucket || '').trim();
+  // Em Cloud Run o disco é efêmero: com bucket definido o upload GCS é obrigatório.
+  if (bucket && !isGcsAttachmentStorageConfigured()) {
+    throw new Error(
+      `GCS bucket "${bucket}" definido, mas transport/credencial indisponível — anexo "${safeName}" não pode ser persistido só em disco`,
+    );
+  }
+
+  const gcsConfigured = isGcsAttachmentStorageConfigured();
   const gcsUploaded = await uploadInboundAttachmentToGcs(
     storageKey,
     input.buffer,
     input.contentType,
   );
-  if (isGcsAttachmentStorageConfigured() && !gcsUploaded) {
-    throw new Error(`Falha ao enviar anexo "${safeName}" para o bucket ${env.gcpStorageBucket}`);
+  if (gcsConfigured && !gcsUploaded) {
+    throw new Error(`Falha ao enviar anexo "${safeName}" para o bucket ${bucket}`);
+  }
+  if (!gcsConfigured) {
+    console.warn('[inboundAttachment] GCS sem bucket — persistindo só em disco local (dev)', {
+      storageKey,
+      filename: safeName,
+    });
   }
 
   const fullPath = path.join(resolveBaseDir(), storageKey);
@@ -75,6 +90,14 @@ export async function persistInboundAttachment(
     if (!gcsUploaded) throw err;
     console.warn('[inboundAttachment] cache local falhou (GCS ok):', (err as Error).message);
   }
+
+  console.info('[inboundAttachment] persistido', {
+    storageKey,
+    filename: safeName,
+    bytes: input.buffer.length,
+    gcsUploaded,
+    gcsUri: buildGcsObjectUri(getInboundAttachmentsPrefix(), storageKey),
+  });
 
   return {
     url: buildInboundAttachmentApiUrl(storageKey),

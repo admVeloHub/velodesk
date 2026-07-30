@@ -1,10 +1,32 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.56.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.57.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push + GCP — Desk: fix anexos inbound (inline/CID + GCS obrigatório)
+
+- **Data/Hora**: 2026-07-30
+- **Tipo**: GitHub Push + GCP Cloud Run (velodesk)
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.57.0
+  - gmailAttachment v1.4.0, attachmentFilter v1.2.0, gmailInbound v1.4.1
+  - inboundAttachmentStorage v1.3.2, gcsAttachmentStorage v1.3.1, email-inbound.service v1.10.1
+  - test-inbound-attachments-filter v1.0.0
+- **Arquivos modificados**:
+  - `backend/src/services/gmail/gmailAttachment.service.ts` — não descarta mais anexos `inline`/Content-ID do cliente; só filtra logo Velotax; logs de persistência
+  - `backend/src/services/attachmentFilter.util.ts` — dedupe por hash/tamanho+nome (nome sozinho não bloqueia reenvio)
+  - `backend/src/services/inboundAttachmentStorage.service.ts` — com bucket configurado, upload GCS obrigatório (Cloud Run não grava só em disco efêmero)
+  - `backend/src/services/gcsAttachmentStorage.service.ts` — `No such object` tratado como miss silencioso na leitura
+  - `backend/scripts/test-inbound-attachments-filter.ts` — smoke test inline/CID + fingerprints
+- **Descrição**: Corrige regressão em que prints/anexos do Gmail (inline + CID) eram ignorados e nunca iam ao bucket; links 404 em anexos antigos (path messageId/uuid) permanecem irrecuperáveis sem reenvio do cliente.
+- **Status**: Pendente (commit local; push + deploy aguardando confirmação)
+
+---
 
 ### GitHub Push — Desk: dedupe anexos inbound por mensagem (sem acumular thread)
 

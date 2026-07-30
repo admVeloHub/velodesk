@@ -1,4 +1,4 @@
-/** gmailInbound.service v1.4.0 — dedupe anexos contra ticket antes do upload GCS */
+/** gmailInbound.service v1.4.1 — dedupe anexos (hash/tamanho+nome) antes do upload GCS */
 import { env } from '../../config/env';
 import {
   findChamadoForEmailReply,

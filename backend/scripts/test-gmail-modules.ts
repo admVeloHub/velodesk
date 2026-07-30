@@ -1,8 +1,15 @@
-/** test-gmail-modules.ts v1.1.0 — smoke test Gmail + HTML e-mail */
+/** test-gmail-modules.ts v1.2.0 — smoke test Gmail + anexos inline/CID */
 import { buildProtocolSubject } from '../src/services/email-outbound.service';
 import { buildRawRfc822 } from '../src/services/gmail/gmailApiSend';
 import { decodePubSubMessage } from '../src/services/gmail/gmailInbound.service';
 import { gmailMessageToInboundPayload, shouldSkipGmailMessage } from '../src/services/gmail/gmailMessageParser';
+import { listGmailAttachmentParts } from '../src/services/gmail/gmailAttachment.service';
+import {
+  attachmentHashFingerprint,
+  attachmentMatchesKnownFingerprints,
+  attachmentNameFingerprint,
+  attachmentSizeNameFingerprint,
+} from '../src/services/attachmentFilter.util';
 import { composeHtmlToEmailHtml } from '../src/services/emailHtml.util';
 import { buildThreadSubject } from '../src/services/emailThread.service';
 
@@ -77,6 +84,75 @@ function testGmailMessageParser() {
   assert(payload?.textBody.includes('ajuda'), 'body parse');
 }
 
+function testInlineCidAttachmentsAreKept() {
+  const parts = listGmailAttachmentParts({
+    mimeType: 'multipart/mixed',
+    parts: [
+      {
+        mimeType: 'image/png',
+        filename: 'calendar.png',
+        headers: [
+          { name: 'Content-Disposition', value: 'inline; filename="calendar.png"' },
+          { name: 'Content-ID', value: '<ii_calendar>' },
+        ],
+        body: { attachmentId: 'ATT1', size: 1200 },
+      },
+      {
+        mimeType: 'image/png',
+        filename: 'simbolo_velotax.png',
+        headers: [
+          { name: 'Content-Disposition', value: 'inline; filename="simbolo_velotax.png"' },
+          { name: 'Content-ID', value: '<brand>' },
+        ],
+        body: { attachmentId: 'ATT2', size: 800 },
+      },
+      {
+        mimeType: 'message/rfc822',
+        filename: 'forwarded.eml',
+        body: { attachmentId: 'ATT3', size: 5000 },
+        parts: [
+          {
+            mimeType: 'image/png',
+            filename: 'quoted-old.png',
+            body: { attachmentId: 'ATT4', size: 900 },
+          },
+        ],
+      },
+    ],
+  });
+
+  assert(parts.length === 1, `esperava 1 anexo real, veio ${parts.length}`);
+  assert(parts[0].filename === 'calendar.png', `filename: ${parts[0].filename}`);
+}
+
+function testAttachmentFingerprintMatch() {
+  const known = new Set<string>([
+    attachmentHashFingerprint('abc123'),
+    attachmentSizeNameFingerprint('gpt.png', 2048),
+  ]);
+
+  assert(
+    attachmentMatchesKnownFingerprints({ filename: 'gpt.png', contentHash: 'zzz', bytes: 2048 }, known),
+    'size+name deveria casar',
+  );
+  assert(
+    attachmentMatchesKnownFingerprints({ filename: 'outro.png', contentHash: 'abc123', bytes: 10 }, known),
+    'hash deveria casar',
+  );
+  assert(
+    !attachmentMatchesKnownFingerprints(
+      { filename: 'gpt.png', contentHash: 'novo', bytes: 9999 },
+      known,
+    ),
+    'nome sozinho NÃO pode casar',
+  );
+  assert(
+    !known.has(attachmentNameFingerprint('gpt.png'))
+      || !attachmentMatchesKnownFingerprints({ filename: 'gpt.png', bytes: 1 }, known),
+    'fingerprint só de nome não bloqueia',
+  );
+}
+
 function main() {
   testBuildProtocolSubject();
   testBuildRawRfc822();
@@ -84,6 +160,8 @@ function main() {
   testBuildThreadSubject();
   testDecodePubSub();
   testGmailMessageParser();
+  testInlineCidAttachmentsAreKept();
+  testAttachmentFingerprintMatch();
   console.log('OK — smoke tests Gmail modules');
 }
 

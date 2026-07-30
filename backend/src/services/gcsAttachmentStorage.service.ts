@@ -1,4 +1,4 @@
-/** gcsAttachmentStorage v1.3.0 — prefixos inbound e sent no mesmo bucket */
+/** gcsAttachmentStorage v1.3.1 — prefixos inbound/sent; "No such object" = miss silencioso */
 import { Readable } from 'stream';
 import { google } from 'googleapis';
 import { env } from '../config/env';
@@ -103,7 +103,8 @@ export async function readAttachmentFromGcs(
     return { stream, contentType };
   } catch (err) {
     const message = (err as Error).message || '';
-    if (!/404|not found/i.test(message)) {
+    // GCS devolve "No such object: bucket/path" (sem "404"/"not found" literais).
+    if (!/404|not found|no such object/i.test(message)) {
       console.warn('[gcsAttachment] leitura falhou:', { prefix: normalizePrefix(prefix), storageKey, error: message });
     }
     return null;

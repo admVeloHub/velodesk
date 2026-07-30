@@ -1,4 +1,4 @@
-/** gmailAttachment.service v1.3.0 — ignora nested rfc822 + dedupe por fingerprint */
+/** gmailAttachment.service v1.4.0 — aceita inline/CID com filename; só filtra logo da marca */
 import crypto from 'crypto';
 import type { gmail_v1 } from 'googleapis';
 import type { InboundEmailAttachment } from '../inbound-email/types';
@@ -37,24 +37,14 @@ function getPartHeader(part: gmail_v1.Schema$MessagePart, name: string): string 
   return String(found?.value ?? '').trim();
 }
 
+/**
+ * Gmail costuma marcar prints/imagens do cliente como inline + Content-ID.
+ * Não dá para descartar por disposition/CID — só a logo da marca Velotax.
+ */
 function shouldSkipGmailAttachmentPart(part: gmail_v1.Schema$MessagePart): boolean {
   const filename = String(part.filename ?? '').trim();
   if (!filename) return true;
-
-  if (isBrandInlineAttachmentFilename(filename)) {
-    return true;
-  }
-
-  const disposition = getPartHeader(part, 'Content-Disposition').toLowerCase();
-  if (disposition.includes('inline') && !disposition.includes('attachment')) {
-    return true;
-  }
-
-  if (getPartHeader(part, 'Content-ID')) {
-    return true;
-  }
-
-  return false;
+  return isBrandInlineAttachmentFilename(filename);
 }
 
 export function listGmailAttachmentParts(
@@ -71,12 +61,21 @@ export function listGmailAttachmentParts(
 
   const filename = String(part.filename ?? '').trim();
   const attachmentId = String(part.body?.attachmentId ?? '').trim();
-  if (filename && attachmentId && !shouldSkipGmailAttachmentPart(part)) {
-    acc.push({
-      filename,
-      mimeType: String(part.mimeType ?? 'application/octet-stream').trim(),
-      attachmentId,
-    });
+  if (filename && attachmentId) {
+    if (shouldSkipGmailAttachmentPart(part)) {
+      console.info('[gmailAttachment] parte ignorada (logo/marca)', {
+        filename,
+        mimeType,
+        disposition: getPartHeader(part, 'Content-Disposition') || null,
+        contentId: getPartHeader(part, 'Content-ID') || null,
+      });
+    } else {
+      acc.push({
+        filename,
+        mimeType: String(part.mimeType ?? 'application/octet-stream').trim(),
+        attachmentId,
+      });
+    }
   }
 
   for (const child of part.parts ?? []) {
@@ -95,7 +94,20 @@ export async function downloadGmailAttachments(
   if (!gmailId) return [];
 
   const parts = listGmailAttachmentParts(message.payload ?? undefined);
-  if (!parts.length) return [];
+  if (!parts.length) {
+    console.info('[gmailAttachment] nenhuma parte com filename+attachmentId', {
+      messageId: messageIdForStorage,
+      gmailId,
+    });
+    return [];
+  }
+
+  console.info('[gmailAttachment] partes candidatas', {
+    messageId: messageIdForStorage,
+    gmailId,
+    count: parts.length,
+    filenames: parts.map((part) => part.filename),
+  });
 
   const stored: InboundEmailAttachment[] = [];
   const seenInMessage = new Set<string>();
@@ -108,7 +120,13 @@ export async function downloadGmailAttachments(
         id: part.attachmentId,
       });
       const raw = String(res.data.data ?? '').trim();
-      if (!raw) continue;
+      if (!raw) {
+        console.warn('[gmailAttachment] attachmentId sem payload', {
+          filename: part.filename,
+          messageId: messageIdForStorage,
+        });
+        continue;
+      }
 
       const buffer = decodeBase64Url(raw);
       if (buffer.length > MAX_ATTACHMENT_BYTES) {
@@ -141,6 +159,8 @@ export async function downloadGmailAttachments(
       )) {
         console.info('[gmailAttachment] anexo já presente no ticket — ignorado', {
           filename: part.filename,
+          contentHash: contentHash.slice(0, 12),
+          bytes: buffer.length,
           messageId: messageIdForStorage,
         });
         continue;
@@ -167,8 +187,16 @@ export async function downloadGmailAttachments(
         contentHash,
         bytes: buffer.length,
       });
+
+      console.info('[gmailAttachment] anexo persistido', {
+        filename: saved.filename,
+        storageKey: saved.storageKey,
+        gcsUri: saved.gcsUri,
+        bytes: buffer.length,
+        messageId: messageIdForStorage,
+      });
     } catch (err) {
-      console.warn('[gmailAttachment] falha ao baixar anexo', {
+      console.error('[gmailAttachment] falha ao baixar/persistir anexo', {
         filename: part.filename,
         messageId: messageIdForStorage,
         error: (err as Error).message,
