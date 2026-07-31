@@ -1,6 +1,6 @@
 /**
- * VeloNewsCriticalModal v1.0.0 — modal crítico (paridade VeloHub)
- * VERSION: v1.0.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * VeloNewsCriticalModal v1.1.0 — modal crítico (paridade VeloHub — Ciente + Fechar)
+ * VERSION: v1.1.0 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
  */
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -22,11 +22,13 @@ export default function VeloNewsCriticalModal() {
   const [showComments, setShowComments] = useState(false);
   const [currentNews, setCurrentNews] = useState(null);
   const [expandedImage, setExpandedImage] = useState(null);
+  const [closing, setClosing] = useState(false);
 
   useEffect(() => {
     setCurrentNews(criticalModalNews);
     setIsAcknowledged(false);
     setShowComments(false);
+    setClosing(false);
   }, [criticalModalNews]);
 
   if (!criticalModalNews || !currentNews) return null;
@@ -34,15 +36,22 @@ export default function VeloNewsCriticalModal() {
   const shouldShowRemindButton = CriticalModalManager.shouldShowRemindButton();
 
   const handleClose = async () => {
-    if (isAcknowledged) {
-      CriticalModalManager.setAcknowledged(currentNews.title);
-      try {
-        await handleAcknowledge(currentNews._id);
-      } catch (err) {
-        console.error('Erro ao confirmar notícia crítica:', err);
+    if (closing) return;
+    setClosing(true);
+    let acknowledged = false;
+    try {
+      if (isAcknowledged) {
+        CriticalModalManager.setAcknowledged(criticalModalNews.title);
+        if (criticalModalNews._id) {
+          acknowledged = await handleAcknowledge(criticalModalNews._id);
+        }
       }
+    } catch (err) {
+      console.error('Erro ao enviar confirmação de ciência:', err);
+    } finally {
+      closeCriticalModal(acknowledged ? { suppressBubbleRestore: true } : undefined);
+      setClosing(false);
     }
-    closeCriticalModal();
   };
 
   const handleRemindLater = () => {
@@ -96,20 +105,21 @@ export default function VeloNewsCriticalModal() {
             <button
               type="button"
               className="velonews-critical-modal__close-btn"
-              disabled={!isAcknowledged}
+              disabled={!isAcknowledged || closing}
               onClick={handleClose}
             >
-              Fechar
+              {closing ? 'Registrando…' : 'Fechar'}
             </button>
             <div className="velonews-critical-modal__ack">
-              <label>
+              <div className="velonews-critical-modal__ack-row">
                 <input
+                  id="velonews-acknowledge"
                   type="checkbox"
                   checked={isAcknowledged}
                   onChange={() => setIsAcknowledged((v) => !v)}
                 />
-                Ciente
-              </label>
+                <label htmlFor="velonews-acknowledge">Ciente</label>
+              </div>
               {shouldShowRemindButton ? (
                 <button type="button" className="velonews-critical-modal__remind" onClick={handleRemindLater}>
                   Me lembre mais tarde

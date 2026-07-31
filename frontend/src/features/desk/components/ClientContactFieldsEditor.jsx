@@ -1,9 +1,9 @@
 /**
- * ClientContactFieldsEditor v1.0.0 — múltiplos e-mails/telefones + WhatsApp
- * VERSION: v1.0.0 | DATE: 2026-07-27
+ * ClientContactFieldsEditor v1.1.0 — CPF primeiro + múltiplos e-mails/telefones
+ * VERSION: v1.1.0 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
  */
 import React from 'react';
-import { isValidEmailFormat } from '../../../services/desk/utils';
+import { isValidEmailFormat, maskCpfInput } from '../../../services/desk/utils';
 
 function ensureMinOne(items) {
   return items.length ? items : [''];
@@ -20,6 +20,10 @@ export default function ClientContactFieldsEditor({
   onWhatsappPhoneChange,
   idPrefix = 'clientContact',
   showName = true,
+  showCpf = false,
+  cpf = '',
+  onCpfChange,
+  cpfLookupLoading = false,
   emailErrors = {},
   onEmailBlur,
 }) {
@@ -70,6 +74,28 @@ export default function ClientContactFieldsEditor({
 
   return (
     <div className="client-contact-fields">
+      {showCpf ? (
+        <div className="client-contact-fields__cpf">
+          <label className="client-contact-fields__label" htmlFor={`${idPrefix}Cpf`}>CPF</label>
+          <input
+            type="text"
+            className="client-contact-fields__input"
+            id={`${idPrefix}Cpf`}
+            value={cpf}
+            onChange={(e) => onCpfChange?.(maskCpfInput(e.target.value))}
+            placeholder="000.000.000-00"
+            autoComplete="off"
+            inputMode="numeric"
+            maxLength={14}
+          />
+          {cpfLookupLoading ? (
+            <p className="client-contact-fields__hint client-contact-fields__hint--lookup">
+              Consultando cadastro…
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {showName ? (
         <div className="client-contact-fields__name">
           <label className="client-contact-fields__label" htmlFor={`${idPrefix}Name`}>Nome</label>
@@ -173,8 +199,9 @@ export default function ClientContactFieldsEditor({
   );
 }
 
-export function validateClientContactDraft({ name, emails, phones, whatsappPhone }, { requireName = true } = {}) {
+export function validateClientContactDraft({ cpf, name, emails, phones, whatsappPhone }, { requireName = true } = {}) {
   const nome = String(name || '').trim();
+  const cpfDigits = String(cpf || '').replace(/\D/g, '').slice(0, 11);
   if (requireName && !nome) {
     return { ok: false, message: 'Informe o nome do cliente.' };
   }
@@ -195,7 +222,7 @@ export function validateClientContactDraft({ name, emails, phones, whatsappPhone
     return { ok: false, message: 'Selecione qual telefone será usado no WhatsApp.' };
   }
 
-  return { ok: true, nome, emailList, phoneList, whatsappPhone: resolveWhatsappPhone(phoneList, whatsappPhone) };
+  return { ok: true, nome, cpf: cpfDigits, emailList, phoneList, whatsappPhone: resolveWhatsappPhone(phoneList, whatsappPhone) };
 }
 
 export function resolveWhatsappPhone(phoneList, whatsappPhone) {
@@ -214,9 +241,11 @@ export function buildContactDraftFromFields(fields) {
     ? fields.phones
     : (fields.phone ? [fields.phone] : []);
   return {
+    cpf: fields.cpf || '',
     name: fields.name || '',
     emails: emails.length ? emails : [''],
     phones: phones.length ? phones : [''],
     whatsappPhone: fields.whatsappPhone || resolveWhatsappPhone(phones, fields.whatsappPhone),
+    clienteId: fields.clienteId || '',
   };
 }

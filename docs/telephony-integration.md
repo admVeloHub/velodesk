@@ -1,6 +1,10 @@
 # Integração Atendimento IA Telefônico — Contact Tel
 
+<!-- VERSION: v1.1.1 | DATE: 2026-07-31 -->
+
 A Contact Tel (fornecedora da Letícia) **envia** o payload completo ao fim de cada ligação via webhook e **consulta** recados emergenciais antes de cada atendimento. O Velodesk **não** chama o GET `https://api.contact-tel.contactpro.com.br/public/v1/calls/{id}/` — esse endpoint serve apenas como referência do formato dos dados.
+
+> **Guia de homologação para a parceira:** [`api-inbound-telephony-parceiro.md`](./api-inbound-telephony-parceiro.md) — payload completo, header de segurança, endpoints e checklist de validação.
 
 ## Autenticação
 
@@ -138,7 +142,9 @@ O script valida:
 
 ## Homologação com Postman
 
-1. `GET http://localhost:8001/api/inbound/telephony/health`
-2. `POST http://localhost:8001/api/inbound/telephony/calls` com body do exemplo acima
-3. Header `X-Inbound-Secret` (se configurado no `.env`)
-4. Conferir em `http://localhost:8000/atendimento-ia-telefonico`
+Base URL produção: `https://velodesk-278491073220.us-east1.run.app`
+
+1. `GET https://velodesk-278491073220.us-east1.run.app/api/inbound/telephony/health`
+2. `POST https://velodesk-278491073220.us-east1.run.app/api/inbound/telephony/calls` com body do exemplo acima
+3. Header `X-Inbound-Secret` (obrigatório em produção)
+4. Conferir em [https://velodesk-278491073220.us-east1.run.app/atendimento-ia-telefonico](https://velodesk-278491073220.us-east1.run.app/atendimento-ia-telefonico)

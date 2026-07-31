@@ -1,19 +1,18 @@
 /**
  * DeskResolvedTicketTable — lista tabular de tickets finalizados
- * VERSION: v1.1.0 | DATE: 2026-07-30
+ * VERSION: v1.2.0 | DATE: 2026-07-31
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   filterEntriesByDeskSearch,
   formatResolvedDateShort,
+  getDeskSearchInferredLabel,
   getTicketProtocolLabel,
   getTicketResolvedAt,
   getTicketResponsible,
   getTicketTitle,
   sortTicketEntries,
 } from '../../../services/desk/utils';
-import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET } from '../../../services/desk/constants';
-
 const PAGE_SIZE = 20;
 
 function buildPageNumbers(current, total) {
@@ -41,15 +40,14 @@ export default function DeskResolvedTicketTable({
   const [sortField, setSortField] = useState('finalizacao');
   const [sortDir, setSortDir] = useState('desc');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState(DESK_SEARCH_MODE_CPF);
 
-  const isTicketMode = searchMode === DESK_SEARCH_MODE_TICKET;
   const localSearchActive = Boolean(searchQuery.trim());
   const searchActive = localSearchActive || externalSearchActive;
+  const detectedLabel = getDeskSearchInferredLabel(searchQuery);
 
   const filteredEntries = useMemo(
-    () => filterEntriesByDeskSearch(entries, searchQuery, searchMode),
-    [entries, searchQuery, searchMode],
+    () => filterEntriesByDeskSearch(entries, searchQuery),
+    [entries, searchQuery],
   );
 
   const sortedEntries = useMemo(
@@ -98,26 +96,19 @@ export default function DeskResolvedTicketTable({
               name="deskResolvedSearch"
               autoComplete="off"
               spellCheck={false}
-              inputMode={isTicketMode ? 'text' : 'numeric'}
-              placeholder={isTicketMode ? 'Buscar por protocolo…' : 'Buscar por CPF…'}
+              inputMode="text"
+              placeholder="Buscar por CPF ou protocolo…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label={isTicketMode ? 'Buscar por protocolo do ticket' : 'Buscar por CPF do cliente'}
+              aria-label="Buscar ticket por CPF ou protocolo"
             />
-            <button
-              type="button"
-              className="queue-search__mode"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                setSearchMode((prev) => (
-                  prev === DESK_SEARCH_MODE_CPF ? DESK_SEARCH_MODE_TICKET : DESK_SEARCH_MODE_CPF
-                ));
-              }}
-              title={isTicketMode ? 'Buscar por protocolo do ticket' : 'Buscar por CPF do cliente'}
-              aria-pressed={isTicketMode}
+            <span
+              className="queue-search__mode queue-search__mode--detected"
+              title={`Busca detectada: ${detectedLabel}`}
+              aria-live="polite"
             >
-              {isTicketMode ? 'Ticket' : 'CPF'}
-            </button>
+              {detectedLabel}
+            </span>
           </div>
         </div>
         <div className="desk-resolved-table__header-actions">

@@ -1,4 +1,4 @@
-/** index v1.10.0 — job closeResolvedTickets (resolvido → fechado 48h) */
+/** index v1.11.0 — rotas /api/consultas (Customer Data API) */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -43,6 +43,7 @@ import agentesDeskRoutes from './routes/agentesDesk.routes';
 import mailRulesRoutes from './routes/mailRules.routes';
 import ticketIaAnalysisRoutes from './routes/ticketIaAnalysis.routes';
 import telephonyRoutes from './routes/telephony.routes';
+import consultasRoutes from './routes/consultas.routes';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
@@ -174,6 +175,7 @@ app.use('/api/agentes-desk', agentesDeskRoutes);
 app.use('/api/mail-rules', mailRulesRoutes);
 app.use('/api/ticket-ia-analysis', ticketIaAnalysisRoutes);
 app.use('/api/telephony', telephonyRoutes);
+app.use('/api/consultas', consultasRoutes);
 
 if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);

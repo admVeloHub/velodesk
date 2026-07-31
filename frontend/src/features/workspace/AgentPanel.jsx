@@ -1,18 +1,17 @@
 ﻿/**
  * Painel 360° — Agente
- * VERSION: v3.0.2 | DATE: 2026-07-22
+ * VERSION: v3.1.0 | DATE: 2026-07-31
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   buildAgent360View,
   computeAgent360View,
-  resolveDeskQueueForWs360Section,
+  buildDeskNavigationForWs360Section,
+  buildDeskNavigationForWs360Ticket,
 } from '../../services/workspace/deskData';
 import { useWorkspace360 } from '../../hooks/useWorkspace360';
-import { useTickets } from '../../context/TicketsContext';
 import { getAgentName } from '../../services/clientDb';
-import { findTicketEntry } from '../../services/ticketsStorage';
 import { markWorkflowInfoRequestsReadForTicket } from '../../services/workflow/workflowInfoNotifications';
 import Workspace360Kpis from './components/ws360/Workspace360Kpis';
 import Workspace360DualTicketSection from './components/ws360/Workspace360DualTicketSection';
@@ -21,7 +20,6 @@ import Workspace360ProductionChart from './components/ws360/Workspace360Producti
 
 export default function AgentPanel() {
   const navigate = useNavigate();
-  const { openTicket } = useTickets();
   const { data, loading, error } = useWorkspace360();
   const [infoRevision, setInfoRevision] = useState(0);
 
@@ -41,20 +39,13 @@ export default function AgentPanel() {
   const actionNow = view?.sections?.find((s) => s.id === 'action-now');
   const workflow = view?.sections?.find((s) => s.id === 'workflow');
 
-  const handleOpenTicket = useCallback((ticketId) => {
-    const entry = findTicketEntry(ticketId);
-    markWorkflowInfoRequestsReadForTicket(entry?.ticket || ticketId);
-
-    if (typeof window.openTicket === 'function') {
-      window.openTicket(ticketId);
-      return;
-    }
-    openTicket(ticketId);
-  }, [openTicket]);
+  const handleOpenTicket = useCallback((ticketId, sectionId) => {
+    markWorkflowInfoRequestsReadForTicket(ticketId);
+    navigate(buildDeskNavigationForWs360Ticket(ticketId, sectionId));
+  }, [navigate]);
 
   const handleSeeAll = useCallback((sectionId) => {
-    const queue = resolveDeskQueueForWs360Section(sectionId);
-    navigate(`/tickets?desk=v2&queue=${encodeURIComponent(queue)}`);
+    navigate(buildDeskNavigationForWs360Section(sectionId));
   }, [navigate]);
 
   if (loading && !view) {

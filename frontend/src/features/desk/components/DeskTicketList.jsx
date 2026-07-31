@@ -1,11 +1,11 @@
 /**
- * DeskTicketList v2.2.1 — busca por protocolo/CPF abaixo do título
- * VERSION: v2.2.1 | DATE: 2026-07-28
+ * DeskTicketList v2.3.0 — busca automática CPF vs protocolo
+ * VERSION: v2.3.0 | DATE: 2026-07-31
  */
 import React, { useEffect, useState } from 'react';
-import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET } from '../../../services/desk/constants';
 import {
   formatTicketListTime,
+  getDeskSearchInferredLabel,
   getSlaClass,
   getTicketQueueEntryAt,
   getTicketTitle,
@@ -19,14 +19,12 @@ export default function DeskTicketList({
   entries,
   searchActive,
   searchQuery = '',
-  searchMode,
   collapsed,
   entrySortOldestFirst,
   onSelectTicket,
   onSortChange,
   onToggleEntrySort,
   onSearchChange,
-  onSearchModeToggle,
   onSearchSubmit,
   onCollapse,
   onExpand,
@@ -34,9 +32,9 @@ export default function DeskTicketList({
   refreshing = false,
   showSkeleton = false,
 }) {
-  const isTicketMode = searchMode === DESK_SEARCH_MODE_TICKET;
   const [query, setQuery] = useState(searchQuery);
   const skeletonItems = [1, 2, 3, 4, 5, 6];
+  const detectedLabel = getDeskSearchInferredLabel(query);
 
   useEffect(() => {
     setQuery(searchQuery);
@@ -94,8 +92,8 @@ export default function DeskTicketList({
               name="crmQueueSearch"
               autoComplete="off"
               spellCheck={false}
-              inputMode={isTicketMode ? 'text' : 'numeric'}
-              placeholder={isTicketMode ? 'Buscar por protocolo…' : 'Buscar por CPF…'}
+              inputMode="text"
+              placeholder="Buscar por CPF ou protocolo…"
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
               onKeyDown={(e) => {
@@ -104,20 +102,15 @@ export default function DeskTicketList({
                   onSearchSubmit?.();
                 }
               }}
+              aria-label="Buscar ticket por CPF ou protocolo"
             />
-            <button
-              type="button"
-              className="queue-search__mode"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSearchModeToggle?.();
-              }}
-              title={isTicketMode ? 'Buscar por protocolo do ticket' : 'Buscar por CPF do cliente'}
-              aria-pressed={isTicketMode}
+            <span
+              className="queue-search__mode queue-search__mode--detected"
+              title={`Busca detectada: ${detectedLabel}`}
+              aria-live="polite"
             >
-              {isTicketMode ? 'Ticket' : 'CPF'}
-            </button>
+              {detectedLabel}
+            </span>
           </div>
 
           <div className="ticket-list-tabs-bar">

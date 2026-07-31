@@ -1,6 +1,6 @@
 /**
- * composeRichEditor v1.0.1 — contenteditable WYSIWYG do compose
- * VERSION: v1.0.1 | DATE: 2026-07-02
+ * composeRichEditor v1.0.3 — fix serialização DocumentFragment na thread
+ * VERSION: v1.0.3 | DATE: 2026-07-31
  */
 
 const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'DIV', 'P', 'UL', 'OL', 'LI', 'IMG']);
@@ -91,7 +91,68 @@ export function sanitizeComposeHtml(html) {
   };
 
   walk(template.content);
-  return template.innerHTML.replace(/<div><br><\/div>/gi, '<br />');
+  return template.innerHTML.replace(/<div>\s*<br\s*\/?>\s*<\/div>/gi, '<br />');
+}
+
+/** Serializa nós DOM — DocumentFragment não expõe innerHTML. */
+function domNodesToHtml(root) {
+  if (!root) return '';
+  const wrapper = document.createElement('div');
+  wrapper.append(...root.childNodes);
+  return wrapper.innerHTML;
+}
+
+/** Normaliza HTML salvo pelo editor para exibição fiel na thread (listas + parágrafos após lista). */
+export function normalizeMessageHtmlForDisplay(html) {
+  const raw = String(html ?? '').trim();
+  if (!raw) return '';
+
+  const safe = sanitizeComposeHtml(raw);
+  if (!safe) return '';
+
+  const template = document.createElement('template');
+  template.innerHTML = safe;
+
+  const root = template.content;
+  const blockAfterList = (list) => {
+    let next = list.nextSibling;
+    while (next && next.nodeType === Node.ELEMENT_NODE && next.tagName === 'BR') {
+      const toRemove = next;
+      next = next.nextSibling;
+      toRemove.remove();
+    }
+    if (!next) return;
+
+    if (next.nodeType === Node.TEXT_NODE && String(next.textContent || '').trim()) {
+      const p = document.createElement('p');
+      p.textContent = next.textContent;
+      next.replaceWith(p);
+      return;
+    }
+
+    if (next.nodeType !== Node.ELEMENT_NODE) return;
+    const el = next;
+    if (el.tagName === 'DIV' && !el.querySelector('ol, ul, img')) {
+      const p = document.createElement('p');
+      p.innerHTML = el.innerHTML;
+      el.replaceWith(p);
+    }
+  };
+
+  root.querySelectorAll('ol, ul').forEach(blockAfterList);
+
+  root.querySelectorAll('li').forEach((li) => {
+    li.querySelectorAll('div').forEach((div) => {
+      if (div.querySelector('ol, ul, img')) return;
+      const br = document.createElement('br');
+      while (div.firstChild) {
+        br.before(div.firstChild);
+      }
+      div.replaceWith(br);
+    });
+  });
+
+  return domNodesToHtml(root).replace(/<div>\s*<br\s*\/?>\s*<\/div>/gi, '<br />');
 }
 
 export function execComposeFormat(root, action) {

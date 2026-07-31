@@ -1,6 +1,6 @@
 /**
- * VeloNewsProvider v1.0.1 — feed VeloHub + polling 3 min
- * VERSION: v1.0.1 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * VeloNewsProvider v1.0.3 — ack crítico com refresh pós-ciência (paridade VeloHub)
+ * VERSION: v1.0.3 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
  */
 import React, {
   createContext,
@@ -151,8 +151,9 @@ export function VeloNewsProvider({ children }) {
     setPopoverOpen(false);
   }, []);
 
-  const closeCriticalModal = useCallback(() => {
+  const closeCriticalModal = useCallback((options = {}) => {
     setCriticalModalNews(null);
+    if (options?.suppressBubbleRestore) return;
     if (pendingCriticalNews && !acknowledgedNewsIds.includes(String(pendingCriticalNews._id))) {
       setCriticalBubbleVisible(true);
     }
@@ -177,26 +178,34 @@ export function VeloNewsProvider({ children }) {
     }
   }, [acknowledgedNewsIds, openCriticalModal, openReadModal]);
 
+  const applyAcknowledgedId = useCallback((newsId) => {
+    const id = String(newsId);
+    setAcknowledgedNewsIds((prev) => {
+      if (prev.some((item) => String(item) === id)) return prev;
+      const next = [...prev, id];
+      setUnreadCount(computeUnreadCount(veloNews, next));
+      const nextCritical = findPendingCritical(veloNews, next);
+      setPendingCriticalNews(nextCritical);
+      setCriticalBubbleVisible(Boolean(nextCritical));
+      return next;
+    });
+  }, [veloNews]);
+
   const handleAcknowledge = useCallback(async (newsId) => {
     if (!userEmail || !newsId) return false;
     try {
-      await acknowledgeNews(newsId, userEmail, userName);
-      const id = String(newsId);
-      setAcknowledgedNewsIds((prev) => {
-        if (prev.some((item) => String(item) === id)) return prev;
-        const next = [...prev, id];
-        setUnreadCount(computeUnreadCount(veloNews, next));
-        const nextCritical = findPendingCritical(veloNews, next);
-        setPendingCriticalNews(nextCritical);
-        setCriticalBubbleVisible(Boolean(nextCritical));
-        return next;
-      });
-      return true;
+      const result = await acknowledgeNews(newsId, userEmail, userName);
+      if (result?.success || result?.alreadyAcknowledged) {
+        applyAcknowledgedId(newsId);
+        await refreshFeed();
+        return true;
+      }
+      return false;
     } catch (err) {
       console.error('Erro ao confirmar VeloNews:', err);
       return false;
     }
-  }, [userEmail, userName, veloNews]);
+  }, [userEmail, userName, applyAcknowledgedId, refreshFeed]);
 
   const value = useMemo(() => ({
     veloNews,

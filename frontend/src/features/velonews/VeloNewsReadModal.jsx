@@ -1,8 +1,8 @@
 /**
- * VeloNewsReadModal v1.0.0 — leitura de notícia não crítica
- * VERSION: v1.0.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * VeloNewsReadModal v1.0.2 — Entendi registra acknowledge (feed compartilhado VeloHub)
+ * VERSION: v1.0.2 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { formatResponseText } from '../../utils/velonews/textFormatter';
 import { processContentHtml } from '../../utils/velonews/processContentHtml';
@@ -11,7 +11,8 @@ import { formatVeloNewsTime } from './veloNewsHelpers';
 import { useVeloNews } from './VeloNewsProvider';
 
 export default function VeloNewsReadModal() {
-  const { readModalNews, closeReadModal } = useVeloNews();
+  const { readModalNews, closeReadModal, handleAcknowledge } = useVeloNews();
+  const [acknowledging, setAcknowledging] = useState(false);
 
   useEffect(() => {
     if (!readModalNews) return undefined;
@@ -23,6 +24,19 @@ export default function VeloNewsReadModal() {
   }, [readModalNews, closeReadModal]);
 
   if (!readModalNews) return null;
+
+  const handleEntendi = async () => {
+    if (acknowledging) return;
+    setAcknowledging(true);
+    try {
+      await handleAcknowledge(readModalNews._id);
+    } catch (err) {
+      console.error('Erro ao registrar ciência VeloNews:', err);
+    } finally {
+      setAcknowledging(false);
+      closeReadModal();
+    }
+  };
 
   const html = processContentHtml(
     formatResponseText(readModalNews.content || '', 'velonews'),
@@ -54,8 +68,13 @@ export default function VeloNewsReadModal() {
           <div dangerouslySetInnerHTML={{ __html: html }} />
         </div>
         <footer className="velonews-read-modal__footer">
-          <button type="button" className="ws360-btn ws360-btn--primary" onClick={closeReadModal}>
-            Entendi
+          <button
+            type="button"
+            className="ws360-btn ws360-btn--primary"
+            onClick={handleEntendi}
+            disabled={acknowledging}
+          >
+            {acknowledging ? 'Registrando…' : 'Entendi'}
           </button>
         </footer>
       </div>

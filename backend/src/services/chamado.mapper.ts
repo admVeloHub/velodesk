@@ -1,4 +1,4 @@
-/** chamado.mapper v2.5.2 — preserva responsável atribuído quando body envia vazio */
+/** chamado.mapper v2.5.4 — resolveInboundClientReplyStatus (resolvido <48h → em-aberto) */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -592,7 +592,7 @@ export function isResolvedWithinReopenWindow(
 
 /**
  * Inbound: anexar no ticket existente vs criar novo.
- * - pendente / resolvido&lt;48h → anexar (com transição para em-andamento)
+ * - pendente / em-andamento / resolvido&lt;48h → anexar (com transição para em-aberto)
  * - fechado / cancelado / resolvido≥48h → spawn ticket novo
  */
 export function shouldSpawnNewTicketOnInbound(
@@ -606,6 +606,19 @@ export function shouldSpawnNewTicketOnInbound(
     return !isResolvedWithinReopenWindow(chamado, windowMs, now);
   }
   return false;
+}
+
+/**
+ * Status gravado ao anexar resposta do cliente no ticket existente (inbound).
+ * Só deve ser chamado quando `shouldSpawnNewTicketOnInbound` é false —
+ * inclui resolvido dentro da janela de 48h (antes do fechamento automático).
+ */
+export function resolveInboundClientReplyStatus(chamado: IChamadoN1): string | undefined {
+  const status = normalizeStatusValue(currentStatus(chamado));
+  if (status === 'pendente' || status === 'em-andamento' || status === 'resolvido') {
+    return 'em-aberto';
+  }
+  return undefined;
 }
 
 export function assertChamadoModifiable(chamado: IChamadoN1): void {

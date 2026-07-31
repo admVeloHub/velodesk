@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.10.0 — commit atômico POST /tickets/:id/commit
- * VERSION: v1.10.0 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.10.1 — upsert ao carregar detalhe fora da fila em cache
+ * VERSION: v1.10.1 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -235,6 +235,30 @@ export function setCachedColumns(next, userEmail = '') {
   persistColumnsToStorage(next, userEmail);
 }
 
+function resolveBoxIdForTicketStatus(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (normalized === 'em-aberto' || normalized === 'em-andamento') return 'em-andamento';
+  if (normalized === 'pendente' || normalized === 'em-espera') return 'em-espera';
+  if (normalized === 'resolvido' || normalized === 'cancelado' || normalized === 'fechado') return 'resolvidos';
+  return 'novos';
+}
+
+function insertTicketIntoColumnsIfMissing(ticket, userEmail = '') {
+  const id = String(ticket?.id || ticket?._id || '').trim();
+  if (!id) return false;
+  if (findInColumns(id)) return false;
+
+  const cols = ensureDefaultColumns();
+  const boxId = resolveBoxIdForTicketStatus(ticket.status);
+  const box = cols.find((c) => c.id === boxId) || cols[0];
+  if (!box) return false;
+  if (!box.tickets) box.tickets = [];
+  box.tickets.unshift(ticket);
+  columns = cols;
+  persistColumnsToStorage(cols, userEmail);
+  return true;
+}
+
 export function patchTicketInCache(ticketId, nextTicket, userEmail = '') {
   const entry = findInColumns(ticketId);
   if (!entry) return false;
@@ -258,7 +282,10 @@ export async function loadTicketDetailFromApi(ticketId) {
     }
     full.listOnly = false;
     full._detailLoaded = true;
-    patchTicketInCache(ticketId, full);
+    const patched = patchTicketInCache(ticketId, full);
+    if (!patched) {
+      insertTicketIntoColumnsIfMissing(full);
+    }
     try {
       window.dispatchEvent(new CustomEvent('velodesk:ticket-detail-changed', {
         detail: { ticketId: String(ticketId) },

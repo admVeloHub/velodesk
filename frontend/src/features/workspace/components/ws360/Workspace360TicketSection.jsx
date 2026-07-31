@@ -1,3 +1,4 @@
+/** Workspace360TicketSection v1.1.0 — repassa sectionId ao abrir ticket */
 import React from 'react';
 import Workspace360TicketRow from './Workspace360TicketRow';
 
@@ -18,7 +19,11 @@ export default function Workspace360TicketSection({ section, onOpenTicket, onSee
           <p className="ws360-section__empty">Nenhum ticket nesta fila.</p>
         ) : (
           section.tickets.map((ticket) => (
-            <Workspace360TicketRow key={ticket.id} ticket={ticket} onOpen={onOpenTicket} />
+            <Workspace360TicketRow
+              key={ticket.id}
+              ticket={ticket}
+              onOpen={(ticketId) => onOpenTicket?.(ticketId, section.id)}
+            />
           ))
         )}
       </div>

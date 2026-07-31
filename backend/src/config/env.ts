@@ -1,4 +1,4 @@
-/** env v1.24.0 — prefixos GCS inbound (desk_ticket_attachments) e sent (desk_ticket_sent_attachments) */
+/** env v1.27.0 — x-api-key (fonte da verdade) para Customer Data API */
 import fs from 'fs';
 import path from 'path';
 
@@ -138,6 +138,8 @@ export const env = {
   languageToolTimeoutMs: parseInt(process.env.LANGUAGETOOL_TIMEOUT_MS || '8000', 10),
   geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
   geminiModel: (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim(),
+  /** Revisor de Texto — flash-lite por padrão (menor latência). */
+  geminiRefinarModel: (process.env.GEMINI_REFINAR_MODEL || 'gemini-2.5-flash-lite').trim(),
   openaiApiKey: (process.env.OPENAI_API_KEY || '').trim(),
   openaiVectorStoreId: (
     process.env.OPENAI_VECTOR_STORE_ID
@@ -191,5 +193,17 @@ export const env = {
   inboundTelephonyEnabled: process.env.INBOUND_TELEPHONY_ENABLED !== 'false',
   inboundTelephonyWebhookSecret: (process.env.INBOUND_TELEPHONY_WEBHOOK_SECRET || '').trim(),
   telephonyAutoCreateTicket: process.env.TELEPHONY_AUTO_CREATE_TICKET === 'true',
+  /** Aba Consultas — Velotax Customer Data API (header x-api-key na fonte da verdade) */
+  customerDataApiKey: (
+    process.env['x-api-key']
+    || process.env.CUSTOMER_DATA_API_KEY
+    || process.env.VELOTAX_CUSTOMER_DATA_API_KEY
+    || ''
+  ).trim(),
+  customerDataBaseUrl: (
+    process.env.VELOTAX_CUSTOMER_DATA_BASE_URL
+    || 'https://customer-data.velotax.com.br'
+  ).trim().replace(/\/+$/, ''),
+  customerDataTimeoutMs: parseInt(process.env.VELOTAX_CUSTOMER_DATA_TIMEOUT_MS || '30000', 10),
 };
 

@@ -1,4 +1,4 @@
-/** DeskAgentQueueBox v1.2.0 — desk_agent_boxex com criterios[] de filtro */
+/** DeskAgentQueueBox v1.3.0 — criterios[] com valores[] (multi-seleção por categoria) */
 import { Schema, Document, Model } from 'mongoose';
 import { getDeskPreferencesConnection } from '../config/database';
 
@@ -6,9 +6,11 @@ export interface IDeskAgentQueueBoxCriterio {
   tipo: string;
   campo?: string;
   operador?: string;
+  /** Legado — primeiro valor selecionado */
   valor: string;
+  /** Multi-seleção na mesma categoria (OR dentro da linha) */
+  valores?: string[];
 }
-
 export interface IDeskAgentQueueBox extends Document {
   boxId: string;
   email: string;
@@ -30,7 +32,7 @@ const CriterioSchema = new Schema<IDeskAgentQueueBoxCriterio>(
     campo: { type: String, default: '', trim: true },
     operador: { type: String, default: 'equals', trim: true },
     valor: { type: String, default: '', trim: true },
-  },
+    valores: { type: [String], default: [] },  },
   { _id: false },
 );
 

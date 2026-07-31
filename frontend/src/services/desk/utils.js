@@ -1,11 +1,11 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.5.0 | DATE: 2026-07-30
- * — caixas personalizadas: filtro virtual por criterios AND
+ * VERSION: v3.7.3 | DATE: 2026-07-31
+ * — busca: 11 dígitos = CPF (match literal, sem exigir checksum válido)
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
-import { ticketMatchesAgentResponsavel, shouldUseMeusChamadosFila, shouldViewAllDeskTickets } from './responsavelSegmentation';
+import { ticketBelongsInMeusTicketsList, ticketMatchesAgentResponsavel, shouldUseMeusChamadosFila, shouldViewAllDeskTickets } from './responsavelSegmentation';
 import { normalizeMessageDisplayText } from '../../utils/htmlText.util';
 import { sanitizeResponsavel } from '../tabulationConfig';
 import {
@@ -14,6 +14,7 @@ import {
   isAgentForwardEscalonar,
   DESK_SEARCH_MODE_CPF,
   DESK_SEARCH_MODE_TICKET,
+  DESK_SEARCH_MODE_BOTH,
 } from './constants';
 import { lookupClient, getAgentName } from '../clientDb';
 import { getCustomQueueById } from './customQueueBoxes';
@@ -88,6 +89,93 @@ export function formatCpf(digits) {
 
 export function isValidCpfDigits(value) {
   return normalizeCpf(value).length === 11;
+}
+
+/** Valida dígitos verificadores do CPF (11 números). */
+export function isValidCpfChecksum(value) {
+  const d = normalizeCpf(value);
+  if (d.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(d)) return false;
+
+  let sum = 0;
+  for (let i = 0; i < 9; i += 1) sum += Number(d[i]) * (10 - i);
+  let rev = 11 - (sum % 11);
+  if (rev >= 10) rev = 0;
+  if (rev !== Number(d[9])) return false;
+
+  sum = 0;
+  for (let i = 0; i < 10; i += 1) sum += Number(d[i]) * (11 - i);
+  rev = 11 - (sum % 11);
+  if (rev >= 10) rev = 0;
+  return rev === Number(d[10]);
+}
+
+function hasCpfFormatting(raw) {
+  return /[.\-]/.test(String(raw || ''));
+}
+
+/** Infere se a busca é por CPF, protocolo ou ambos (parcial ambíguo). */
+export function inferDeskSearchMode(rawQuery) {
+  const trimmed = String(rawQuery || '').trim();
+  if (!trimmed) return DESK_SEARCH_MODE_CPF;
+
+  if (/^#/.test(trimmed)) return DESK_SEARCH_MODE_TICKET;
+
+  const withoutHash = trimmed.replace(/^#/, '');
+  if (/[a-zA-Z]/.test(withoutHash)) return DESK_SEARCH_MODE_TICKET;
+
+  const digits = normalizeCpf(trimmed);
+  if (hasCpfFormatting(trimmed) && digits.length > 0 && digits.length <= 11) {
+    return DESK_SEARCH_MODE_CPF;
+  }
+
+  if (!digits) return DESK_SEARCH_MODE_TICKET;
+
+  if (digits.length === 11) {
+    /* Match literal: CPF no ticket pode ter typo ou ser fictício — checksum não bloqueia busca */
+    return DESK_SEARCH_MODE_CPF;
+  }
+
+  if (digits.length > 11) return DESK_SEARCH_MODE_TICKET;
+
+  /* 1–10 dígitos sem máscara: CPF ainda em digitação ou protocolo parcial — busca nos dois */
+  return DESK_SEARCH_MODE_BOTH;
+}
+
+export function getDeskSearchModeLabel(mode) {
+  if (mode === DESK_SEARCH_MODE_TICKET) return 'Protocolo';
+  if (mode === DESK_SEARCH_MODE_BOTH) return 'CPF / Protocolo';
+  return 'CPF';
+}
+
+export function getDeskSearchInferredLabel(rawQuery) {
+  const trimmed = String(rawQuery || '').trim();
+  if (!trimmed) return 'Auto';
+  return getDeskSearchModeLabel(inferDeskSearchMode(rawQuery));
+}
+
+export function getDeskSearchNotFoundMessage(rawQuery) {
+  const mode = inferDeskSearchMode(rawQuery);
+  if (mode === DESK_SEARCH_MODE_TICKET) return 'Nenhum ticket encontrado para o protocolo informado.';
+  if (mode === DESK_SEARCH_MODE_CPF) return 'Nenhum ticket encontrado para o CPF informado.';
+  return 'Nenhum ticket encontrado para o CPF ou protocolo informado.';
+}
+
+export function getDeskSearchSuccessMessage(rawQuery, count) {
+  const mode = inferDeskSearchMode(rawQuery);
+  if (mode === DESK_SEARCH_MODE_TICKET) {
+    return count === 1
+      ? 'Ticket localizado pelo protocolo.'
+      : `${count} tickets correspondem ao protocolo informado.`;
+  }
+  if (mode === DESK_SEARCH_MODE_CPF) {
+    return count === 1
+      ? '1 ticket encontrado para este CPF.'
+      : `${count} tickets encontrados para este CPF.`;
+  }
+  return count === 1
+    ? '1 ticket encontrado.'
+    : `${count} tickets encontrados.`;
 }
 
 /** Exige formato mínimo local@dominio.ext (pelo menos um ponto após @) */
@@ -901,6 +989,7 @@ export function isDeskTableQueue(queueId) {
 
 export const MY_TICKETS_STATUS_SECTIONS = [
   { id: 'novos', label: 'Novos', dot: '#1634FF' },
+  { id: 'cliente-respondeu', label: 'Cliente respondeu', dot: '#E85D04' },
   { id: 'em-andamento', label: 'Em andamento', dot: '#15A237' },
   { id: 'pendente', label: 'Pendente', dot: '#FCC200' },
   { id: 'resolvidos', label: 'Resolvidos', dot: '#9ca3af' },
@@ -927,52 +1016,35 @@ function matchesTicketByProtocol(ticket, rawQuery) {
   return false;
 }
 
-function matchesTicketSearch(entry, q, searchMode = DESK_SEARCH_MODE_CPF) {
+function matchesTicketSearch(entry, q, searchMode) {
   if (!q) return true;
   const t = entry.ticket;
-  if (searchMode === DESK_SEARCH_MODE_TICKET) {
-    return matchesTicketByProtocol(t, q);
+  const mode = searchMode === DESK_SEARCH_MODE_CPF || searchMode === DESK_SEARCH_MODE_TICKET
+    ? searchMode
+    : inferDeskSearchMode(q);
+
+  if (mode === DESK_SEARCH_MODE_BOTH) {
+    return matchesTicketByCpf(t, q) || matchesTicketByProtocol(t, q);
   }
+  if (mode === DESK_SEARCH_MODE_TICKET) return matchesTicketByProtocol(t, q);
   return matchesTicketByCpf(t, q);
 }
 
-/** Filtra entradas já carregadas por protocolo (modo ticket) ou CPF (modo cpf). */
-export function filterEntriesByDeskSearch(entries, rawQuery, searchMode = DESK_SEARCH_MODE_CPF) {
+/** Filtra entradas por protocolo ou CPF (detecção automática por padrão). */
+export function filterEntriesByDeskSearch(entries, rawQuery, searchMode) {
   const q = String(rawQuery || '').trim();
   if (!q) return entries || [];
   return (entries || []).filter((entry) => matchesTicketSearch(entry, q, searchMode));
 }
 
 function filterMyTicketsEntries(searchQuery) {
-  const q = (searchQuery || '').toLowerCase();
+  const q = String(searchQuery || '').trim();
   const activeQueues = new Set(['novos', 'em-andamento', 'pendente', 'resolvidos']);
 
-  if (shouldViewAllDeskTickets()) {
-    return getAllCockpitTickets().filter((entry) => {
-      if (!activeQueues.has(entry.queueId)) return false;
-      return matchesTicketSearch(entry, q);
-    });
-  }
-
-  const agentQueues = new Set(['novos', 'em-andamento', 'pendente']);
-  const trustBackendQueues = shouldUseMeusChamadosFila();
-
   return getAllCockpitTickets().filter((entry) => {
-    const { queueId, ticket } = entry;
-
-    if (queueId === 'resolvidos') {
-      if (!ticketMatchesAgentResponsavel(ticket)) return false;
-      return matchesTicketSearch(entry, q);
-    }
-
-    if (!agentQueues.has(queueId)) return false;
-
-    // /boxes?fila=meus-chamados já filtra por responsável no backend — não re-filtrar no cliente
-    if (trustBackendQueues) {
-      return matchesTicketSearch(entry, q);
-    }
-
-    return ticketMatchesAgentResponsavel(ticket) && matchesTicketSearch(entry, q);
+    if (!activeQueues.has(entry.queueId)) return false;
+    if (!ticketBelongsInMeusTicketsList(entry.ticket)) return false;
+    return matchesTicketSearch(entry, q);
   });
 }
 
@@ -998,15 +1070,25 @@ export function groupMyTicketsByStatus(entries) {
   })).filter((section) => section.entries.length > 0);
 }
 
+function normalizeTicketStatusKey(status) {
+  return String(status || '').trim().toLowerCase().replace(/\s+/g, '-');
+}
+
 function matchesMyTicketsStatusSection(entry, sectionId) {
-  if (entry.queueId === sectionId) return true;
-  if (sectionId !== 'em-andamento') return false;
-  const status = String(entry.ticket?.status || '').trim().toLowerCase();
-  return status === 'em-aberto' || status === 'em-andamento' || status === 'em andamento';
+  const status = normalizeTicketStatusKey(entry.ticket?.status);
+
+  if (sectionId === 'cliente-respondeu') return status === 'em-aberto';
+  if (sectionId === 'em-andamento') return status === 'em-andamento';
+  if (sectionId === 'novos') return status === 'novo' || entry.queueId === 'novos';
+  if (sectionId === 'pendente') return status === 'pendente' || entry.queueId === 'pendente';
+  if (sectionId === 'resolvidos') {
+    return ['resolvido', 'cancelado', 'fechado'].includes(status) || entry.queueId === 'resolvidos';
+  }
+  return entry.queueId === sectionId;
 }
 
 function filterCustomQueueEntries(customBox, searchQuery) {
-  const q = (searchQuery || '').toLowerCase();
+  const q = String(searchQuery || '').trim();
   return getAllCockpitTickets().filter((entry) => {
     if (!shouldViewAllDeskTickets() && !ticketMatchesAgentResponsavel(entry.ticket)) return false;
     if (!ticketMatchesQueueCriterios(entry.ticket, customBox.criterios)) return false;
@@ -1015,7 +1097,7 @@ function filterCustomQueueEntries(customBox, searchQuery) {
 }
 
 export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOldestFirst = false) {
-  const q = (searchQuery || '').toLowerCase();
+  const q = String(searchQuery || '').trim();
   if (isMeusTicketsQueue(activeQueue)) {
     return sortTicketEntries(filterMyTicketsEntries(q), 'sla', 'asc');
   }
@@ -1041,24 +1123,20 @@ export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOld
   return sortTicketEntries(filtered, activeSort, 'desc', entrySortOldestFirst);
 }
 
-/** Busca global por Enter: CPF (modo cpf) ou protocolo (modo ticket). */
+/** Busca global por Enter: CPF ou protocolo (detecção automática). */
 export function resolveDeskSearchEntries(
   rawQuery,
   activeSort,
   entrySortOldestFirst = false,
-  searchMode = DESK_SEARCH_MODE_CPF,
+  searchMode,
 ) {
   const trimmed = String(rawQuery || '').trim();
   if (!trimmed) return [];
 
   const all = getAllCockpitTickets();
-  const mode = searchMode === DESK_SEARCH_MODE_TICKET ? DESK_SEARCH_MODE_TICKET : DESK_SEARCH_MODE_CPF;
-
   const filtered = all.filter(({ ticket: t }) => {
     if (!ticketMatchesAgentResponsavel(t)) return false;
-    return mode === DESK_SEARCH_MODE_TICKET
-      ? matchesTicketByProtocol(t, trimmed)
-      : matchesTicketByCpf(t, trimmed);
+    return matchesTicketSearch({ ticket: t }, trimmed, searchMode);
   });
 
   return sortTicketEntries(filtered, activeSort, 'desc', entrySortOldestFirst);
@@ -1109,11 +1187,13 @@ export function resolveDeskWorkingEntries(
   appliedSearch,
   activeSort,
   entrySortOldestFirst = false,
-  searchMode = DESK_SEARCH_MODE_CPF,
 ) {
   const search = String(appliedSearch || '').trim();
+  if (isMeusTicketsQueue(activeQueue)) {
+    return filterTickets(activeQueue, search, activeSort, entrySortOldestFirst);
+  }
   return search
-    ? resolveDeskSearchEntries(search, activeSort, entrySortOldestFirst, searchMode)
+    ? resolveDeskSearchEntries(search, activeSort, entrySortOldestFirst)
     : filterTickets(activeQueue, '', activeSort, entrySortOldestFirst);
 }
 
@@ -1458,9 +1538,17 @@ export function copyTabulationFromTicket(source, target) {
   };
 }
 
-export function collectClientTickets(cpf, clientName) {
+/** Cliente determinado para histórico 360° — exige CPF completo. */
+export function isClientIdentifiedForHistory(cpf) {
+  return isValidCpfDigits(cpf);
+}
+
+export function collectClientTickets(cpf, _clientName) {
   const cpfDigits = normalizeCpf(cpf);
-  const nameKey = (clientName || '').toLowerCase().trim();
+  if (!isValidCpfDigits(cpfDigits)) {
+    return [];
+  }
+
   const seen = new Set();
   const list = [];
 
@@ -1468,16 +1556,37 @@ export function collectClientTickets(cpf, clientName) {
     const id = String(t.id || t._id);
     if (seen.has(id)) return;
     const tCpf = normalizeCpf(t.lateralForm?.clienteCpf || t.lateralForm?.cpf || t.clientCPF || '');
-    const tName = (t.clientName || t.solicitante || '').toLowerCase();
-    const titleMatch = nameKey && (t.title || '').toLowerCase().includes(nameKey);
-    if ((cpfDigits && tCpf === cpfDigits) || (nameKey && (tName === nameKey || titleMatch))) {
-      seen.add(id);
-      list.push(t);
-    }
+    if (tCpf !== cpfDigits) return;
+    seen.add(id);
+    list.push(t);
   });
 
   list.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
   return list;
+}
+
+/** Status operacionais do cliente — outro ticket ativo além do atual. */
+const CLIENT_ACTIVE_TICKET_STATUSES = new Set(['em-aberto', 'em-andamento', 'pendente']);
+
+export function isClientActiveTicketStatus(status) {
+  const key = String(status || '').trim().toLowerCase().replace(/\s+/g, '-');
+  return CLIENT_ACTIVE_TICKET_STATUSES.has(key);
+}
+
+/**
+ * CPF identificado com outro ticket em aberto, em andamento ou pendente (exclui o ticket atual).
+ * Sem CPF válido não acusa alerta — evita falso positivo em "Cliente" genérico.
+ */
+export function clientHasOtherActiveTickets(cpf, _clientName, excludeTicketId) {
+  if (!isValidCpfDigits(cpf)) return false;
+
+  const cpfDigits = normalizeCpf(cpf);
+  const excludeId = String(excludeTicketId || '');
+  return collectClientTickets(cpfDigits, '').some((t) => {
+    const id = String(t.id || t._id);
+    if (excludeId && id === excludeId) return false;
+    return isClientActiveTicketStatus(t.status);
+  });
 }
 
 function isSameDay(isoA, isoB) {
@@ -1834,7 +1943,7 @@ export function buildTicketEventsFeed(ticket, client) {
 
 export function applySendStatus(entry, queueId) {
   const statusMap = {
-    'em-andamento': { box: 'em-andamento', status: 'em-aberto' },
+    'em-andamento': { box: 'em-andamento', status: 'em-andamento' },
     pendente: { box: 'em-espera', status: 'pendente' },
     resolvidos: { box: 'resolvidos', status: 'resolvido' },
     cancelado: { box: 'resolvidos', status: 'cancelado' },

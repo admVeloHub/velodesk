@@ -1,12 +1,13 @@
 /**
  * Caixas customizadas — filtros multi-critério (desk_agent_boxex)
- * VERSION: v2.1.0 | DATE: 2026-07-30
+ * VERSION: v2.2.0 | DATE: 2026-07-31
  */
 import { QUEUE_STATUSES } from './constants';
 import { addCustomBox } from '../ticketsCache';
 import { agentQueueBoxesApi } from '../../api/client';
 import { isApiMode } from '../ticketsCache';
 import { isBackendJwtUsable } from '../../utils/backendJwt';
+import { normalizeCriterioRow } from './customQueueBoxCriteria';
 
 const STORAGE_KEY = 'velodeskCustomQueues';
 
@@ -57,19 +58,7 @@ function writeStorage(list) {
 
 function normalizeCriterios(raw) {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => {
-      if (!item || typeof item !== 'object') return null;
-      const tipo = String(item.tipo || '').trim().toLowerCase();
-      if (!tipo) return null;
-      return {
-        tipo,
-        campo: String(item.campo || '').trim(),
-        operador: String(item.operador || 'equals').trim() || 'equals',
-        valor: String(item.valor ?? '').trim(),
-      };
-    })
-    .filter(Boolean);
+  return raw.map(normalizeCriterioRow).filter(Boolean);
 }
 
 function normalizeBox(raw) {

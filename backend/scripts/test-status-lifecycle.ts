@@ -13,6 +13,7 @@ import {
   isChamadoFechado,
   isResolvedWithinReopenWindow,
   lastStatusFilter,
+  resolveInboundClientReplyStatus,
   shouldSpawnNewTicketOnInbound,
   statusFromBoxName,
   boxNameFromStatus,
@@ -86,14 +87,29 @@ function testResolvedWindow() {
 
 function testInboundStatusOverride() {
   const pendente = mockChamado('pendente');
-  appendMessage(pendente, 'resposta cliente', false, 'them', [], { source: 'test' }, 'em-andamento');
-  assert(currentStatus(pendente) === 'em-andamento', 'pendente + inbound → em-andamento');
+  appendMessage(pendente, 'resposta cliente', false, 'them', [], { source: 'test' }, 'em-aberto');
+  assert(currentStatus(pendente) === 'em-aberto', 'pendente + inbound → em-aberto');
+
+  const emAndamento = mockChamado('em-andamento');
+  appendMessage(emAndamento, 'resposta cliente', false, 'them', [], { source: 'test' }, 'em-aberto');
+  assert(currentStatus(emAndamento) === 'em-aberto', 'em-andamento + inbound → em-aberto');
 
   const now = Date.now();
   const resolvido = mockChamado('resolvido', new Date(now - 60 * 60 * 1000));
-  appendMessage(resolvido, 'cliente voltou', false, 'them', [], { source: 'test' }, 'em-andamento');
-  assert(currentStatus(resolvido) === 'em-andamento', 'resolvido <48h + inbound → em-andamento');
+  appendMessage(resolvido, 'cliente voltou', false, 'them', [], { source: 'test' }, 'em-aberto');
+  assert(currentStatus(resolvido) === 'em-aberto', 'resolvido <48h + inbound → em-aberto');
   assert(getResolvedAt(resolvido) != null, 'getResolvedAt preserva histórico resolvido');
+}
+
+function testInboundResolvido48hIntegration() {
+  const now = Date.now();
+
+  const recent = mockChamado('resolvido', new Date(now - 60 * 60 * 1000));
+  assert(shouldSpawnNewTicketOnInbound(recent, RESOLVED_REOPEN_WINDOW_MS, now) === false, 'resolvido <48h anexa no mesmo');
+  assert(resolveInboundClientReplyStatus(recent) === 'em-aberto', 'resolvido <48h → em-aberto (Cliente respondeu)');
+
+  const old = mockChamado('resolvido', new Date(now - 50 * 60 * 60 * 1000));
+  assert(shouldSpawnNewTicketOnInbound(old, RESOLVED_REOPEN_WINDOW_MS, now) === true, 'resolvido ≥48h gera ticket novo');
 }
 
 function testJobCloseTransition() {
@@ -132,6 +148,7 @@ function main() {
   testHelpersBasics();
   testResolvedWindow();
   testInboundStatusOverride();
+  testInboundResolvido48hIntegration();
   testJobCloseTransition();
   testBoxResolvidosIncludesFechado();
   console.log('OK test-status-lifecycle — todos os cenários passaram');

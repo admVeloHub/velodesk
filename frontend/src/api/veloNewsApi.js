@@ -1,6 +1,6 @@
 /**
- * veloNewsApi v1.0.5 — VeloNews via API VeloHub (VeloHubCentral / console_conteudo)
- * VERSION: v1.0.5 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * veloNewsApi v1.0.7 — userId igual ao VeloHub (trim, sem alterar casing)
+ * VERSION: v1.0.7 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
  *
  * Endpoints /velo-news/* → proxy /velohub-api → API VeloHub
  * Persistência: console_conteudo.Velonews + velonews_acknowledgments (VeloHubCentral)
@@ -35,12 +35,20 @@ async function veloNewsRequest(path, options = {}) {
   }
 
   if (!res.ok) {
+    if (res.status === 409) {
+      return { success: true, alreadyAcknowledged: true, ...(data || {}) };
+    }
     const err = new Error(data?.message || data?.error || `VeloNews API ${res.status}`);
     err.status = res.status;
     throw err;
   }
 
   return data;
+}
+
+/** Mesmo valor enviado pelo VeloHub em userId / URL de acknowledgments (trim apenas). */
+export function normalizeVeloNewsUserEmail(email) {
+  return String(email || '').trim();
 }
 
 function normalizeNewsItem(item) {
@@ -69,9 +77,10 @@ export async function fetchAllVeloNews() {
 }
 
 export async function fetchAcknowledgments(userEmail) {
-  if (!userEmail) return [];
+  const normalizedEmail = normalizeVeloNewsUserEmail(userEmail);
+  if (!normalizedEmail) return [];
   const data = await veloNewsRequest(
-    `/velo-news/acknowledgments/${encodeURIComponent(userEmail)}`
+    `/velo-news/acknowledgments/${encodeURIComponent(normalizedEmail)}`
   );
   return Array.isArray(data?.acknowledgedNewsIds)
     ? data.acknowledgedNewsIds.map(String)
@@ -79,10 +88,11 @@ export async function fetchAcknowledgments(userEmail) {
 }
 
 export async function acknowledgeNews(newsId, userEmail, userName) {
+  const normalizedEmail = normalizeVeloNewsUserEmail(userEmail);
   return veloNewsRequest(`/velo-news/${encodeURIComponent(newsId)}/acknowledge`, {
     method: 'POST',
     body: JSON.stringify({
-      userId: userEmail,
+      userId: normalizedEmail,
       userName: userName || 'Usuário',
     }),
   });

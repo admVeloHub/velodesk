@@ -1,10 +1,57 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.57.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.59.0 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: API inbound telefonia IA, aba Consultas e melhorias Desk/VeloNews
+
+- **Data/Hora**: 2026-07-31
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.59.0
+  - **Telefonia inbound**: inbound.routes v1.4.0, telephony-integration.md v1.1.1, api-inbound-telephony-parceiro.md v1.0.2
+  - **Backend**: env v1.27.0, index v1.11.0, consultas.routes v1.0.0, customerDataApi v1.0.0, consultaCpfResolver v1.0.0, consultaProductMap v1.0.0, chamado.mapper, email-inbound, geminiRefinar, workspace360, agentQueueBox
+  - **Frontend**: DeskConsultasPanel v2.0.0, ConsultaOverviewSummary, ConsultaProductCard, useCustomerConsulta, CriteriaMultiSelect, ticketThreadSync, VeloNews modals, DeskV2Root, composeRichEditor, ticketsCache, velodesk-crm.css
+- **Arquivos principais**:
+  - `docs/api-inbound-telephony-parceiro.md` — guia Contact Tel (POST ligações, GET recados, URL prod Cloud Run)
+  - `backend/src/routes/inbound.routes.ts` — health telefonia com `apiVersion`
+  - `backend/src/routes/consultas.routes.ts` + services Customer Data API
+  - `frontend/src/features/desk/components/DeskConsultasPanel.jsx` e hooks/formatters Consultas
+  - Preferências (caixas/critérios), VeloNews, thread sync, Gemini refinar, CSS CRM
+- **Descrição**: Documentação e endpoints inbound para IA telefônica (Contact Tel → `telephony_calls`); integração aba Consultas com Customer Data API; melhorias de UX Desk, caixas por critérios, VeloNews e compose. **Produção:** configurar `INBOUND_TELEPHONY_WEBHOOK_SECRET` no Cloud Run antes de homologar POST/GET com a parceira.
+- **Validação**: `npm run test:telephony-inbound` OK local; health prod `GET /api/inbound/telephony/health` OK; POST/GET aguardam secret no Cloud Run.
+- **Status**: Push dev + main
+
+---
+
+### Desenvolvimento local — Aba Consultas (Customer Data API, estratégia B+)
+
+- **Data/Hora**: 2026-07-30
+- **Tipo**: Desenvolvimento local (sem push)
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.58.0
+  - **Backend**: env v1.26.0, index v1.11.0, customerDataApi.service v1.0.0, consultaCpfResolver v1.0.0, consultaProductMap v1.0.0, consultas.routes v1.0.0
+  - **Frontend**: DeskConsultasPanel v2.0.0, ConsultaOverviewSummary v1.0.0, ConsultaProductCard v1.0.0, useCustomerConsulta v1.0.1, consultaFormatters v1.0.0, client.js v1.20.0
+- **Arquivos modificados/criados**:
+  - `backend/src/config/env.ts`, `loadFonteVelodeskEnv.cjs` — `x-api-key` (fonte da verdade; dotenv não lê chaves com hífen)
+  - `backend/src/services/customerDataApi.service.ts` — proxy Velotax Customer Data API (overview + produtos, retry 503, logs mascarados)
+  - `backend/src/services/consultaCpfResolver.service.ts` — CPF resolvido server-side via ticket + `b2c_cadastros.clientes`
+  - `backend/src/services/consultaProductMap.ts` — mapeamento tabulação → slug API + prefetch B+
+  - `backend/src/routes/consultas.routes.ts`, `backend/src/index.ts` — rotas novas `/api/consultas/*`
+  - `frontend/src/hooks/useCustomerConsulta.js` — fetch lazy ao abrir aba + refresh manual + cache por ticket
+  - `frontend/src/features/desk/components/DeskConsultasPanel.jsx` e componentes auxiliares — UI 360° real
+  - `frontend/src/api/client.js` — `consultasApi`
+  - `frontend/velodesk-crm.css` — estilos flags, loading, request-id
+- **Descrição**: Integração da aba Consultas com a Velotax Customer Data API (estratégia B+): overview imediato, prefetch paralelo dos produtos com flag ativa + produto do ticket, expand sob demanda para demais produtos. Chave de API somente no backend; sem CPF no ticket bloqueia com mensagem. Homologação end-to-end aguarda chave na fonte da verdade.
+- **Validação**: `tsc --noEmit` backend OK; rotas retornam 503 quando chave ausente; checklist guia §10 pendente de chave real.
+- **Status**: Desenvolvimento local — `x-api-key` na fonte da verdade; health upstream `Up` validado localmente
+
+---
 
 ### GitHub Push — Desk: módulo Preferências (caixas por critérios) + correção do fluxo de anexos inbound
 

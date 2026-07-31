@@ -1,6 +1,6 @@
 /**
  * Preferências do agente — comportamento ao salvar + caixas personalizadas
- * VERSION: v1.0.1 | DATE: 2026-07-30
+ * VERSION: v1.0.3 | DATE: 2026-07-31
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
@@ -56,8 +56,8 @@ export default function PreferenciasView() {
 
   if (permissionsLoading) {
     return (
-      <div id="preferencias" className="page preferencias-page active">
-        <div className="preferencias-layout">
+      <div id="preferencias" className="page preferencias-page eco-page active">
+        <div className="eco-page-inner preferencias-layout">
           <p className="preferencias-boxes__empty">Carregando preferências…</p>
         </div>
       </div>
@@ -93,8 +93,8 @@ export default function PreferenciasView() {
   };
 
   return (
-    <div id="preferencias" className="page preferencias-page active">
-      <div className="preferencias-layout">
+    <div id="preferencias" className="page preferencias-page eco-page active">
+      <div className="eco-page-inner preferencias-layout">
         <header className="preferencias-header">
           <div className="preferencias-header__icon" aria-hidden="true">
             <i className="ti ti-adjustments" />
@@ -142,13 +142,13 @@ export default function PreferenciasView() {
             </div>
             <button
               type="button"
-              className="btn-primary preferencias-add-box"
+              className="config-action-btn config-action-btn--create config-action-btn--compact"
               onClick={() => {
                 setEditingBox(null);
                 setModalOpen(true);
               }}
             >
-              <i className="ti ti-plus" aria-hidden="true" /> Adicionar caixa
+              Adicionar caixa
             </button>
           </div>
 

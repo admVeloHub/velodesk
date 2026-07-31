@@ -1,6 +1,6 @@
 /**
  * Modal — criar/editar caixa personalizada com critérios
- * VERSION: v2.0.0 | DATE: 2026-07-30
+ * VERSION: v2.1.2 | DATE: 2026-07-31
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -9,10 +9,11 @@ import {
   createCustomQueueBox,
   updateCustomQueueBox,
 } from '../../../services/desk/customQueueBoxes';
+import { isCriterioRowValid, normalizeCriterioRow } from '../../../services/desk/customQueueBoxCriteria';
 import QueueBoxCriteriaEditor from '../../preferencias/components/QueueBoxCriteriaEditor';
 
 function defaultCriterios() {
-  return [{ tipo: 'status', campo: 'status', operador: 'equals', valor: 'em-andamento' }];
+  return [{ tipo: 'status', campo: 'status', operador: 'equals', valor: 'em-andamento', valores: ['em-andamento'] }];
 }
 
 export default function CreateQueueBoxModal({ open, onClose, onSaved, initialBox = null }) {
@@ -30,20 +31,23 @@ export default function CreateQueueBoxModal({ open, onClose, onSaved, initialBox
     setName(String(initialBox?.name || ''));
     setCriterios(
       Array.isArray(initialBox?.criterios) && initialBox.criterios.length
-        ? initialBox.criterios.map((c) => ({ ...c }))
+        ? initialBox.criterios.map((c) => normalizeCriterioRow(c)).filter(Boolean)
         : defaultCriterios(),
     );
     setNameError(false);
     setCriteriaError(false);
     setSaving(false);
     nameRef.current?.focus();
+  }, [open, initialBox?.id]);
 
+  useEffect(() => {
+    if (!open) return undefined;
     const onKey = (event) => {
       if (event.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose, initialBox]);
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -54,14 +58,9 @@ export default function CreateQueueBoxModal({ open, onClose, onSaved, initialBox
       nameRef.current?.focus();
       return;
     }
-    const validCriterios = (criterios || []).filter((c) => {
-      if (!c?.tipo) return false;
-      const valor = String(c.valor || '').trim();
-      if (c.tipo === 'atribuido') {
-        return valor === '__me__' || valor === '__empty__' || Boolean(valor);
-      }
-      return Boolean(valor);
-    });
+    const validCriterios = (criterios || [])
+      .map((c) => normalizeCriterioRow(c))
+      .filter((c) => c && isCriterioRowValid(c));
     if (!validCriterios.length) {
       setCriteriaError(true);
       showNotification('Informe ao menos um critério de filtragem.', 'error');
@@ -107,7 +106,7 @@ export default function CreateQueueBoxModal({ open, onClose, onSaved, initialBox
                 {isEdit ? 'Editar caixa' : 'Nova caixa'}
               </h2>
               <p className="queue-box-modal__subtitle">
-                Defina o nome e os critérios de filtragem (combinados com E).
+                Defina o nome e os critérios. Linhas diferentes combinam com E; várias opções na mesma linha combinam com OU.
               </p>
             </div>
           </div>
@@ -154,7 +153,7 @@ export default function CreateQueueBoxModal({ open, onClose, onSaved, initialBox
               />
             </div>
             <p className="queue-box-modal__hint">
-              A caixa lista os tickets visíveis ao agente que atendem todos os critérios.
+              A caixa lista tickets que atendem todos os critérios (E). Status, produto, tabulação etc. aceitam múltiplas seleções por linha (OU).
             </p>
           </div>
         </div>

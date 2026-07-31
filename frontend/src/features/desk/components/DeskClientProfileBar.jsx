@@ -1,10 +1,25 @@
 /**
- * DeskClientProfileBar v1.9.1 — bloqueia edição de contato em ticket fechado
- * VERSION: v1.9.2 | DATE: 2026-07-29
+ * DeskClientProfileBar v1.11.3 — botão Histórico desativado sem CPF
+ * VERSION: v1.11.3 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
  */
-import React, { useEffect, useState } from 'react';
-import { getClientContactFields, getClientActiveProducts, getProductTagClass, getTicketProtocolLabel, isTicketInWorkflow, isTicketReadOnly } from '../../../services/desk/utils';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { clientsApi } from '../../../api/client';
+import { mapClienteDocToContact } from '../../../api/adapters/clienteAdapter';
+import {
+  isClientIdentifiedForHistory,
+  clientHasOtherActiveTickets,
+  getClientContactFields,
+  getClientActiveProducts,
+  getProductTagClass,
+  getTicketProtocolLabel,
+  isTicketInWorkflow,
+  isTicketReadOnly,
+  isValidCpfDigits,
+  maskCpfInput,
+  normalizeCpf,
+} from '../../../services/desk/utils';
 import { useNotifications } from '../../../context/NotificationContext';
+import { useTickets } from '../../../context/TicketsContext';
 import TicketWorkflowStepper from './TicketWorkflowStepper';
 import WorkflowProgressModal from './WorkflowProgressModal';
 import ClientContactFieldsEditor, {
@@ -32,14 +47,19 @@ export default function DeskClientProfileBar({
   canManageWorkflow = false,
 }) {
   const { showNotification } = useNotifications();
+  const { refreshKey } = useTickets();
   const [editOpen, setEditOpen] = useState(false);
   const [workflowModalOpen, setWorkflowModalOpen] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
+  const [cpfLookupLoading, setCpfLookupLoading] = useState(false);
+  const lastLookupCpfRef = useRef('');
   const [draft, setDraft] = useState({
+    cpf: '',
     name: '',
     emails: [''],
     phones: [''],
     whatsappPhone: '',
+    clienteId: '',
   });
   const [emailErrors, setEmailErrors] = useState({});
   const contact = getClientContactFields(ticket, client);
@@ -47,15 +67,80 @@ export default function DeskClientProfileBar({
   const protocolLabel = resolveProtocolLabel(ticket);
   const inWorkflow = isTicketInWorkflow(ticket);
   const ticketReadOnly = isTicketReadOnly(ticket);
+  const clientIdentified = isClientIdentifiedForHistory(contact.cpf);
+  const historyWarnActive = useMemo(
+    () => clientIdentified
+      && clientHasOtherActiveTickets(
+        contact.cpf,
+        contact.name,
+        ticket?.id || ticket?._id,
+      ),
+    [clientIdentified, contact.cpf, contact.name, ticket?.id, ticket?._id, refreshKey],
+  );
+  const historyTitle = !clientIdentified
+    ? 'Informe o CPF do cliente para consultar o histórico'
+    : historyWarnActive
+      ? 'Cliente possui outro ticket em aberto, em andamento ou pendente'
+      : 'Histórico de tickets do cliente (por CPF)';
 
   const openEdit = () => {
     if (ticketReadOnly) {
       showNotification('Ticket fechado — não aceita modificações.', 'warning');
       return;
     }
-    setDraft(buildContactDraftFromFields(contact));
+    const nextDraft = buildContactDraftFromFields({
+      ...contact,
+      clienteId: ticket?.clienteId || ticket?.lateralForm?.clienteId || '',
+    });
+    lastLookupCpfRef.current = normalizeCpf(nextDraft.cpf);
+    setDraft(nextDraft);
     setEmailErrors({});
     setEditOpen(true);
+  };
+
+  const lookupClienteByCpf = useCallback(async (digits) => {
+    if (!isValidCpfDigits(digits) || lastLookupCpfRef.current === digits) return;
+    lastLookupCpfRef.current = digits;
+    setCpfLookupLoading(true);
+    try {
+      const cliente = await clientsApi.getByCpf(digits);
+      const mapped = mapClienteDocToContact(cliente);
+      if (!mapped) return;
+      setDraft({
+        cpf: maskCpfInput(digits),
+        name: mapped.clientName,
+        emails: mapped.emails.length ? mapped.emails : [''],
+        phones: mapped.phones.length ? mapped.phones : [''],
+        whatsappPhone: mapped.whatsappPhone,
+        clienteId: mapped.clienteId || '',
+      });
+      showNotification('Dados preenchidos a partir do cadastro.', 'success');
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        setDraft((prev) => ({
+          ...prev,
+          cpf: maskCpfInput(digits),
+          clienteId: '',
+        }));
+        return;
+      }
+      const msg = err?.response?.data?.message || 'Não foi possível consultar o CPF.';
+      showNotification(msg, 'error');
+    } finally {
+      setCpfLookupLoading(false);
+    }
+  }, [showNotification]);
+
+  const handleCpfChange = (value) => {
+    const masked = maskCpfInput(value);
+    const digits = normalizeCpf(masked);
+    if (digits.length < 11) {
+      lastLookupCpfRef.current = '';
+    }
+    setDraft((prev) => ({ ...prev, cpf: masked, clienteId: digits.length < 11 ? '' : prev.clienteId }));
+    if (isValidCpfDigits(digits)) {
+      void lookupClienteByCpf(digits);
+    }
   };
 
   const saveEdit = async () => {
@@ -71,10 +156,12 @@ export default function DeskClientProfileBar({
     setSavingContact(true);
     try {
       await onSaveContact({
+        cpf: validation.cpf,
         name: validation.nome,
         emails: validation.emailList,
         phones: validation.phoneList,
         whatsappPhone: validation.whatsappPhone,
+        clienteId: draft.clienteId,
       });
       setEditOpen(false);
     } catch {
@@ -98,9 +185,16 @@ export default function DeskClientProfileBar({
   const historyButton = (
     <button
       type="button"
-      className="btn-secondary btn-sm ticket-client-history-btn"
+      className={
+        'btn-secondary btn-sm ticket-client-history-btn'
+        + (historyWarnActive ? ' ticket-client-history-btn--active-client' : '')
+      }
       id="btnClientHistory"
       onClick={onOpenHistory}
+      disabled={!clientIdentified}
+      title={historyTitle}
+      aria-label={historyTitle}
+      aria-disabled={!clientIdentified}
     >
       <i className="fas fa-history" /> Histórico
     </button>
@@ -157,6 +251,10 @@ export default function DeskClientProfileBar({
                 <div className="crm-client-edit-popover__fields">
                   <ClientContactFieldsEditor
                     idPrefix="editClient"
+                    showCpf
+                    cpf={draft.cpf}
+                    onCpfChange={handleCpfChange}
+                    cpfLookupLoading={cpfLookupLoading}
                     name={draft.name}
                     onNameChange={(value) => setDraft((d) => ({ ...d, name: value }))}
                     emails={draft.emails}

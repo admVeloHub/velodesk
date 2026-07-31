@@ -1,6 +1,6 @@
 /**
- * ClientTicketHistoryModal v1.2.0 — mesclagem de tickets duplicados (Client360)
- * VERSION: v1.2.0 | DATE: 2026-07-23
+ * ClientTicketHistoryModal v1.3.0 — histórico só com CPF identificado
+ * VERSION: v1.3.0 | DATE: 2026-07-31
  */
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -12,6 +12,7 @@ import {
   getTicketProtocolLabel,
   getTicketStatusLabel,
   getTicketTitle,
+  isClientIdentifiedForHistory,
   normalizeCpf,
 } from '../../../services/desk/utils';
 import { getClient360WorkflowIconMeta } from '../../../services/workflow/workflowTeamQueues';
@@ -33,7 +34,6 @@ export default function ClientTicketHistoryModal({
   merging = false,
 }) {
   const [selectedTargetId, setSelectedTargetId] = useState(null);
-  const mergeEnabled = Boolean(onMergeTickets && sourceTicketId);
 
   useEffect(() => {
     if (!open) {
@@ -61,13 +61,15 @@ export default function ClientTicketHistoryModal({
     || contact.cpf
     || '',
   );
+  const clientIdentified = isClientIdentifiedForHistory(cpfDigits);
+  const mergeEnabled = clientIdentified && Boolean(onMergeTickets && sourceTicketId);
   const mergeContext = { clientCpfDigits: cpfDigits, clientName: contact.name };
-  const clientTickets = collectClientTickets(cpfDigits, contact.name);
-  const tickets = clientTickets.length ? clientTickets : [ticket];
+  const tickets = clientIdentified ? collectClientTickets(cpfDigits) : [];
   const products = getClientProducts(ticket, client);
-  const situacao = client?.situacao || 'Informe o CPF no formulário lateral';
+  const situacao = client?.situacao || (clientIdentified ? '—' : 'Informe o CPF no formulário lateral');
   const risco = client?.risco || '—';
   const analise = getClientAnalise(client);
+  const displayName = contact.name && contact.name !== 'Cliente' ? contact.name : 'Cliente não identificado';
 
   const handleRowClick = (ticketId) => {
     onClose();
@@ -104,7 +106,7 @@ export default function ClientTicketHistoryModal({
     >
       <div className="modal-content modal-content--wide" role="dialog" aria-modal="true" aria-labelledby="clientHistoryTitle">
         <div className="modal-header">
-          <h3 id="clientHistoryTitle">Cliente — {contact.name}</h3>
+          <h3 id="clientHistoryTitle">Cliente — {displayName}</h3>
           <button type="button" className="close-btn" onClick={onClose} aria-label="Fechar">
             <i className="fas fa-times" />
           </button>
@@ -125,89 +127,110 @@ export default function ClientTicketHistoryModal({
                 <span>{risco}</span>
               </div>
             </div>
-            <p><strong>Produtos:</strong> {products.length ? products.join(', ') : '—'}</p>
-            <p className="client360-analise"><i className="fas fa-brain" /> {analise}</p>
-            <h5 className="client360-section-title">Tickets atendidos ({tickets.length})</h5>
-            {mergeEnabled ? (
-              <p className="client360-merge-hint">
-                Selecione o chamado em andamento para mesclar o ticket atual.
-              </p>
+            {clientIdentified ? (
+              <>
+                <p><strong>Produtos:</strong> {products.length ? products.join(', ') : '—'}</p>
+                <p className="client360-analise"><i className="fas fa-brain" /> {analise}</p>
+              </>
             ) : null}
-            <div className="client360-table-wrap">
-              <table className="client360-table">
-                <thead>
-                  <tr>
-                    {mergeEnabled ? <th className="client360-table__th-check" aria-label="Mesclar" /> : null}
-                    <th>Ticket</th>
-                    <th>Assunto</th>
-                    <th>Canal</th>
-                    <th>Status</th>
-                    <th>Data</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tickets.map((t) => {
-                    const ticketId = String(t.id || t._id);
-                    const workflowIcon = getClient360WorkflowIconMeta(t);
-                    const mergeEligible = mergeEnabled
-                      && canSelectTicketForMerge(ticket, t, sourceTicketId, mergeContext);
-                    const isMergeSelected = selectedTargetId === ticketId;
-                    return (
-                      <tr
-                        key={ticketId}
-                        className={
-                          'client360-row--clickable'
-                          + (isMergeSelected ? ' client360-row--merge-selected' : '')
-                        }
-                        onClick={() => handleRowClick(ticketId)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => e.key === 'Enter' && handleRowClick(ticketId)}
-                      >
-                        {mergeEnabled ? (
-                          <td
-                            className="client360-table__td-check"
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => e.stopPropagation()}
-                          >
-                            <input
-                              type="checkbox"
-                              className="client360-merge-check"
-                              checked={isMergeSelected}
-                              disabled={!mergeEligible || merging}
-                              onChange={() => handleToggleMergeTarget(ticketId, mergeEligible)}
-                              aria-label={
-                                mergeEligible
-                                  ? `Mesclar ticket atual em #${getTicketProtocolLabel(t) || ticketId}`
-                                  : 'Indisponível para mesclagem'
-                              }
-                            />
-                          </td>
-                        ) : null}
-                        <td>
-                          <span className="client360-ticket-cell">
-                            #{getTicketProtocolLabel(t) || t.id}
-                            {workflowIcon ? (
-                              <span
-                                className={`client360-workflow-icon client360-workflow-icon--${workflowIcon.modifier}`}
-                                title={workflowIcon.title}
-                                aria-label={workflowIcon.title}
-                              >
-                                <i className={`ti ${workflowIcon.icon}`} aria-hidden="true" />
-                              </span>
-                            ) : null}
-                          </span>
-                        </td>
-                        <td>{getTicketTitle(t)}</td>
-                        <td>{t.lateralForm?.canal || t.channel || t.source || '—'}</td>
-                        <td>{getTicketStatusLabel(t.status)}</td>
-                        <td>{formatTableDate(t.updatedAt || t.createdAt)}</td>
+            <h5 className="client360-section-title">
+              {clientIdentified
+                ? `Tickets atendidos (${tickets.length})`
+                : 'Histórico de atendimentos'}
+            </h5>
+            {!clientIdentified ? (
+              <p className="client360-empty" role="status">
+                Identifique o cliente informando o <strong>CPF</strong> no cadastro lateral
+                {' '}(ícone de lápis no painel superior) para consultar o histórico de chamados.
+              </p>
+            ) : tickets.length === 0 ? (
+              <p className="client360-empty" role="status">
+                Nenhum outro ticket encontrado para este CPF na fila carregada.
+              </p>
+            ) : (
+              <>
+                {mergeEnabled ? (
+                  <p className="client360-merge-hint">
+                    Selecione o chamado em andamento para mesclar o ticket atual.
+                  </p>
+                ) : null}
+                <div className="client360-table-wrap">
+                  <table className="client360-table">
+                    <thead>
+                      <tr>
+                        {mergeEnabled ? <th className="client360-table__th-check" aria-label="Mesclar" /> : null}
+                        <th>Ticket</th>
+                        <th>Assunto</th>
+                        <th>Canal</th>
+                        <th>Status</th>
+                        <th>Data</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody>
+                      {tickets.map((t) => {
+                        const ticketId = String(t.id || t._id);
+                        const workflowIcon = getClient360WorkflowIconMeta(t);
+                        const mergeEligible = mergeEnabled
+                          && canSelectTicketForMerge(ticket, t, sourceTicketId, mergeContext);
+                        const isMergeSelected = selectedTargetId === ticketId;
+                        return (
+                          <tr
+                            key={ticketId}
+                            className={
+                              'client360-row--clickable'
+                              + (isMergeSelected ? ' client360-row--merge-selected' : '')
+                            }
+                            onClick={() => handleRowClick(ticketId)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => e.key === 'Enter' && handleRowClick(ticketId)}
+                          >
+                            {mergeEnabled ? (
+                              <td
+                                className="client360-table__td-check"
+                                onClick={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => e.stopPropagation()}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="client360-merge-check"
+                                  checked={isMergeSelected}
+                                  disabled={!mergeEligible || merging}
+                                  onChange={() => handleToggleMergeTarget(ticketId, mergeEligible)}
+                                  aria-label={
+                                    mergeEligible
+                                      ? `Mesclar ticket atual em #${getTicketProtocolLabel(t) || ticketId}`
+                                      : 'Indisponível para mesclagem'
+                                  }
+                                />
+                              </td>
+                            ) : null}
+                            <td>
+                              <span className="client360-ticket-cell">
+                                #{getTicketProtocolLabel(t) || t.id}
+                                {workflowIcon ? (
+                                  <span
+                                    className={`client360-workflow-icon client360-workflow-icon--${workflowIcon.modifier}`}
+                                    title={workflowIcon.title}
+                                    aria-label={workflowIcon.title}
+                                  >
+                                    <i className={`ti ${workflowIcon.icon}`} aria-hidden="true" />
+                                  </span>
+                                ) : null}
+                              </span>
+                            </td>
+                            <td>{getTicketTitle(t)}</td>
+                            <td>{t.lateralForm?.canal || t.channel || t.source || '—'}</td>
+                            <td>{getTicketStatusLabel(t.status)}</td>
+                            <td>{formatTableDate(t.updatedAt || t.createdAt)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         </div>
         <div className="modal-footer client360-modal-footer">

@@ -1,4 +1,4 @@
-/** workspace360.service v1.0.0 — agregações Painel 360° sobre chamados_n1 */
+/** workspace360.service v1.1.0 — Cliente respondeu = em-aberto; em-andamento = workflow */
 import mongoose from 'mongoose';
 import { ChamadoN1, IChamadoN1 } from '../models/ChamadoN1';
 import { User } from '../models/User';
@@ -174,9 +174,9 @@ function channelMatchesFilter(chamado: IChamadoN1, filter: string): boolean {
 }
 
 function statusToQueueId(status: string): string {
-  if (status === 'novo' || status === 'em-aberto') return 'novos';
+  if (status === 'novo') return 'novos';
+  if (status === 'em-aberto' || status === 'em-andamento') return 'em-andamento';
   if (status === 'pendente' || status === 'em-espera') return 'pendente';
-  if (status === 'em-andamento') return 'em-andamento';
   if (status === 'resolvido') return 'resolvidos';
   return 'novos';
 }
@@ -248,10 +248,9 @@ async function enrichTicketForPanel(chamado: IChamadoN1, queueId: string) {
 
 function classifyAgentSection(chamado: IChamadoN1): 'action-now' | 'client-replied' | 'workflow' | null {
   const status = currentStatus(chamado);
-  const qid = statusToQueueId(status);
-  if (qid === 'pendente') return 'client-replied';
-  if (qid === 'em-andamento') return 'workflow';
-  if (status === 'novo' || status === 'em-aberto' || isSlaAtRisk(chamado)) return 'action-now';
+  if (status === 'em-aberto') return 'client-replied';
+  if (status === 'em-andamento') return 'workflow';
+  if (status === 'novo' || isSlaAtRisk(chamado)) return 'action-now';
   return null;
 }
 

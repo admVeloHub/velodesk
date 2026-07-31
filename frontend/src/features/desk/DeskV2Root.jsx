@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.19.0 | DATE: 2026-07-30
- * — ticket fechado somente leitura + badge Fechado
+ * VERSION: v3.21.0 | DATE: 2026-07-31
+ * — URL ?ticket= abre ticket; ?queue=meus-tickets&section=cliente-respondeu expande seção
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -26,6 +26,8 @@ import {
   syncTicketWorkflowOnCommit,
   getTicketStatusBadgeMeta,
   isTicketReadOnly,
+  getDeskSearchNotFoundMessage,
+  getDeskSearchSuccessMessage,
 } from '../../services/desk/utils';
 import { mergeTicketInto } from '../../services/desk/ticketMergeService';
 import {
@@ -73,12 +75,13 @@ import DeskAiRevisionModal from './components/DeskAiRevisionModal';
 import { resolveAutomaticaConfig } from '../config/workflow/workflowConfigData';
 import { resolveWorkflowForTicket } from '../../services/desk/workflowEngine';
 import { resolveRequisicaoCamposVisiveis } from '../../services/workflow/workflowRequisicao';
-import { getAutoCloseOnSave, getDeskSearchMode, setDeskSearchMode } from '../../services/desk/agentDeskPreferences';
-import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET, parseDeskQueueFromUrl } from '../../services/desk/constants';
+import { getAutoCloseOnSave } from '../../services/desk/agentDeskPreferences';
+import { parseDeskQueueFromUrl, parseDeskMyTicketsSectionFromUrl } from '../../services/desk/constants';
 import ProdutosForwardPopover from './components/ProdutosForwardPopover';
 import WorkflowComunicacaoModal from '../workflow/components/WorkflowComunicacaoModal';
 import { replyWorkflowComunicacao } from '../../services/workflow/workflowDecisionHandlers';
 import deskPlatformTrace, { createPlatformTraceCounter } from '../../utils/deskPlatformTrace';
+import { hasPublicThreadChanged } from '../../services/desk/ticketThreadSync';
 
 /** Respostas de cliente chegam por e-mail a qualquer momento: a thread se atualiza sozinha */
 const AUTO_REFRESH_DETAIL_MS = 15000;
@@ -165,7 +168,6 @@ export default function DeskV2Root() {
   const [entrySortOldestFirst, setEntrySortOldestFirst] = useState(false);
   const [searchDraft, setSearchDraft] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
-  const [searchMode, setSearchMode] = useState(() => getDeskSearchMode());
   const [queueCollapsed, setQueueCollapsed] = useState(() => localStorage.getItem('velodeskCrmQueueCollapsed') === '1');
   const [listCollapsed, setListCollapsed] = useState(() => localStorage.getItem('velodeskCrmTicketListCollapsed') === '1');
   const [createOpen, setCreateOpen] = useState(false);
@@ -199,6 +201,7 @@ export default function DeskV2Root() {
   const [workflowStartTemplate, setWorkflowStartTemplate] = useState(null);
   const pendingWorkflowTemplateRef = useRef(null);
   const commitInProgressRef = useRef(false);
+  const openedTicketFromUrlRef = useRef(null);
 
   useEffect(() => {
     const fromUrl = searchParams.get('queue');
@@ -208,6 +211,40 @@ export default function DeskV2Root() {
     setActiveQueue((current) => (current === queue ? current : queue));
     setTableQueueBrowsing(isDeskTableQueue(queue));
   }, [searchParams]);
+
+  useEffect(() => {
+    const ticketId = String(searchParams.get('ticket') || '').trim();
+    if (!ticketId) {
+      openedTicketFromUrlRef.current = null;
+      return undefined;
+    }
+    if (openedTicketFromUrlRef.current === ticketId && String(activeTabId) === ticketId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    (async () => {
+      let entry = findTicketEntry(ticketId);
+      if (!entry) {
+        try {
+          await loadTicketDetailFromApi(ticketId);
+          entry = findTicketEntry(ticketId);
+        } catch {
+          if (!cancelled) {
+            showNotification('Não foi possível abrir o ticket — recarregue a lista.', 'warning');
+          }
+          return;
+        }
+      }
+      if (cancelled || !entry) return;
+      openedTicketFromUrlRef.current = ticketId;
+      suppressAutoSelectRef.current = true;
+      setTableQueueBrowsing(false);
+      openTicket(ticketId);
+    })();
+
+    return () => { cancelled = true; };
+  }, [searchParams, refreshKey, openTicket, activeTabId, showNotification]);
 
   useEffect(() => {
     if (!user?.email) {
@@ -240,10 +277,11 @@ export default function DeskV2Root() {
     }
   }, [syncTicketViews, showNotification]);
 
-  const entries = resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst, searchMode);
+  const entries = resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst);
   const isTableQueueView = isDeskTableQueue(activeQueue);
   const isResolvedQueue = activeQueue === 'resolvidos';
   const isMyTicketsQueue = isMeusTicketsQueue(activeQueue);
+  const myTicketsExpandedSection = parseDeskMyTicketsSectionFromUrl(searchParams.get('section'));
   const entry = activeTabId ? findTicketEntry(activeTabId) : null;
   const ticket = entry?.ticket;
   const ticketReadOnly = isTicketReadOnly(ticket);
@@ -377,12 +415,24 @@ export default function DeskV2Root() {
       if (commitInProgressRef.current) return;
       inFlight = true;
       try {
-        const full = await loadTicketDetailFromApi(ticketId);
-        const msgs = full?.messages?.length ?? 0;
+        const raw = await ticketsApi.get(ticketId);
+        if (raw?.listOnly === true) return;
+        const full = apiTicketToCockpit(raw);
+        if (!full?.id && !full?._id) return;
+        full.listOnly = false;
+        full._detailLoaded = true;
+
         const prevEntry = findTicketEntry(ticketId);
-        const prevMsgs = prevEntry?.ticket?.messages?.length;
-        if (prevMsgs == null || msgs !== prevMsgs) {
-          const last = full?.messages?.[msgs - 1];
+        const prevTicket = prevEntry?.ticket;
+        const merged = prevTicket
+          ? mergeApiTicketPreservingPendingWorkflow(prevTicket, full)
+          : full;
+        const threadChanged = hasPublicThreadChanged(prevTicket, merged);
+
+        if (threadChanged) {
+          const msgs = merged?.messages?.length ?? 0;
+          const prevMsgs = prevTicket?.messages?.length;
+          const last = merged?.messages?.[msgs - 1];
           deskPlatformTrace('auto-refresh', 'poll:msgs-mudou', {
             ticketId,
             de: prevMsgs ?? null,
@@ -391,10 +441,8 @@ export default function DeskV2Root() {
             patch: !cancelled && !commitInProgressRef.current,
           });
         }
-        if (!cancelled && !commitInProgressRef.current) {
-          const merged = prevEntry?.ticket
-            ? mergeApiTicketPreservingPendingWorkflow(prevEntry.ticket, full)
-            : full;
+
+        if (!cancelled && !commitInProgressRef.current && threadChanged) {
           patchTicket(ticketId, merged);
         }
       } catch (err) {
@@ -559,7 +607,7 @@ export default function DeskV2Root() {
 
     let nextId = plannedNextId;
     if (!nextId) {
-      const freshList = resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst, searchMode);
+      const freshList = resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst);
       nextId = pickNextTicketFromEntries(listAnchorId, freshList);
     }
 
@@ -581,7 +629,7 @@ export default function DeskV2Root() {
       openTicket(nextId);
       pendingAdvanceTicketIdRef.current = null;
     });
-  }, [activeQueue, appliedSearch, activeSort, entrySortOldestFirst, searchMode, openTicket, closeTicketTab, activeTabId, persistTabSession]);
+  }, [activeQueue, appliedSearch, activeSort, entrySortOldestFirst, openTicket, closeTicketTab, activeTabId, persistTabSession]);
 
   const selectMainTab = (tab) => {
     setMainTab(tab);
@@ -595,14 +643,6 @@ export default function DeskV2Root() {
     localStorage.setItem('velodeskCrmTicketListCollapsed', '0');
     setListCollapsed(false);
     setTableQueueBrowsing(isDeskTableQueue(queueId));
-  };
-
-  const handleSearchModeToggle = () => {
-    setSearchMode((prev) => {
-      const next = prev === DESK_SEARCH_MODE_CPF ? DESK_SEARCH_MODE_TICKET : DESK_SEARCH_MODE_CPF;
-      setDeskSearchMode(next);
-      return next;
-    });
   };
 
   const handleSearchChange = useCallback((value) => {
@@ -624,12 +664,9 @@ export default function DeskV2Root() {
       return;
     }
 
-    const results = resolveDeskSearchEntries(q, activeSort, entrySortOldestFirst, searchMode);
+    const results = resolveDeskSearchEntries(q, activeSort, entrySortOldestFirst);
     if (!results.length) {
-      const hint = searchMode === DESK_SEARCH_MODE_TICKET
-        ? 'Nenhum ticket encontrado para o protocolo informado.'
-        : 'Nenhum ticket encontrado para o CPF informado (11 dígitos).';
-      showNotification(hint, 'warning');
+      showNotification(getDeskSearchNotFoundMessage(q), 'warning');
       return;
     }
 
@@ -638,14 +675,7 @@ export default function DeskV2Root() {
     persistTabSession(activeTabId);
     openTicket(results[0].ticket.id);
 
-    const msg = searchMode === DESK_SEARCH_MODE_TICKET
-      ? (results.length === 1
-        ? 'Ticket localizado pelo protocolo.'
-        : `${results.length} tickets correspondem ao protocolo informado.`)
-      : (results.length === 1
-        ? '1 ticket encontrado para este CPF.'
-        : `${results.length} tickets encontrados para este CPF.`);
-    showNotification(msg, 'success');
+    showNotification(getDeskSearchSuccessMessage(q, results.length), 'success');
   };
 
   const handleIgnoreSpellWord = useCallback((word) => {
@@ -675,7 +705,7 @@ export default function DeskV2Root() {
     commitInProgressRef.current = true;
     const status = statusId || sendStatus;
     const savedListTicketId = getEntryTicketId(entry);
-    const workingListBeforeSave = resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst, searchMode);
+    const workingListBeforeSave = resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst);
     const plannedNextId = getAutoCloseOnSave()
       ? pickNextTicketFromEntries(savedListTicketId, workingListBeforeSave)
       : null;
@@ -883,7 +913,9 @@ export default function DeskV2Root() {
       : [];
     const whatsappPhone = String(draft?.whatsappPhone || '').trim()
       || (phoneList.length === 1 ? phoneList[0] : '');
-    const cpf = normalizeCpf(ticket.lateralForm?.cpf || ticket.lateralForm?.clienteCpf || ticket.clientCPF);
+    const cpf = normalizeCpf(
+      draft?.cpf || ticket.lateralForm?.cpf || ticket.lateralForm?.clienteCpf || ticket.clientCPF,
+    );
 
     if (!nome) {
       showNotification('Informe o nome do cliente.', 'error');
@@ -907,7 +939,7 @@ export default function DeskV2Root() {
         emails: emailList,
         phones: phoneList,
         whatsappPhone,
-        clienteId: ticket.clienteId || ticket.lateralForm?.clienteId,
+        clienteId: draft?.clienteId || ticket.clienteId || ticket.lateralForm?.clienteId,
       });
       const clienteId = clienteDoc?._id || clienteDoc?.id || ticket.clienteId || ticket.lateralForm?.clienteId;
       const primaryEmail = emailList[0] || '';
@@ -1283,10 +1315,8 @@ export default function DeskV2Root() {
           entries={entries}
           searchActive={!!appliedSearch.trim()}
           searchQuery={searchDraft}
-          searchMode={searchMode}
           collapsed={listCollapsed}
           onSearchChange={handleSearchChange}
-          onSearchModeToggle={handleSearchModeToggle}
           onSearchSubmit={handleSearchSubmit}
           onSelectTicket={selectTicket}
           onSortChange={setActiveSort}
@@ -1318,6 +1348,7 @@ export default function DeskV2Root() {
               <DeskMyTicketsTable
                 entries={entries}
                 searchActive={!!appliedSearch.trim()}
+                expandedSectionId={myTicketsExpandedSection}
                 onSelectTicket={selectTicket}
                 onReload={reload}
                 refreshing={ticketsLoading}
@@ -1469,6 +1500,7 @@ export default function DeskV2Root() {
                     <DeskConsultasPanel
                       ticket={ticket}
                       client={client}
+                      active={mainTab === 'consultas'}
                     />
                   )}
                 </div>
@@ -1506,7 +1538,7 @@ export default function DeskV2Root() {
           iaWaitingMessage={ticketAi.waitingMessage}
           iaHasSuggestion={ticketAi.hasSuggestion}
           iaHasTabulationSuggestion={ticketAi.hasTabulationSuggestion}
-          iaShowSection={ticketAi.showIaBar || Boolean(ticketAi.waitingReason)}
+          iaShowSection={ticketAi.showIaSection}
           iaAuditScore={ticketAi.auditScore}
           tabulationReadonly={tabulationReadonly}
           ticketReadOnly={ticketReadOnly}

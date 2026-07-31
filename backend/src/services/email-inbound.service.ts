@@ -1,4 +1,4 @@
-﻿/** email-inbound.service v1.10.1 — dedupe só por hash/tamanho (não nome isolado) */
+/** email-inbound.service v1.11.1 — resolvido <48h + resposta cliente → em-aberto */
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
@@ -6,8 +6,7 @@ import { applyAssignmentIfNeeded } from './assignmentRouter.service';
 import {
   appendMessage,
   createChamadoFromBody,
-  currentStatus,
-  normalizeStatusValue,
+  resolveInboundClientReplyStatus,
   shouldSpawnNewTicketOnInbound,
 } from './chamado.mapper';
 import { normalizeEmail, resolveClienteRefFromEmail } from './cliente.service';
@@ -234,10 +233,7 @@ async function runInboundEmailFlow(
   const attachments = attachmentUrls(payload);
 
   if (existing && !shouldSpawnNewTicketOnInbound(existing)) {
-    const status = normalizeStatusValue(currentStatus(existing));
-    const statusOverride = (status === 'pendente' || status === 'resolvido')
-      ? 'em-andamento'
-      : undefined;
+    const statusOverride = resolveInboundClientReplyStatus(existing);
     appendMessage(existing, bodyText, false, 'them', attachments, emailMeta, statusOverride);
     await existing.save();
     await ChamadoIaAnalise.updateOne(

@@ -1,6 +1,6 @@
 /**
  * VeloNews — estilos Desk (popover, crítico, histórico)
- * VERSION: v1.0.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.0.1 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
  */
 
 /* Popover (base ws360-news-popover renomeado) */
@@ -380,6 +380,17 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
+}
+
+.velonews-critical-modal__ack-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.velonews-critical-modal__ack-row label {
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .velonews-critical-modal__ack label {

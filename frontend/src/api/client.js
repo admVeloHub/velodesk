@@ -1,6 +1,6 @@
 /**
- * API client v1.19.0 — agentQueueBoxesApi.update (criterios de caixas)
- * VERSION: v1.19.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team
+ * API client v1.20.0 — consultasApi (Customer Data API / aba Consultas)
+ * VERSION: v1.20.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -296,4 +296,12 @@ export const mailRulesApi = {
     api.patch(`/mail-rules/${encodeURIComponent(list)}/${encodeURIComponent(id)}`, data).then((r) => r.data),
   remove: (list, id) =>
     api.delete(`/mail-rules/${encodeURIComponent(list)}/${encodeURIComponent(id)}`).then((r) => r.data),
+};
+
+export const consultasApi = {
+  health: () => api.get('/consultas/health').then((r) => r.data),
+  fetch360: ({ ticketId, protocolo } = {}) =>
+    api.post('/consultas/360', { ticketId, protocolo }).then((r) => r.data),
+  fetchProduct: (slug, { ticketId, protocolo } = {}) =>
+    api.post(`/consultas/product/${encodeURIComponent(slug)}`, { ticketId, protocolo }).then((r) => r.data),
 };

@@ -1,6 +1,5 @@
 /**
- * loadFonteVelodeskEnv.cjs — FONTE DA VERDADE/.env-velodesk + .env + backend/.env
- * VERSION: v2.2.2 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * loadFonteVelodeskEnv.cjs v2.2.3 — x-api-key (Customer Data API) preservado da fonte da verdade
  *
  * VeloHubCentral (colaboradores): MONGO_ENV da FONTE DA VERDADE/.env — fonte da verdade.
  */
@@ -81,6 +80,27 @@ function findFonteDir(startDir) {
   return null;
 }
 
+function hydrateCustomerDataApiKey(envPaths) {
+  const keyPattern = /^x-api-key\s*=\s*(.+)\s*$/i;
+  for (const envPath of envPaths) {
+    if (!envPath || !fs.existsSync(envPath)) continue;
+    let content = '';
+    try {
+      content = fs.readFileSync(envPath, 'utf8');
+    } catch {
+      continue;
+    }
+    for (const line of content.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const match = trimmed.match(keyPattern);
+      if (!match) continue;
+      const value = match[1].trim().replace(/^["']|["']$/g, '').trim();
+      if (value) process.env['x-api-key'] = value;
+    }
+  }
+}
+
 function loadFrom(startDir) {
   const backendDir = path.resolve(startDir);
   const backendEnvPath = path.join(backendDir, '.env');
@@ -118,6 +138,14 @@ function loadFrom(startDir) {
     source = 'VELODESK_DOTENV_PATH';
     loaded = true;
   }
+
+  // dotenv não suporta chaves com hífen (x-api-key) — leitura explícita dos arquivos
+  hydrateCustomerDataApiKey([
+    fonteHubEnvPath,
+    fonteEnvPath,
+    backendEnvPath,
+    custom,
+  ].filter(Boolean));
 
   applyDefaults();
   return { envPath, loaded, source, fonteEnvPath, fonteHubEnvPath, backendEnvPath };

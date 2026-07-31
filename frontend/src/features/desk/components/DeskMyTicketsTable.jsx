@@ -1,11 +1,12 @@
 /**
- * DeskMyTicketsTable v1.3.0 — busca por ticket/CPF no cabeçalho
- * VERSION: v1.3.0 | DATE: 2026-07-30
+ * DeskMyTicketsTable v1.5.1 — seção expandida via URL (?section=cliente-respondeu)
+ * VERSION: v1.5.1 | DATE: 2026-07-31
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   filterEntriesByDeskSearch,
   formatTicketSlaRemaining,
+  getDeskSearchInferredLabel,
   getSlaClass,
   getTicketProtocolLabel,
   getTicketTitle,
@@ -13,7 +14,7 @@ import {
   normalizeTicketForDeskV2,
   sortTicketEntries,
 } from '../../../services/desk/utils';
-import { DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET, SLA_SHORT_LABELS } from '../../../services/desk/constants';
+import { SLA_SHORT_LABELS } from '../../../services/desk/constants';
 
 const MY_TICKETS_SECTIONS_WITHOUT_HEADER = new Set(['pendente', 'resolvidos']);
 
@@ -68,20 +69,20 @@ function TicketGrid({ id, children }) {
 export default function DeskMyTicketsTable({
   entries = [],
   searchActive: externalSearchActive = false,
+  expandedSectionId = null,
   onSelectTicket,
   onReload,
   refreshing = false,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState(DESK_SEARCH_MODE_CPF);
 
-  const isTicketMode = searchMode === DESK_SEARCH_MODE_TICKET;
   const localSearchActive = Boolean(searchQuery.trim());
   const searchActive = localSearchActive || externalSearchActive;
+  const detectedLabel = getDeskSearchInferredLabel(searchQuery);
 
   const filteredEntries = useMemo(
-    () => filterEntriesByDeskSearch(entries, searchQuery, searchMode),
-    [entries, searchQuery, searchMode],
+    () => filterEntriesByDeskSearch(entries, searchQuery),
+    [entries, searchQuery],
   );
 
   const { headerSections, flatEntries } = useMemo(() => {
@@ -99,6 +100,31 @@ export default function DeskMyTicketsTable({
 
   const total = filteredEntries.length;
   const [collapsedSections, setCollapsedSections] = useState(() => new Set());
+  const didScrollExpandedRef = useRef(false);
+
+  useEffect(() => {
+    if (!expandedSectionId) {
+      didScrollExpandedRef.current = false;
+      return;
+    }
+    setCollapsedSections((prev) => {
+      if (!prev.has(expandedSectionId)) return prev;
+      const next = new Set(prev);
+      next.delete(expandedSectionId);
+      return next;
+    });
+  }, [expandedSectionId]);
+
+  useEffect(() => {
+    if (!expandedSectionId || didScrollExpandedRef.current) return;
+    const section = headerSections.find((item) => item.id === expandedSectionId);
+    if (!section?.entries?.length) return;
+    didScrollExpandedRef.current = true;
+    requestAnimationFrame(() => {
+      document.getElementById(`deskMyTicketsSection-${expandedSectionId}`)
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+  }, [expandedSectionId, headerSections]);
 
   const toggleSection = (sectionId) => {
     setCollapsedSections((prev) => {
@@ -126,26 +152,19 @@ export default function DeskMyTicketsTable({
                 name="deskMyTicketsSearch"
                 autoComplete="off"
                 spellCheck={false}
-                inputMode={isTicketMode ? 'text' : 'numeric'}
-                placeholder={isTicketMode ? 'Buscar por protocolo…' : 'Buscar por CPF…'}
+                inputMode="text"
+                placeholder="Buscar por CPF ou protocolo…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label={isTicketMode ? 'Buscar por protocolo do ticket' : 'Buscar por CPF do cliente'}
+                aria-label="Buscar ticket por CPF ou protocolo"
               />
-              <button
-                type="button"
-                className="queue-search__mode"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  setSearchMode((prev) => (
-                    prev === DESK_SEARCH_MODE_CPF ? DESK_SEARCH_MODE_TICKET : DESK_SEARCH_MODE_CPF
-                  ));
-                }}
-                title={isTicketMode ? 'Buscar por protocolo do ticket' : 'Buscar por CPF do cliente'}
-                aria-pressed={isTicketMode}
+              <span
+                className="queue-search__mode queue-search__mode--detected"
+                title={`Busca detectada: ${detectedLabel}`}
+                aria-live="polite"
               >
-                {isTicketMode ? 'Ticket' : 'CPF'}
-              </button>
+                {detectedLabel}
+              </span>
             </div>
           </div>
           <span className="desk-my-tickets-table__subtitle">

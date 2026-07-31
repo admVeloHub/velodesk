@@ -1,6 +1,6 @@
 /**
- * ComposeRefinarModal v1.0.4 — label Revisão de texto
- * VERSION: v1.0.4 | DATE: 2026-07-10
+ * ComposeRefinarModal v1.0.5 — timeout 25s na revisão Gemini
+ * VERSION: v1.0.5 | DATE: 2026-07-30
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -8,6 +8,7 @@ import api from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
 
 const MODAL_Z = 11000;
+const REFINAR_REQUEST_TIMEOUT_MS = 25_000;
 
 /**
  * @param {object} props
@@ -79,7 +80,7 @@ export default function ComposeRefinarModal({
     api.post('/compose/refinar-rascunho', {
       rascunho: texto,
       nomeOperador,
-    }, { signal: controller.signal })
+    }, { signal: controller.signal, timeout: REFINAR_REQUEST_TIMEOUT_MS })
       .then((response) => {
         if (controller.signal.aborted) return;
         const data = response.data || {};
@@ -99,7 +100,11 @@ export default function ComposeRefinarModal({
         const status = err?.response?.status;
         const msg = status === 503
           ? 'Revisão indisponível'
-          : (err?.response?.data?.error || 'Falha na comunicação com o servidor.');
+          : status === 504
+            ? 'A revisão demorou mais que o esperado. Tente novamente.'
+            : (err?.code === 'ECONNABORTED'
+              ? 'A revisão demorou mais que o esperado. Tente novamente.'
+              : (err?.response?.data?.error || 'Falha na comunicação com o servidor.'));
         showNotification(msg, 'error');
         handleClose();
       });

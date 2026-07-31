@@ -1,69 +1,31 @@
 /**
- * DeskConsultasPanel v1.1.0 — consulta 360° de produtos do cliente
- * VERSION: v1.1.0 | DATE: 2026-07-22 | AUTHOR: VeloHub Development Team
+ * DeskConsultasPanel v2.1.0 — cards de produto com expand/collapse independente
+ * VERSION: v2.1.0 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
  */
-import React, { useMemo } from 'react';
-import { useTabulation } from '../../../context/TabulationContext';
-import { getMotivos } from '../../../services/tabulationConfig';
-import { getProductCatalogMeta } from '../../../services/desk/processDefinitions';
-import {
-  getClientContactFields,
-  getClientProducts,
-  getProductTagClass,
-} from '../../../services/desk/utils';
+import React from 'react';
+import useCustomerConsulta from '../../../hooks/useCustomerConsulta';
+import { getClientContactFields } from '../../../services/desk/utils';
+import { CONSULTA_PRODUCT_SLUGS } from '../../../services/desk/consultaFormatters';
+import ConsultaOverviewSummary from './ConsultaOverviewSummary';
+import ConsultaProductCard from './ConsultaProductCard';
 
-function ProductCard({ produto, meta, motivos, isTicketProduct }) {
-  return (
-    <article className={'crm-consultas-product' + (isTicketProduct ? ' crm-consultas-product--active' : '')}>
-      <header className="crm-consultas-product__header">
-        <span className={'crm-consultas-product__tag velo-tag ' + getProductTagClass(produto)}>
-          {produto}
-        </span>
-        {isTicketProduct ? (
-          <span className="crm-consultas-product__badge">Produto do ticket</span>
-        ) : null}
-      </header>
-
-      <p className="crm-consultas-product__desc">{meta.descricao}</p>
-
-      <dl className="crm-consultas-product__meta">
-        <div>
-          <dt>Público-alvo</dt>
-          <dd>{meta.publico}</dd>
-        </div>
-        <div>
-          <dt>Canais de atendimento</dt>
-          <dd>{(meta.canais || []).join(' · ') || '—'}</dd>
-        </div>
-        {motivos.length ? (
-          <div>
-            <dt>Motivos tabuláveis</dt>
-            <dd>
-              <ul className="crm-consultas-product__motivos">
-                {motivos.map((motivo) => (
-                  <li key={motivo}>{motivo}</li>
-                ))}
-              </ul>
-            </dd>
-          </div>
-        ) : null}
-      </dl>
-    </article>
-  );
-}
-
-export default function DeskConsultasPanel({ ticket, client, onReload, refreshing = false }) {
-  const { config } = useTabulation();
+export default function DeskConsultasPanel({ ticket, client, active = false }) {
   const contact = getClientContactFields(ticket, client);
-  const products = getClientProducts(ticket, client);
-  const ticketProduto = String(ticket?.lateralForm?.produto || '').trim();
+  const {
+    state,
+    data,
+    error,
+    refreshing,
+    productLoading,
+    reload,
+    loadProduct,
+  } = useCustomerConsulta({ ticket, active });
 
-  const productCards = useMemo(() => products.map((produto) => ({
-    produto,
-    meta: getProductCatalogMeta(produto),
-    motivos: getMotivos(config, produto),
-    isTicketProduct: Boolean(ticketProduto && produto === ticketProduto),
-  })), [products, config, ticketProduto]);
+  const ticketKey = String(ticket?.id || ticket?._id || ticket?.protocolo || '');
+
+  const requestId = data?.overview?.requestId
+    || (data?.products && Object.values(data.products).find((item) => item?.requestId)?.requestId)
+    || '';
 
   return (
     <div className="crm-consultas" id="deskConsultasPanel" aria-label="Consultas do cliente">
@@ -74,47 +36,97 @@ export default function DeskConsultasPanel({ ticket, client, onReload, refreshin
             <button
               type="button"
               className={'crm-icon-btn crm-consultas__refresh' + (refreshing ? ' is-refreshing' : '')}
-              onClick={() => onReload?.()}
+              onClick={() => reload()}
               title="Atualizar consultas"
               aria-label="Atualizar consultas"
-              disabled={refreshing || !onReload}
+              disabled={refreshing || state === 'loading'}
             >
               <i className="ti ti-refresh" aria-hidden="true" />
             </button>
           </div>
           <p className="crm-consultas__subtitle">
-            Informações de produtos vinculados a {contact.name || 'cliente'}
+            Relação comercial Velotax de {contact.name || 'cliente'}
+            {data?.cpfFormatted ? ` · CPF ${data.cpfFormatted}` : (contact.cpf ? ` · CPF ${contact.cpf}` : '')}
           </p>
         </div>
       </header>
 
-      <section className="crm-consultas__products" aria-label="Produtos do cliente">
-        <h3 className="crm-consultas__section-title">
-          Produtos ({productCards.length})
-        </h3>
+      {!active ? (
+        <div className="crm-consultas__empty">
+          <i className="ti ti-click" aria-hidden="true" />
+          <p>Abra esta aba para consultar os dados do cliente.</p>
+        </div>
+      ) : null}
 
-        {productCards.length ? (
-          <div className="crm-consultas__products-grid">
-            {productCards.map(({ produto, meta, motivos, isTicketProduct }) => (
-              <ProductCard
-                key={produto}
-                produto={produto}
-                meta={meta}
-                motivos={motivos}
-                isTicketProduct={isTicketProduct}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="crm-consultas__empty">
-            <i className="ti ti-package-off" aria-hidden="true" />
-            <p>Nenhum produto vinculado a este cliente.</p>
-            <p className="crm-consultas__empty-hint">
-              Classifique o ticket com um produto ou consulte o CPF para carregar o cadastro.
+      {active && state === 'loading' ? (
+        <div className="crm-consultas__empty">
+          <i className="ti ti-loader-2 crm-consultas__spin" aria-hidden="true" />
+          <p>Consultando dados do cliente…</p>
+        </div>
+      ) : null}
+
+      {active && state === 'missing_cpf' ? (
+        <div className="crm-consultas__empty crm-consultas__empty--blocked">
+          <i className="ti ti-id" aria-hidden="true" />
+          <p>{error?.message || 'Informe o CPF no cadastro do cliente para consultar.'}</p>
+          <p className="crm-consultas__empty-hint">
+            Preencha o CPF no painel lateral do ticket e tente novamente.
+          </p>
+        </div>
+      ) : null}
+
+      {active && state === 'error' ? (
+        <div className="crm-consultas__empty crm-consultas__empty--blocked">
+          <i className="ti ti-alert-circle" aria-hidden="true" />
+          <p>{error?.message || 'Não foi possível carregar as consultas.'}</p>
+          {error?.type !== 'not_configured' ? (
+            <button type="button" className="velo-btn velo-btn--secondary velo-btn--sm" onClick={() => reload()}>
+              Tentar novamente
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {active && state === 'loaded' && data ? (
+        <>
+          <ConsultaOverviewSummary
+            overview={data.overview}
+            cpfFormatted={data.cpfFormatted || contact.cpf}
+            contactName={contact.name}
+          />
+
+          <section className="crm-consultas__products" aria-label="Produtos do cliente">
+            <h3 className="crm-consultas__section-title">
+              Produtos ({CONSULTA_PRODUCT_SLUGS.length})
+            </h3>
+            <div className="crm-consultas__products-grid">
+              {CONSULTA_PRODUCT_SLUGS.map((slug) => (
+                <ConsultaProductCard
+                  key={`${ticketKey}-${slug}`}
+                  slug={slug}
+                  entry={data.products?.[slug]}
+                  isTicketProduct={data.ticketProductSlug === slug}
+                  loading={Boolean(productLoading[slug])}
+                  onLoad={loadProduct}
+                />
+              ))}
+            </div>
+          </section>
+
+          {data.errors?.length ? (
+            <p className="crm-consultas__analise" role="status">
+              <i className="ti ti-info-circle" aria-hidden="true" />
+              Alguns produtos não puderam ser carregados. Expanda o card do produto ou atualize a consulta.
             </p>
-          </div>
-        )}
-      </section>
+          ) : null}
+
+          {requestId ? (
+            <p className="crm-consultas__request-id" aria-label="Identificador de correlação">
+              Ref. consulta: {requestId}
+            </p>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }

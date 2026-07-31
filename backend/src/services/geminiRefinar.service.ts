@@ -1,6 +1,6 @@
 /**
- * geminiRefinar.service v1.0.2 — modelos atuais (2.5) + fallback em cadeia
- * VERSION: v1.0.2 | DATE: 2026-07-02
+ * geminiRefinar.service v1.1.0 — flash-lite prioritário, timeout e fallback rápido
+ * VERSION: v1.1.0 | DATE: 2026-07-30
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from '../config/env';
@@ -8,11 +8,55 @@ import { getRefinarRascunhoPersona } from './refinarRascunhoPersona';
 import { logAiUsage } from './aiUsage.service';
 
 const MAX_RASCUNHO_CHARS = 25_000;
-const GEMINI_FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'] as const;
+/** Modelos rápidos — sem Pro (latência imprevisível em revisão curta). */
+const REFINAR_FAST_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'] as const;
+const REFINAR_TIMEOUT_MS = 18_000;
+const REFINAR_MAX_OUTPUT_TOKENS = 4096;
 
-function buildModelsToTry(primary: string): string[] {
-  const ordered = [primary, ...GEMINI_FALLBACK_MODELS];
-  return [...new Set(ordered.map((m) => m.trim()).filter(Boolean))];
+let geminiClient: GoogleGenerativeAI | null = null;
+let cachedSystemPrompt: string | null = null;
+
+function getGeminiClient(): GoogleGenerativeAI {
+  if (!geminiClient) {
+    geminiClient = new GoogleGenerativeAI(env.geminiApiKey);
+  }
+  return geminiClient;
+}
+
+function getSystemPrompt(): string {
+  if (!cachedSystemPrompt) {
+    cachedSystemPrompt = getRefinarRascunhoPersona();
+  }
+  return cachedSystemPrompt;
+}
+
+function buildRefinarModelsToTry(): string[] {
+  const primary = (env.geminiRefinarModel || env.geminiModel || REFINAR_FAST_MODELS[0]).trim();
+  const ordered = [primary, ...REFINAR_FAST_MODELS];
+  return [...new Set(ordered.filter(Boolean))];
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label}: timeout após ${ms}ms`));
+    }, ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+function isRetryableGeminiError(err: unknown): boolean {
+  const message = (err as Error)?.message || String(err);
+  return /404|not found|no longer available|429|quota|rate limit|503|unavailable|overloaded|500|internal|timeout após/i.test(message);
 }
 
 export function validateRascunhoInput(rascunho: unknown): { ok: true; text: string } | { ok: false; error: string } {
@@ -32,6 +76,9 @@ export function isGeminiRefinarConfigured(): boolean {
 
 function mapGeminiErrorMessage(err: unknown): string {
   const message = (err as Error)?.message || String(err);
+  if (/timeout após/i.test(message)) {
+    return 'A revisão demorou mais que o esperado. Tente novamente em instantes.';
+  }
   if (/403|Forbidden/i.test(message) && /dunning|billing|quota|permission/i.test(message)) {
     return 'Conta Google Gemini com cobrança suspensa ou sem permissão. Verifique faturamento no Google Cloud / AI Studio ou use outra GEMINI_API_KEY.';
   }
@@ -39,15 +86,43 @@ function mapGeminiErrorMessage(err: unknown): string {
     return 'Limite de uso da API Gemini atingido. Tente novamente em alguns minutos.';
   }
   if (/404|not found|no longer available/i.test(message)) {
-    return `Modelo Gemini indisponível (${env.geminiModel}). Ajuste GEMINI_MODEL no backend (ex.: gemini-2.5-flash).`;
+    return `Modelo Gemini indisponível (${env.geminiRefinarModel || env.geminiModel}). Ajuste GEMINI_REFINAR_MODEL no backend (ex.: gemini-2.5-flash-lite).`;
   }
   return message || 'Não foi possível refinar o rascunho';
 }
 
-async function callGeminiModel(modelName: string, fullPrompt: string, userId?: string) {
-  const gemini = new GoogleGenerativeAI(env.geminiApiKey);
-  const model = gemini.getGenerativeModel({ model: modelName });
-  const result = await model.generateContent(fullPrompt);
+function buildUserBlock(rascunho: string, nomeOperador: string): string {
+  const nome = String(nomeOperador || '').trim() || 'não informado';
+  return (
+    '## Dados desta solicitação\n\n'
+    + '- **Nome do operador** (usar no lugar de [Nome do Operador] no template; se for "não informado", use cumprimento profissional sem inventar nome): '
+    + `${nome}\n\n`
+    + '- **Rascunho do colaborador** (única fonte do desenvolvimento; não invente prazos, valores nem procedimentos):\n\n'
+    + `${rascunho}\n\n`
+    + '## Tarefa\n\n'
+    + 'Aplique a persona (travas, estrutura do e-mail). **Saída:** somente o corpo do e-mail refinado em português brasileiro, texto simples, sem rascunho repetido, sem análise, sem seções, sem preâmbulo.\n'
+  );
+}
+
+async function callGeminiModel(
+  modelName: string,
+  userBlock: string,
+  userId?: string,
+): Promise<string> {
+  const model = getGeminiClient().getGenerativeModel({
+    model: modelName,
+    systemInstruction: getSystemPrompt(),
+    generationConfig: {
+      maxOutputTokens: REFINAR_MAX_OUTPUT_TOKENS,
+      temperature: 0.35,
+    },
+  });
+
+  const result = await withTimeout(
+    model.generateContent(userBlock),
+    REFINAR_TIMEOUT_MS,
+    `Gemini ${modelName}`,
+  );
 
   const usage = result.response.usageMetadata;
   if (usage) {
@@ -73,51 +148,53 @@ export async function generateRefinarRascunhoWithGemini(params: {
     return { success: false, error: 'Serviço Gemini não configurado' };
   }
 
-  try {
-    const systemPrompt = getRefinarRascunhoPersona();
-    const nome = String(params.nomeOperador || '').trim() || 'não informado';
+  const startedAt = Date.now();
+  const userBlock = buildUserBlock(params.rascunho, String(params.nomeOperador || ''));
+  const modelsToTry = buildRefinarModelsToTry();
 
-    const userBlock =
-      '## Dados desta solicitação\n\n'
-      + '- **Nome do operador** (usar no lugar de [Nome do Operador] no template; se for "não informado", use cumprimento profissional sem inventar nome): '
-      + `${nome}\n\n`
-      + '- **Rascunho do colaborador** (única fonte do desenvolvimento; não invente prazos, valores nem procedimentos):\n\n'
-      + `${params.rascunho}\n\n`
-      + '## Tarefa\n\n'
-      + 'Aplique a persona (travas, estrutura do e-mail). **Saída:** somente o corpo do e-mail refinado em português brasileiro, texto simples, sem rascunho repetido, sem análise, sem seções, sem preâmbulo.\n';
+  console.info('[gemini-refinar] início', {
+    userId: params.userId || 'anonimo',
+    chars: params.rascunho.length,
+    models: modelsToTry,
+  });
 
-    const fullPrompt = `${systemPrompt}\n\n${userBlock}`;
-    console.log('[gemini-refinar] processando para', params.userId || 'anonimo');
-
-    const modelsToTry = buildModelsToTry(env.geminiModel);
-
-    let lastError: unknown = null;
-    for (const modelName of modelsToTry) {
-      try {
-        const response = await callGeminiModel(modelName, fullPrompt, params.userId);
-        if (modelName !== env.geminiModel) {
-          console.warn(`[gemini-refinar] fallback OK com modelo ${modelName}`);
-        }
-        return {
-          success: true,
-          response,
-          model: modelName,
-        };
-      } catch (err) {
-        lastError = err;
-        console.error(`[gemini-refinar] modelo ${modelName}:`, (err as Error).message);
+  let lastError: unknown = null;
+  for (const modelName of modelsToTry) {
+    const modelStarted = Date.now();
+    try {
+      const response = await callGeminiModel(modelName, userBlock, params.userId);
+      console.info('[gemini-refinar] ok', {
+        model: modelName,
+        ms: Date.now() - startedAt,
+        modelMs: Date.now() - modelStarted,
+        chars: params.rascunho.length,
+      });
+      if (modelName !== modelsToTry[0]) {
+        console.warn(`[gemini-refinar] fallback OK com modelo ${modelName}`);
       }
+      return {
+        success: true,
+        response,
+        model: modelName,
+      };
+    } catch (err) {
+      lastError = err;
+      console.warn('[gemini-refinar] falha', {
+        model: modelName,
+        modelMs: Date.now() - modelStarted,
+        error: (err as Error).message,
+      });
+      if (!isRetryableGeminiError(err)) break;
     }
-
-    return {
-      success: false,
-      error: mapGeminiErrorMessage(lastError),
-    };
-  } catch (err) {
-    console.error('[gemini-refinar]', (err as Error).message);
-    return {
-      success: false,
-      error: mapGeminiErrorMessage(err),
-    };
   }
+
+  console.error('[gemini-refinar] esgotado', {
+    ms: Date.now() - startedAt,
+    error: (lastError as Error)?.message,
+  });
+
+  return {
+    success: false,
+    error: mapGeminiErrorMessage(lastError),
+  };
 }

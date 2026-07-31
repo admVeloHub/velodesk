@@ -1,4 +1,4 @@
-/* Velodesk CRM v1.10.0 — settings bar removida (Preferências); critérios de caixa */
+/* Velodesk CRM v1.11.8 — botão Histórico desativado sem CPF */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -328,6 +328,18 @@
     background: rgba(22, 52, 255, 0.55);
     border-color: rgba(255, 255, 255, 0.28);
     color: #fff;
+}
+
+#velodeskDeskV2Root .queue-search__mode--detected {
+    cursor: default;
+    user-select: none;
+    pointer-events: none;
+    min-width: 4.5rem;
+    text-align: center;
+}
+
+#velodeskDeskV2Root .queue-search__mode--detected:hover {
+    background: rgba(255, 255, 255, 0.12);
 }
 
 #velodeskDeskV2Root .ticket-list-header .queue-search--ticket-list {
@@ -1437,6 +1449,33 @@
     color: #fff;
 }
 
+#velodeskDeskV2Root .crm-client-profile-bar .ticket-client-history-btn--active-client {
+    background: #E85D04;
+}
+
+#velodeskDeskV2Root .crm-client-profile-bar .ticket-client-history-btn--active-client:hover,
+#velodeskDeskV2Root .crm-client-profile-bar .ticket-client-history-btn--active-client:focus-visible {
+    background: #C45203;
+    color: #fff;
+}
+
+#velodeskDeskV2Root .crm-client-profile-bar .ticket-client-history-btn:disabled {
+    background: #d1d5db;
+    color: #9ca3af;
+    cursor: not-allowed;
+    opacity: 0.85;
+}
+
+#velodeskDeskV2Root .crm-client-profile-bar .ticket-client-history-btn:disabled:hover,
+#velodeskDeskV2Root .crm-client-profile-bar .ticket-client-history-btn:disabled:focus-visible {
+    background: #d1d5db;
+    color: #9ca3af;
+}
+
+#velodeskDeskV2Root .crm-client-profile-bar .ticket-client-history-btn:disabled i {
+    color: #9ca3af;
+}
+
 #velodeskDeskV2Root .crm-client-profile-bar .ticket-client-advance-btn {
     border-radius: 999px;
     box-shadow: none;
@@ -1900,6 +1939,19 @@
     min-width: 0;
 }
 
+#velodeskDeskV2Root .client-contact-fields__cpf,
+.queue-box-modal .client-contact-fields__cpf {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#velodeskDeskV2Root .client-contact-fields__hint--lookup,
+.queue-box-modal .client-contact-fields__hint--lookup {
+    color: var(--blue-medium, #2563eb);
+    font-style: italic;
+}
+
 #velodeskDeskV2Root .client-contact-fields__name,
 .queue-box-modal .client-contact-fields__name {
     display: flex;
@@ -2031,14 +2083,15 @@
 }
 
 .queue-box-modal--wide {
-    width: min(720px, calc(100vw - 32px));
-    max-height: min(calc(100vh - 32px), 780px);
+    width: min(920px, calc(100vw - 24px));
+    max-height: min(calc(100vh - 24px), 860px);
 }
 
 .queue-box-modal--wide .queue-box-modal__body {
     overflow-y: auto;
     flex: 1;
     min-height: 0;
+    max-height: min(calc(100vh - 180px), 680px);
 }
 
 .queue-box-criteria {
@@ -2059,14 +2112,48 @@
 .queue-box-criteria__row {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
     align-items: flex-start;
+}
+
+.queue-box-criteria__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex: 1 1 100%;
+    width: 100%;
+}
+
+.queue-box-criteria__head .queue-box-criteria__control--tipo {
+    flex: 1 1 auto;
+    min-width: 120px;
+    max-width: 220px;
+}
+
+.queue-box-criteria__control--tipo {
+    flex: 0 1 130px;
+    min-width: 120px;
+}
+
+.queue-box-criteria__control--campo {
+    flex: 0 1 150px;
+    min-width: 130px;
+}
+
+.queue-box-criteria__control--op {
+    flex: 0 1 100px;
+    max-width: 110px;
+}
+
+.queue-box-criteria__valor {
+    flex: 1 1 100%;
+    min-width: min(100%, 260px);
 }
 
 .queue-box-criteria__row > .queue-box-criteria__control,
 .queue-box-criteria__row > .queue-box-criteria__atribuido {
-    flex: 1 1 120px;
-    min-width: 110px;
+    min-width: 0;
 }
 
 .queue-box-criteria__control--op {
@@ -2094,6 +2181,7 @@
 }
 
 .queue-box-criteria__remove {
+    flex-shrink: 0;
     width: 32px;
     height: 32px;
     border: none;
@@ -2104,6 +2192,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    font-size: 1rem;
 }
 
 .queue-box-criteria__remove:hover {
@@ -2136,6 +2225,125 @@
     outline: 1px solid #E24B4A;
     border-radius: 8px;
     padding: 6px;
+}
+
+.queue-box-multi {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+
+.queue-box-multi__trigger {
+    width: 100%;
+    min-height: 36px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 0.5px solid #E2E4E9;
+    background: #fff;
+    color: #1A1A2E;
+    font-size: 0.78rem;
+    font-family: inherit;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.queue-box-multi__values {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+
+.queue-box-multi__chevron {
+    flex-shrink: 0;
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+.queue-box-multi__trigger.is-open,
+.queue-box-multi__trigger:focus-visible {
+    border-color: #1694FF;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(22, 148, 255, 0.15);
+}
+
+.queue-box-multi__placeholder {
+    color: #9ca3af;
+}
+
+.queue-box-multi__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    width: 100%;
+}
+
+.queue-box-multi__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #1634FF;
+    font-size: 0.72rem;
+    line-height: 1.2;
+}
+
+.queue-box-multi__chip-remove {
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0 2px;
+}
+
+.queue-box-multi__panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 20;
+    max-height: 220px;
+    overflow-y: auto;
+    border-radius: 8px;
+    border: 0.5px solid #E2E4E9;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(26, 26, 46, 0.12);
+    padding: 6px;
+}
+
+.queue-box-multi__option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    color: #1A1A2E;
+    cursor: pointer;
+}
+
+.queue-box-multi__option:hover {
+    background: #f3f4f8;
+}
+
+.queue-box-multi__option input {
+    margin: 0;
+}
+
+.queue-box-multi__empty {
+    margin: 0;
+    padding: 8px;
+    font-size: 0.75rem;
+    color: #9ca3af;
 }
 
 .register-client-modal .queue-box-modal__body {
@@ -2607,6 +2815,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 14px;
+    align-items: start;
 }
 
 #velodeskDeskV2Root .crm-consultas-product {
@@ -2615,6 +2824,8 @@
     border-radius: 12px;
     padding: 14px 16px;
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    align-self: start;
+    height: auto;
 }
 
 #velodeskDeskV2Root .crm-consultas-product--active {
@@ -2728,6 +2939,100 @@
     margin-top: 6px !important;
     font-size: var(--desk-fs-sm) !important;
     color: #94a3b8;
+}
+
+#velodeskDeskV2Root .crm-consultas__empty--blocked {
+    border-color: #fca5a5;
+    background: #fffafa;
+    color: #991b1b;
+}
+
+#velodeskDeskV2Root .crm-consultas__empty--inline {
+    min-height: auto;
+    padding: 16px;
+    margin-bottom: 0;
+}
+
+#velodeskDeskV2Root .crm-consultas__spin {
+    animation: crm-consultas-spin 0.9s linear infinite;
+}
+
+@keyframes crm-consultas-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+#velodeskDeskV2Root .crm-consultas__flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+#velodeskDeskV2Root .crm-consultas__flag {
+    font-size: var(--desk-fs-caption);
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+#velodeskDeskV2Root .crm-consultas__flag.is-active {
+    background: rgba(22, 52, 255, 0.1);
+    color: #1634FF;
+}
+
+#velodeskDeskV2Root .crm-consultas-product__toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+}
+
+#velodeskDeskV2Root .crm-consultas-product__toggle .ti-chevron-up,
+#velodeskDeskV2Root .crm-consultas-product__toggle .ti-chevron-down {
+    margin-left: auto;
+    color: #94a3b8;
+    font-size: 16px;
+}
+
+#velodeskDeskV2Root .crm-consultas-product__actions {
+    margin-top: 8px;
+}
+
+#velodeskDeskV2Root .crm-consultas-product__body {
+    margin-top: 8px;
+}
+
+#velodeskDeskV2Root .crm-consultas-product:not(.crm-consultas-product--expanded) .crm-consultas-product__body,
+#velodeskDeskV2Root .crm-consultas-product:not(.crm-consultas-product--expanded) .crm-consultas-product__desc {
+    display: none;
+}
+
+#velodeskDeskV2Root .crm-consultas-product__installments,
+#velodeskDeskV2Root .crm-consultas-product__years {
+    margin: 8px 0 0;
+    padding-left: 18px;
+    font-size: var(--desk-fs-sm);
+    color: #334155;
+}
+
+#velodeskDeskV2Root .crm-consultas-product__desc--loading {
+    color: #64748b;
+    font-style: italic;
+}
+
+#velodeskDeskV2Root .crm-consultas__request-id {
+    margin: 16px 0 0;
+    font-size: var(--desk-fs-caption);
+    color: #94a3b8;
+    text-align: right;
 }
 
 @media (max-width: 960px) {
@@ -3071,7 +3376,44 @@
     max-width: 100%;
     overflow-wrap: anywhere;
     word-break: break-word;
+    white-space: normal;
+}
+
+#velodeskDeskV2Root .msg-bubble__formatted--plain {
     white-space: pre-wrap;
+}
+
+#velodeskDeskV2Root .msg-bubble__formatted--html ol,
+#velodeskDeskV2Root .msg-bubble__formatted--html ul {
+    margin: 0.35em 0 0.5em;
+    padding-left: 1.35em;
+    list-style-position: outside;
+}
+
+#velodeskDeskV2Root .msg-bubble__formatted--html li {
+    display: list-item;
+    margin: 0.2em 0;
+}
+
+#velodeskDeskV2Root .msg-bubble__formatted--html p,
+#velodeskDeskV2Root .msg-bubble__formatted--html > div {
+    margin: 0.45em 0;
+}
+
+#velodeskDeskV2Root .msg-bubble__formatted--html ol + p,
+#velodeskDeskV2Root .msg-bubble__formatted--html ul + p,
+#velodeskDeskV2Root .msg-bubble__formatted--html ol + div,
+#velodeskDeskV2Root .msg-bubble__formatted--html ul + div {
+    margin-top: 0.55em;
+}
+
+#velodeskDeskV2Root .msg-bubble__formatted--html ol + br,
+#velodeskDeskV2Root .msg-bubble__formatted--html ul + br,
+#velodeskDeskV2Root .msg-bubble__formatted--html li br {
+    display: block;
+    margin-top: 0.35em;
+    line-height: 0.35em;
+    content: "";
 }
 
 #velodeskDeskV2Root .msg-bubble__formatted a {
@@ -5834,6 +6176,21 @@ body.desk-v2-mode {
 
 body.desk-v2-mode #ecosystemModal {
     z-index: 9000;
+}
+
+body.desk-v2-mode #ecosystemModal .client360-empty {
+    margin: 12px 0 0;
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #9a3412;
+    font-size: var(--desk-fs-sm, 0.875rem);
+    line-height: 1.45;
+}
+
+body.desk-v2-mode #ecosystemModal .client360-empty strong {
+    font-weight: 700;
 }
 
 body.desk-v2-mode #cockpitFocusContext {

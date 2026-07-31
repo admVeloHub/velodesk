@@ -1,4 +1,4 @@
-﻿/** inbound.routes v1.3.0 — Gmail Pub/Sub: 503 em backlog parcial e em cold start do desk_config */
+﻿/** inbound.routes v1.4.0 — telephony inbound: health com apiVersion para homologação parceira */
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { env } from '../config/env';
@@ -101,13 +101,14 @@ router.post('/gmail/pubsub', async (req: Request, res: Response) => {
   }
 });
 
-/** Telefonia IA — health check para parceira */
+/** Telefonia IA — health check para parceira (sem autenticação) */
 router.get('/telephony/health', async (_req, res: Response) => {
   const activeRecados = await countActiveRecados();
   const lastRecadoUpdate = await getLatestActiveRecadoUpdatedAt();
   res.json({
     status: 'ok',
     enabled: env.inboundTelephonyEnabled,
+    apiVersion: '1.0.0',
     activeRecados,
     lastRecadoUpdate,
   });

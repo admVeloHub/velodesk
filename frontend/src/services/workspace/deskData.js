@@ -1,10 +1,11 @@
 /**
  * Workspace — dados operacionais do painel 360°
- * VERSION: v2.3.0 | DATE: 2026-07-22
+ * VERSION: v2.4.1 | DATE: 2026-07-31
  */
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { getAgentName } from '../clientDb';
 import { getSlaClass, isTicketInWorkflow, getWorkflowProgress } from '../desk/utils';
+import { MEUS_TICKETS_QUEUE_ID, MY_TICKETS_SECTION_CLIENTE_RESPONDEU } from '../desk/constants';
 import { ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import { getWorkflowInfoRequests, resolveDeskTicketIdForInfoRequest } from '../workflow/workflowInfoNotifications';
 import { getWorkflowTeamQueueMeta, ticketMatchesWorkflowTeam } from '../workflow/workflowTeamQueues';
@@ -173,7 +174,7 @@ export function mapEntryToRow(entry, sectionVariant) {
     slaTone,
     tags: buildTags(ticket),
     accent,
-    unread: queueId === 'novos' || queueId === 'pendente',
+    unread: queueId === 'novos' || String(ticket?.status || '').trim().toLowerCase() === 'em-aberto',
   };
 }
 
@@ -232,9 +233,10 @@ export function mergeWorkflowInfoRequestsIntoSection(section, existingTickets = 
 }
 
 function classifyEntry(entry) {
-  const { queueId } = entry;
-  const sla = getSlaClass(entry.ticket);
-  if (queueId === 'pendente') return 'client-replied';
+  const { queueId, ticket } = entry;
+  const status = String(ticket?.status || '').trim().toLowerCase();
+  const sla = getSlaClass(ticket);
+  if (status === 'em-aberto') return 'client-replied';
   if (queueId === 'em-andamento') return 'workflow';
   if (queueId === 'novos' || sla === 'critical' || sla === 'warning') return 'action-now';
   return null;
@@ -248,13 +250,37 @@ const SECTION_DEFS = [
 
 const WS360_SECTION_QUEUE_MAP = {
   'action-now': 'novos',
-  'client-replied': 'pendente',
+  'client-replied': MEUS_TICKETS_QUEUE_ID,
   workflow: 'em-andamento',
+};
+
+const WS360_SECTION_MY_TICKETS_SECTION = {
+  'client-replied': MY_TICKETS_SECTION_CLIENTE_RESPONDEU,
 };
 
 /** Fila do Desk CRM correspondente a uma seção do Painel 360° Agente. */
 export function resolveDeskQueueForWs360Section(sectionId) {
   return WS360_SECTION_QUEUE_MAP[sectionId] || 'novos';
+}
+
+/** URL do Desk ao clicar em "ver todos" no Painel 360° Agente. */
+export function buildDeskNavigationForWs360Section(sectionId) {
+  const params = new URLSearchParams({ desk: 'v2', queue: resolveDeskQueueForWs360Section(sectionId) });
+  const myTicketsSection = WS360_SECTION_MY_TICKETS_SECTION[sectionId];
+  if (myTicketsSection) params.set('section', myTicketsSection);
+  return `/tickets?${params.toString()}`;
+}
+
+/** URL do Desk ao abrir um ticket a partir de uma seção do Painel 360°. */
+export function buildDeskNavigationForWs360Ticket(ticketId, sectionId) {
+  const params = new URLSearchParams({
+    desk: 'v2',
+    ticket: String(ticketId),
+    queue: resolveDeskQueueForWs360Section(sectionId),
+  });
+  const myTicketsSection = WS360_SECTION_MY_TICKETS_SECTION[sectionId];
+  if (myTicketsSection) params.set('section', myTicketsSection);
+  return `/tickets?${params.toString()}`;
 }
 
 export function computeAgent360View() {

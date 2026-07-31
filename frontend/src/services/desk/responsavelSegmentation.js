@@ -1,6 +1,6 @@
 /**
- * responsavelSegmentation v1.5.0 — gestão vê todas as categorias do Desk
- * VERSION: v1.5.0 | DATE: 2026-07-24
+ * responsavelSegmentation v1.6.0 — Meus Tickets sempre por responsável atribuído
+ * VERSION: v1.6.0 | DATE: 2026-07-30
  */
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 import { normalizeProfileId } from '../../config/profiles';
@@ -129,6 +129,14 @@ export function ticketAssignedToCurrentAgent(ticket) {
   if (!responsavel) return false;
   const candidates = buildResponsavelCandidates();
   return candidates.includes(responsavel);
+}
+
+/**
+ * Fila virtual Meus Tickets — sempre exclusiva do usuário logado.
+ * Não herda ver_todos/gestão: perfil de gestão vê totais nas outras filas, não aqui.
+ */
+export function ticketBelongsInMeusTicketsList(ticket) {
+  return ticketAssignedToCurrentAgent(ticket);
 }
 
 /** Responsável explícito diferente do agente logado (transferência para outro agente). */

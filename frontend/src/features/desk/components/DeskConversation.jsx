@@ -1,10 +1,10 @@
 /**
- * DeskConversation v1.5.7 — oculta logo Velotax inline de anexos inbound
- * VERSION: v1.5.7 | DATE: 2026-07-30
+ * DeskConversation v1.5.8 — listas numeradas e quebras após lista na thread
+ * VERSION: v1.5.8 | DATE: 2026-07-31
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
-import { sanitizeComposeHtml } from '../../../services/desk/composeRichEditor';
+import { normalizeMessageHtmlForDisplay } from '../../../services/desk/composeRichEditor';
 import { shouldHideWorkflowSystemThreadMessage } from '../../../services/desk/utils';
 import { normalizeMessageDisplayText } from '../../../utils/htmlText.util';
 
@@ -120,11 +120,11 @@ function MessageBubbleText({ text, attachments }) {
       {hasText ? (
         /<[a-z][\s\S]*>/i.test(raw) ? (
           <span
-            className="msg-bubble__formatted"
-            dangerouslySetInnerHTML={{ __html: sanitizeComposeHtml(raw) }}
+            className="msg-bubble__formatted msg-bubble__formatted--html"
+            dangerouslySetInnerHTML={{ __html: normalizeMessageHtmlForDisplay(raw) }}
           />
         ) : !composeTextHasFormatting(raw) ? (
-          <span className="msg-bubble__formatted">{raw}</span>
+          <span className="msg-bubble__formatted msg-bubble__formatted--plain">{raw}</span>
         ) : (
           <span
             className="msg-bubble__formatted"

@@ -1,6 +1,6 @@
 /**
- * agentQueueBox.service v1.1.0 — caixas com criterios[] de filtro
- * VERSION: v1.1.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team
+ * agentQueueBox.service v1.2.0 — criterios com valores[] (multi-seleção)
+ * VERSION: v1.2.0 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
  */
 import { getDeskAgentQueueBoxModel, type IDeskAgentQueueBox, type IDeskAgentQueueBoxCriterio } from '../models/DeskAgentQueueBox';
 
@@ -29,6 +29,15 @@ export interface AgentQueueBoxCriterioDto {
   campo?: string;
   operador?: string;
   valor: string;
+  valores?: string[];
+}
+
+function parseCriterioValores(row: Record<string, unknown>): string[] {
+  if (Array.isArray(row.valores)) {
+    return row.valores.map((v) => String(v).trim()).filter(Boolean);
+  }
+  const single = String(row.valor ?? '').trim();
+  return single ? [single] : [];
 }
 
 export interface AgentQueueBoxDto {
@@ -75,13 +84,18 @@ function normalizeCriterios(raw: unknown): IDeskAgentQueueBoxCriterio[] {
       const row = item as Record<string, unknown>;
       const tipo = String(row.tipo || '').trim().toLowerCase();
       if (!CRITERIO_TIPOS.has(tipo)) return null;
-      const valor = String(row.valor ?? '').trim();
-      if (!valor && tipo !== 'atribuido') return null;
+      const valores = parseCriterioValores(row);
+      if (!valores.length && tipo !== 'atribuido') return null;
+      if (tipo === 'atribuido') {
+        const v = valores[0] || '';
+        if (v !== '__me__' && v !== '__empty__' && !v) return null;
+      }
       return {
         tipo,
         campo: String(row.campo || '').trim(),
         operador: String(row.operador || 'equals').trim() || 'equals',
-        valor,
+        valor: valores[0] || '',
+        valores,
       };
     })
     .filter(Boolean) as IDeskAgentQueueBoxCriterio[];
@@ -99,12 +113,18 @@ function toDto(doc: IDeskAgentQueueBox): AgentQueueBoxDto {
     isCustom: doc.isCustom !== false,
     order: typeof doc.order === 'number' ? doc.order : 0,
     criterios: Array.isArray(doc.criterios)
-      ? doc.criterios.map((c) => ({
-        tipo: String(c.tipo || ''),
-        campo: String(c.campo || ''),
-        operador: String(c.operador || 'equals'),
-        valor: String(c.valor || ''),
-      }))
+      ? doc.criterios.map((c) => {
+        const valores = Array.isArray(c.valores) && c.valores.length
+          ? c.valores.map((v) => String(v).trim()).filter(Boolean)
+          : (String(c.valor || '').trim() ? [String(c.valor).trim()] : []);
+        return {
+          tipo: String(c.tipo || ''),
+          campo: String(c.campo || ''),
+          operador: String(c.operador || 'equals'),
+          valor: valores[0] || String(c.valor || ''),
+          valores,
+        };
+      })
       : [],
   };
 }

@@ -1,13 +1,18 @@
 /**
  * Desk CRM — constantes de filas e classificação
- * VERSION: v2.3.3 | DATE: 2026-07-28
+ * VERSION: v2.3.5 | DATE: 2026-07-31
  */
 export const MEUS_TICKETS_QUEUE_ID = 'meus-tickets';
+
+/** Seção colapsável em Meus Tickets — tickets com status em-aberto (cliente respondeu). */
+export const MY_TICKETS_SECTION_CLIENTE_RESPONDEU = 'cliente-respondeu';
 
 /** Modos da busca global do Desk (Enter na fila). */
 export const DESK_SEARCH_MODE_CPF = 'cpf';
 export const DESK_SEARCH_MODE_TICKET = 'ticket';
-export const DESK_SEARCH_MODES = [DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET];
+/** Busca parcial ambígua — CPF ou protocolo. */
+export const DESK_SEARCH_MODE_BOTH = 'both';
+export const DESK_SEARCH_MODES = [DESK_SEARCH_MODE_CPF, DESK_SEARCH_MODE_TICKET, DESK_SEARCH_MODE_BOTH];
 
 export const QUEUE_STATUSES = [
   { id: 'novos', name: 'Novos', dot: '#1634FF', boxes: ['novos'] },
@@ -19,10 +24,19 @@ export const QUEUE_STATUSES = [
 
 export const AGENT_DESK_QUEUE_IDS = new Set(['novos', 'em-andamento', 'pendente', 'resolvidos']);
 
+const DESK_QUEUE_URL_IDS = new Set([...AGENT_DESK_QUEUE_IDS, MEUS_TICKETS_QUEUE_ID]);
+
 /** Valida fila vinda da URL do Desk; fallback quando ausente ou inválida. */
 export function parseDeskQueueFromUrl(value, fallback = 'novos') {
   const id = String(value || '').trim();
-  return AGENT_DESK_QUEUE_IDS.has(id) ? id : fallback;
+  return DESK_QUEUE_URL_IDS.has(id) ? id : fallback;
+}
+
+/** Seção de Meus Tickets vinda da URL (?section=cliente-respondeu). */
+export function parseDeskMyTicketsSectionFromUrl(value) {
+  const id = String(value || '').trim();
+  if (id === MY_TICKETS_SECTION_CLIENTE_RESPONDEU) return id;
+  return null;
 }
 
 export const SEND_STATUS_OPTIONS_AGENT = [
