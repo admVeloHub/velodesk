@@ -1,10 +1,14 @@
-/** workflowMatcher v1.5.0 — exclui workflows escalonar-* legados */
+/** workflowMatcher v1.6.0 — match por gatilho de tabulação (sem exclusão por slug) */
 import { GRUPO_TO_FUNCAO_MAP } from '../config/funcaoPermissaoDefaults';
 import type { IGrupoResponsabilidade } from '../models/GrupoResponsabilidade';
 import type { IWorkflowCriterio } from '../models/WorkflowDefinicao';
 
 function normalize(value: unknown): string {
-  return String(value ?? '').trim().toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 }
 
 function readTabulationField(
@@ -17,6 +21,7 @@ function readTabulationField(
     produto: fields.produto || '',
     motivo: fields.motivo || '',
     detalhe: fields.detalhe || '',
+    canal: fields.canal || '',
     responsavel: fields.responsavel || '',
     atribuido: fields.atribuido || '',
   };
@@ -99,10 +104,6 @@ export function evaluateCriterios(
   });
 }
 
-export function isLegacyEscalonarWorkflowSlug(slug: unknown): boolean {
-  return String(slug || '').trim().toLowerCase().startsWith('escalonar-');
-}
-
 /** Gatilho sem critérios nunca ativa o workflow */
 export function evaluateGatilhoCriterios(
   criterios: IWorkflowCriterio[],
@@ -116,6 +117,7 @@ export function evaluateGatilhoCriterios(
 export function buildTabulationFieldsFromTicket(ticket: {
   tabulacao?: Array<Record<string, string>>;
   lateralForm?: Record<string, unknown>;
+  channel?: string;
 }): Record<string, string> {
   const tab = ticket.tabulacao?.[0] || {};
   const lf = ticket.lateralForm || {};
@@ -131,6 +133,7 @@ export function buildTabulationFieldsFromTicket(ticket: {
     produto: String(lf.produto ?? tab.produto ?? ''),
     motivo: String(lf.motivo ?? tab.motivo ?? ''),
     detalhe: String(lf.detalhe ?? tab.detalhe ?? ''),
+    canal: String(lf.canal ?? tab.canal ?? ticket.channel ?? ''),
     responsavel: String(lf.responsavel ?? tab.responsavel ?? ''),
     atribuido: String(lf.atribuido ?? tab.atribuido ?? ''),
     statusPagamento: String(integracao.statusPagamento ?? lf.statusPagamento ?? ''),

@@ -1,10 +1,35 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.60.0 | DATE: 2026-08-03 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.61.0 | DATE: 2026-08-03 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: botão Iniciar Workflow por tabulação (sem legado escalonar)
+
+- **Data/Hora**: 2026-08-03
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.61.0
+  - **Match workflow**: workflowEngine v1.10.0, workflowMatcher v1.6.0, workflowDefinicao.service v1.8.0, workflowTicket.service v1.6.0
+  - **Desk**: DeskV2Root v3.22.0, utils v3.8.0, workflowDefinitions v2.2.0, ticketAdapter v1.7.1
+  - **Config**: workflowConfigData v2.9.0, WorkflowCriteriaEditor v2.4.0, WorkflowConfigEditor v2.7.2, WorkflowsConfigSection v3.0.1
+  - **Permissões/filas**: permissionService v1.6.1, workflowTeamQueues v1.2.1, constants v2.3.6
+- **Arquivos principais**:
+  - `frontend/src/services/desk/workflowEngine.js` — match só por gatilho ativo; remove legado escalonar; canal + normalização sem acento
+  - `frontend/src/features/desk/DeskV2Root.jsx` — reavalia botão quando lista de workflows do contexto muda
+  - `frontend/src/services/desk/utils.js` / `pendingWorkflowStart` — arquitetura: tabulação → botão → requisição → cache → save
+  - `backend/src/services/workflowMatcher.service.ts` / `workflowDefinicao.service.ts` / `workflowTicket.service.ts` — start/resolve sem bloqueio por slug legado
+  - `frontend/src/api/adapters/ticketAdapter.js` — remove campo escalonar do lateralForm
+  - `workflowConfigData.js` — workflow novo nasce ativo; gatilho com canal
+- **Descrição**: Corrige botão "Iniciar Workflow" que não aparecia com tabulação válida. Removido bloqueio/legado do campo escalonar; ativação segue apenas a arquitetura atual (match por gatilho → painel de requisição → pending em cache → persistência ao salvar o ticket).
+- **Validação**: Match local contra workflows ativos no desk_config; fluxo pending→save intacto.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — Desk: consultas em rascunho, máscara telefone e poll silencioso
 

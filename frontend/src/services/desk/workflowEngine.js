@@ -1,6 +1,6 @@
 /**
- * workflowEngine v1.8.0 — exclui escalonar-* legado; só workflows configurados
- * VERSION: v1.8.0 | DATE: 2026-07-23
+ * workflowEngine v1.10.0 — match só por gatilho de tabulação (sem legado escalonar)
+ * VERSION: v1.10.0 | DATE: 2026-08-03
  */
 import { getRuntimeGrupos, getRuntimeWorkflows } from './workflowRuntimeStore';
 
@@ -31,7 +31,11 @@ export const WORKFLOW_DECISION_ACTIONS = {
 };
 
 function normalizeText(value) {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 }
 
 function readFields(ticket, rightFields = {}) {
@@ -43,6 +47,7 @@ function readFields(ticket, rightFields = {}) {
     produto: rightFields.produto ?? lf.produto ?? '',
     motivo: rightFields.motivo ?? lf.motivo ?? '',
     detalhe: rightFields.detalhe ?? lf.detalhe ?? '',
+    canal: rightFields.canal ?? lf.canal ?? ticket?.channel ?? '',
     responsavel: rightFields.responsavel ?? lf.responsavel ?? '',
     atribuido: rightFields.atribuido ?? lf.atribuido ?? '',
     statusPagamento: rightFields.statusPagamento ?? integracao.statusPagamento ?? lf.statusPagamento ?? '',
@@ -77,6 +82,7 @@ function readTabulationValue(fields, campo) {
     produto: fields.produto,
     motivo: fields.motivo,
     detalhe: fields.detalhe,
+    canal: fields.canal,
     responsavel: fields.responsavel,
     atribuido: fields.atribuido,
   };
@@ -120,10 +126,6 @@ export function evaluateCriterios(criterios = [], fields, grupos = getRuntimeGru
 export function evaluateGatilhoCriterios(criterios = [], fields, grupos = getRuntimeGrupos()) {
   if (!criterios.length) return false;
   return evaluateCriterios(criterios, fields, grupos);
-}
-
-export function isLegacyEscalonarWorkflowSlug(slug) {
-  return String(slug || '').trim().toLowerCase().startsWith('escalonar-');
 }
 
 function buildDecisionFromPasso(passoConfig, slug) {
@@ -192,29 +194,16 @@ export function normalizeWorkflowDef(definicao) {
 export function getWorkflowTemplateById(templateId, definitions = getRuntimeWorkflows()) {
   const slug = String(templateId || '').trim();
   const def = definitions.find((d) => d.slug === slug || String(d._id) === slug);
-  if (def) return normalizeWorkflowDef(def);
-
-  if (slug.startsWith('escalonar-')) {
-    return buildEscalonarWorkflowTemplate(slug.replace('escalonar-', ''));
-  }
-  return null;
+  return def ? normalizeWorkflowDef(def) : null;
 }
 
 export function resolveWorkflowForTicket(ticket, rightFields = {}, definitions = getRuntimeWorkflows()) {
   const fields = readFields(ticket, rightFields);
   const match = definitions.find(
-    (def) => !isLegacyEscalonarWorkflowSlug(def.slug)
+    (def) => def.ativo !== false
       && evaluateGatilhoCriterios(def.gatilho?.criterios || [], fields),
   );
   return match ? normalizeWorkflowDef(match) : null;
-}
-
-
-export function buildEscalonarWorkflowTemplate(escalonarId) {
-  const slug = `escalonar-${escalonarId}`;
-  const def = getRuntimeWorkflows().find((d) => d.slug === slug);
-  if (def) return normalizeWorkflowDef(def);
-  return null;
 }
 
 export function resolveAtribuidoForStep(step, fields = {}) {
@@ -278,16 +267,6 @@ export function createWorkflowState(template, options = {}) {
 
 export function getWorkflowTeamLabel(teamId) {
   return WORKFLOW_TEAM_LABELS[teamId] || teamId || 'Operação';
-}
-
-export function findEscalonarTargetStepIndex(template, escalonarId) {
-  const target = String(escalonarId || '').trim().toLowerCase();
-  if (!target || !template?.steps?.length) return -1;
-  return template.steps.findIndex((step) => {
-    const team = String(step.team || '').toLowerCase();
-    const grupo = String(step.atribuicao?.grupoSlug || '').toLowerCase();
-    return team === target || grupo === target;
-  });
 }
 
 function findStepIndex(template, stepId) {

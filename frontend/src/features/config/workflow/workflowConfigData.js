@@ -1,6 +1,6 @@
 /**
- * workflowConfigData v2.8.0 — FUNCAO_ATRIBUICAO inclui produtos (+ fallback dinâmico no editor)
- * VERSION: v2.8.0 | DATE: 2026-07-24
+ * workflowConfigData v2.9.0 — gatilho inclui canal; workflow novo nasce ativo
+ * VERSION: v2.9.0 | DATE: 2026-08-03
  */
 import {
   normalizeRequisicaoConfig,
@@ -43,6 +43,7 @@ export const GATILHO_CRITERIO_OPCOES = [
   { fonte: 'tabulacao', campo: 'produto', label: 'Produto' },
   { fonte: 'tabulacao', campo: 'motivo', label: 'Motivo' },
   { fonte: 'tabulacao', campo: 'detalhe', label: 'Detalhe' },
+  { fonte: 'tabulacao', campo: 'canal', label: 'Canal' },
   { fonte: 'integracao', campo: 'statusPagamento', label: 'Status de pagamento' },
   { fonte: 'integracao', campo: 'dataContratacao', label: 'Prazo desde contratação' },
   { fonte: 'integracao', campo: 'statusContrato', label: 'Status do contrato' },
@@ -334,7 +335,7 @@ export function createEmptyWorkflowDocument() {
     titulo: 'Novo workflow',
     descricao: '',
     ordem: 0,
-    ativo: false,
+    ativo: true,
     gatilho: {
       tipo: 'tabulacao',
       criterios: [],

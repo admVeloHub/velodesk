@@ -1,6 +1,6 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.21.0 | DATE: 2026-07-31
+ * VERSION: v3.22.0 | DATE: 2026-08-03
  * — URL ?ticket= abre ticket; ?queue=meus-tickets&section=cliente-respondeu expande seção
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -68,6 +68,7 @@ import DeskConsultasPanel from './components/DeskConsultasPanel';
 import DeskRightPanel from './components/DeskRightPanel';
 import { applyCascadeFieldChange, applyTabulationSuggestion, buildDefaultRightFields, getMotivos, hasApplyableTabulation, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel, validateTabulationForSendStatus } from '../../services/tabulationConfig';
 import { useTabulation } from '../../context/TabulationContext';
+import { useWorkflowConfig } from '../../context/WorkflowConfigContext';
 import { createSpellContext, loadSpellEngine, scanText } from '../../services/spellcheck/spellEngine';
 import { htmlToPlainText } from '../../services/desk/composeRichEditor';
 import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
@@ -160,6 +161,7 @@ export default function DeskV2Root() {
   const { user } = useAuth();
   const permsCtx = usePermissionsOptional();
   const { config } = useTabulation();
+  const { workflows: runtimeWorkflows } = useWorkflowConfig();
   const [searchParams] = useSearchParams();
 
   const detailLoadRef = useRef(null);
@@ -1065,8 +1067,8 @@ export default function DeskV2Root() {
     if (!ticket || isDraftTicket(ticket) || isTicketInWorkflow(ticket)) return null;
     const fields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
     if (!isTabulationComplete(fields, config)) return null;
-    return resolveWorkflowForTicket(ticket, fields);
-  }, [ticket, rightFields, config]);
+    return resolveWorkflowForTicket(ticket, fields, runtimeWorkflows);
+  }, [ticket, rightFields, config, runtimeWorkflows]);
 
   const executeWorkflowStart = useCallback(async (requisicaoValores) => {
     const template = pendingWorkflowTemplateRef.current || workflowStartTemplate;
@@ -1148,7 +1150,7 @@ export default function DeskV2Root() {
       return;
     }
 
-    const template = resolveWorkflowForTicket(ticket, fields);
+    const template = resolveWorkflowForTicket(ticket, fields, runtimeWorkflows);
     if (!template) {
       showNotification('Tabulação não compatível com nenhum workflow ativo.', 'warning');
       return;
@@ -1167,6 +1169,7 @@ export default function DeskV2Root() {
   }, [
     config,
     executeWorkflowStart,
+    runtimeWorkflows,
     rightFields,
     showNotification,
     startingWorkflow,

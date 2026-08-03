@@ -1,6 +1,6 @@
 /**
- * WorkflowsConfigSection v3.0.0 — lista + editor via API
- * VERSION: v3.0.0 | DATE: 2026-07-14
+ * WorkflowsConfigSection v3.0.1 — create força ativo quando draft não desativa
+ * VERSION: v3.0.1 | DATE: 2026-08-03
  */
 import React, { useCallback, useState } from 'react';
 import { workflowApi } from '../../../api/client';
@@ -47,7 +47,11 @@ export default function WorkflowsConfigSection() {
   const handleSave = useCallback(async (updatedWorkflow) => {
     if (creating) {
       const slug = createWorkflowSlug(updatedWorkflow.titulo);
-      await workflowApi.create({ ...updatedWorkflow, slug });
+      await workflowApi.create({
+        ...updatedWorkflow,
+        slug,
+        ativo: updatedWorkflow.ativo !== false,
+      });
     } else {
       await workflowApi.update(editingId, updatedWorkflow);
     }

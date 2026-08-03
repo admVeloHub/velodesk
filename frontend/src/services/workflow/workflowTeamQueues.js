@@ -1,6 +1,6 @@
 /**
- * workflowTeamQueues v1.2.0 — match por atribuido, slug escalonar-{time} ou step.team
- * VERSION: v1.2.0 | DATE: 2026-07-24
+ * workflowTeamQueues v1.2.1 — remove fallback lateralForm.escalonar
+ * VERSION: v1.2.1 | DATE: 2026-08-03
  */
 import {
   getWorkflowProgress,
@@ -72,7 +72,6 @@ export function ticketMatchesWorkflowTeam(ticket, teamId) {
     wf.definicaoSlug || wf.templateId || '',
   );
 
-  if (normalizeTeamSlug(lf.escalonar) === team) return true;
   if (templateSlug === `escalonar-${team}`) return true;
   if (templateSlug === team) return true;
   if (templateSlug.endsWith(`-${team}`)) return true;

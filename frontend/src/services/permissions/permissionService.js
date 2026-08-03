@@ -1,6 +1,6 @@
 /**
- * permissionService v1.6.0 — canInterruptWorkflow (suporte/gestão/supervisão)
- * VERSION: v1.6.0 | DATE: 2026-07-28
+ * permissionService v1.6.1 — team match sem lateralForm.escalonar
+ * VERSION: v1.6.1 | DATE: 2026-08-03
  */
 import api from '../../api/client';
 import { normalizeProfileId } from '../../config/profiles';
@@ -280,7 +280,7 @@ function matchesAtribuidoAnyUserFuncao(ticket, perm) {
 function matchesWorkflowDefinitionTeam(ticket, perm) {
   const lf = ticket?.lateralForm || {};
   const wf = lf.workflow || {};
-  const slug = String(wf.definicaoSlug || wf.templateId || lf.escalonar || '')
+  const slug = String(wf.definicaoSlug || wf.templateId || '')
     .trim()
     .toLowerCase();
   if (!slug) return false;

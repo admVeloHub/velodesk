@@ -1,6 +1,6 @@
 /**
- * WorkflowCriteriaEditor v2.3.0 — valores sempre populados, sem bloqueio de cascata
- * VERSION: v2.3.0 | DATE: 2026-07-23
+ * WorkflowCriteriaEditor v2.4.0 — gatilho com canal
+ * VERSION: v2.4.0 | DATE: 2026-08-03
  */
 import React, { useMemo } from 'react';
 import { useTabulation } from '../../../context/TabulationContext';
@@ -58,6 +58,7 @@ export default function WorkflowCriteriaEditor({
   const {
     getProdutoNames,
     getTipoChamadoOptions,
+    getCanalContatoOptions,
     resolveMotivoOptions,
     resolveDetalheOptions,
   } = useTabulation();
@@ -78,6 +79,8 @@ export default function WorkflowCriteriaEditor({
           value,
           label: value,
         }));
+      case 'canal':
+        return (getCanalContatoOptions?.() || []).map((value) => ({ value, label: value }));
       default:
         return [];
     }
@@ -162,7 +165,7 @@ export default function WorkflowCriteriaEditor({
 
     if (isTabulacaoRow(row)) {
       const options = getTabulationValueOptions(row.campo);
-      if (['tipoChamado', 'produto', 'motivo', 'detalhe'].includes(row.campo)) {
+      if (['tipoChamado', 'produto', 'motivo', 'detalhe', 'canal'].includes(row.campo)) {
         return renderGatilhoValorSelect(row, index, options);
       }
     }

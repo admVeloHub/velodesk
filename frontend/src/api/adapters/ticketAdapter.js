@@ -1,6 +1,6 @@
 /**
- * ticketAdapter v1.7.0 — responsável só quando atribuído (roleta/ação manual)
- * VERSION: v1.7.0 | DATE: 2026-07-28 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.7.1 — remove campo escalonar do lateralForm
+ * VERSION: v1.7.1 | DATE: 2026-08-03 | AUTHOR: VeloHub Development Team
  */
 import { getAgentName } from '../../services/clientDb';
 import { DEFAULT_TIPO, sanitizeResponsavel } from '../../services/tabulationConfig';
@@ -145,7 +145,6 @@ export function cockpitTicketToApi(ticket) {
       clienteTelefone: phoneList,
       clienteTelefoneWhatsapp: lf.clienteTelefoneWhatsapp || ticket.clientPhone || phoneList[0] || undefined,
       clienteId: ticket.clienteId || lf.clienteId,
-      escalonar: lf.escalonar,
       wasEscalated: lf.wasEscalated,
       lastWorkflow: lf.lastWorkflow,
       retornoN1: lf.retornoN1,
@@ -184,7 +183,6 @@ export function buildCreatePayload(form) {
       motivo: form.motivo || lf.motivo,
       responsavel: (form.atribuir || lf.responsavel || '').replace(' (eu)', ''),
       detalhe: lf.detalhe || form.detalhe || '',
-      escalonar: lf.escalonar,
       wasEscalated: lf.wasEscalated,
       lastWorkflow: lf.lastWorkflow,
       retornoN1: lf.retornoN1,

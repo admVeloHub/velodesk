@@ -1,6 +1,6 @@
 /**
- * WorkflowConfigEditor v2.7.1 — clientKey estável nos campos de requisição
- * VERSION: v2.7.1 | DATE: 2026-07-23
+ * WorkflowConfigEditor v2.7.2 — validação de gatilho para grupo de responsabilidade
+ * VERSION: v2.7.2 | DATE: 2026-08-03
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNotifications } from '../../../context/NotificationContext';
@@ -85,7 +85,11 @@ export default function WorkflowConfigEditor({
       return;
     }
     const criterios = draft?.gatilho?.criterios || [];
-    if (criterios.some((c) => !String(c.campo || '').trim() || !String(c.valor || '').trim())) {
+    if (criterios.some((c) => {
+      if (!String(c.campo || '').trim()) return true;
+      if (c.fonte === 'grupo_responsabilidade' || c.operador === 'not_empty') return false;
+      return !String(c.valor || '').trim();
+    })) {
       showNotification('Complete os critérios do gatilho antes de salvar.', 'error');
       return;
     }

@@ -1,6 +1,6 @@
 /**
  * Desk CRM — constantes de filas e classificação
- * VERSION: v2.3.5 | DATE: 2026-07-31
+ * VERSION: v2.3.6 | DATE: 2026-08-03
  */
 export const MEUS_TICKETS_QUEUE_ID = 'meus-tickets';
 
@@ -89,18 +89,6 @@ export const ESCALONAR_OPTIONS = [
   { id: 'produtos', label: 'Produtos' },
   { id: 'suporte', label: 'Suporte' },
 ];
-
-/** Encaminhamento do Desk Agente — abaixo de Detalhe */
-export const AGENT_FORWARD_OPTIONS = [
-  { id: 'financeiro', label: 'Financeiro' },
-  { id: 'produtos', label: 'Produtos' },
-];
-
-export const AGENT_FORWARD_IDS = new Set(['financeiro', 'produtos']);
-
-export function isAgentForwardEscalonar(id) {
-  return AGENT_FORWARD_IDS.has(id);
-}
 
 export const SLA_LABELS = {
   ok: 'Dentro do prazo',

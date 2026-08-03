@@ -1,4 +1,4 @@
-/** workflowTicket.service v1.5.0 — cancelWorkflowForChamado (interromper) */
+/** workflowTicket.service v1.6.0 — startWorkflow sem bloqueio por slug legado */
 import { isAutomaticaStep, resolveAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
@@ -13,7 +13,6 @@ import { getActiveGrupos } from './grupoResponsabilidade.service';
 import {
   buildTabulationFieldsFromTicket,
   evaluateGatilhoCriterios,
-  isLegacyEscalonarWorkflowSlug,
   resolveAtribuidoForPasso,
 } from './workflowMatcher.service';
 import {
@@ -250,8 +249,23 @@ export async function startWorkflowForChamado(
     throw new WorkflowAdvanceError('Workflow já está ativo neste ticket', 400);
   }
 
+  const tab = readTabulacaoSnapshot(chamado.tabulacao?.[0]);
+  const meta = (chamado.metadados && typeof chamado.metadados === 'object')
+    ? chamado.metadados as Record<string, unknown>
+    : {};
   const ticketCtx = {
-    tabulacao: chamado.tabulacao as unknown as Array<Record<string, string>>,
+    tabulacao: [tab as unknown as Record<string, string>],
+    lateralForm: {
+      tipoChamado: tab.tipoChamado,
+      classificacaoTipo: tab.tipoChamado,
+      produto: tab.produto,
+      motivo: tab.motivo,
+      detalhe: tab.detalhe,
+      responsavel: tab.responsavel,
+      atribuido: tab.atribuido,
+      canal: String(meta.canal ?? meta.channel ?? ''),
+      metadados: meta,
+    },
   };
   const fields = buildTabulationFieldsFromTicket(ticketCtx);
   const grupos = await getActiveGrupos();
@@ -260,9 +274,6 @@ export async function startWorkflowForChamado(
   const slug = String(definicaoSlug || '').trim();
 
   if (slug) {
-    if (isLegacyEscalonarWorkflowSlug(slug)) {
-      throw new WorkflowAdvanceError('Workflow de encaminhamento legado não está disponível', 400);
-    }
     definicao = await getWorkflowBySlug(slug);
     if (!definicao || definicao.ativo === false) {
       throw new WorkflowAdvanceError('Workflow selecionado não encontrado ou inativo', 400);

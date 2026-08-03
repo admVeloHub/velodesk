@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.7.4 | DATE: 2026-08-03
- * — busca: 11 dígitos = CPF (match literal, sem exigir checksum válido)
+ * VERSION: v3.8.0 | DATE: 2026-08-03
+ * — workflow: ativação só por tabulação + botão (sem campo escalonar)
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
@@ -11,7 +11,6 @@ import { sanitizeResponsavel } from '../tabulationConfig';
 import {
   MEUS_TICKETS_QUEUE_ID,
   QUEUE_STATUSES,
-  isAgentForwardEscalonar,
   DESK_SEARCH_MODE_CPF,
   DESK_SEARCH_MODE_TICKET,
   DESK_SEARCH_MODE_BOTH,
@@ -22,11 +21,9 @@ import { ticketMatchesQueueCriterios } from './customQueueBoxCriteria';
 import {
   advanceWorkflowStep,
   advanceWorkflowByDecision,
-  buildEscalonarWorkflowTemplate,
   buildWorkflowAdvanceMessage,
   createWorkflowState,
   evaluateWorkflowAutoAdvance,
-  findEscalonarTargetStepIndex,
   getWorkflowTeamLabel,
   getWorkflowTemplateById,
   resolveWorkflowForTicket,
@@ -583,8 +580,7 @@ export function getWorkflowTemplateForTicket(ticket) {
   const wf = readTicketLateralWorkflow(ticket);
   const templateKey = wf?.templateId || wf?.definicaoSlug || ticket?.workflow?.workflowId;
   if (!templateKey) return null;
-  return getWorkflowTemplateById(templateKey)
-    || (String(templateKey).startsWith('escalonar-') ? buildEscalonarWorkflowTemplate(String(templateKey).replace('escalonar-', '')) : null);
+  return getWorkflowTemplateById(templateKey);
 }
 
 function formatDurationMs(ms) {
@@ -646,7 +642,7 @@ export function getWorkflowProgress(ticket) {
       .map((h) => h.stepId),
   );
 
-  let stepsWithState = template.steps.map((step, index) => {
+  const stepsWithState = template.steps.map((step, index) => {
     let state = 'pending';
     if (completedIds.has(step.id)) state = 'completed';
     else if (step.id === currentStepId) state = 'active';
@@ -661,24 +657,7 @@ export function getWorkflowProgress(ticket) {
     };
   });
 
-  const escalonarId = ticket?.lateralForm?.escalonar;
   const agentRetainsTicket = Boolean(ticket?.lateralForm?.agentRetainsTicket);
-  let forwardTargetStepIndex = -1;
-  let forwardTargetStepId = null;
-
-  if (agentRetainsTicket && isAgentForwardEscalonar(escalonarId)) {
-    forwardTargetStepIndex = findEscalonarTargetStepIndex(template, escalonarId);
-    if (forwardTargetStepIndex > activeStepIndex) {
-      const targetStep = template.steps[forwardTargetStepIndex];
-      forwardTargetStepId = targetStep?.id || null;
-      stepsWithState = stepsWithState.map((step, index) => {
-        if (index === forwardTargetStepIndex && step.state === 'pending') {
-          return { ...step, state: 'signaled' };
-        }
-        return step;
-      });
-    }
-  }
 
   let slaRemainingMs = null;
   let slaTotalHours = null;
@@ -699,8 +678,8 @@ export function getWorkflowProgress(ticket) {
     activeStepIndex,
     activeStep,
     stepsWithState,
-    forwardTargetStepIndex,
-    forwardTargetStepId,
+    forwardTargetStepIndex: -1,
+    forwardTargetStepId: null,
     slaRemainingMs,
     slaRemainingLabel: slaRemainingMs != null ? formatDurationMs(slaRemainingMs) : null,
     slaTotalHours,
@@ -718,32 +697,21 @@ function getWorkflowInstanceKey(workflow) {
   return workflow?.templateId || workflow?.definicaoSlug || '';
 }
 
-export function maybeActivateWorkflowForTicket(ticket, rightFields, escalonar, author, options = {}) {
-  const mode = options.mode || 'commit';
+/** Match por tabulação — ativação efetiva só via botão Iniciar Workflow (pending → save). */
+export function maybeActivateWorkflowForTicket(ticket, rightFields, _unused, author) {
   const lf = ticket.lateralForm || {};
   if (getWorkflowInstanceKey(lf.workflow)) {
     return { activated: false, workflow: lf.workflow, template: getWorkflowTemplateForTicket(ticket) };
   }
 
-  let template = null;
-  if (mode === 'escalonar') {
-    if (!escalonar) {
-      return { activated: false, workflow: null, template: null };
-    }
-    template = buildEscalonarWorkflowTemplate(escalonar);
-  } else {
-    template = resolveWorkflowForTicket(ticket, rightFields);
-    if (!template && escalonar) {
-      template = buildEscalonarWorkflowTemplate(escalonar);
-    }
-  }
+  const template = resolveWorkflowForTicket(ticket, rightFields);
   if (!template) {
     return { activated: false, workflow: null, template: null };
   }
 
   const workflow = createWorkflowState(template, {
     by: author || getAgentName() || 'sistema',
-    trigger: escalonar ? 'escalonar' : 'tabulation',
+    trigger: 'tabulation',
   });
   const activeStep = template.steps.find((s) => s.id === workflow.currentStepId);
   const atribuido = resolveAtribuidoForStep(activeStep);
@@ -771,11 +739,7 @@ export function syncTicketWorkflowOnCommit(ticket) {
   const workflow = lf.workflow;
 
   if (workflow) {
-    const { escalonar: _legacyEscalonar, ...lfRest } = lf;
-    ticket.lateralForm = { ...lfRest, workflow };
-  } else if (lf.escalonar) {
-    const { escalonar: _legacyEscalonar, ...lfRest } = lf;
-    ticket.lateralForm = lfRest;
+    ticket.lateralForm = { ...lf, workflow };
   }
 
   return {

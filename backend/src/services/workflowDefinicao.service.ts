@@ -1,4 +1,4 @@
-/** workflowDefinicao.service v1.7.1 — resolveWorkflowForTicket lateralForm unknown */
+/** workflowDefinicao.service v1.8.0 — resolve por gatilho sem exclusão de slug */
 import { migratePassoAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import { normalizeRequisicaoConfig } from '../config/workflowRequisicaoDefaults';
@@ -8,7 +8,7 @@ import {
   IWorkflowGatilho,
   IWorkflowPassoEnvelope,
 } from '../models/WorkflowDefinicao';
-import { evaluateGatilhoCriterios, buildTabulationFieldsFromTicket, isLegacyEscalonarWorkflowSlug } from './workflowMatcher.service';
+import { evaluateGatilhoCriterios, buildTabulationFieldsFromTicket } from './workflowMatcher.service';
 import { getActiveGrupos } from './grupoResponsabilidade.service';
 
 let cachedActive: IWorkflowDefinicao[] | null = null;
@@ -193,7 +193,6 @@ export async function resolveWorkflowForTicket(ticket: {
   const workflows = await getActiveWorkflows();
 
   return workflows.find(
-    (wf) => !isLegacyEscalonarWorkflowSlug(wf.slug)
-      && evaluateGatilhoCriterios(wf.gatilho?.criterios || [], fields, grupos),
+    (wf) => evaluateGatilhoCriterios(wf.gatilho?.criterios || [], fields, grupos),
   ) || null;
 }
