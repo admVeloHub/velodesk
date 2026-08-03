@@ -1,10 +1,34 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.59.0 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.60.0 | DATE: 2026-08-03 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: consultas em rascunho, máscara telefone e poll silencioso
+
+- **Data/Hora**: 2026-08-03
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.60.0
+  - **Consultas**: consultas.routes v1.0.1, consultaCpfResolver v1.0.3, consultaFormatters v1.0.1, useCustomerConsulta v1.0.2, DeskConsultasPanel v2.1.1, client.js (consultasApi payload completo)
+  - **Contato/telefone**: utils v3.7.4, clienteAdapter v1.1.1, ClientContactFieldsEditor v1.2.0
+  - **Desk UX**: TicketsContext v1.7.5, ticketsCache v1.10.2, RegisterClientModal v1.1.1, CreateTicketPanel v2.0.2
+- **Arquivos principais**:
+  - `backend/src/services/consultaCpfResolver.service.ts` — rascunho usa CPF do painel sem consultar MongoDB; códigos `missing_cpf`, `ticket_not_found`, `invalid_cpf`
+  - `backend/src/routes/consultas.routes.ts` — body com `cpf`, `isDraft`, `ticketProduct`; erros distintos na resposta
+  - `frontend/src/hooks/useCustomerConsulta.js`, `consultaFormatters.js`, `DeskConsultasPanel.jsx` — envia CPF/isDraft; estados de erro separados
+  - `frontend/src/services/desk/utils.js`, `clienteAdapter.js`, `ClientContactFieldsEditor.jsx` — máscara e formatação telefone BR
+  - `frontend/src/context/TicketsContext.js`, `ticketsCache.js` — poll silencioso só incrementa refreshKey se fingerprint das filas mudou
+  - `RegisterClientModal.jsx`, `CreateTicketPanel.jsx` — corrige re-render/fechamento do modal de cadastro
+- **Descrição**: Corrige aba Consultas em tickets rascunho (CPF visível no painel mas 404 "Ticket não encontrado"). Adiciona máscara de telefone BR no editor de contato e formatação consistente na exibição. Otimiza poll silencioso das filas para evitar re-render desnecessário.
+- **Validação**: `tsc --noEmit` backend OK; resolver de rascunho validado com CPF local.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — Desk: API inbound telefonia IA, aba Consultas e melhorias Desk/VeloNews
 

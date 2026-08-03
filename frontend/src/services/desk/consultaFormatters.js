@@ -1,7 +1,8 @@
 /**
- * consultaFormatters v1.0.0 — formatação de dados da aba Consultas
- * VERSION: v1.0.0 | DATE: 2026-07-30
+ * consultaFormatters v1.0.1 — CPF do ticket + client para rascunhos
+ * VERSION: v1.0.1 | DATE: 2026-08-03
  */
+import { isDraftTicket } from '../../api/adapters/ticketAdapter';
 
 export const CONSULTA_PRODUCT_SLUGS = [
   'emprestimo-pessoal',
@@ -76,10 +77,22 @@ export function getOverviewProductFlags(products) {
   ];
 }
 
-export function getTicketRefFromTicket(ticket) {
+export function getTicketRefFromTicket(ticket, client = null) {
   const ticketId = String(ticket?.id || ticket?._id || '').trim();
   const protocolo = String(
     ticket?.protocolo || ticket?.chamadoProtocolo || ticket?.lateralForm?.protocolo || '',
   ).trim();
-  return { ticketId: ticketId || undefined, protocolo: protocolo || undefined };
+  const lf = ticket?.lateralForm || {};
+  const cpfRaw = lf.clienteCpf || lf.cpf || ticket?.clientCPF || client?.cpf || '';
+  const cpf = String(cpfRaw || '').replace(/\D/g, '');
+  const isDraft = isDraftTicket(ticket);
+  const ticketProduct = String(lf.produto || ticket?.produto || '').trim() || undefined;
+
+  return {
+    ticketId: ticketId || undefined,
+    protocolo: protocolo || undefined,
+    cpf: cpf.length === 11 ? cpf : undefined,
+    isDraft,
+    ticketProduct,
+  };
 }

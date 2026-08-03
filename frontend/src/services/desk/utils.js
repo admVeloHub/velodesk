@@ -1,6 +1,6 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.7.3 | DATE: 2026-07-31
+ * VERSION: v3.7.4 | DATE: 2026-08-03
  * — busca: 11 dígitos = CPF (match literal, sem exigir checksum válido)
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
@@ -85,6 +85,27 @@ export function formatCpf(digits) {
   const d = normalizeCpf(digits);
   if (d.length !== 11) return maskCpfInput(d);
   return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
+/** Remove não-dígitos do telefone */
+export function normalizePhone(v) {
+  return String(v || '').replace(/\D/g, '');
+}
+
+/** Máscara telefone BR enquanto digita (máx. 11 dígitos): (11) 99999-9999 ou (11) 9999-9999 */
+export function maskPhoneInput(value) {
+  const d = normalizePhone(value).slice(0, 11);
+  if (!d.length) return '';
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
+export function formatPhone(digits) {
+  const d = normalizePhone(digits);
+  if (!d.length) return '';
+  return maskPhoneInput(d);
 }
 
 export function isValidCpfDigits(value) {
@@ -336,21 +357,23 @@ export function getClientContactFields(ticket, client) {
   const emailList = Array.isArray(emailsRaw)
     ? emailsRaw.map((item) => String(item || '').trim()).filter(Boolean)
     : (emailsRaw?.lista || []).map((item) => String(item || '').trim()).filter(Boolean);
-  const phoneList = Array.isArray(phonesRaw)
+  const phoneListRaw = Array.isArray(phonesRaw)
     ? phonesRaw.map((item) => String(item || '').trim()).filter(Boolean)
     : (phonesRaw?.lista || []).map((item) => String(item || '').trim()).filter(Boolean);
+  const phoneList = phoneListRaw.map((item) => formatPhone(item)).filter(Boolean);
   const whatsappFromLf = String(lf.clienteTelefoneWhatsapp || '').trim();
   const whatsappFromClient = String(client?.whatsappPhone || client?.telefoneWhatsapp || '').trim();
-  const whatsappPhone = whatsappFromLf || whatsappFromClient || phoneList[0] || '';
+  const whatsappRaw = whatsappFromLf || whatsappFromClient || phoneListRaw[0] || '';
+  const whatsappPhone = whatsappRaw ? formatPhone(whatsappRaw) : '';
   const emailFromLf = emailList[0];
   const phoneFromLf = whatsappPhone || phoneList[0];
   return {
     name: lf.clienteNome || ticket?.clientName || ticket?.solicitante || client?.name || '',
     cpf: formatCpf(lf.clienteCpf || lf.cpf || ticket?.clientCPF || client?.cpf || ''),
     email: emailFromLf || ticket?.clientEmail || client?.email || '',
-    phone: phoneFromLf || ticket?.clientPhone || client?.telefone || '',
+    phone: phoneFromLf ? formatPhone(phoneFromLf) : formatPhone(ticket?.clientPhone || client?.telefone || ''),
     emails: emailList,
-    phones: phoneList,
+    phones: phoneList.length ? phoneList : (phoneFromLf ? [formatPhone(phoneFromLf)] : []),
     whatsappPhone,
   };
 }

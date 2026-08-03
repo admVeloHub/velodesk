@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.10.1 — upsert ao carregar detalhe fora da fila em cache
- * VERSION: v1.10.1 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.10.2 — fingerprint de filas para poll silencioso sem re-render vazio
+ * VERSION: v1.10.2 | DATE: 2026-08-03 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -78,6 +78,19 @@ export function setApiMode(enabled) {
 
 export function getCachedColumns() {
   return columns;
+}
+
+/** Assinatura das filas (id + status por box) — poll silencioso só re-renderiza se mudou. */
+export function fingerprintQueueColumns(cols) {
+  return (cols || [])
+    .map((box) => {
+      const sig = (box.tickets || [])
+        .map((t) => `${String(t.id || t._id)}:${String(t.status || 'novo').trim().toLowerCase()}`)
+        .sort()
+        .join(',');
+      return `${box.id}=${sig}`;
+    })
+    .join('|');
 }
 
 function stripDraftsFromColumns(cols) {

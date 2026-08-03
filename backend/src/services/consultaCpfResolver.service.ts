@@ -1,4 +1,4 @@
-/** consultaCpfResolver v1.0.1 — CPF formatado para exibição no Desk */
+/** consultaCpfResolver v1.0.3 — rascunho não consulta MongoDB */
 import mongoose from 'mongoose';
 import { ChamadoN1, IChamadoN1 } from '../models/ChamadoN1';
 import { findClienteByCpf, findClienteById, getPrimaryDados, normalizeCpf } from './cliente.service';
@@ -7,16 +7,27 @@ import { mapTabulacaoProdutoToSlug, type ConsultaProductSlug } from './consultaP
 export class ConsultaCpfError extends Error {
   status: number;
 
-  constructor(status: number, message: string) {
+  code: string;
+
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code || (status === 422 ? 'missing_cpf' : status === 404 ? 'ticket_not_found' : 'consulta_error');
   }
+}
+
+export interface ResolveConsultaInput {
+  ticketId?: string;
+  protocolo?: string;
+  /** CPF do painel lateral — obrigatório em rascunho; fallback em ticket persistido */
+  cpf?: string;
+  isDraft?: boolean;
+  ticketProduct?: string;
 }
 
 export interface ResolvedConsultaContext {
   cpf: string;
   cpfFormatted: string;
-  chamado: IChamadoN1;
   protocolo: string;
   ticketProductSlug: ConsultaProductSlug | null;
   ticketProductLabel: string;
@@ -46,11 +57,34 @@ function isValidCpfDigits(cpf: string): boolean {
   return check === parseInt(digits[10], 10);
 }
 
-async function loadChamado(ticketId?: string, protocolo?: string): Promise<IChamadoN1> {
+function assertValidCpf(cpfRaw: unknown): string {
+  const cpf = normalizeCpf(cpfRaw);
+  if (!cpf) {
+    throw new ConsultaCpfError(
+      422,
+      'Informe o CPF no cadastro do cliente para consultar.',
+      'missing_cpf',
+    );
+  }
+  if (!isValidCpfDigits(cpf)) {
+    throw new ConsultaCpfError(
+      422,
+      'O CPF informado no cadastro do cliente não é válido.',
+      'invalid_cpf',
+    );
+  }
+  return cpf;
+}
+
+function isDraftTicketId(ticketId?: string): boolean {
+  return String(ticketId ?? '').trim().startsWith('draft-');
+}
+
+async function loadChamado(ticketId?: string, protocolo?: string): Promise<IChamadoN1 | null> {
   const id = String(ticketId ?? '').trim();
   const proto = String(protocolo ?? '').trim();
 
-  if (id && mongoose.Types.ObjectId.isValid(id)) {
+  if (id && !isDraftTicketId(id) && mongoose.Types.ObjectId.isValid(id)) {
     const chamado = await ChamadoN1.findById(id);
     if (chamado) return chamado;
   }
@@ -60,7 +94,7 @@ async function loadChamado(ticketId?: string, protocolo?: string): Promise<ICham
     if (chamado) return chamado;
   }
 
-  throw new ConsultaCpfError(404, 'Ticket não encontrado.');
+  return null;
 }
 
 function extractCpfFromChamado(chamado: IChamadoN1): string {
@@ -82,11 +116,43 @@ function extractCpfFromChamado(chamado: IChamadoN1): string {
   return '';
 }
 
-export async function resolveConsultaContext(input: {
-  ticketId?: string;
-  protocolo?: string;
-}): Promise<ResolvedConsultaContext> {
-  const chamado = await loadChamado(input.ticketId, input.protocolo);
+function buildContextFromCpf(
+  cpf: string,
+  protocolo: string,
+  ticketProductLabel: string,
+): ResolvedConsultaContext {
+  return {
+    cpf,
+    cpfFormatted: formatCpfDisplay(cpf),
+    protocolo,
+    ticketProductSlug: mapTabulacaoProdutoToSlug(ticketProductLabel),
+    ticketProductLabel,
+  };
+}
+
+export async function resolveConsultaContext(input: ResolveConsultaInput): Promise<ResolvedConsultaContext> {
+  const ticketId = String(input.ticketId ?? '').trim() || undefined;
+  const protocoloInput = String(input.protocolo ?? '').trim() || undefined;
+  const ticketProductLabel = String(input.ticketProduct ?? '').trim();
+  const draft = Boolean(input.isDraft) || isDraftTicketId(ticketId);
+
+  if (draft) {
+    const cpf = assertValidCpf(input.cpf);
+    const protocolo = protocoloInput || ticketId || 'draft';
+    return buildContextFromCpf(cpf, protocolo, ticketProductLabel);
+  }
+
+  const chamado = await loadChamado(ticketId, protocoloInput);
+
+  if (!chamado) {
+    if (input.cpf) {
+      const cpf = assertValidCpf(input.cpf);
+      const protocolo = protocoloInput || ticketId || 'desk';
+      return buildContextFromCpf(cpf, protocolo, ticketProductLabel);
+    }
+    throw new ConsultaCpfError(404, 'Ticket não encontrado.', 'ticket_not_found');
+  }
+
   let cpf = extractCpfFromChamado(chamado);
 
   const ref = chamado.cliente?.[0];
@@ -100,10 +166,15 @@ export async function resolveConsultaContext(input: {
     }
   }
 
+  if (!cpf && input.cpf) {
+    cpf = normalizeCpf(input.cpf);
+  }
+
   if (!cpf) {
     throw new ConsultaCpfError(
       422,
       'Informe o CPF no cadastro do cliente para consultar.',
+      'missing_cpf',
     );
   }
 
@@ -111,18 +182,17 @@ export async function resolveConsultaContext(input: {
     throw new ConsultaCpfError(
       422,
       'O CPF informado no cadastro do cliente não é válido.',
+      'invalid_cpf',
     );
   }
 
-  const tabProduto = chamado.tabulacao?.[0]?.produto ?? '';
-  const ticketProductSlug = mapTabulacaoProdutoToSlug(tabProduto);
+  const tabProduto = chamado.tabulacao?.[0]?.produto ?? ticketProductLabel;
 
   return {
     cpf,
     cpfFormatted: formatCpfDisplay(cpf),
-    chamado,
     protocolo: chamado.chamadoProtocolo,
-    ticketProductSlug,
+    ticketProductSlug: mapTabulacaoProdutoToSlug(tabProduto),
     ticketProductLabel: tabProduto,
   };
 }

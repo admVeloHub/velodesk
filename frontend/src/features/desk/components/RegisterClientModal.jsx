@@ -1,8 +1,8 @@
 /**
  * Modal — cadastro cliente b2c_cadastros.clientes
- * VERSION: v1.1.0 | DATE: 2026-07-27
+ * VERSION: v1.1.1 | DATE: 2026-08-03
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { clientsApi } from '../../../api/client';
 import { buildClienteCreateBody } from '../../../api/adapters/clienteAdapter';
@@ -18,22 +18,27 @@ export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [emailErrors, setEmailErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open) return;
     setNome('');
     setEmails(['']);
     setPhones(['']);
     setWhatsappPhone('');
     setEmailErrors({});
     setSaving(false);
+  }, [open]);
 
+  useEffect(() => {
+    if (!open) return undefined;
     const onKey = (event) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

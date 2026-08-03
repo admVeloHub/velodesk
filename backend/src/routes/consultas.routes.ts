@@ -1,4 +1,4 @@
-/** consultas.routes v1.0.0 — proxy aba Consultas (Customer Data API B+) */
+/** consultas.routes v1.0.1 — códigos de erro distintos + CPF em rascunho */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import {
@@ -7,16 +7,33 @@ import {
   fetchProductSnapshot,
   isCustomerDataApiConfigured,
 } from '../services/customerDataApi.service';
-import { ConsultaCpfError, resolveConsultaContext } from '../services/consultaCpfResolver.service';
+import { ConsultaCpfError, resolveConsultaContext, type ResolveConsultaInput } from '../services/consultaCpfResolver.service';
 import { isConsultaProductSlug } from '../services/consultaProductMap';
+import { normalizeCpf } from '../services/cliente.service';
 
 const router = Router();
 
-function readTicketRef(body: Record<string, unknown>): { ticketId?: string; protocolo?: string } {
+function readConsultaInput(body: Record<string, unknown>): ResolveConsultaInput {
+  const ticketId = String(body.ticketId ?? body.id ?? '').trim() || undefined;
+  const lateral = (body.lateralForm ?? {}) as Record<string, unknown>;
+  const cpf = normalizeCpf(
+    body.cpf
+    ?? body.clientCPF
+    ?? lateral.clienteCpf
+    ?? lateral.cpf,
+  ) || undefined;
+
   return {
-    ticketId: String(body.ticketId ?? body.id ?? '').trim() || undefined,
+    ticketId,
     protocolo: String(body.protocolo ?? body.chamadoProtocolo ?? '').trim() || undefined,
+    cpf,
+    isDraft: Boolean(body.isDraft) || String(ticketId ?? '').startsWith('draft-'),
+    ticketProduct: String(body.ticketProduct ?? lateral.produto ?? body.produto ?? '').trim() || undefined,
   };
+}
+
+function respondConsultaError(res: Response, err: ConsultaCpfError) {
+  return res.status(err.status).json({ message: err.message, code: err.code });
 }
 
 router.get('/health', authMiddleware, async (_req: Request, res: Response) => {
@@ -36,18 +53,18 @@ router.post('/360', authMiddleware, async (req: Request, res: Response) => {
     });
   }
 
-  const ref = readTicketRef(req.body ?? {});
-  if (!ref.ticketId && !ref.protocolo) {
-    return res.status(400).json({ message: 'ticketId ou protocolo é obrigatório.' });
+  const input = readConsultaInput(req.body ?? {});
+  if (!input.ticketId && !input.protocolo && !input.cpf) {
+    return res.status(400).json({ message: 'ticketId, protocolo ou cpf é obrigatório.' });
   }
 
   try {
-    const ctx = await resolveConsultaContext(ref);
+    const ctx = await resolveConsultaContext(input);
     const payload = await fetchConsulta360(ctx);
     res.json(payload);
   } catch (err) {
     if (err instanceof ConsultaCpfError) {
-      return res.status(err.status).json({ message: err.message, code: 'missing_cpf' });
+      return respondConsultaError(res, err);
     }
     const message = err instanceof Error ? err.message : String(err);
     console.error('[consultas] POST /360 falhou:', message);
@@ -67,13 +84,13 @@ router.post('/product/:slug', authMiddleware, async (req: Request, res: Response
     return res.status(400).json({ message: 'Produto de consulta inválido.' });
   }
 
-  const ref = readTicketRef(req.body ?? {});
-  if (!ref.ticketId && !ref.protocolo) {
-    return res.status(400).json({ message: 'ticketId ou protocolo é obrigatório.' });
+  const input = readConsultaInput(req.body ?? {});
+  if (!input.ticketId && !input.protocolo && !input.cpf) {
+    return res.status(400).json({ message: 'ticketId, protocolo ou cpf é obrigatório.' });
   }
 
   try {
-    const ctx = await resolveConsultaContext(ref);
+    const ctx = await resolveConsultaContext(input);
     const snapshot = await fetchProductSnapshot(slug, ctx.cpf, ctx.protocolo);
     res.json({
       slug,
@@ -83,7 +100,7 @@ router.post('/product/:slug', authMiddleware, async (req: Request, res: Response
     });
   } catch (err) {
     if (err instanceof ConsultaCpfError) {
-      return res.status(err.status).json({ message: err.message, code: 'missing_cpf' });
+      return respondConsultaError(res, err);
     }
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[consultas] POST /product/${slug} falhou:`, message);

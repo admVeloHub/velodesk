@@ -1,8 +1,8 @@
 /**
  * Painel compacto — criar ticket draft por CPF
- * VERSION: v2.0.1 | DATE: 2026-06-23
+ * VERSION: v2.0.2 | DATE: 2026-08-03
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { clientsApi } from '../../../api/client';
 import { buildDraftTicketFromCliente } from '../../../api/adapters/clienteAdapter';
 import { createDraftTicketInCache } from '../../../services/ticketsCache';
@@ -69,9 +69,13 @@ export default function CreateTicketPanel({ onClose, onSaved }) {
     }
   };
 
-  const handleRegisterSaved = (clienteDoc) => {
+  const handleRegisterSaved = useCallback((clienteDoc) => {
     openDraftForCliente(clienteDoc);
-  };
+  }, [showNotification, onSaved, onClose]);
+
+  const handleRegisterClose = useCallback(() => {
+    setRegisterOpen(false);
+  }, []);
 
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -126,7 +130,7 @@ export default function CreateTicketPanel({ onClose, onSaved }) {
       <RegisterClientModal
         open={registerOpen}
         cpf={pendingCpf}
-        onClose={() => setRegisterOpen(false)}
+        onClose={handleRegisterClose}
         onSaved={handleRegisterSaved}
       />
     </>

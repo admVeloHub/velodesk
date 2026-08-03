@@ -1,6 +1,6 @@
 /**
- * DeskConsultasPanel v2.1.0 — cards de produto com expand/collapse independente
- * VERSION: v2.1.0 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
+ * DeskConsultasPanel v2.1.1 — rascunho usa CPF do painel sem exigir Mongo
+ * VERSION: v2.1.1 | DATE: 2026-08-03 | AUTHOR: VeloHub Development Team
  */
 import React from 'react';
 import useCustomerConsulta from '../../../hooks/useCustomerConsulta';
@@ -19,7 +19,7 @@ export default function DeskConsultasPanel({ ticket, client, active = false }) {
     productLoading,
     reload,
     loadProduct,
-  } = useCustomerConsulta({ ticket, active });
+  } = useCustomerConsulta({ ticket, client, active });
 
   const ticketKey = String(ticket?.id || ticket?._id || ticket?.protocolo || '');
 
@@ -70,8 +70,21 @@ export default function DeskConsultasPanel({ ticket, client, active = false }) {
           <i className="ti ti-id" aria-hidden="true" />
           <p>{error?.message || 'Informe o CPF no cadastro do cliente para consultar.'}</p>
           <p className="crm-consultas__empty-hint">
-            Preencha o CPF no painel lateral do ticket e tente novamente.
+            Preencha o CPF no painel do cliente e salve, depois atualize a consulta.
           </p>
+        </div>
+      ) : null}
+
+      {active && state === 'ticket_not_found' ? (
+        <div className="crm-consultas__empty crm-consultas__empty--blocked">
+          <i className="ti ti-alert-circle" aria-hidden="true" />
+          <p>{error?.message || 'Ticket não encontrado.'}</p>
+          <p className="crm-consultas__empty-hint">
+            Salve o ticket (rascunho) ou atualize a página e tente novamente.
+          </p>
+          <button type="button" className="velo-btn velo-btn--secondary velo-btn--sm" onClick={() => reload()}>
+            Tentar novamente
+          </button>
         </div>
       ) : null}
 

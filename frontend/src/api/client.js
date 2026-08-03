@@ -300,8 +300,8 @@ export const mailRulesApi = {
 
 export const consultasApi = {
   health: () => api.get('/consultas/health').then((r) => r.data),
-  fetch360: ({ ticketId, protocolo } = {}) =>
-    api.post('/consultas/360', { ticketId, protocolo }).then((r) => r.data),
-  fetchProduct: (slug, { ticketId, protocolo } = {}) =>
-    api.post(`/consultas/product/${encodeURIComponent(slug)}`, { ticketId, protocolo }).then((r) => r.data),
+  fetch360: (payload = {}) =>
+    api.post('/consultas/360', payload).then((r) => r.data),
+  fetchProduct: (slug, payload = {}) =>
+    api.post(`/consultas/product/${encodeURIComponent(slug)}`, payload).then((r) => r.data),
 };

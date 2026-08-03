@@ -1,9 +1,15 @@
 /**
- * ClientContactFieldsEditor v1.1.0 — CPF primeiro + múltiplos e-mails/telefones
- * VERSION: v1.1.0 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
+ * ClientContactFieldsEditor v1.2.0 — máscara de telefone BR no input
+ * VERSION: v1.2.0 | DATE: 2026-08-03 | AUTHOR: VeloHub Development Team
  */
 import React from 'react';
-import { isValidEmailFormat, maskCpfInput } from '../../../services/desk/utils';
+import { isValidEmailFormat, maskCpfInput, maskPhoneInput, normalizePhone } from '../../../services/desk/utils';
+
+function phoneMatches(a, b) {
+  const left = normalizePhone(a);
+  const right = normalizePhone(b);
+  return Boolean(left && right && left === right);
+}
 
 function ensureMinOne(items) {
   return items.length ? items : [''];
@@ -47,12 +53,13 @@ export default function ClientContactFieldsEditor({
   };
 
   const updatePhone = (index, value) => {
+    const masked = maskPhoneInput(value);
     const next = [...phoneRows];
     const prev = next[index];
-    next[index] = value;
+    next[index] = masked;
     onPhonesChange(next);
-    if (whatsappPhone && whatsappPhone === prev) {
-      onWhatsappPhoneChange(value.trim());
+    if (whatsappPhone && phoneMatches(whatsappPhone, prev)) {
+      onWhatsappPhoneChange(masked.trim());
     }
   };
 
@@ -62,7 +69,7 @@ export default function ClientContactFieldsEditor({
     const removed = phoneRows[index];
     const next = phoneRows.length <= 1 ? [''] : phoneRows.filter((_, i) => i !== index);
     onPhonesChange(next);
-    if (whatsappPhone && whatsappPhone === removed) {
+    if (whatsappPhone && phoneMatches(whatsappPhone, removed)) {
       const fallback = next.map((item) => String(item || '').trim()).find(Boolean) || '';
       onWhatsappPhoneChange(fallback);
     }
@@ -164,6 +171,8 @@ export default function ClientContactFieldsEditor({
                 onChange={(e) => updatePhone(index, e.target.value)}
                 placeholder="(11) 99999-9999"
                 autoComplete={index === 0 ? 'tel' : 'off'}
+                inputMode="numeric"
+                maxLength={15}
               />
               <label
                 className={'client-contact-fields__wa' + (!trimmed ? ' is-disabled' : '')}
@@ -172,7 +181,7 @@ export default function ClientContactFieldsEditor({
                 <input
                   type="radio"
                   name={radioName}
-                  checked={Boolean(trimmed && whatsappPhone === trimmed)}
+                  checked={Boolean(trimmed && phoneMatches(whatsappPhone, trimmed))}
                   disabled={!trimmed}
                   onChange={() => selectWhatsapp(trimmed)}
                 />
@@ -215,7 +224,8 @@ export function validateClientContactDraft({ cpf, name, emails, phones, whatsapp
   }
 
   const phoneList = (phones || []).map((item) => String(item || '').trim()).filter(Boolean);
-  if (phoneList.length > 1 && whatsappPhone && !phoneList.includes(String(whatsappPhone).trim())) {
+  const whatsappSelected = String(whatsappPhone || '').trim();
+  if (phoneList.length > 1 && whatsappSelected && !phoneList.some((item) => phoneMatches(item, whatsappSelected))) {
     return { ok: false, message: 'Selecione um telefone válido para WhatsApp.' };
   }
   if (phoneList.length > 1 && !String(whatsappPhone || '').trim()) {
@@ -229,7 +239,10 @@ export function resolveWhatsappPhone(phoneList, whatsappPhone) {
   const phones = (phoneList || []).map((item) => String(item || '').trim()).filter(Boolean);
   if (!phones.length) return '';
   const selected = String(whatsappPhone || '').trim();
-  if (selected && phones.includes(selected)) return selected;
+  if (selected) {
+    const match = phones.find((item) => phoneMatches(item, selected));
+    if (match) return match;
+  }
   return phones[0];
 }
 

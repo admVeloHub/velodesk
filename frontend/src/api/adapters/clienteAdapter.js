@@ -1,8 +1,8 @@
 /**
- * clienteAdapter v1.1.0 — múltiplos e-mails/telefones + whatsapp
- * VERSION: v1.1.0 | DATE: 2026-07-27
+ * clienteAdapter v1.1.1 — formata telefones ao mapear cadastro
+ * VERSION: v1.1.1 | DATE: 2026-08-03
  */
-import { normalizeCpf } from '../../services/desk/utils';
+import { formatPhone, normalizeCpf, normalizePhone } from '../../services/desk/utils';
 
 function normalizeListInput(value) {
   if (Array.isArray(value)) {
@@ -16,7 +16,10 @@ export function resolveWhatsappPhone(phoneList, whatsappPhone) {
   const phones = normalizeListInput(phoneList);
   if (!phones.length) return '';
   const selected = String(whatsappPhone ?? '').trim();
-  if (selected && phones.includes(selected)) return selected;
+  if (selected) {
+    const match = phones.find((item) => normalizePhone(item) === normalizePhone(selected));
+    if (match) return match;
+  }
   return phones[0];
 }
 
@@ -30,8 +33,10 @@ export function mapClienteDocToContact(doc) {
   if (!dados) return null;
   const cpf = normalizeCpf(dados.clienteCpf);
   const emails = dados.clienteEmail?.lista || [];
-  const phones = dados.clienteTelefone?.lista || [];
-  const whatsappPhone = dados.clienteTelefone?.whatsapp || resolveWhatsappPhone(phones, '');
+  const phonesRaw = dados.clienteTelefone?.lista || [];
+  const phones = phonesRaw.map((item) => formatPhone(item)).filter(Boolean);
+  const whatsappRaw = dados.clienteTelefone?.whatsapp || resolveWhatsappPhone(phonesRaw, '');
+  const whatsappPhone = whatsappRaw ? formatPhone(whatsappRaw) : '';
   return {
     clienteId: doc._id || doc.id,
     clientCPF: cpf,

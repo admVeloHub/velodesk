@@ -1,6 +1,6 @@
 /**
- * useCustomerConsulta v1.0.1 — fetch lazy da aba Consultas (estratégia B+)
- * VERSION: v1.0.1 | DATE: 2026-07-30
+ * useCustomerConsulta v1.0.2 — rascunho + CPF do client como fallback
+ * VERSION: v1.0.2 | DATE: 2026-08-03
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { consultasApi } from '../api/client';
@@ -8,31 +8,35 @@ import { getTicketRefFromTicket } from '../services/desk/consultaFormatters';
 
 const cache = new Map();
 
-function cacheKey(ticket) {
-  const ref = getTicketRefFromTicket(ticket);
-  return ref.ticketId || ref.protocolo || '';
+function cacheKey(ticket, client) {
+  const ref = getTicketRefFromTicket(ticket, client);
+  return ref.ticketId || ref.protocolo || ref.cpf || '';
 }
 
 function normalizeError(err) {
   const status = err?.response?.status;
   const data = err?.response?.data || {};
   const message = data.message || err?.message || 'Não foi possível carregar as consultas.';
-  if (status === 422 || data.code === 'missing_cpf') {
-    return { type: 'missing_cpf', message };
+  const code = data.code || '';
+  if (code === 'missing_cpf' || code === 'invalid_cpf' || status === 422) {
+    return { type: 'missing_cpf', message, code };
+  }
+  if (code === 'ticket_not_found' || status === 404) {
+    return { type: 'ticket_not_found', message, code };
   }
   if (status === 503) {
-    return { type: 'not_configured', message };
+    return { type: 'not_configured', message, code };
   }
-  return { type: 'error', message, status };
+  return { type: 'error', message, status, code };
 }
 
-export default function useCustomerConsulta({ ticket, active }) {
+export default function useCustomerConsulta({ ticket, client, active }) {
   const [state, setState] = useState('idle');
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [productLoading, setProductLoading] = useState({});
-  const ticketKey = cacheKey(ticket);
+  const ticketKey = cacheKey(ticket, client);
   const load360Ref = useRef(null);
 
   const applyPayload = useCallback((payload) => {
@@ -43,7 +47,8 @@ export default function useCustomerConsulta({ ticket, active }) {
   }, [ticketKey]);
 
   const load360 = useCallback(async (force = false) => {
-    if (!ticket || !ticketKey) return;
+    const ref = getTicketRefFromTicket(ticket, client);
+    if (!ticket || (!ref.ticketId && !ref.protocolo && !ref.cpf)) return;
 
     if (!force && cache.has(ticketKey)) {
       applyPayload(cache.get(ticketKey));
@@ -55,18 +60,18 @@ export default function useCustomerConsulta({ ticket, active }) {
     setError(null);
 
     try {
-      const ref = getTicketRefFromTicket(ticket);
+      const ref = getTicketRefFromTicket(ticket, client);
       const payload = await consultasApi.fetch360(ref);
       applyPayload(payload);
     } catch (err) {
       const normalized = normalizeError(err);
       setError(normalized);
-      setState(normalized.type === 'missing_cpf' ? 'missing_cpf' : 'error');
+      setState(normalized.type === 'missing_cpf' ? 'missing_cpf' : normalized.type === 'ticket_not_found' ? 'ticket_not_found' : 'error');
       if (force) setData(null);
     } finally {
       setRefreshing(false);
     }
-  }, [ticket, ticketKey, applyPayload]);
+  }, [ticket, client, ticketKey, applyPayload]);
 
   load360Ref.current = load360;
 
@@ -80,7 +85,7 @@ export default function useCustomerConsulta({ ticket, active }) {
 
     setProductLoading((prev) => ({ ...prev, [slug]: true }));
     try {
-      const ref = getTicketRefFromTicket(ticket);
+      const ref = getTicketRefFromTicket(ticket, client);
       const snapshot = await consultasApi.fetchProduct(slug, ref);
       setData((prev) => {
         if (!prev) return prev;
@@ -109,7 +114,7 @@ export default function useCustomerConsulta({ ticket, active }) {
     } finally {
       setProductLoading((prev) => ({ ...prev, [slug]: false }));
     }
-  }, [ticket, ticketKey]);
+  }, [ticket, client, ticketKey]);
 
   useEffect(() => {
     if (!active || !ticket || !ticketKey) return;
@@ -121,7 +126,7 @@ export default function useCustomerConsulta({ ticket, active }) {
     }
 
     load360Ref.current?.(false);
-  }, [active, ticket, ticketKey, applyPayload]);
+  }, [active, ticket, client, ticketKey, applyPayload]);
 
   return {
     state,
