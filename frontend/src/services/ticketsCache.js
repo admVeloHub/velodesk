@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.10.2 — fingerprint de filas para poll silencioso sem re-render vazio
- * VERSION: v1.10.2 | DATE: 2026-08-03 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.10.3 — fila Novos filtrada por responsável no cache do agente
+ * VERSION: v1.10.3 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -12,7 +12,7 @@ import {
   buildCreatePayload,
   isDraftTicket,
 } from '../api/adapters/ticketAdapter';
-import { readDeskProfileId, shouldUseMeusChamadosFila, ticketMatchesAgentResponsavel } from './desk/responsavelSegmentation';
+import { readDeskProfileId, shouldUseMeusChamadosFila, ticketBelongsInAgentNovosQueue } from './desk/responsavelSegmentation';
 import { getAgentName } from './clientDb';
 import { syncProconDemandasFromTickets } from './especiais/proconTicketService';
 
@@ -340,7 +340,7 @@ function filterColumnsForAgent(columns) {
     ...box,
     tickets: (box.tickets || []).filter((ticket) => {
       if (box.id === 'resolvidos') return true;
-      // Novos / Em andamento / Pendente: backend meus-chamados já aplicou responsável
+      if (box.id === 'novos') return ticketBelongsInAgentNovosQueue(ticket);
       return true;
     }),
   }));

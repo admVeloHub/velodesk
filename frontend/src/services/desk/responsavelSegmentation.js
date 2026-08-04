@@ -1,9 +1,10 @@
 /**
- * responsavelSegmentation v1.6.0 — Meus Tickets sempre por responsável atribuído
- * VERSION: v1.6.0 | DATE: 2026-07-30
+ * responsavelSegmentation v1.6.1 — fila Novos: atribuídos ao agente ou sem responsável
+ * VERSION: v1.6.1 | DATE: 2026-08-04
  */
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 import { normalizeProfileId } from '../../config/profiles';
+import { sanitizeResponsavel } from '../tabulationConfig';
 import {
   readCachedPermissions,
   shouldUseMeusChamadosFila as permShouldUseMeusChamados,
@@ -104,6 +105,34 @@ export function buildResponsavelCandidates() {
   return [...new Set(values.filter(Boolean))];
 }
 
+export function readTicketResponsavel(ticket) {
+  return sanitizeResponsavel(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
+}
+
+/**
+ * Fila Novos (sidebar) — agentes veem só tickets novos atribuídos a si ou sem responsável real.
+ * Gestão / ver_todos: todos os novos.
+ */
+export function ticketBelongsInAgentNovosQueue(ticket, profileId = readDeskProfileId()) {
+  if (shouldViewAllDeskTickets(profileId)) return true;
+
+  const perm = readCachedPermissions();
+  if (perm && hasPermission(perm.permissoes, 'tickets', 'ver_todos')) return true;
+  if (perm && !permShouldUseMeusChamados(perm)) return true;
+
+  if (!shouldUseMeusChamadosFila(profileId)) {
+    return ticketMatchesAgentResponsavel(ticket, profileId);
+  }
+
+  const status = normalize(ticket?.status || '');
+  if (status && status !== 'novo') return false;
+
+  const responsavel = normalize(readTicketResponsavel(ticket));
+  if (!responsavel) return true;
+
+  return buildResponsavelCandidates().includes(responsavel);
+}
+
 export function ticketMatchesAgentResponsavel(ticket, profileId = readDeskProfileId()) {
   if (shouldViewAllDeskTickets(profileId)) return true;
 
@@ -113,7 +142,7 @@ export function ticketMatchesAgentResponsavel(ticket, profileId = readDeskProfil
 
   if (!shouldUseMeusChamadosFila(profileId)) return true;
 
-  const responsavel = normalize(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
+  const responsavel = normalize(readTicketResponsavel(ticket));
   const status = normalize(ticket?.status || '');
 
   if (!responsavel && status === 'novo') return true;
@@ -125,7 +154,7 @@ export function ticketMatchesAgentResponsavel(ticket, profileId = readDeskProfil
 
 /** Apenas tickets com responsável explícito igual ao agente logado. */
 export function ticketAssignedToCurrentAgent(ticket) {
-  const responsavel = normalize(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
+  const responsavel = normalize(readTicketResponsavel(ticket));
   if (!responsavel) return false;
   const candidates = buildResponsavelCandidates();
   return candidates.includes(responsavel);

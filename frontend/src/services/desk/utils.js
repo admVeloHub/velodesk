@@ -1,11 +1,12 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.10.0 | DATE: 2026-08-04
- * — stepper: resolve etapas via passosResumo / template runtime
+ * VERSION: v3.10.2 | DATE: 2026-08-04
+ * — Meus Tickets: apenas novos, cliente respondeu e em andamento (sem resolvidos/pendente)
+ * — Novos: agente vê só atribuídos a si ou sem responsável
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
-import { ticketBelongsInMeusTicketsList, ticketMatchesAgentResponsavel, shouldUseMeusChamadosFila, shouldViewAllDeskTickets } from './responsavelSegmentation';
+import { ticketBelongsInMeusTicketsList, ticketBelongsInAgentNovosQueue, ticketMatchesAgentResponsavel, shouldUseMeusChamadosFila, shouldViewAllDeskTickets } from './responsavelSegmentation';
 import { normalizeMessageDisplayText } from '../../utils/htmlText.util';
 import { sanitizeResponsavel } from '../tabulationConfig';
 import {
@@ -999,9 +1000,10 @@ export const MY_TICKETS_STATUS_SECTIONS = [
   { id: 'novos', label: 'Novos', dot: '#1634FF' },
   { id: 'cliente-respondeu', label: 'Cliente respondeu', dot: '#E85D04' },
   { id: 'em-andamento', label: 'Em andamento', dot: '#15A237' },
-  { id: 'pendente', label: 'Pendente', dot: '#FCC200' },
-  { id: 'resolvidos', label: 'Resolvidos', dot: '#9ca3af' },
 ];
+
+const MEUS_TICKETS_ACTIVE_QUEUE_IDS = new Set(['novos', 'em-andamento']);
+const MEUS_TICKETS_ACTIVE_STATUSES = new Set(['novo', 'em-aberto', 'em-andamento', '']);
 
 function matchesTicketByCpf(ticket, rawQuery) {
   const digits = normalizeCpf(String(rawQuery || '').trim());
@@ -1047,12 +1049,21 @@ export function filterEntriesByDeskSearch(entries, rawQuery, searchMode) {
 
 function filterMyTicketsEntries(searchQuery) {
   const q = String(searchQuery || '').trim();
-  const activeQueues = new Set(['novos', 'em-andamento', 'pendente', 'resolvidos']);
 
   return getAllCockpitTickets().filter((entry) => {
-    if (!activeQueues.has(entry.queueId)) return false;
+    if (!MEUS_TICKETS_ACTIVE_QUEUE_IDS.has(entry.queueId)) return false;
     if (isFusaoAbsorvido(entry.ticket)) return false;
     if (!ticketBelongsInMeusTicketsList(entry.ticket)) return false;
+    if (isTicketTerminalStatus(entry.ticket)) return false;
+
+    const status = normalizeTicketStatusKey(entry.ticket?.status);
+    if (status === 'pendente') return false;
+    if (entry.queueId === 'novos') {
+      if (status && status !== 'novo') return false;
+    } else if (!MEUS_TICKETS_ACTIVE_STATUSES.has(status)) {
+      return false;
+    }
+
     return matchesTicketSearch(entry, q);
   });
 }
@@ -1088,11 +1099,7 @@ function matchesMyTicketsStatusSection(entry, sectionId) {
 
   if (sectionId === 'cliente-respondeu') return status === 'em-aberto';
   if (sectionId === 'em-andamento') return status === 'em-andamento';
-  if (sectionId === 'novos') return status === 'novo' || entry.queueId === 'novos';
-  if (sectionId === 'pendente') return status === 'pendente' || entry.queueId === 'pendente';
-  if (sectionId === 'resolvidos') {
-    return ['resolvido', 'cancelado', 'fechado'].includes(status) || entry.queueId === 'resolvidos';
-  }
+  if (sectionId === 'novos') return status === 'novo' || status === '' || entry.queueId === 'novos';
   return entry.queueId === sectionId;
 }
 
@@ -1126,6 +1133,7 @@ export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOld
     .filter((entry) => {
       if (isFusaoAbsorvido(entry.ticket)) return false;
       if (entry.queueId !== activeQueue) return false;
+      if (activeQueue === 'novos' && !ticketBelongsInAgentNovosQueue(entry.ticket)) return false;
       if (filterByResponsavel && !trustBackendQueues && !ticketMatchesAgentResponsavel(entry.ticket)) {
         return false;
       }
@@ -1167,6 +1175,7 @@ export function countByQueue(queueId) {
   return getAllCockpitTickets().filter((e) => {
     if (isFusaoAbsorvido(e.ticket)) return false;
     if (e.queueId !== queueId) return false;
+    if (queueId === 'novos' && !ticketBelongsInAgentNovosQueue(e.ticket)) return false;
     if (filterByResponsavel && !trustBackendQueues && !ticketMatchesAgentResponsavel(e.ticket)) {
       return false;
     }

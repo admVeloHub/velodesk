@@ -1,10 +1,30 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.63.0 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.64.0 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: filas Meus Tickets e Novos por responsável do agente
+
+- **Data/Hora**: 2026-08-04
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.64.0
+  - **Desk/filas**: utils v3.10.2, responsavelSegmentation v1.6.1, ticketsCache v1.10.3, DeskMyTicketsTable v1.5.2
+- **Arquivos principais**:
+  - `frontend/src/services/desk/utils.js` — Meus Tickets só novos/cliente respondeu/em andamento; exclui resolvidos e pendente; fila Novos filtrada por responsável
+  - `frontend/src/services/desk/responsavelSegmentation.js` — `ticketBelongsInAgentNovosQueue` (atribuídos ao agente ou sem responsável real); `readTicketResponsavel` com sanitize
+  - `frontend/src/services/ticketsCache.js` — coluna Novos filtrada ao hidratar cache da API
+  - `frontend/src/features/desk/components/DeskMyTicketsTable.jsx` — remove seção flat sem status; só seções com cabeçalho
+- **Descrição**: Corrige tickets resolvidos aparecendo no final de Meus Tickets (devem ir só para Resolvidos). Fila Novos para agentes exibe apenas tickets novos atribuídos a si ou sem atribuição; gestão/ver_todos mantém visão completa.
+- **Validação**: Filtros aplicados em listagem, contagem de fila e cache pós-API.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — Backend: fix build GCP workflow (contexto tabulação IChamadoN1)
 

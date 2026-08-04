@@ -1,6 +1,6 @@
 /**
- * DeskMyTicketsTable v1.5.1 — seção expandida via URL (?section=cliente-respondeu)
- * VERSION: v1.5.1 | DATE: 2026-07-31
+ * DeskMyTicketsTable v1.5.2 — apenas seções Novos / Cliente respondeu / Em andamento
+ * VERSION: v1.5.2 | DATE: 2026-08-04
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -12,11 +12,8 @@ import {
   getTicketTitle,
   groupMyTicketsByStatus,
   normalizeTicketForDeskV2,
-  sortTicketEntries,
 } from '../../../services/desk/utils';
 import { SLA_SHORT_LABELS } from '../../../services/desk/constants';
-
-const MY_TICKETS_SECTIONS_WITHOUT_HEADER = new Set(['pendente', 'resolvidos']);
 
 function renderTicketRows(sectionEntries, onSelectTicket) {
   return sectionEntries.map(({ ticket }) => {
@@ -85,18 +82,10 @@ export default function DeskMyTicketsTable({
     [entries, searchQuery],
   );
 
-  const { headerSections, flatEntries } = useMemo(() => {
-    const grouped = groupMyTicketsByStatus(filteredEntries);
-    const withoutHeader = grouped.filter((section) => MY_TICKETS_SECTIONS_WITHOUT_HEADER.has(section.id));
-    const withHeader = grouped.filter((section) => !MY_TICKETS_SECTIONS_WITHOUT_HEADER.has(section.id));
-    const mergedFlat = sortTicketEntries(
-      withoutHeader.flatMap((section) => section.entries),
-      'sla',
-      'asc',
-    );
-
-    return { headerSections: withHeader, flatEntries: mergedFlat };
-  }, [filteredEntries]);
+  const sections = useMemo(
+    () => groupMyTicketsByStatus(filteredEntries),
+    [filteredEntries],
+  );
 
   const total = filteredEntries.length;
   const [collapsedSections, setCollapsedSections] = useState(() => new Set());
@@ -117,14 +106,14 @@ export default function DeskMyTicketsTable({
 
   useEffect(() => {
     if (!expandedSectionId || didScrollExpandedRef.current) return;
-    const section = headerSections.find((item) => item.id === expandedSectionId);
+    const section = sections.find((item) => item.id === expandedSectionId);
     if (!section?.entries?.length) return;
     didScrollExpandedRef.current = true;
     requestAnimationFrame(() => {
       document.getElementById(`deskMyTicketsSection-${expandedSectionId}`)
         ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     });
-  }, [expandedSectionId, headerSections]);
+  }, [expandedSectionId, sections]);
 
   const toggleSection = (sectionId) => {
     setCollapsedSections((prev) => {
@@ -188,13 +177,13 @@ export default function DeskMyTicketsTable({
       </header>
 
       <div className="desk-my-tickets-table__body">
-        {headerSections.length === 0 && flatEntries.length === 0 ? (
+        {sections.length === 0 ? (
           <p className="desk-my-tickets-table__empty">
             {searchActive ? 'Nenhum ticket encontrado na busca' : 'Nenhum ticket atribuído a você nesta visão'}
           </p>
         ) : null}
 
-        {headerSections.map((section) => {
+        {sections.map((section) => {
           const isCollapsed = collapsedSections.has(section.id);
 
           return (
@@ -231,13 +220,6 @@ export default function DeskMyTicketsTable({
           );
         })}
 
-        {flatEntries.length > 0 ? (
-          <section className="desk-my-tickets-table__section desk-my-tickets-table__section--flat">
-            <TicketGrid id="deskMyTicketsSection-flat">
-              {renderTicketRows(flatEntries, onSelectTicket)}
-            </TicketGrid>
-          </section>
-        ) : null}
       </div>
     </div>
   );
