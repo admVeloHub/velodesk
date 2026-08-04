@@ -1,4 +1,4 @@
-/** index v1.11.0 — rotas /api/consultas (Customer Data API) */
+/** index v1.13.0 — rotas /api/ticket-fusao */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -44,6 +44,8 @@ import mailRulesRoutes from './routes/mailRules.routes';
 import ticketIaAnalysisRoutes from './routes/ticketIaAnalysis.routes';
 import telephonyRoutes from './routes/telephony.routes';
 import consultasRoutes from './routes/consultas.routes';
+import ticketSearchRoutes from './routes/ticketSearch.routes';
+import ticketFusaoRoutes from './routes/ticketFusao.routes';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
@@ -176,6 +178,8 @@ app.use('/api/mail-rules', mailRulesRoutes);
 app.use('/api/ticket-ia-analysis', ticketIaAnalysisRoutes);
 app.use('/api/telephony', telephonyRoutes);
 app.use('/api/consultas', consultasRoutes);
+app.use('/api/ticket-search', ticketSearchRoutes);
+app.use('/api/ticket-fusao', ticketFusaoRoutes);
 
 if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);

@@ -1,4 +1,4 @@
-/** ChamadoN1 v1.8.0 — enum de status em registro (ciclo fechado 48h) */
+/** ChamadoN1 v1.9.0 — campo fusao (vínculo estilo Ouvidoria) */
 import mongoose, { Schema, Document, Types } from 'mongoose';
 import type { IChamadoWorkflowRequisicao } from '../config/workflowRequisicaoDefaults';
 
@@ -15,6 +15,21 @@ export const CHAMADO_STATUS_VALUES = [
 ] as const;
 
 export type ChamadoStatus = (typeof CHAMADO_STATUS_VALUES)[number];
+
+export type FusaoHierarquia = 'superior' | 'inferior' | 'redundante';
+
+/** Vínculo de fusão (espelha Fusao do VeloHub Ouvidoria). */
+export interface IChamadoFusao {
+  fundido: boolean;
+  dataFundido: Date | null;
+  hierarquia: FusaoHierarquia | '';
+  parentId: Types.ObjectId | null;
+  childId: Types.ObjectId | null;
+  parentProtocolo?: string;
+  childProtocolo?: string;
+  childProtocolos?: string[];
+  childIds?: Types.ObjectId[];
+}
 
 export interface IChamadoWorkflow {
   active: boolean;
@@ -63,6 +78,7 @@ export interface IChamadoN1 extends Document {
   tabulacao: ITabulacao[];
   registro: IRegistro[];
   workflow?: IChamadoWorkflow;
+  fusao?: IChamadoFusao;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -140,6 +156,25 @@ const ChamadoWorkflowSchema = new Schema<IChamadoWorkflow>(
   { _id: false },
 );
 
+const ChamadoFusaoSchema = new Schema<IChamadoFusao>(
+  {
+    fundido: { type: Boolean, default: false },
+    dataFundido: { type: Date, default: null },
+    hierarquia: {
+      type: String,
+      enum: ['superior', 'inferior', 'redundante', ''],
+      default: '',
+    },
+    parentId: { type: Schema.Types.ObjectId, default: null },
+    childId: { type: Schema.Types.ObjectId, default: null },
+    parentProtocolo: { type: String, default: '' },
+    childProtocolo: { type: String, default: '' },
+    childProtocolos: { type: [String], default: [] },
+    childIds: { type: [Schema.Types.ObjectId], default: [] },
+  },
+  { _id: false },
+);
+
 const ChamadoN1Schema = new Schema<IChamadoN1>(
   {
     chamadoProtocolo: { type: String },
@@ -148,6 +183,7 @@ const ChamadoN1Schema = new Schema<IChamadoN1>(
     tabulacao: { type: [TabulacaoSchema], default: [] },
     registro: { type: [RegistroSchema], default: [] },
     workflow: { type: ChamadoWorkflowSchema, default: undefined },
+    fusao: { type: ChamadoFusaoSchema, default: undefined },
   },
   {
     timestamps: true,
@@ -156,5 +192,6 @@ const ChamadoN1Schema = new Schema<IChamadoN1>(
 );
 
 ChamadoN1Schema.index({ chamadoProtocolo: 1 }, { unique: true, sparse: true, name: 'chamadoProtocolo_1' });
+ChamadoN1Schema.index({ 'cliente.clienteCpf': 1 }, { name: 'cliente_clienteCpf_1' });
 
 export const ChamadoN1 = mongoose.model<IChamadoN1>('ChamadoN1', ChamadoN1Schema);

@@ -1,4 +1,4 @@
-/** workflowDefinicao.service v1.8.0 — resolve por gatilho sem exclusão de slug */
+/** workflowDefinicao.service v1.8.1 — getWorkflowsByIds com ObjectId explícito */
 import { migratePassoAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import { normalizeRequisicaoConfig } from '../config/workflowRequisicaoDefaults';
@@ -80,8 +80,13 @@ export async function getWorkflowsByIds(ids: string[]): Promise<Map<string, IWor
   const map = new Map<string, IWorkflowDefinicao>();
   if (!unique.length) return map;
 
+  const objectIds = unique
+    .filter((id) => Types.ObjectId.isValid(id))
+    .map((id) => new Types.ObjectId(id));
+  if (!objectIds.length) return map;
+
   const Model = getWorkflowDefinicaoModel();
-  const docs = await Model.find({ _id: { $in: unique } }).lean();
+  const docs = await Model.find({ _id: { $in: objectIds } }).lean();
   docs.forEach((doc) => {
     map.set(String(doc._id), doc as unknown as IWorkflowDefinicao);
   });

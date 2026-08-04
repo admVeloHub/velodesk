@@ -1,10 +1,34 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.61.0 | DATE: 2026-08-03 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.62.0 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: busca avançada de tickets e mesclagem (fusão)
+
+- **Data/Hora**: 2026-08-04
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.62.0
+  - **Backend**: index v1.13.0, ChamadoN1 v1.9.0, chamado.mapper, ticketSearch.routes v1.1.0, ticketSearch.service, ticketFusao.routes v1.0.1, ticketFusao.service v1.1.1, ticketFusao.helpers
+  - **Frontend**: TicketSearchView v1.0.0, TicketSearchPage, client.js v1.22.0, ClientTicketHistoryModal (mesclagem multi-seleção), FusaoFundidoBadge v1.1.0, TicketFusaoStatusControls, ticketFusaoService, utils (isFusaoAbsorvido), styles.css, velodesk-crm.css
+  - **Desk/workflow**: DeskV2Root, workflowEngine, workflowDefinitions, TicketWorkflowStepper, App.js (rota `/busca-tickets`), profiles.js
+- **Arquivos principais**:
+  - `backend/src/routes/ticketSearch.routes.ts` — `GET/POST /api/ticket-search` com critérios multi-campo + busca por CPF
+  - `backend/src/routes/ticketFusao.routes.ts` — `POST /api/ticket-fusao` mescla ticket ativo + inativos (mesmo CPF)
+  - `backend/src/models/ChamadoN1.ts` — campo `fusao` (fundido, hierarquia, parent/child) + índice `cliente.clienteCpf`
+  - `frontend/src/features/ticket-search/` — página Busca de Tickets com critérios reutilizando padrão de caixas
+  - `frontend/src/features/desk/components/ClientTicketHistoryModal.jsx` — seleção múltipla e confirmação de mesclagem no histórico por CPF
+  - `frontend/src/services/desk/utils.js` — tickets absorvidos pela fusão saem das filas abertas
+- **Descrição**: Nova página de busca avançada de tickets no Desk e mesclagem de chamados do mesmo cliente (estilo Ouvidoria VeloHub): ticket ativo permanece aberto, absorvidos vão para resolvido com vínculo `fusao` e badge "Mesclado" no histórico.
+- **Validação**: Rotas novas registradas em `index.ts`; fluxo UI histórico → seleção → confirmação → POST fusão.
+- **Status**: Push dev
+
+---
 
 ### GitHub Push — Desk: botão Iniciar Workflow por tabulação (sem legado escalonar)
 

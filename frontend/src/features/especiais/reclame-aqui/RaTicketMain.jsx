@@ -9,8 +9,7 @@ import { useNotifications } from '../../../context/NotificationContext';
 import { useTicketAiSuggestions } from '../../../hooks/useTicketAiSuggestions';
 import { lookupClient } from '../../../services/clientDb';
 import { buildRegistroThread } from '../../../services/desk/utils';
-import { mergeTicketInto } from '../../../services/desk/ticketMergeService';
-import { isDraftTicket } from '../../../services/ticketsCache';
+import { fundirTickets } from '../../../services/desk/ticketFusaoService';
 import { getStatusLabel } from '../../../services/especiais/reclameAquiData';
 import {
   formatRaDeadlineLabel,
@@ -82,28 +81,25 @@ export default function RaTicketMain({
     showNotification('Abra o Desk para visualizar o ticket selecionado.', 'info');
   }, [showNotification]);
 
-  const handleMergeTickets = useCallback(async (targetId) => {
-    if (!ticket?.id || mergeInProgress) return;
-    if (isDraftTicket(ticket)) {
-      showNotification('Salve o ticket antes de mesclar.', 'warning');
-      return;
-    }
+  const handleFundirTickets = useCallback(async ({ activeId, inactiveIds, cpf }) => {
+    if (!activeId || mergeInProgress) return;
     setMergeInProgress(true);
     try {
-      const result = await mergeTicketInto(ticket.id, targetId);
+      const result = await fundirTickets({ activeId, inactiveIds, cpf });
       setHistoryOpen(false);
-      onTicketUpdated?.(result.target);
+      onTicketUpdated?.(result.active);
       if (typeof window.openTicket === 'function') {
-        window.openTicket(targetId);
+        window.openTicket(activeId);
       }
-      showNotification('Tickets mesclados com sucesso.', 'success');
+      showNotification('Mesclagem registrada com sucesso.', 'success');
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Não foi possível mesclar os tickets.';
       showNotification(msg, 'error');
+      throw err;
     } finally {
       setMergeInProgress(false);
     }
-  }, [ticket, mergeInProgress, onTicketUpdated, showNotification]);
+  }, [mergeInProgress, onTicketUpdated, showNotification]);
 
   useEffect(() => {
     setConsultasOpen(false);
@@ -365,7 +361,7 @@ export default function RaTicketMain({
         client={client}
         onSelectTicket={handleSelectHistoryTicket}
         sourceTicketId={ticket?.id || ticket?._id}
-        onMergeTickets={handleMergeTickets}
+        onFundirTickets={handleFundirTickets}
         merging={mergeInProgress}
       />
     </div>

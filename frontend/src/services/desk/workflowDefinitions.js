@@ -1,11 +1,12 @@
 /**
- * workflowDefinitions v2.2.0 — reexporta workflowEngine (sem legado escalonar)
- * VERSION: v2.2.0 | DATE: 2026-08-03
+ * workflowDefinitions v2.3.0 — reexporta buildTemplateFromPassosResumo
+ * VERSION: v2.3.0 | DATE: 2026-08-04
  */
 import {
   WORKFLOW_TEAM_LABELS,
   WORKFLOW_DECISION_ACTIONS,
   getWorkflowTemplateById,
+  buildTemplateFromPassosResumo,
   resolveWorkflowForTicket,
   createWorkflowState,
   getWorkflowTeamLabel,
@@ -28,6 +29,7 @@ export {
   WORKFLOW_TEAM_LABELS,
   WORKFLOW_DECISION_ACTIONS,
   getWorkflowTemplateById,
+  buildTemplateFromPassosResumo,
   resolveWorkflowForTicket,
   createWorkflowState,
   getWorkflowTeamLabel,

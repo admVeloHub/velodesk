@@ -1,6 +1,6 @@
 /**
- * API client v1.20.0 — consultasApi (Customer Data API / aba Consultas)
- * VERSION: v1.20.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team
+ * API client v1.22.0 — ticketSearch by-cpf + ticketFusaoApi
+ * VERSION: v1.22.0 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -304,4 +304,16 @@ export const consultasApi = {
     api.post('/consultas/360', payload).then((r) => r.data),
   fetchProduct: (slug, payload = {}) =>
     api.post(`/consultas/product/${encodeURIComponent(slug)}`, payload).then((r) => r.data),
+};
+
+export const ticketSearchApi = {
+  search: (payload = {}) =>
+    api.post('/ticket-search', payload).then((r) => r.data),
+  byCpf: (cpf) =>
+    api.get(`/ticket-search/by-cpf/${encodeURIComponent(String(cpf || '').replace(/\D/g, ''))}`).then((r) => r.data),
+};
+
+export const ticketFusaoApi = {
+  fundir: (payload) =>
+    api.post('/ticket-fusao', payload).then((r) => r.data),
 };

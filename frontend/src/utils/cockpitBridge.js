@@ -1,11 +1,12 @@
 ﻿/**
  * Ponte global — navegação e ações do cockpit ↔ React Router
- * VERSION: v2.3.0 | DATE: 2026-07-30
+ * VERSION: v2.4.0 | DATE: 2026-08-04
  */
 const PAGE_ROUTES = {
   workspace: '/workspace',
   dashboard: '/dashboard',
   tickets: '/tickets?desk=v2',
+  'busca-tickets': '/busca-tickets',
   preferencias: '/preferencias',
   'atendimento-ia-telefonico': '/atendimento-ia-telefonico',
   'alteracoes-cadastrais': '/alteracoes-cadastrais',

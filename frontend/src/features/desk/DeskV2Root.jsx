@@ -1,7 +1,8 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.22.0 | DATE: 2026-08-03
- * — URL ?ticket= abre ticket; ?queue=meus-tickets&section=cliente-respondeu expande seção
+ * VERSION: v3.24.1 | DATE: 2026-08-04
+ * — clique em ticket absorvido pela mesclagem abre o ativo (parent)
+ * — textos UI: mesclar / mesclagem
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -28,8 +29,9 @@ import {
   isTicketReadOnly,
   getDeskSearchNotFoundMessage,
   getDeskSearchSuccessMessage,
+  isFusaoAbsorvido,
 } from '../../services/desk/utils';
-import { mergeTicketInto } from '../../services/desk/ticketMergeService';
+import { fundirTickets } from '../../services/desk/ticketFusaoService';
 import {
   applyPendingWorkflowStartToTicket,
   discardPendingWorkflowStart,
@@ -57,6 +59,7 @@ import DeskMyTicketsTable from './components/DeskMyTicketsTable';
 import DeskTicketTabsBar from './components/DeskTicketTabsBar';
 import DeskClientProfileBar from './components/DeskClientProfileBar';
 import ClientTicketHistoryModal from './components/ClientTicketHistoryModal';
+import TicketFusaoStatusControls from './components/TicketFusaoStatusControls';
 import DeskConversation from './components/DeskConversation';
 import TicketWorkflowInfoRequestCallout from './components/TicketWorkflowInfoRequestCallout';
 import { markWorkflowInfoRequestsReadForTicket } from '../../services/workflow/workflowInfoNotifications';
@@ -546,6 +549,28 @@ export default function DeskV2Root() {
       showNotification('Não foi possível abrir o ticket — recarregue a lista.', 'warning');
       return;
     }
+    if (isFusaoAbsorvido(entry.ticket)) {
+      const parentId = entry.ticket?.fusao?.parentId;
+      if (parentId) {
+        showNotification('Ticket mesclado — abrindo o chamado ativo.', 'info');
+        const parentEntry = findTicketEntry(parentId);
+        if (parentEntry) {
+          openTicket(parentId);
+          return;
+        }
+        (async () => {
+          try {
+            await loadTicketDetailFromApi(parentId);
+            openTicket(parentId);
+          } catch {
+            showNotification('Não foi possível abrir o ticket ativo da mesclagem.', 'warning');
+          }
+        })();
+        return;
+      }
+      showNotification('Este ticket foi mesclado e não está mais disponível na fila.', 'warning');
+      return;
+    }
     openTicket(id);
   };
 
@@ -566,36 +591,29 @@ export default function DeskV2Root() {
     closeTicketTab(id);
   };
 
-  const handleMergeTickets = useCallback(async (targetId) => {
-    if (!ticket?.id || mergeInProgress) return;
-    if (isTicketReadOnly(ticket)) {
-      showNotification('Ticket fechado — não é possível mesclar.', 'warning');
-      return;
-    }
-    const sourceId = String(ticket.id);
-    if (isDraftTicket(ticket)) {
-      showNotification('Salve o ticket antes de mesclar.', 'warning');
-      return;
-    }
+  const handleFundirTickets = useCallback(async ({ activeId, inactiveIds, cpf }) => {
+    if (!activeId || mergeInProgress) return;
     setMergeInProgress(true);
     try {
-      await mergeTicketInto(sourceId, targetId);
+      await fundirTickets({ activeId, inactiveIds, cpf });
       await syncTicketViews();
       setHistoryOpen(false);
-      selectTicket(targetId);
+      selectTicket(activeId);
       setMainTab('notas');
-      if (openTabs.some((tab) => String(tab.id) === sourceId)) {
-        closeTicketTabHandler(sourceId);
-      }
-      showNotification('Tickets mesclados com sucesso.', 'success');
+      (inactiveIds || []).forEach((id) => {
+        if (openTabs.some((tab) => String(tab.id) === String(id))) {
+          closeTicketTabHandler(id);
+        }
+      });
+      showNotification('Mesclagem registrada com sucesso.', 'success');
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Não foi possível mesclar os tickets.';
       showNotification(msg, 'error');
+      throw err;
     } finally {
       setMergeInProgress(false);
     }
   }, [
-    ticket,
     mergeInProgress,
     syncTicketViews,
     selectTicket,
@@ -1411,9 +1429,12 @@ export default function DeskV2Root() {
                   <i className="ti ti-search" /> Consultas
                 </button>
               </div>
-              <span className={'status-badge tabs-top__status status-badge--' + ticketStatus.cls}>
-                {ticketStatus.label}
-              </span>
+              <div className="tabs-top__status-group">
+                <TicketFusaoStatusControls ticket={ticket} />
+                <span className={'status-badge tabs-top__status status-badge--' + ticketStatus.cls}>
+                  {ticketStatus.label}
+                </span>
+              </div>
             </nav>
             <ClientTicketHistoryModal
               open={historyOpen}
@@ -1422,7 +1443,7 @@ export default function DeskV2Root() {
               client={client}
               onSelectTicket={selectTicket}
               sourceTicketId={ticket?.id || ticket?._id}
-              onMergeTickets={handleMergeTickets}
+              onFundirTickets={handleFundirTickets}
               merging={mergeInProgress}
             />
             <div className={'crm-conversation-wrap' + (waChatOpen ? ' crm-conversation-wrap--wa' : '')}>

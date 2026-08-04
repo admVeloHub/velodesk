@@ -1,6 +1,6 @@
 /**
- * TicketsContext v1.7.5 — poll silencioso só incrementa refreshKey se filas mudaram
- * VERSION: v1.7.5 | DATE: 2026-08-03 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.7.6 — ao sumir da fila, limpa aba ativa (evita tela em branco pós-mesclagem)
+ * VERSION: v1.7.6 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi } from '../services/ticketsStorage';
@@ -122,15 +122,21 @@ export function TicketsProvider({ children }) {
   }, [isAuthenticated, refreshTickets]);
 
   useEffect(() => {
-    setOpenTabs((prev) =>
-      prev
+    setOpenTabs((prev) => {
+      const next = prev
         .map((tab) => {
           const entry = findTicketEntry(tab.id);
           if (!entry) return null;
           return { ...tab, ...buildTabMeta(entry) };
         })
-        .filter(Boolean)
-    );
+        .filter(Boolean);
+      setActiveTabId((current) => {
+        if (!current) return current;
+        if (next.some((tab) => String(tab.id) === String(current))) return current;
+        return next.length ? next[next.length - 1].id : null;
+      });
+      return next;
+    });
   }, [refreshKey]);
 
   const openTicket = useCallback((ticketId) => {

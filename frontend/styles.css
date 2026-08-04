@@ -1,4 +1,4 @@
-/* Reset e configura√ß√µes b√°sicas */
+/* Reset e configuraÁıes b·sicas */
 * {
     margin: 0;
     padding: 0;
@@ -17,7 +17,7 @@ body {
     min-height: 100%;
 }
 
-/* Sem rolagem na p√°gina ‚Äî scroll s√≥ nas colunas internas (tickets, chat, etc.) */
+/* Sem rolagem na p·gina ? scroll sÛ nas colunas internas (tickets, chat, etc.) */
 body:has(.main-app[style*="grid"]) {
     overflow: hidden;
     height: 100%;
@@ -57,7 +57,7 @@ body {
     animation: fadeIn 0.8s ease-out;
 }
 
-/* Anima√ß√£o de entrada da tela de login */
+/* AnimaÁ„o de entrada da tela de login */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -69,7 +69,7 @@ body {
     }
 }
 
-/* Anima√ß√£o de sa√≠da da tela de login */
+/* AnimaÁ„o de saÌda da tela de login */
 @keyframes fadeOut {
     from {
         opacity: 1;
@@ -93,7 +93,7 @@ body {
     animation: slideInUp 0.6s ease-out 0.2s both;
 }
 
-/* Anima√ß√£o de entrada da caixa de login */
+/* AnimaÁ„o de entrada da caixa de login */
 @keyframes slideInUp {
     from {
         opacity: 0;
@@ -118,7 +118,7 @@ body {
     animation: logoGlow 2s ease-in-out infinite alternate;
 }
 
-/* Anima√ß√£o do logo */
+/* AnimaÁ„o do logo */
 @keyframes logoGlow {
     from {
         text-shadow: 0 0 5px rgba(0, 0, 88, 0.3);
@@ -168,7 +168,7 @@ body {
     transform: translateY(-1px);
 }
 
-/* Bot√µes */
+/* Botıes */
 .btn-primary {
     background: linear-gradient(135deg, var(--accent-blue) 0%, var(--primary-blue) 100%);
     color: var(--white);
@@ -223,7 +223,7 @@ body {
     background: var(--light-gray);
 }
 
-/* Sidebar n√£o ocupa espa√ßo no grid pois √© fixo */
+/* Sidebar n„o ocupa espaÁo no grid pois È fixo */
 .main-app .sidebar {
     grid-area: unset;
     position: fixed;
@@ -357,7 +357,7 @@ body {
     /* Prevenir qualquer movimento */
     margin: 0;
     border: none;
-    /* Garantir que n√£o se mova com scroll */
+    /* Garantir que n„o se mova com scroll */
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
 }
@@ -493,7 +493,7 @@ body {
     font-size: 1.1rem;
 }
 
-/* Conte√∫do principal */
+/* Conte˙do principal */
 .main-content {
     grid-area: content;
     background: var(--light-gray);
@@ -503,11 +503,11 @@ body {
     height: 100%;
     max-height: 100%;
     transition: margin-left 0.3s ease, background 0.3s ease;
-    margin-left: 250px; /* Espa√ßo para o sidebar fixo */
+    margin-left: 250px; /* EspaÁo para o sidebar fixo */
     margin-top: 0;
 }
 
-/* Remover background e margin-top quando p√°ginas principais estiverem ativas */
+/* Remover background e margin-top quando p·ginas principais estiverem ativas */
 .main-content:has(#tickets.active),
 .main-content.tickets-active,
 .main-content:has(#chat.active),
@@ -521,7 +521,7 @@ body {
     min-height: 0;
 }
 
-/* Relat√≥rios: √°rea principal precisa rolar (conte√∫do longo + gr√°ficos) */
+/* RelatÛrios: ·rea principal precisa rolar (conte˙do longo + gr·ficos) */
 .main-content:has(#reports.active) {
     background: transparent !important;
     padding: 0 !important;
@@ -530,7 +530,7 @@ body {
     overflow-y: auto !important;
 }
 
-/* P√°ginas com conte√∫do longo: rolagem s√≥ no main-content, n√£o no body */
+/* P·ginas com conte˙do longo: rolagem sÛ no main-content, n„o no body */
 .main-content:has(.page.active:not(#tickets):not(#chat):not(#config):not(#preferencias):not(#especiais-reclame-aqui):not(#especiais-procon):not(#workflow)) {
     overflow-y: auto;
     overflow-x: hidden;
@@ -538,7 +538,7 @@ body {
     box-sizing: border-box;
 }
 
-/* Ajustar padding apenas para p√°ginas que n√£o s√£o tickets, chat, reports ou config */
+/* Ajustar padding apenas para p·ginas que n„o s„o tickets, chat, reports ou config */
 .main-content .page:not(#tickets):not(#chat):not(#reports):not(#config):not(#preferencias):not(#especiais-reclame-aqui):not(#especiais-procon):not(#workflow) {
     padding: 0.5rem 1rem;
     padding-top: 0.25rem;
@@ -565,7 +565,7 @@ body.has-ticket-tabs-visible {
     --velo-ticket-tabs-height: 36px;
 }
 
-/* Ajustar margin-top nas p√°ginas principais */
+/* Ajustar margin-top nas p·ginas principais */
 .main-content #chat,
 .main-content #config {
     margin-top: 0 !important;
@@ -603,7 +603,7 @@ body.has-ticket-tabs-visible {
     min-height: 0;
 }
 
-/* Relat√≥rios: permite rolagem vertical; conte√∫do pode ultrapassar a viewport */
+/* RelatÛrios: permite rolagem vertical; conte˙do pode ultrapassar a viewport */
 .main-content #reports {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
@@ -621,7 +621,7 @@ body.has-ticket-tabs-visible {
     flex-direction: column;
 }
 
-/* √Årea de tickets: abaixo do header fixo + guias; scroll s√≥ nas colunas internas */
+/* ¡rea de tickets: abaixo do header fixo + guias; scroll sÛ nas colunas internas */
 #tickets .tickets-layout,
 #tickets .ticket-tabs-content {
     margin-top: var(--velo-tickets-content-gap);
@@ -643,7 +643,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     max-height: calc(100% - var(--velo-ticket-tabs-height) - var(--velo-tickets-content-gap));
 }
 
-/* Com aba de ticket aberta: barra fixa no topo e √°rea de conte√∫do preenche o restante (scroll suave na coluna lateral) */
+/* Com aba de ticket aberta: barra fixa no topo e ·rea de conte˙do preenche o restante (scroll suave na coluna lateral) */
 #tickets.ticket-tab-open {
     min-height: 0;
 }
@@ -658,7 +658,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 #tickets.ticket-tab-open .ticket-tabs-content {
-    /* basis 0% evita que o conte√∫do ‚Äúempurre‚Äù a altura e corte a rolagem no fim */
+    /* basis 0% evita que o conte˙do ?empurre? a altura e corte a rolagem no fim */
     flex: 1 1 0;
     min-height: 0;
     overflow: hidden;
@@ -666,13 +666,13 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     flex-direction: column;
 }
 
-/* Remover background do main-content quando estiver na p√°gina de tickets */
+/* Remover background do main-content quando estiver na p·gina de tickets */
 .main-content:has(#tickets.active),
 .main-content #tickets.active ~ * {
     background: transparent;
 }
 
-/* Alternativa para navegadores que n√£o suportam :has() */
+/* Alternativa para navegadores que n„o suportam :has() */
 #tickets.active ~ * {
     background: transparent;
 }
@@ -686,7 +686,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: var(--primary-blue);
 }
 
-/* Remover background da p√°gina de tickets */
+/* Remover background da p·gina de tickets */
 #tickets {
     background: transparent !important;
     padding-left: 0 !important;
@@ -699,14 +699,14 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     display: block !important;
 }
 
-/* Tickets: .page.active vira block e quebra flex/altura das abas ‚Äî precisa de coluna flex para carregar o conte√∫do */
+/* Tickets: .page.active vira block e quebra flex/altura das abas ? precisa de coluna flex para carregar o conte˙do */
 #tickets.page.active,
 #tickets.active.page {
     display: flex !important;
     flex-direction: column;
 }
 
-/* Configura√ß√µes: idem ‚Äî sem flex a √°rea √∫til n√£o ganha altura e a rolagem corta o fim do conte√∫do */
+/* ConfiguraÁıes: idem ? sem flex a ·rea ˙til n„o ganha altura e a rolagem corta o fim do conte˙do */
 #config.page.active,
 #config.active.page {
     display: flex !important;
@@ -722,7 +722,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     min-height: 0;
 }
 
-/* Remover regra que for√ßa display baseado em style inline - apenas ativa se tiver classe active */
+/* Remover regra que forÁa display baseado em style inline - apenas ativa se tiver classe active */
 .page[style*="display: block"]:not(.active) {
     display: none !important;
 }
@@ -742,7 +742,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border-radius: 0;
 }
 
-/* Ocultar page-header na p√°gina de tickets e configura√ß√µes */
+/* Ocultar page-header na p·gina de tickets e configuraÁıes */
 #tickets .page-header,
 #config .page-header {
     display: none;
@@ -916,7 +916,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 .priority-media { background: #fff3cd; color: #856404; }
 .priority-alta { background: #f8d7da; color: #721c24; }
 
-/* Formul√°rio de ticket */
+/* Formul·rio de ticket */
 @keyframes ticketSidebarFadeIn {
     from {
         opacity: 0;
@@ -1092,7 +1092,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     gap: 1rem;
 }
 
-/* Rodap√© fixo do ticket */
+/* RodapÈ fixo do ticket */
 .ticket-footer-fixed {
     position: fixed;
     bottom: 0;
@@ -1119,7 +1119,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .ticket-footer-left {
     flex: 1;
-    /* Espa√ßo para alinhar com o conte√∫do principal */
+    /* EspaÁo para alinhar com o conte˙do principal */
 }
 
 .ticket-footer-right {
@@ -1134,7 +1134,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     position: fixed;
     bottom: 0;
     left: 250px;
-    /* N√£o cobre o formul√°rio lateral ‚Äî s√≥ a coluna principal */
+    /* N„o cobre o formul·rio lateral ? sÛ a coluna principal */
     right: calc(var(--velo-ticket-lateral-width, clamp(280px, 32vw, 380px)) + 2.4rem);
     background: var(--white);
     border-top: 2px solid #e9ecef;
@@ -1296,7 +1296,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 0.72rem !important;
 }
 
-/* Bot√£o de atualiza√ß√£o */
+/* Bot„o de atualizaÁ„o */
 #refreshTicketsBtn {
     background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
     color: white;
@@ -1358,7 +1358,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: rgba(255, 255, 255, 0.2);
 }
 
-/* CSS espec√≠fico para o bot√£o Criar Ticket */
+/* CSS especÌfico para o bot„o Criar Ticket */
 #createTicketBtn {
     padding: 0.54rem 0.81rem !important;
     font-size: 0.7rem !important;
@@ -1375,7 +1375,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 /* .config-layout removido - usando config-page-wrapper */
 
 /* ============================================
-   CONFIGURA√á√ïES - LAYOUT ROBUSTO DE CRM
+   CONFIGURA«’ES - LAYOUT ROBUSTO DE CRM
    ============================================ */
 
 .config-page-wrapper {
@@ -1476,7 +1476,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     flex: 1;
 }
 
-/* Layout da p√°gina Configura√ß√µes (sidebar + √°rea principal) */
+/* Layout da p·gina ConfiguraÁıes (sidebar + ·rea principal) */
 #config .config-layout {
     display: flex;
     flex: 1 1 0;
@@ -2052,7 +2052,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     transition: all 0.25s ease;
 }
 
-/* Cores espec√≠ficas para cada √≠cone */
+/* Cores especÌficas para cada Ìcone */
 .profile-menu-item:first-child i {
     color: #667eea;
 }
@@ -2113,7 +2113,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.12) 100%);
 }
 
-/* √çcones dentro dos links */
+/* Õcones dentro dos links */
 .profile-menu a i {
     width: 20px;
     text-align: center;
@@ -2206,7 +2206,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     min-height: 400px;
 }
 
-/* Cabe√ßalho do Ticket */
+/* CabeÁalho do Ticket */
 .ticket-header {
     display: flex;
     align-items: center;
@@ -2265,7 +2265,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Informa√ß√µes do Ticket */
+/* InformaÁıes do Ticket */
 .ticket-details {
     margin-bottom: 2rem;
     animation: ticketDetailsFadeIn 0.5s ease-out 0.3s both;
@@ -2306,7 +2306,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: var(--dark-gray);
 }
 
-/* Descri√ß√£o do Ticket */
+/* DescriÁ„o do Ticket */
 .ticket-description {
     margin-bottom: 2rem;
     padding: 1rem;
@@ -2430,7 +2430,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border: 2px dashed #ddd;
 }
 
-/* √Årea de Resposta */
+/* ¡rea de Resposta */
 .ticket-response {
     margin-bottom: 2rem;
 }
@@ -2965,7 +2965,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 0.8rem;
     color: var(--dark-gray);
     margin-bottom: 0.25rem;
-    display: none; /* Ocultar descri√ß√£o na lista compacta */
+    display: none; /* Ocultar descriÁ„o na lista compacta */
 }
 
 .box-item.active .box-description {
@@ -2976,7 +2976,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 0.8rem;
     color: var(--info);
     margin-top: 0.25rem;
-    display: none; /* Ocultar usu√°rios na lista compacta */
+    display: none; /* Ocultar usu·rios na lista compacta */
 }
 
 .box-item.active .box-users {
@@ -3137,7 +3137,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border: 2px dashed var(--accent-blue);
 }
 
-/* Bot√µes de a√ß√£o */
+/* Botıes de aÁ„o */
 .page-actions {
     display: flex;
     gap: 1rem;
@@ -3164,7 +3164,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 .kanban-column.pendente { border-top-color: #dc3545; }
 .kanban-column.resolvido { border-top-color: #28a745; }
 
-/* Sistema de Abas de Tickets ‚Äî fixo logo abaixo do header */
+/* Sistema de Abas de Tickets ? fixo logo abaixo do header */
 .ticket-tabs-bar {
     position: fixed;
     top: var(--velo-chrome-top);
@@ -3436,7 +3436,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: var(--white);
     border-radius: 12px;
     padding: 1.35rem 1.5rem;
-    /* Espa√ßo no fim da rolagem para o conte√∫do n√£o ficar sob o rodap√© fixo (.ticket-tab-footer-fixed) */
+    /* EspaÁo no fim da rolagem para o conte˙do n„o ficar sob o rodapÈ fixo (.ticket-tab-footer-fixed) */
     padding-bottom: calc(1.25rem + 5.25rem + env(safe-area-inset-bottom, 0px));
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 14px rgba(0, 0, 88, 0.06);
     border: 1px solid rgba(0, 0, 88, 0.06);
@@ -3557,7 +3557,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Conte√∫do principal do ticket: blocos mais compactos */
+/* Conte˙do principal do ticket: blocos mais compactos */
 .ticket-tab-main-column .ticket-header {
     margin-bottom: 0.85rem;
     padding-bottom: 0.65rem;
@@ -4042,7 +4042,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     line-height: 1.45;
 }
 
-/* --- Hist√≥rico e resposta estilo Octadesk (timeline + painel de coment√°rio) --- */
+/* --- HistÛrico e resposta estilo Octadesk (timeline + painel de coment·rio) --- */
 .ticket-tab-main-column .ticket-timeline.ticket-history-octa,
 .ticket-main-column .ticket-timeline.ticket-history-octa {
     margin-top: 0.5rem;
@@ -4062,7 +4062,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border-bottom: 1px solid rgba(0, 0, 88, 0.08);
 }
 
-/* Hist√≥rico sem scroll pr√≥prio: rola junto com a coluna principal */
+/* HistÛrico sem scroll prÛprio: rola junto com a coluna principal */
 .ticket-tab-main-column .ticket-timeline.ticket-history-octa .timeline-container,
 .ticket-main-column .ticket-timeline.ticket-history-octa .timeline-container {
     max-height: none;
@@ -4361,7 +4361,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     min-height: 140px;
 }
 
-/* Formul√°rio lateral: se√ß√µes mais leves */
+/* Formul·rio lateral: seÁıes mais leves */
 .ticket-tab-sidebar .sidebar-section {
     margin-bottom: 1.1rem;
 }
@@ -4411,7 +4411,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 0.8rem;
 }
 
-/* Um √∫nico scroll no painel lateral: campos do formul√°rio fluem em altura (sem caixa min√∫scula dentro) */
+/* Um ˙nico scroll no painel lateral: campos do formul·rio fluem em altura (sem caixa min˙scula dentro) */
 .ticket-tab-sidebar .form-section .form-fields,
 .ticket-tab-sidebar #ticketFormFields-placeholder,
 .ticket-tab-sidebar [id^="ticketFormFields-"] {
@@ -4428,7 +4428,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     line-height: 1.4;
 }
 
-/* Informa√ß√µes do cliente: mesmo quadro que "Campos do Formul√°rio" (form-section), campos mais compactos */
+/* InformaÁıes do cliente: mesmo quadro que "Campos do Formul·rio" (form-section), campos mais compactos */
 .ticket-tab-sidebar .client-info-section {
     background: linear-gradient(135deg, #f3e5f5 0%, #e8f5e8 100%);
     border: 1px solid rgba(0, 0, 88, 0.1);
@@ -4645,7 +4645,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-style: italic;
 }
 
-/* Configura√ß√µes */
+/* ConfiguraÁıes */
 .config-tabs {
     background: var(--white);
     border-radius: 10px;
@@ -4694,7 +4694,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     overflow: visible !important;
 }
 
-/* Aba Automa√ß√µes (configura√ß√µes ‚Äî id √∫nico configAutomationTab) */
+/* Aba AutomaÁıes (configuraÁıes ? id ˙nico configAutomationTab) */
 #configAutomationTab.config-tab-content.active {
     display: block !important;
     visibility: visible !important;
@@ -5131,7 +5131,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 /* ===== NOVOS ESTILOS PARA TICKETS REESTRUTURADOS ===== */
 
-/* Cabe√ßalho do Ticket */
+/* CabeÁalho do Ticket */
 .ticket-header {
     display: flex;
     justify-content: space-between;
@@ -5271,7 +5271,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     box-shadow: 0 0 0 2px rgba(0, 0, 88, 0.1);
 }
 
-/* Formul√°rio de Tabula√ß√£o (Lateral) */
+/* Formul·rio de TabulaÁ„o (Lateral) */
 .ticket-form-sidebar {
     width: 350px;
     background: var(--light-gray);
@@ -5329,9 +5329,9 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     padding: 0.5rem 0;
 }
 
-/* ===== SISTEMA DE USU√ÅRIOS ===== */
+/* ===== SISTEMA DE USU¡RIOS ===== */
 
-/* Lista de Usu√°rios */
+/* Lista de Usu·rios */
 .users-list {
     max-height: 400px;
     overflow-y: auto;
@@ -5428,7 +5428,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: #dc2626;
 }
 
-/* Modal de Usu√°rio */
+/* Modal de Usu·rio */
 .user-modal .form-group {
     margin-bottom: 1rem;
 }
@@ -5457,7 +5457,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     box-shadow: 0 0 0 2px rgba(0, 0, 88, 0.1);
 }
 
-/* Abas de Configura√ß√£o */
+/* Abas de ConfiguraÁ„o */
 .config-tab-content {
     display: none;
 }
@@ -5818,7 +5818,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Estilos para p√°gina de Relat√≥rios */
+/* Estilos para p·gina de RelatÛrios */
 .reports-container {
     padding: 0 0 1.5rem 0;
     margin-top: 0 !important;
@@ -5937,7 +5937,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     box-shadow: 0 0 0 3px rgba(0, 0, 88, 0.1);
 }
 
-/* Responsividade para relat√≥rios */
+/* Responsividade para relatÛrios */
 @media (max-width: 768px) {
     .reports-grid {
         grid-template-columns: 1fr;
@@ -6538,7 +6538,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: var(--primary-blue);
 }
 
-/* Upload para anota√ß√µes internas */
+/* Upload para anotaÁıes internas */
 .internal-upload .file-upload-area {
     background: #fffbf0;
     border-color: #f0d000;
@@ -6553,7 +6553,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: #8b4513;
 }
 
-/* Estilos para Anota√ß√µes Internas */
+/* Estilos para AnotaÁıes Internas */
 .internal-form {
     background: #fffbf0;
     border: 2px solid #f0d000;
@@ -6610,7 +6610,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     100% { transform: scale(1); }
 }
 
-/* Estilos para timeline de anota√ß√µes internas */
+/* Estilos para timeline de anotaÁıes internas */
 .timeline-item.internal {
     background: #fffbf0;
     border-left: 4px solid #f0d000;
@@ -6659,7 +6659,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: white;
 }
 
-/* Estilos para bot√£o de anota√ß√£o interna */
+/* Estilos para bot„o de anotaÁ„o interna */
 .internal-form .btn-primary {
     background: linear-gradient(135deg, #f0d000 0%, #ffd700 100%);
     color: #8b4513;
@@ -6673,7 +6673,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     box-shadow: 0 4px 12px rgba(240, 208, 0, 0.3);
 }
 
-/* Estilos para bot√µes na aba de anota√ß√£o interna */
+/* Estilos para botıes na aba de anotaÁ„o interna */
 .internal-form .ai-assistant-btn {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -6816,7 +6816,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     line-height: 1.4;
 }
 
-/* ===== SISTEMA DE NOTIFICA√á√ïES ===== */
+/* ===== SISTEMA DE NOTIFICA«’ES ===== */
 
 .notifications-container {
     position: fixed;
@@ -6886,7 +6886,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: var(--dark-gray);
 }
 
-/* Tipos de notifica√ß√£o */
+/* Tipos de notificaÁ„o */
 .notification-success {
     border-left-color: var(--success);
 }
@@ -6919,7 +6919,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: var(--info);
 }
 
-/* Responsividade para notifica√ß√µes */
+/* Responsividade para notificaÁıes */
 @media (max-width: 768px) {
     .notifications-container {
         left: 10px;
@@ -6932,7 +6932,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* ===== SISTEMA DE NOTIFICA√á√ïES AVAN√áADO ===== */
+/* ===== SISTEMA DE NOTIFICA«’ES AVAN«ADO ===== */
 
 .header-actions {
     display: flex;
@@ -7000,7 +7000,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     51%, 100% { opacity: 0.3; }
 }
 
-/* Painel de Notifica√ß√µes */
+/* Painel de NotificaÁıes */
 .notification-panel {
     position: fixed;
     top: var(--velo-chrome-top);
@@ -7228,7 +7228,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     transform: translateY(-1px);
 }
 
-/* ===== TOASTS DE NOTIFICA√á√ÉO ===== */
+/* ===== TOASTS DE NOTIFICA«√O ===== */
 
 .notification-toast {
     background: var(--white);
@@ -7309,7 +7309,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* ===== RELAT√ìRIOS AVAN√áADOS ===== */
+/* ===== RELAT”RIOS AVAN«ADOS ===== */
 
 .reports-filters {
     background: var(--white);
@@ -7486,7 +7486,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: #721c24;
 }
 
-/* Responsividade para relat√≥rios */
+/* Responsividade para relatÛrios */
 @media (max-width: 768px) {
     .reports-filters {
         flex-direction: column;
@@ -7685,7 +7685,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* ===== P√ÅGINA DE CONFIGURA√á√ïES ===== */
+/* ===== P¡GINA DE CONFIGURA«’ES ===== */
 
 .config-sections {
     display: grid;
@@ -7749,7 +7749,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 1rem;
 }
 
-/* Responsividade para configura√ß√µes */
+/* Responsividade para configuraÁıes */
 @media (max-width: 768px) {
     .config-sections {
         grid-template-columns: 1fr;
@@ -8411,7 +8411,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     height: 250px !important;
 }
 
-/* Se√ß√£o de Satisfa√ß√£o */
+/* SeÁ„o de SatisfaÁ„o */
 .satisfaction-section {
     background: var(--white);
     border-radius: 12px;
@@ -8979,7 +8979,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
         display: block;
     }
     
-/* Bot√£o de menu mobile */
+/* Bot„o de menu mobile */
 .mobile-menu-btn {
     display: none;
     background: none;
@@ -9129,7 +9129,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
         padding: 1rem;
     }
     
-    /* Formul√°rios mobile */
+    /* Formul·rios mobile */
     .form-actions {
         flex-direction: column;
     }
@@ -9346,7 +9346,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     white-space: nowrap;
 }
 
-/* Estilos para sistema de atribui√ß√£o de conversas */
+/* Estilos para sistema de atribuiÁ„o de conversas */
 .chat-filters {
     padding: 0.5rem;
     border-bottom: 1px solid var(--border-color);
@@ -9991,7 +9991,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 0.9rem;
 }
 
-/* Bot√µes adicionais */
+/* Botıes adicionais */
 .btn-info {
     background: var(--info);
     color: var(--white);
@@ -10118,7 +10118,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Lista de tickets: rolagem s√≥ na lista, n√£o na p√°gina */
+/* Lista de tickets: rolagem sÛ na lista, n„o na p·gina */
 .tickets-panel {
     overflow: hidden !important;
     min-height: 0;
@@ -10131,7 +10131,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     overflow-x: hidden;
 }
 
-/* Responsividade para p√°gina de tickets */
+/* Responsividade para p·gina de tickets */
 @media (max-width: 768px) {
     .tickets-layout {
         grid-template-columns: 1fr;
@@ -10268,7 +10268,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: #c82333;
 }
 
-/* Estilos para Configura√ß√£o de Campo */
+/* Estilos para ConfiguraÁ„o de Campo */
 .field-config {
     display: flex;
     flex-direction: column;
@@ -10364,7 +10364,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: #c82333;
 }
 
-/* Estilos para Sele√ß√£o Simples */
+/* Estilos para SeleÁ„o Simples */
 .options-list {
     display: flex;
     flex-direction: column;
@@ -10403,7 +10403,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: #c82333;
 }
 
-/* Estilos para Lista de Formul√°rios */
+/* Estilos para Lista de Formul·rios */
 .form-item {
     background: #f8f9fa;
     padding: 20px;
@@ -10577,7 +10577,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Estilos para √Årvore de Sele√ß√£o Din√¢mica */
+/* Estilos para ¡rvore de SeleÁ„o Din‚mica */
 .tree-explanation {
     background: #e3f2fd;
     padding: 15px;
@@ -10679,7 +10679,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .tree-preview-item.has-children::after {
-    content: '‚ñ∂';
+    content: '?';
     position: absolute;
     right: 10px;
     top: 50%;
@@ -10689,7 +10689,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 .tree-preview-item.has-children.expanded::after {
-    content: '‚ñº';
+    content: '?';
 }
 
 .tree-children {
@@ -10822,7 +10822,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     transform: translateY(0);
 }
 
-/* Estilos para Campos do Formul√°rio no Ticket */
+/* Estilos para Campos do Formul·rio no Ticket */
 .ticket-form-field {
     margin-bottom: 11px;
 }
@@ -10880,7 +10880,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border: 2px dashed #e9ecef;
 }
 
-/* Estilos para Formul√°rios nos Tickets */
+/* Estilos para Formul·rios nos Tickets */
 .form-fields-container {
     background: #f8f9fa;
     padding: 20px;
@@ -10937,7 +10937,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     min-height: 80px;
 }
 
-/* Estilos para √Årvore de Sele√ß√£o em Cascata nos Tickets */
+/* Estilos para ¡rvore de SeleÁ„o em Cascata nos Tickets */
 .tree-selection-container {
     border: none;
     background: transparent;
@@ -10957,7 +10957,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border-left: 2px solid #e9ecef;
 }
 
-/* Estilos para o select de √°rvore */
+/* Estilos para o select de ·rvore */
 .tree-select-container {
     position: relative;
 }
@@ -11092,7 +11092,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     cursor: pointer;
 }
 
-/* Responsividade para formul√°rios nos tickets */
+/* Responsividade para formul·rios nos tickets */
 @media (max-width: 768px) {
     .form-fields-container {
         padding: 15px;
@@ -11220,7 +11220,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Estilos para edi√ß√£o de formul√°rios */
+/* Estilos para ediÁ„o de formul·rios */
 .form-fields-section {
     margin-top: 20px;
     padding-top: 20px;
@@ -11236,7 +11236,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     margin-bottom: 15px;
 }
 
-/* Config ‚Äî aba Formul√°rios (lista + modais) */
+/* Config ? aba Formul·rios (lista + modais) */
 #formsTab .forms-config-section {
     max-width: 920px;
 }
@@ -11479,7 +11479,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     padding-right: 0.5rem;
 }
 
-/* Modais de formul√°rio */
+/* Modais de formul·rio */
 .forms-editor-modal .modal-content--forms-editor:not(.modal--ticket-size),
 .forms-new-modal .modal-content--forms-new {
     max-width: 640px;
@@ -11494,7 +11494,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     max-width: 520px;
 }
 
-/* Modais de edi√ß√£o no tamanho da √°rea do ticket aberto */
+/* Modais de ediÁ„o no tamanho da ·rea do ticket aberto */
 .modal--ticket-size {
     width: min(1680px, 99vw) !important;
     max-width: min(1680px, 99vw) !important;
@@ -11533,7 +11533,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     padding: 1rem 1.25rem 1.5rem;
 }
 
-/* Construtor de √°rvore sequencial (modais de campo) */
+/* Construtor de ·rvore sequencial (modais de campo) */
 .modal-content--tree-modal {
     width: min(1680px, 99vw) !important;
     max-width: min(1680px, 99vw) !important;
@@ -11598,7 +11598,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     gap: 0.65rem;
 }
 
-/* Cada nova raiz = bloco pr√≥prio; filhos ficam abaixo da linha da raiz */
+/* Cada nova raiz = bloco prÛprio; filhos ficam abaixo da linha da raiz */
 .tree-root-block {
     border: 1px solid rgba(0, 0, 88, 0.12);
     border-radius: 12px;
@@ -12111,7 +12111,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 12px;
 }
 
-/* Estilos para campos de formul√°rio em tickets */
+/* Estilos para campos de formul·rio em tickets */
 .form-fields-section {
     margin-top: 20px;
     padding: 15px;
@@ -12538,7 +12538,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border-color: #004085;
 }
 
-/* Estilos para campos de √°rvore como selects */
+/* Estilos para campos de ·rvore como selects */
 .tree-field-container {
     display: flex;
     flex-direction: column;
@@ -12565,7 +12565,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     padding: 8px;
 }
 
-/* Estilos para √Årvore Sequencial (Zendesk) */
+/* Estilos para ¡rvore Sequencial (Zendesk) */
 .tree-sequential-container {
     display: flex;
     flex-direction: column;
@@ -12630,7 +12630,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border-radius: 6px;
 }
 
-/* Estilos para √°rvore de sele√ß√£o */
+/* Estilos para ·rvore de seleÁ„o */
 .tree-selection-container {
     border: 1px solid #ddd;
     border-radius: 6px;
@@ -12813,7 +12813,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-style: italic;
 }
 
-/* Estilos espec√≠ficos por tipo */
+/* Estilos especÌficos por tipo */
 .timeline-item.creation .timeline-content {
     border-left: 4px solid #1976d2;
 }
@@ -12859,7 +12859,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
    ============================================ */
 
 /* ============================================
-   FILTRO AVAN√áADO DE TICKETS
+   FILTRO AVAN«ADO DE TICKETS
    ============================================ */
 
 .ticket-filters-advanced {
@@ -13044,7 +13044,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border-left-width: 4px;
 }
 
-/* Cabe√ßalho do ticket fino */
+/* CabeÁalho do ticket fino */
 .ticket-slim-header {
     display: flex;
     justify-content: space-between;
@@ -13085,7 +13085,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     white-space: nowrap;
 }
 
-/* Status espec√≠ficos */
+/* Status especÌficos */
 .ticket-item-slim[data-status="novos"] .ticket-slim-status,
 .ticket-item-slim[data-status="novo"] .ticket-slim-status {
     background: #e3f2fd;
@@ -13115,7 +13115,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: #dc3545;
 }
 
-/* Conte√∫do do ticket fino */
+/* Conte˙do do ticket fino */
 .ticket-slim-content {
     margin-bottom: 5.4px;
 }
@@ -13131,7 +13131,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     overflow: hidden;
 }
 
-/* Rodap√© do ticket fino */
+/* RodapÈ do ticket fino */
 .ticket-slim-footer {
     display: flex;
     justify-content: space-between;
@@ -13260,10 +13260,10 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 /* ============================================
-   RELAT√ìRIOS - LEITURA DE TICKETS
+   RELAT”RIOS - LEITURA DE TICKETS
    ============================================ */
 
-/* Tabs de Relat√≥rios */
+/* Tabs de RelatÛrios */
 .reports-tabs {
     display: flex;
     gap: 10px;
@@ -13316,7 +13316,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     display: block;
 }
 
-/* Se√ß√£o de Importa√ß√£o */
+/* SeÁ„o de ImportaÁ„o */
 .import-section {
     background: white;
     border-radius: 10px;
@@ -13430,7 +13430,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: #667eea;
 }
 
-/* Se√ß√£o de Leitura */
+/* SeÁ„o de Leitura */
 .reading-section {
     background: white;
     border-radius: 10px;
@@ -13533,7 +13533,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-/* Card de avalia√ß√µes expandido - segunda linha */
+/* Card de avaliaÁıes expandido - segunda linha */
 .stat-card-rating {
     grid-column: 1 / -1;
     flex-direction: row;
@@ -13832,7 +13832,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: #28a745;
 }
 
-/* Avalia√ß√£o por Texto */
+/* AvaliaÁ„o por Texto */
 .rating-text {
     padding: 4px 12px;
     border-radius: 12px;
@@ -13853,7 +13853,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border: 1px solid #f5c6cb;
 }
 
-/* Gr√°ficos */
+/* Gr·ficos */
 .reading-charts {
     margin-bottom: 30px;
     padding: 20px;
@@ -14206,7 +14206,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     line-height: 1.4;
 }
 
-/* √Årea principal de mensagens */
+/* ¡rea principal de mensagens */
 .chat-main {
     flex: 1;
     display: flex;
@@ -14287,7 +14287,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     transform: scale(0.95);
 }
 
-/* √Årea de mensagens */
+/* ¡rea de mensagens */
 .chat-messages {
     flex: 1;
     overflow-y: auto;
@@ -14489,7 +14489,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     transform: scale(1.05);
 }
 
-/* Container de configura√ß√£o quando n√£o conectado */
+/* Container de configuraÁ„o quando n„o conectado */
 .whatsapp-setup-container {
     display: flex;
     align-items: center;
@@ -14592,7 +14592,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Ocultar modal de configura√ß√£o de campo - n√£o deve aparecer na aba de tickets */
+/* Ocultar modal de configuraÁ„o de campo - n„o deve aparecer na aba de tickets */
 #fieldConfigModal {
     display: none !important;
     visibility: hidden !important;
@@ -14600,7 +14600,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     pointer-events: none !important;
 }
 
-/* Estilos para configura√ß√µes de e-mail */
+/* Estilos para configuraÁıes de e-mail */
 .email-settings-form {
     background: var(--white);
     padding: 1.5rem;
@@ -14656,7 +14656,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 /* ============================================
-   ESTILOS PARA P√ÅGINA DE AUTOMA√á√ïES
+   ESTILOS PARA P¡GINA DE AUTOMA«’ES
    ============================================ */
 
 .automation-container {
@@ -14993,7 +14993,7 @@ input:checked + .slider:before {
     color: var(--dark-gray);
 }
 
-/* Responsividade para automa√ß√µes */
+/* Responsividade para automaÁıes */
 @media (max-width: 768px) {
     .automation-tabs {
         flex-direction: column;
@@ -15019,7 +15019,7 @@ input:checked + .slider:before {
     }
 }
 
-/* Estilos para Workflows e Automa√ß√µes */
+/* Estilos para Workflows e AutomaÁıes */
 .workflow-item,
 .automation-rule-item,
 .automation-flow-item {
@@ -15110,7 +15110,7 @@ input:checked + .slider:before {
 }
 
 /* ============================================
-   CONFIGURA√á√ïES ‚Äî visual moderno (V2)
+   CONFIGURA«’ES ? visual moderno (V2)
    VERSION: v2.4.6 | DATE: 2026-06-30
    ============================================ */
 #config.config-page {
@@ -15869,7 +15869,7 @@ input:checked + .slider:before {
     gap: 1rem;
 }
 
-/* Config ‚Äî aba Formul√°rios / tabula√ß√£o */
+/* Config ? aba Formul·rios / tabulaÁ„o */
 #config .config-tabulation .btn-forms-primary {
     display: inline-flex;
     align-items: center;
@@ -16336,7 +16336,7 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     margin: 0 0 0.75rem;
 }
 
-/* Config ‚Äî aba Formul√°rios / tabula√ß√£o (legado #formsTab removido) */
+/* Config ? aba Formul·rios / tabulaÁ„o (legado #formsTab removido) */
 #config .config-status-badge {
     display: inline-flex;
     align-items: center;
@@ -16637,7 +16637,7 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     }
 }
 
-/* ===== Header global: busca, registro r√°pido, tema ===== */
+/* ===== Header global: busca, registro r·pido, tema ===== */
 .header-global-search {
     display: flex;
     align-items: center;
@@ -16694,7 +16694,7 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     padding: 0.45rem 0.65rem;
 }
 
-/* Macros na √°rea de tickets */
+/* Macros na ·rea de tickets */
 .ticket-footer-macros,
 .ticket-inline-macros,
 .ticket-macro-hub {
@@ -16763,7 +16763,7 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     gap: 0.5rem;
 }
 
-/* Bot√£o cliente dentro do ticket */
+/* Bot„o cliente dentro do ticket */
 .ticket-header-top {
     display: flex;
     flex-wrap: wrap;
@@ -16799,7 +16799,7 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     font-size: 1rem;
 }
 
-/* Busca na p√°gina de tickets */
+/* Busca na p·gina de tickets */
 .tickets-panel-header .ticket-filters {
     flex: 1;
     justify-content: flex-end;
@@ -16815,7 +16815,7 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     padding-right: 2rem;
 }
 
-/* Modo escuro ‚Äî tokens e overrides em velodesk-dark-theme.css (import por √∫ltimo) */
+/* Modo escuro ? tokens e overrides em velodesk-dark-theme.css (import por ˙ltimo) */
 body.velodesk-dark .header {
     background: #1a1f26;
     border-bottom-color: rgba(255, 255, 255, 0.1);
@@ -16831,7 +16831,7 @@ body.velodesk-dark .sidebar {
 }
 
 /* ============================================
-   PREFER√äNCIAS ‚Äî v1.0.2 | DATE: 2026-07-31
+   PREFER NCIAS ? v1.0.2 | DATE: 2026-07-31
    ============================================ */
 #preferencias.preferencias-page {
     --pref-bg: #f0f4f8;
@@ -17088,3 +17088,513 @@ body.velodesk-dark .sidebar {
     color: #E24B4A;
 }
 
+
+/* ============================================
+   BUSCA DE TICKETS ? v1.0.0 | DATE: 2026-08-04
+   ============================================ */
+#busca-tickets.ticket-search-page {
+    --ts-bg: #f0f4f8;
+    --ts-surface: #F3F7FC;
+    --ts-border: rgba(0, 0, 88, 0.08);
+    --ts-muted: #64748b;
+    --ts-blue: #1634FF;
+    --ts-dark: #000058;
+    display: flex !important;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+    padding: 0 !important;
+    overflow: auto;
+    background: var(--ts-bg);
+    box-sizing: border-box;
+}
+
+.main-content:has(#busca-tickets.active) {
+    overflow: hidden !important;
+    padding: 0 !important;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.ticket-search-layout {
+    flex: 1 1 0;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: 1.25rem 1.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    box-sizing: border-box;
+}
+
+.ticket-search-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.ticket-search-header__title {
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--ts-dark);
+}
+
+.ticket-search-header__subtitle {
+    margin: 0.35rem 0 0;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.875rem;
+    color: var(--ts-muted);
+    max-width: 40rem;
+}
+
+.ticket-search-header__actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.ticket-search-panel,
+.ticket-search-results {
+    background: var(--ts-surface);
+    border: 1px solid var(--ts-border);
+    border-radius: 12px;
+    padding: 1rem 1.15rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 88, 0.04);
+}
+
+.ticket-search-criteria__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ticket-search-criteria__row {
+    padding: 0.75rem;
+    border: 1px solid var(--ts-border);
+    border-radius: 10px;
+    background: #fff;
+}
+
+.ticket-search-criteria__cols {
+    display: grid;
+    grid-template-columns: minmax(140px, 1.1fr) minmax(110px, 0.8fr) minmax(180px, 2fr) 36px;
+    gap: 0.5rem;
+    align-items: start;
+}
+
+.ticket-search-criteria__control {
+    width: 100%;
+    min-height: 36px;
+    border: 1px solid rgba(0, 0, 88, 0.12);
+    border-radius: 8px;
+    padding: 0.4rem 0.55rem;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.8125rem;
+    color: #0f172a;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+.ticket-search-criteria__valor {
+    min-width: 0;
+}
+
+.ticket-search-criteria__dates,
+.ticket-search-criteria__atribuido {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.ticket-search-criteria__hint {
+    font-size: 0.75rem;
+    color: var(--ts-muted);
+    font-family: 'Poppins', sans-serif;
+}
+
+.ticket-search-criteria__remove {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ticket-search-criteria__remove:hover:not(:disabled) {
+    background: #fef2f2;
+    color: #E24B4A;
+}
+
+.ticket-search-criteria__remove:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.ticket-search-criteria__add {
+    margin-top: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ticket-search-criteria__empty {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--ts-muted);
+}
+
+.ticket-search-results__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.ticket-search-results__title {
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--ts-dark);
+}
+
+.ticket-search-results__count {
+    font-size: 0.8125rem;
+    color: var(--ts-muted);
+}
+
+.ticket-search-results__empty {
+    margin: 0;
+    padding: 1.25rem 0.25rem;
+    font-size: 0.875rem;
+    color: var(--ts-muted);
+}
+
+.ticket-search-table-wrap {
+    overflow: auto;
+    max-height: min(55vh, 520px);
+    border-radius: 8px;
+    border: 1px solid var(--ts-border);
+}
+
+.ticket-search-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.8125rem;
+}
+
+.ticket-search-table th {
+    text-align: left;
+    padding: 0.65rem 0.75rem;
+    background: #EEF6FC;
+    color: var(--ts-dark);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    white-space: nowrap;
+}
+
+.ticket-search-table td {
+    padding: 0.6rem 0.75rem;
+    border-top: 1px solid var(--ts-border);
+    color: #0f172a;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ticket-search-table__row {
+    cursor: pointer;
+}
+
+.ticket-search-table__row:hover {
+    background: rgba(22, 52, 255, 0.04);
+}
+
+.ticket-search-table__row:focus {
+    outline: 2px solid var(--ts-blue);
+    outline-offset: -2px;
+}
+
+@media (max-width: 900px) {
+    .ticket-search-criteria__cols {
+        grid-template-columns: 1fr;
+    }
+
+    .ticket-search-criteria__remove {
+        justify-self: start;
+    }
+}
+
+/* ============================================
+   CLIENT360 MESCLAGEM + HISTORICO ? v1.0.1 | DATE: 2026-08-04
+   ============================================ */
+.client360-section {
+    margin-top: 1rem;
+}
+
+.client360-section-subtitle {
+    margin: 0 0 0.5rem;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #000058;
+}
+
+.client360-empty-cell {
+    padding: 0.75rem !important;
+    color: #64748b;
+    font-size: 0.8125rem;
+}
+
+.client360-fusao-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.35rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Poppins', sans-serif;
+    vertical-align: middle;
+}
+
+.client360-fusao-badge--superior {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.client360-fusao-badge--inferior {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.client360-fusao-badge--redundante {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.client360-fusao-confirm {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    align-items: center;
+    justify-content: center;
+}
+
+.client360-fusao-confirm .modal-content {
+    min-width: min(720px, 94vw);
+    max-width: 860px;
+}
+
+.client360-fusao-pick-table-wrap {
+    margin-top: 0.75rem;
+    overflow: auto;
+    border: 1px solid rgba(0, 0, 88, 0.08);
+    border-radius: 10px;
+}
+
+.client360-fusao-pick-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.8125rem;
+}
+
+.client360-fusao-pick-table th {
+    text-align: left;
+    padding: 0.55rem 0.65rem;
+    background: #EEF6FC;
+    color: #000058;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.client360-fusao-pick-table td {
+    padding: 0.55rem 0.65rem;
+    border-top: 1px solid rgba(0, 0, 88, 0.08);
+    color: #0f172a;
+    vertical-align: middle;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.client360-fusao-pick-table__th-radio,
+.client360-fusao-pick-table__td-radio {
+    width: 36px;
+}
+
+.client360-fusao-pick-row {
+    cursor: pointer;
+}
+
+.client360-fusao-pick-row:hover:not(.is-disabled) {
+    background: rgba(22, 52, 255, 0.04);
+}
+
+.client360-fusao-pick-row.is-selected {
+    background: rgba(22, 52, 255, 0.08);
+}
+
+.client360-fusao-pick-row.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.client360-fusao-pick-hint {
+    display: inline-block;
+    margin-left: 0.35rem;
+    font-size: 0.7rem;
+    color: #b91c1c;
+    font-weight: 500;
+}
+
+.client360-fusao-pick-empty {
+    color: #94a3b8;
+}
+
+.client360-status-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-family: 'Poppins', sans-serif;
+}
+
+.client360-status-badge--novo { background: #EEF1FF; color: #1634FF; }
+.client360-status-badge--andamento { background: #E8F7ED; color: #15A237; }
+.client360-status-badge--pendente,
+.client360-status-badge--aguardando { background: #FFF8E1; color: #B8860B; }
+.client360-status-badge--resolvido { background: #F3F4F6; color: #6B7280; }
+.client360-status-badge--fechado,
+.client360-status-badge--cancelado { background: #ffebee; color: #dc3545; }
+
+.client360-workflow-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-family: 'Poppins', sans-serif;
+}
+
+.client360-workflow-badge--financeiro {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.client360-workflow-badge--produtos {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.client360-workflow-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-left: 0.25rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.client360-workflow-icon--financeiro {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.client360-workflow-icon--produtos {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.ticket-client-fusao-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.ticket-client-fusao-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 180px;
+    background: #F3F7FC;
+    border: 1px solid rgba(0, 0, 88, 0.1);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 88, 0.12);
+    z-index: 40;
+    padding: 0.35rem;
+}
+
+.ticket-client-fusao-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.ticket-client-fusao-list__item {
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: transparent;
+    padding: 0.45rem 0.6rem;
+    border-radius: 6px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.8125rem;
+    color: #000058;
+    cursor: pointer;
+}
+
+.ticket-client-fusao-list__item:hover:not(:disabled) {
+    background: #EEF6FC;
+    color: #1634FF;
+}
+
+.ticket-client-fusao-list__item:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.ticket-client-profile__protocol {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.ticket-client-profile__protocol-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}

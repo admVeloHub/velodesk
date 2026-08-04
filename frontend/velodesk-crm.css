@@ -1,4 +1,4 @@
-/* Velodesk CRM v1.11.8 — botão Histórico desativado sem CPF */
+/* Velodesk CRM v1.12.3 — Avançar: clip-path contínuo + mesma largura do Histórico */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -1287,9 +1287,10 @@
     display: flex;
     flex-direction: row;
     align-items: stretch;
-    gap: 8px;
+    gap: 10px;
     height: 100%;
-    min-height: 64px;
+    min-height: 72px;
+    overflow: visible;
 }
 
 #velodeskDeskV2Root .ticket-client-profile__header-stepper {
@@ -1301,23 +1302,29 @@
 
 #velodeskDeskV2Root .ticket-client-profile__header-stepper .desk-workflow-stepper {
     height: 100%;
-    min-height: 64px;
+    min-height: 72px;
+    width: 100%;
 }
 
 #velodeskDeskV2Root .ticket-client-profile__header-side-actions {
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
+    align-items: stretch;
     gap: 4px;
     flex-shrink: 0;
-    min-width: 0;
+    min-width: 112px;
+    width: 112px;
+    overflow: visible;
 }
 
 #velodeskDeskV2Root .ticket-client-profile__header-side-actions .ticket-client-history-btn,
 #velodeskDeskV2Root .ticket-client-profile__header-side-actions .ticket-client-advance-btn {
-    width: auto;
-    min-width: 0;
-    align-self: flex-end;
+    width: 112px;
+    min-width: 112px;
+    max-width: 112px;
+    align-self: stretch;
+    box-sizing: border-box;
 }
 
 #velodeskDeskV2Root .crm-client-profile-bar .ticket-client-profile--header-grid--with-workflow .ticket-client-profile__cell-protocol {
@@ -1430,11 +1437,17 @@
     min-height: 30px;
     max-height: none;
     padding: 4px 10px;
-    border-radius: 12px;
+    border-radius: 6px;
     background: #6c757d;
     color: #fff;
     transition: background-color 0.2s ease;
     box-shadow: none;
+}
+
+#velodeskDeskV2Root .ticket-client-profile__header-side-actions .ticket-client-history-btn {
+    width: 112px;
+    min-width: 112px;
+    max-width: 112px;
 }
 
 #velodeskDeskV2Root .crm-client-profile-bar .ticket-client-history-btn:hover,
@@ -1477,15 +1490,50 @@
 }
 
 #velodeskDeskV2Root .crm-client-profile-bar .ticket-client-advance-btn {
-    border-radius: 999px;
+    position: relative;
+    border-radius: 6px 0 0 6px;
+    padding: 4px 18px 4px 10px;
     box-shadow: none;
     transform: none;
+    overflow: hidden;
+    /* formato contínuo: corpo + ponta triangular à direita */
+    clip-path: polygon(
+        0 0,
+        calc(100% - 14px) 0,
+        100% 50%,
+        calc(100% - 14px) 100%,
+        0 100%
+    );
+}
+
+#velodeskDeskV2Root .crm-client-profile-bar .ticket-client-advance-btn::after {
+    content: none;
+    display: none;
 }
 
 #velodeskDeskV2Root .crm-client-profile-bar .ticket-client-advance-btn:hover,
 #velodeskDeskV2Root .crm-client-profile-bar .ticket-client-advance-btn:active {
     transform: none;
     box-shadow: none;
+    border-radius: 6px 0 0 6px;
+}
+
+/* Mesma largura no stack do workflow */
+#velodeskDeskV2Root .ticket-client-profile__header-side-actions .ticket-client-history-btn,
+#velodeskDeskV2Root .ticket-client-profile__header-side-actions .ticket-client-advance-btn {
+    width: 112px !important;
+    min-width: 112px !important;
+    max-width: 112px !important;
+    align-self: stretch;
+    box-sizing: border-box;
+}
+
+#velodeskDeskV2Root .ticket-client-profile__header-side-actions .ticket-client-advance-btn {
+    border-radius: 6px 0 0 6px !important;
+}
+
+#velodeskDeskV2Root .ticket-client-profile__header-side-actions .ticket-client-history-btn {
+    border-radius: 6px !important;
 }
 
 #velodeskDeskV2Root .ticket-client-profile__cell-client {
@@ -2531,6 +2579,24 @@
 #velodeskDeskV2Root .tabs-top__status {
     flex-shrink: 0;
     margin-left: auto;
+}
+
+#velodeskDeskV2Root .tabs-top__status-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+#velodeskDeskV2Root .tabs-top__status-group .tabs-top__status {
+    margin-left: 0;
+}
+
+#velodeskDeskV2Root .tabs-top__fusao {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 #velodeskDeskV2Root .tab-btn {
@@ -6614,21 +6680,47 @@ body.desk-v2-mode #cockpitFocusContext {
     flex-direction: column;
     justify-content: space-between;
     align-items: stretch;
-    gap: 6px;
-    padding: 6px 10px;
+    gap: 4px;
+    padding: 8px 12px;
     box-sizing: border-box;
-    width: auto;
-    min-width: 140px;
-    max-width: min(300px, calc(100vw - 280px));
+    width: 100%;
+    min-width: 200px;
+    max-width: min(420px, calc(100vw - 260px));
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper--header-stack .desk-workflow-stepper__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper--header-stack .desk-workflow-stepper__eyebrow {
     margin: 0;
     max-width: none;
-    flex: 0 0 auto;
+    flex: 1 1 auto;
+    min-width: 0;
     padding-right: 0;
     border-right: none;
     font-size: var(--wf-stepper-eyebrow);
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper__eyebrow-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper__progress-hint {
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: rgba(0, 0, 88, 0.55);
+    line-height: 1;
+    white-space: nowrap;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper--header-stack .desk-workflow-stepper__track {
@@ -6636,19 +6728,37 @@ body.desk-v2-mode #cockpitFocusContext {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    min-height: 24px;
+    min-height: 26px;
+    width: 100%;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper--header-stack .desk-workflow-stepper__step {
     width: auto;
     min-width: var(--wf-stepper-compact-circle);
+    max-width: none;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper--header-stack .desk-workflow-stepper__connector {
     flex: 1 1 auto;
     width: auto;
-    min-width: 8px;
+    min-width: 10px;
     max-width: none;
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper--header-stack .desk-workflow-stepper__circle {
+    margin-bottom: 0;
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper__active-caption {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: #000058;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
 }
 
 #velodeskDeskV2Root .desk-workflow-stepper__eyebrow {

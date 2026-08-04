@@ -1,26 +1,107 @@
 /**
- * ClientTicketHistoryModal v1.3.0 — histórico só com CPF identificado
- * VERSION: v1.3.0 | DATE: 2026-07-31
+ * ClientTicketHistoryModal — histórico Mongo por CPF + mesclagem multi-seleção
+ * VERSION: v2.1.2 | DATE: 2026-08-04
+ * — textos UI: mesclar / mesclagem / mesclado
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ticketSearchApi } from '../../../api/client';
 import {
-  collectClientTickets,
   getClientAnalise,
   getClientContactFields,
   getClientProducts,
   getTicketProtocolLabel,
+  getTicketStatusBadgeMeta,
   getTicketStatusLabel,
   getTicketTitle,
   isClientIdentifiedForHistory,
+  isTicketTerminalStatus,
   normalizeCpf,
 } from '../../../services/desk/utils';
 import { getClient360WorkflowIconMeta } from '../../../services/workflow/workflowTeamQueues';
-import { canSelectTicketForMerge } from '../../../services/desk/ticketMergeService';
+import FusaoFundidoBadge from './FusaoFundidoBadge';
 
 function formatTableDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('pt-BR');
+}
+
+function ticketIdOf(t) {
+  return String(t?.id || t?._id || '');
+}
+
+function TicketRows({
+  tickets,
+  mergeEnabled,
+  selectedIds,
+  onToggle,
+  onRowClick,
+  merging,
+}) {
+  if (!tickets.length) {
+    return (
+      <tr>
+        <td colSpan={mergeEnabled ? 6 : 5} className="client360-empty-cell">
+          Nenhum ticket nesta seção.
+        </td>
+      </tr>
+    );
+  }
+
+  return tickets.map((t) => {
+    const ticketId = ticketIdOf(t);
+    const workflowIcon = getClient360WorkflowIconMeta(t);
+    const isSelected = selectedIds.has(ticketId);
+    return (
+      <tr
+        key={ticketId}
+        className={
+          'client360-row--clickable'
+          + (isSelected ? ' client360-row--merge-selected' : '')
+        }
+        onClick={() => onRowClick(ticketId)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && onRowClick(ticketId)}
+      >
+        {mergeEnabled ? (
+          <td
+            className="client360-table__td-check"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              className="client360-merge-check"
+              checked={isSelected}
+              disabled={merging}
+              onChange={() => onToggle(ticketId)}
+              aria-label={`Selecionar #${getTicketProtocolLabel(t) || ticketId} para mesclagem`}
+            />
+          </td>
+        ) : null}
+        <td>
+          <span className="client360-ticket-cell">
+            #{getTicketProtocolLabel(t) || t.id || ticketId}
+            {workflowIcon ? (
+              <span
+                className={`client360-workflow-icon client360-workflow-icon--${workflowIcon.modifier}`}
+                title={workflowIcon.title}
+                aria-label={workflowIcon.title}
+              >
+                <i className={`ti ${workflowIcon.icon}`} aria-hidden="true" />
+              </span>
+            ) : null}
+            <FusaoFundidoBadge fusao={t.fusao} />
+          </span>
+        </td>
+        <td>{getTicketTitle(t)}</td>
+        <td>{t.lateralForm?.canal || t.channel || t.source || '—'}</td>
+        <td>{getTicketStatusLabel(t.status)}</td>
+        <td>{formatTableDate(t.updatedAt || t.createdAt)}</td>
+      </tr>
+    );
+  });
 }
 
 export default function ClientTicketHistoryModal({
@@ -30,41 +111,92 @@ export default function ClientTicketHistoryModal({
   client,
   onSelectTicket,
   sourceTicketId,
-  onMergeTickets,
+  onFundirTickets,
   merging = false,
 }) {
-  const [selectedTargetId, setSelectedTargetId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [activePickId, setActivePickId] = useState('');
 
-  useEffect(() => {
-    if (!open) {
-      setSelectedTargetId(null);
-    }
-  }, [open]);
+  const contact = useMemo(
+    () => (ticket ? getClientContactFields(ticket, client) : { cpf: '', name: '' }),
+    [ticket, client],
+  );
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
-  if (!open || !ticket) return null;
-
-  const contact = getClientContactFields(ticket, client);
   const cpfDigits = normalizeCpf(
-    ticket.lateralForm?.clienteCpf
-    || ticket.lateralForm?.cpf
-    || ticket.clientCPF
+    ticket?.lateralForm?.clienteCpf
+    || ticket?.lateralForm?.cpf
+    || ticket?.clientCPF
     || client?.cpf
     || contact.cpf
     || '',
   );
   const clientIdentified = isClientIdentifiedForHistory(cpfDigits);
-  const mergeEnabled = clientIdentified && Boolean(onMergeTickets && sourceTicketId);
-  const mergeContext = { clientCpfDigits: cpfDigits, clientName: contact.name };
-  const tickets = clientIdentified ? collectClientTickets(cpfDigits) : [];
+  const mergeEnabled = clientIdentified && Boolean(onFundirTickets);
+
+  const refreshList = useCallback(async () => {
+    if (!clientIdentified || !cpfDigits) {
+      setTickets([]);
+      return;
+    }
+    setLoading(true);
+    setLoadError('');
+    try {
+      const data = await ticketSearchApi.byCpf(cpfDigits);
+      setTickets(Array.isArray(data?.tickets) ? data.tickets : []);
+    } catch (err) {
+      setTickets([]);
+      setLoadError(err?.response?.data?.message || err?.message || 'Erro ao carregar histórico');
+    } finally {
+      setLoading(false);
+    }
+  }, [clientIdentified, cpfDigits]);
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedIds(new Set());
+      setConfirmOpen(false);
+      setActivePickId('');
+      setTickets([]);
+      setLoadError('');
+      return undefined;
+    }
+    void refreshList();
+    return undefined;
+  }, [open, refreshList]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        if (confirmOpen) setConfirmOpen(false);
+        else onClose();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose, confirmOpen]);
+
+  const { openTickets, closedTickets } = useMemo(() => {
+    const openList = [];
+    const closedList = [];
+    tickets.forEach((t) => {
+      if (isTicketTerminalStatus(t)) closedList.push(t);
+      else openList.push(t);
+    });
+    return { openTickets: openList, closedTickets: closedList };
+  }, [tickets]);
+
+  const selectedTickets = useMemo(
+    () => tickets.filter((t) => selectedIds.has(ticketIdOf(t))),
+    [tickets, selectedIds],
+  );
+
+  if (!open || !ticket) return null;
+
   const products = getClientProducts(ticket, client);
   const situacao = client?.situacao || (clientIdentified ? '—' : 'Informe o CPF no formulário lateral');
   const risco = client?.risco || '—';
@@ -76,23 +208,71 @@ export default function ClientTicketHistoryModal({
     if (onSelectTicket) onSelectTicket(ticketId);
   };
 
-  const handleToggleMergeTarget = (ticketId, eligible) => {
-    if (!eligible || merging) return;
-    setSelectedTargetId((prev) => (prev === ticketId ? null : ticketId));
+  const handleToggle = (ticketId) => {
+    if (merging) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(ticketId)) next.delete(ticketId);
+      else next.add(ticketId);
+      return next;
+    });
   };
 
   const handleMergeClick = () => {
-    if (!selectedTargetId || merging || !onMergeTickets) return;
-    const target = tickets.find((t) => String(t.id || t._id) === String(selectedTargetId));
-    const sourceProto = getTicketProtocolLabel(ticket) || sourceTicketId;
-    const targetProto = target ? (getTicketProtocolLabel(target) || selectedTargetId) : selectedTargetId;
-    const confirmed = window.confirm(
-      `Mesclar o ticket #${sourceProto} ao chamado #${targetProto}?\n\n`
-      + 'O ticket atual será encerrado como resolvido e o chamado em andamento permanecerá ativo.',
-    );
-    if (!confirmed) return;
-    onMergeTickets(selectedTargetId);
+    if (selectedIds.size < 2 || merging || !onFundirTickets) return;
+    const preferred = sourceTicketId && selectedIds.has(String(sourceTicketId))
+      ? String(sourceTicketId)
+      : selectedTickets.find((t) => !isTicketTerminalStatus(t));
+    setActivePickId(preferred ? ticketIdOf(preferred) : ticketIdOf(selectedTickets[0]));
+    setConfirmOpen(true);
   };
+
+  const handleConfirmFundir = async () => {
+    if (!activePickId || selectedIds.size < 2 || !onFundirTickets) return;
+    const inactiveIds = [...selectedIds].filter((id) => id !== activePickId);
+    await onFundirTickets({
+      activeId: activePickId,
+      inactiveIds,
+      cpf: cpfDigits,
+    });
+    setConfirmOpen(false);
+    setSelectedIds(new Set());
+    await refreshList();
+  };
+
+  const renderTable = (sectionTickets, title) => (
+    <div className="client360-section" key={title}>
+      <h6 className="client360-section-subtitle">
+        {title}
+        {' '}
+        ({sectionTickets.length})
+      </h6>
+      <div className="client360-table-wrap">
+        <table className="client360-table">
+          <thead>
+            <tr>
+              {mergeEnabled ? <th className="client360-table__th-check" aria-label="Mesclar" /> : null}
+              <th>Ticket</th>
+              <th>Assunto</th>
+              <th>Canal</th>
+              <th>Status</th>
+              <th>Data</th>
+            </tr>
+          </thead>
+          <tbody>
+            <TicketRows
+              tickets={sectionTickets}
+              mergeEnabled={mergeEnabled}
+              selectedIds={selectedIds}
+              onToggle={handleToggle}
+              onRowClick={handleRowClick}
+              merging={merging}
+            />
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 
   return createPortal(
     <div
@@ -100,7 +280,7 @@ export default function ClientTicketHistoryModal({
       className="modal"
       style={{ display: 'flex', zIndex: 9000 }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && !confirmOpen) onClose();
       }}
       role="presentation"
     >
@@ -135,7 +315,7 @@ export default function ClientTicketHistoryModal({
             ) : null}
             <h5 className="client360-section-title">
               {clientIdentified
-                ? `Tickets atendidos (${tickets.length})`
+                ? `Tickets do cliente (${tickets.length})`
                 : 'Histórico de atendimentos'}
             </h5>
             {!clientIdentified ? (
@@ -143,92 +323,23 @@ export default function ClientTicketHistoryModal({
                 Identifique o cliente informando o <strong>CPF</strong> no cadastro lateral
                 {' '}(ícone de lápis no painel superior) para consultar o histórico de chamados.
               </p>
+            ) : loading ? (
+              <p className="client360-empty" role="status">Carregando histórico…</p>
+            ) : loadError ? (
+              <p className="client360-empty" role="alert">{loadError}</p>
             ) : tickets.length === 0 ? (
               <p className="client360-empty" role="status">
-                Nenhum outro ticket encontrado para este CPF na fila carregada.
+                Nenhum ticket encontrado para este CPF.
               </p>
             ) : (
               <>
                 {mergeEnabled ? (
                   <p className="client360-merge-hint">
-                    Selecione o chamado em andamento para mesclar o ticket atual.
+                    Selecione dois ou mais tickets e clique em Mesclar. Em seguida escolha qual permanece Ativo.
                   </p>
                 ) : null}
-                <div className="client360-table-wrap">
-                  <table className="client360-table">
-                    <thead>
-                      <tr>
-                        {mergeEnabled ? <th className="client360-table__th-check" aria-label="Mesclar" /> : null}
-                        <th>Ticket</th>
-                        <th>Assunto</th>
-                        <th>Canal</th>
-                        <th>Status</th>
-                        <th>Data</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tickets.map((t) => {
-                        const ticketId = String(t.id || t._id);
-                        const workflowIcon = getClient360WorkflowIconMeta(t);
-                        const mergeEligible = mergeEnabled
-                          && canSelectTicketForMerge(ticket, t, sourceTicketId, mergeContext);
-                        const isMergeSelected = selectedTargetId === ticketId;
-                        return (
-                          <tr
-                            key={ticketId}
-                            className={
-                              'client360-row--clickable'
-                              + (isMergeSelected ? ' client360-row--merge-selected' : '')
-                            }
-                            onClick={() => handleRowClick(ticketId)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => e.key === 'Enter' && handleRowClick(ticketId)}
-                          >
-                            {mergeEnabled ? (
-                              <td
-                                className="client360-table__td-check"
-                                onClick={(e) => e.stopPropagation()}
-                                onKeyDown={(e) => e.stopPropagation()}
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="client360-merge-check"
-                                  checked={isMergeSelected}
-                                  disabled={!mergeEligible || merging}
-                                  onChange={() => handleToggleMergeTarget(ticketId, mergeEligible)}
-                                  aria-label={
-                                    mergeEligible
-                                      ? `Mesclar ticket atual em #${getTicketProtocolLabel(t) || ticketId}`
-                                      : 'Indisponível para mesclagem'
-                                  }
-                                />
-                              </td>
-                            ) : null}
-                            <td>
-                              <span className="client360-ticket-cell">
-                                #{getTicketProtocolLabel(t) || t.id}
-                                {workflowIcon ? (
-                                  <span
-                                    className={`client360-workflow-icon client360-workflow-icon--${workflowIcon.modifier}`}
-                                    title={workflowIcon.title}
-                                    aria-label={workflowIcon.title}
-                                  >
-                                    <i className={`ti ${workflowIcon.icon}`} aria-hidden="true" />
-                                  </span>
-                                ) : null}
-                              </span>
-                            </td>
-                            <td>{getTicketTitle(t)}</td>
-                            <td>{t.lateralForm?.canal || t.channel || t.source || '—'}</td>
-                            <td>{getTicketStatusLabel(t.status)}</td>
-                            <td>{formatTableDate(t.updatedAt || t.createdAt)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                {renderTable(openTickets, 'Em aberto')}
+                {renderTable(closedTickets, 'Fechados')}
               </>
             )}
           </div>
@@ -242,14 +353,139 @@ export default function ClientTicketHistoryModal({
               type="button"
               className="btn-primary"
               onClick={handleMergeClick}
-              disabled={!selectedTargetId || merging}
+              disabled={selectedIds.size < 2 || merging}
             >
-              {merging ? 'Mesclando…' : 'Mesclar tickets'}
+              {merging ? 'Mesclando…' : 'Mesclar'}
             </button>
           ) : null}
         </div>
       </div>
+
+      {confirmOpen ? (
+        <div
+          className="modal client360-fusao-confirm"
+          style={{ display: 'flex', zIndex: 9100 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !merging) setConfirmOpen(false);
+          }}
+          role="presentation"
+        >
+          <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby="fusaoConfirmTitle">
+            <div className="modal-header">
+              <h3 id="fusaoConfirmTitle">Confirmar mesclagem</h3>
+              <button
+                type="button"
+                className="close-btn"
+                onClick={() => !merging && setConfirmOpen(false)}
+                aria-label="Fechar"
+              >
+                <i className="fas fa-times" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="client360-merge-hint">
+                Escolha o ticket que permanecerá Ativo.
+              </p>
+              <div className="client360-fusao-pick-table-wrap">
+                <table className="client360-fusao-pick-table">
+                  <thead>
+                    <tr>
+                      <th className="client360-fusao-pick-table__th-radio" aria-label="Ativo" />
+                      <th>Ticket</th>
+                      <th>Assunto</th>
+                      <th>Status</th>
+                      <th>Workflow</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedTickets.map((t) => {
+                      const id = ticketIdOf(t);
+                      const terminal = isTicketTerminalStatus(t);
+                      const statusMeta = getTicketStatusBadgeMeta(t);
+                      const workflowIcon = getClient360WorkflowIconMeta(t);
+                      return (
+                        <tr
+                          key={id}
+                          className={
+                            'client360-fusao-pick-row'
+                            + (activePickId === id ? ' is-selected' : '')
+                            + (terminal ? ' is-disabled' : '')
+                          }
+                          onClick={() => {
+                            if (!merging && !terminal) setActivePickId(id);
+                          }}
+                        >
+                          <td className="client360-fusao-pick-table__td-radio">
+                            <input
+                              type="radio"
+                              name="fusao-ativo"
+                              checked={activePickId === id}
+                              disabled={merging || terminal}
+                              onChange={() => setActivePickId(id)}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={`Definir #${getTicketProtocolLabel(t) || id} como ativo`}
+                            />
+                          </td>
+                          <td>
+                            <span className="client360-ticket-cell">
+                              #{getTicketProtocolLabel(t) || id}
+                              {terminal ? (
+                                <span className="client360-fusao-pick-hint">Não pode ser o ativo</span>
+                              ) : null}
+                            </span>
+                          </td>
+                          <td title={getTicketTitle(t)}>{getTicketTitle(t)}</td>
+                          <td>
+                            <span className={`client360-status-badge client360-status-badge--${statusMeta.cls}`}>
+                              {statusMeta.label}
+                            </span>
+                          </td>
+                          <td>
+                            {workflowIcon ? (
+                              <span
+                                className={`client360-workflow-badge client360-workflow-badge--${workflowIcon.modifier}`}
+                                title={workflowIcon.title}
+                              >
+                                <i className={`ti ${workflowIcon.icon}`} aria-hidden="true" />
+                                Workflow
+                              </span>
+                            ) : (
+                              <span className="client360-fusao-pick-empty">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setConfirmOpen(false)}
+                disabled={merging}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void handleConfirmFundir()}
+                disabled={
+                  merging
+                  || !activePickId
+                  || selectedTickets.find((t) => ticketIdOf(t) === activePickId && isTicketTerminalStatus(t))
+                }
+              >
+                {merging ? 'Mesclando…' : 'Confirmar mesclagem'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>,
-    document.body
+    document.body,
   );
 }

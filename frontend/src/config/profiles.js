@@ -1,6 +1,6 @@
 /**
  * Perfis operacionais — Agente / Gestão / Workflow / Especiais
- * VERSION: v1.6.0 | DATE: 2026-07-30 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.7.0 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team
  */
 export const PROFILES = {
   agent: {
@@ -9,7 +9,7 @@ export const PROFILES = {
     icon: 'fa-headset',
     color: '#1634FF',
     desc: 'Tickets, fila operacional e registro rápido',
-    nav: ['workspace', 'tickets', 'preferencias', 'atendimento-ia-telefonico', 'chat'],
+    nav: ['workspace', 'tickets', 'busca-tickets', 'preferencias', 'atendimento-ia-telefonico', 'chat'],
     defaultPage: 'workspace',
   },
   gestao: {
@@ -18,7 +18,7 @@ export const PROFILES = {
     icon: 'fa-user-tie',
     color: '#000058',
     desc: 'SLA, performance da equipe e escalonamentos',
-    nav: ['workspace', 'dashboard', 'tickets', 'preferencias', 'atendimento-ia-telefonico', 'config'],
+    nav: ['workspace', 'dashboard', 'tickets', 'busca-tickets', 'preferencias', 'atendimento-ia-telefonico', 'config'],
     defaultPage: 'workspace',
   },
   workflow: {
@@ -27,7 +27,7 @@ export const PROFILES = {
     icon: 'fa-diagram-project',
     color: '#1694FF',
     desc: 'Fluxos operacionais entre times e acompanhamento de etapas',
-    nav: ['workspace', 'workflow-inbox', 'dashboard'],
+    nav: ['workspace', 'workflow-inbox', 'busca-tickets', 'dashboard'],
     defaultPage: 'workflow-inbox',
   },
   especiais: {
@@ -38,6 +38,7 @@ export const PROFILES = {
     desc: 'Canais especiais — Reclame Aqui, Procon, Consumidor.Gov, Bacen e Processos',
     nav: [
       'workspace',
+      'busca-tickets',
       'especiais-reclame-aqui',
       'especiais-procon',
       'especiais-consumidor-gov',
@@ -54,6 +55,13 @@ export const NAV_ITEMS = [
   { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: 'ti-dashboard', tooltip: 'Dashboard' },
   { id: 'reports', path: '/reports', label: 'Relatórios', icon: 'ti-chart-bar', tooltip: 'Relatórios' },
   { id: 'tickets', path: '/tickets', label: 'Tickets', icon: 'ti-ticket', tooltip: 'Tickets' },
+  {
+    id: 'busca-tickets',
+    path: '/busca-tickets',
+    label: 'Busca de Tickets',
+    icon: 'ti-search',
+    tooltip: 'Busca avançada de tickets',
+  },
   {
     id: 'preferencias',
     path: '/preferencias',

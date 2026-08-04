@@ -1,4 +1,4 @@
-/** workflowDto.util v1.0.1 — sync legacy lateralForm.workflow → top-level */
+/** workflowDto.util v1.1.0 — lateral workflow inclui passosResumo para o stepper */
 import { Types } from 'mongoose';
 import type { IChamadoN1, IChamadoWorkflow } from '../models/ChamadoN1';
 import type { IWorkflowDefinicao, IWorkflowPassoEnvelope } from '../models/WorkflowDefinicao';
@@ -6,6 +6,22 @@ import { getWorkflowById, resolveWorkflowForTicket } from './workflowDefinicao.s
 
 function sortPassos(definicao: IWorkflowDefinicao): IWorkflowPassoEnvelope[] {
   return [...(definicao.passos || [])].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+}
+
+function buildPassosResumo(definicao: IWorkflowDefinicao) {
+  return sortPassos(definicao).map((envelope) => {
+    const cfg = envelope.passo || {};
+    return {
+      id: String(envelope._id),
+      nome: String(cfg.nome || 'Etapa').trim() || 'Etapa',
+      ordem: envelope.ordem ?? 0,
+      acaoTipo: cfg.acao?.tipo || 'manual',
+      team: cfg.atribuicao?.funcaoSlug
+        || cfg.atribuicao?.grupoSlug
+        || (cfg.atribuicao?.tipo === 'colaborador' ? 'n1' : 'n1'),
+      slaHoras: cfg.slaHoras ?? null,
+    };
+  });
 }
 
 export function buildLateralWorkflowDto(
@@ -33,6 +49,7 @@ export function buildLateralWorkflowDto(
       at: startedAt,
       by: 'sistema',
       trigger: index === step ? 'active' : 'history',
+      label: String(p.passo?.nome || '').trim() || undefined,
     };
   });
 
@@ -47,6 +64,7 @@ export function buildLateralWorkflowDto(
     completedAt,
     status: wf.completedAt ? 'completed' : 'active',
     stepHistory,
+    passosResumo: buildPassosResumo(definicao),
     pendingDecision: wf.pendingDecision ?? null,
   };
 }

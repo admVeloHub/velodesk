@@ -1,6 +1,6 @@
 /**
- * workflowEngine v1.10.0 — match só por gatilho de tabulação (sem legado escalonar)
- * VERSION: v1.10.0 | DATE: 2026-08-03
+ * workflowEngine v1.11.0 — template a partir de passosResumo do ticket
+ * VERSION: v1.11.0 | DATE: 2026-08-04
  */
 import { getRuntimeGrupos, getRuntimeWorkflows } from './workflowRuntimeStore';
 
@@ -193,8 +193,39 @@ export function normalizeWorkflowDef(definicao) {
 
 export function getWorkflowTemplateById(templateId, definitions = getRuntimeWorkflows()) {
   const slug = String(templateId || '').trim();
-  const def = definitions.find((d) => d.slug === slug || String(d._id) === slug);
+  if (!slug) return null;
+  const def = definitions.find((d) => (
+    d.slug === slug
+    || String(d._id) === slug
+    || String(d.id) === slug
+  ));
   return def ? normalizeWorkflowDef(def) : null;
+}
+
+/** Monta template a partir de passosResumo embutido no lateralForm.workflow (list/detail). */
+export function buildTemplateFromPassosResumo(workflow) {
+  const resumo = Array.isArray(workflow?.passosResumo) ? workflow.passosResumo : [];
+  if (!resumo.length) return null;
+  const steps = resumo
+    .slice()
+    .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+    .map((p) => ({
+      id: String(p.id),
+      label: String(p.nome || p.label || 'Etapa').trim() || 'Etapa',
+      icon: resolveStepIcon(p.acaoTipo),
+      team: p.team || 'n1',
+      slaHours: p.slaHoras ?? p.slaHours ?? null,
+    }));
+  if (!steps.length) return null;
+  const stepIndex = typeof workflow?.step === 'number' ? workflow.step : 0;
+  return {
+    id: workflow?.definicaoSlug || workflow?.templateId || 'workflow',
+    definicaoId: workflow?.definicaoId,
+    title: workflow?.title || 'Workflow',
+    steps,
+    defaultActiveStepId: workflow?.currentStepId || steps[Math.min(stepIndex, steps.length - 1)]?.id || steps[0].id,
+    demoCompletedSteps: [],
+  };
 }
 
 export function resolveWorkflowForTicket(ticket, rightFields = {}, definitions = getRuntimeWorkflows()) {

@@ -1,4 +1,4 @@
-/** chamado.mapper v2.5.4 — resolveInboundClientReplyStatus (resolvido <48h → em-aberto) */
+/** chamado.mapper v2.8.0 — list workflow lateral completo (stepper) */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -19,6 +19,7 @@ import { extractEmailReplyContent } from './emailReplyContent.util';
 import { sanitizeResponsavel, inferResponsavelFromAgentRegistro } from './responsavel.util';
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { filterRealAttachmentUrls } from './attachmentFilter.util';
+import { excludeFusaoAbsorvidosFilter, serializeFusaoDto } from './ticketFusao.helpers';
 
 function normalizeTicketMessageText(raw: string): string {
   return decodeBasicHtmlEntities(String(raw ?? '').trim());
@@ -386,6 +387,17 @@ export interface TicketDto {
   updatedAt?: Date;
   listOnly?: boolean;
   queueEntryAt?: Date;
+  fusao?: {
+    fundido: boolean;
+    dataFundido?: Date | null;
+    hierarquia?: string;
+    parentId?: string | null;
+    childId?: string | null;
+    parentProtocolo?: string;
+    childProtocolo?: string;
+    childProtocolos?: string[];
+    childIds?: string[];
+  };
 }
 
 /** Limites por box na listagem GET /boxes */
@@ -433,11 +445,12 @@ export function buildBoxListFindOptions(
 ): BoxListFindOptions {
   const baseFilter = buildChamadoQueryFilter(status, queue, responsavelCandidates, extraFilter);
   const isTerminal = TERMINAL_BOX_STATUSES.has(status);
+  const excludeAbsorvidos = excludeFusaoAbsorvidosFilter();
 
-  let filter: Record<string, unknown> = baseFilter;
+  let filter: Record<string, unknown> = { $and: [baseFilter, excludeAbsorvidos] };
   if (isTerminal) {
     const since = new Date(Date.now() - BOX_LIST_RESOLVED_MAX_AGE_MS);
-    filter = { $and: [baseFilter, { updatedAt: { $gte: since } }] };
+    filter = { $and: [baseFilter, excludeAbsorvidos, { updatedAt: { $gte: since } }] };
   }
 
   return {
@@ -465,20 +478,8 @@ function buildLateralWorkflowListDto(
   chamado: IChamadoN1,
   definicao: IWorkflowDefinicao,
 ): Record<string, unknown> {
-  const wf = chamado.workflow;
-  if (!wf?.active || !wf.workflowId) return {};
-
-  return {
-    templateId: definicao.slug,
-    definicaoSlug: definicao.slug,
-    definicaoId: String(definicao._id),
-    title: definicao.titulo,
-    step: wf.step ?? 0,
-    startedAt: wf.startedAt ? new Date(wf.startedAt).toISOString() : null,
-    completedAt: wf.completedAt ? new Date(wf.completedAt).toISOString() : null,
-    status: wf.completedAt ? 'completed' : 'active',
-    pendingDecision: wf.pendingDecision ?? null,
-  };
+  // Mesmo payload do detalhe (passosResumo + stepHistory) — stepper não depende só do runtime
+  return buildLateralWorkflowDto(chamado, definicao) || {};
 }
 
 function resolveQueueEntryAt(chamado: IChamadoN1): Date | undefined {
@@ -1481,6 +1482,7 @@ function buildTicketDtoCore(
     updatedAt: chamado.updatedAt,
     listOnly: listOnly || undefined,
     queueEntryAt: listOnly ? resolveQueueEntryAt(chamado) : undefined,
+    fusao: serializeFusaoDto(chamado.fusao),
   };
 }
 

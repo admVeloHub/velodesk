@@ -1,6 +1,6 @@
 /**
- * DeskClientProfileBar v1.11.3 — botão Histórico desativado sem CPF
- * VERSION: v1.11.3 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
+ * DeskClientProfileBar v1.13.2 — botões Avançar/Histórico: largura igual + ponta triangular
+ * VERSION: v1.13.2 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clientsApi } from '../../../api/client';

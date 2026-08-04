@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.8.0 | DATE: 2026-08-03
- * — workflow: ativação só por tabulação + botão (sem campo escalonar)
+ * VERSION: v3.10.0 | DATE: 2026-08-04
+ * — stepper: resolve etapas via passosResumo / template runtime
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
@@ -21,6 +21,7 @@ import { ticketMatchesQueueCriterios } from './customQueueBoxCriteria';
 import {
   advanceWorkflowStep,
   advanceWorkflowByDecision,
+  buildTemplateFromPassosResumo,
   buildWorkflowAdvanceMessage,
   createWorkflowState,
   evaluateWorkflowAutoAdvance,
@@ -547,6 +548,7 @@ function readTicketLateralWorkflow(ticket) {
     ...(lateral || {}),
     templateId: templateSlug || lateral?.templateId || pendingSlug,
     definicaoSlug: templateSlug || lateral?.definicaoSlug || pendingSlug,
+    definicaoId: lateral?.definicaoId || (persisted?.workflowId ? String(persisted.workflowId) : undefined),
     title: lateral?.title || template?.title || ticket?._pendingWorkflowStart?.templateTitle || 'Workflow',
     step: persisted?.step ?? lateral?.step ?? 0,
     passoId: persisted?.passoId ?? lateral?.passoId,
@@ -558,6 +560,14 @@ function readTicketLateralWorkflow(ticket) {
     pendingDecision: persisted?.pendingDecision ?? lateral?.pendingDecision ?? null,
     currentStepId: lateral?.currentStepId,
     stepHistory: lateral?.stepHistory || [],
+    passosResumo: lateral?.passosResumo || template?.steps?.map((s, index) => ({
+      id: s.id,
+      nome: s.label,
+      ordem: index,
+      acaoTipo: s.acao?.tipo || 'manual',
+      team: s.team || 'n1',
+      slaHoras: s.slaHours ?? null,
+    })) || undefined,
   };
 }
 
@@ -578,9 +588,17 @@ export function isTicketWorkflowActive(ticket) {
 
 export function getWorkflowTemplateForTicket(ticket) {
   const wf = readTicketLateralWorkflow(ticket);
-  const templateKey = wf?.templateId || wf?.definicaoSlug || ticket?.workflow?.workflowId;
-  if (!templateKey) return null;
-  return getWorkflowTemplateById(templateKey);
+  const templateKey = wf?.templateId
+    || wf?.definicaoSlug
+    || wf?.definicaoId
+    || ticket?.workflow?.workflowId;
+  if (templateKey) {
+    const fromRuntime = getWorkflowTemplateById(templateKey);
+    if (fromRuntime?.steps?.length) return fromRuntime;
+  }
+  const fromPassos = buildTemplateFromPassosResumo(wf);
+  if (fromPassos?.steps?.length) return fromPassos;
+  return null;
 }
 
 function formatDurationMs(ms) {
@@ -598,6 +616,9 @@ function getStepStartedAt(workflow, stepId) {
 }
 
 function buildFallbackWorkflowTemplate(workflow, ticket) {
+  const fromPassos = buildTemplateFromPassosResumo(workflow);
+  if (fromPassos?.steps?.length) return fromPassos;
+
   const slug = workflow?.definicaoSlug || workflow?.templateId || ticket?.workflow?.workflowId || 'workflow';
   const title = workflow?.title || 'Workflow';
   const stepIndex = typeof workflow?.step === 'number' ? workflow.step : 0;
@@ -623,7 +644,7 @@ export function getWorkflowProgress(ticket) {
   if (!workflow) return null;
 
   let template = getWorkflowTemplateForTicket(ticket);
-  if (!template) {
+  if (!template?.steps?.length) {
     template = buildFallbackWorkflowTemplate(workflow, ticket);
   }
   if (!template?.steps?.length) return null;
@@ -1030,6 +1051,7 @@ function filterMyTicketsEntries(searchQuery) {
 
   return getAllCockpitTickets().filter((entry) => {
     if (!activeQueues.has(entry.queueId)) return false;
+    if (isFusaoAbsorvido(entry.ticket)) return false;
     if (!ticketBelongsInMeusTicketsList(entry.ticket)) return false;
     return matchesTicketSearch(entry, q);
   });
@@ -1077,6 +1099,7 @@ function matchesMyTicketsStatusSection(entry, sectionId) {
 function filterCustomQueueEntries(customBox, searchQuery) {
   const q = String(searchQuery || '').trim();
   return getAllCockpitTickets().filter((entry) => {
+    if (isFusaoAbsorvido(entry.ticket)) return false;
     if (!shouldViewAllDeskTickets() && !ticketMatchesAgentResponsavel(entry.ticket)) return false;
     if (!ticketMatchesQueueCriterios(entry.ticket, customBox.criterios)) return false;
     return matchesTicketSearch(entry, q);
@@ -1101,6 +1124,7 @@ export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOld
   const trustBackendQueues = shouldUseMeusChamadosFila();
   const filtered = getAllCockpitTickets()
     .filter((entry) => {
+      if (isFusaoAbsorvido(entry.ticket)) return false;
       if (entry.queueId !== activeQueue) return false;
       if (filterByResponsavel && !trustBackendQueues && !ticketMatchesAgentResponsavel(entry.ticket)) {
         return false;
@@ -1122,6 +1146,7 @@ export function resolveDeskSearchEntries(
 
   const all = getAllCockpitTickets();
   const filtered = all.filter(({ ticket: t }) => {
+    if (isFusaoAbsorvido(t)) return false;
     if (!ticketMatchesAgentResponsavel(t)) return false;
     return matchesTicketSearch({ ticket: t }, trimmed, searchMode);
   });
@@ -1140,6 +1165,7 @@ export function countByQueue(queueId) {
   const filterByResponsavel = shouldFilterByAgentResponsavel(queueId);
   const trustBackendQueues = shouldUseMeusChamadosFila();
   return getAllCockpitTickets().filter((e) => {
+    if (isFusaoAbsorvido(e.ticket)) return false;
     if (e.queueId !== queueId) return false;
     if (filterByResponsavel && !trustBackendQueues && !ticketMatchesAgentResponsavel(e.ticket)) {
       return false;
@@ -1421,6 +1447,18 @@ export function getTicketStatusLabel(status) {
 }
 
 const TERMINAL_TICKET_STATUSES = new Set(['resolvido', 'resolvidos', 'cancelado', 'fechado']);
+
+/** Ticket absorvido na mesclagem (hierarquia inferior / redundante com parent). */
+export function isFusaoAbsorvido(ticket) {
+  const fusao = ticket?.fusao;
+  if (!fusao || fusao.fundido !== true) return false;
+  const h = String(fusao.hierarquia || '').toLowerCase();
+  if (h === 'inferior') return true;
+  if (h === 'redundante' && fusao.parentId != null && String(fusao.parentId) !== '') {
+    return true;
+  }
+  return false;
+}
 
 export function isTicketTerminalStatus(ticket) {
   const status = String(ticket?.status || '').trim().toLowerCase();
