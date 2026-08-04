@@ -1,7 +1,9 @@
-/** workflowMatcher v1.6.0 — match por gatilho de tabulação (sem exclusão por slug) */
+/** workflowMatcher v1.6.1 — contexto de tabulação a partir de IChamadoN1 (canal via registro) */
 import { GRUPO_TO_FUNCAO_MAP } from '../config/funcaoPermissaoDefaults';
 import type { IGrupoResponsabilidade } from '../models/GrupoResponsabilidade';
 import type { IWorkflowCriterio } from '../models/WorkflowDefinicao';
+import type { IChamadoN1 } from '../models/ChamadoN1';
+import { isProconChamado, readTabulacaoSnapshot } from './chamado.mapper';
 
 function normalize(value: unknown): string {
   return String(value ?? '')
@@ -140,6 +142,35 @@ export function buildTabulationFieldsFromTicket(ticket: {
     dataContratacao: String(integracao.dataContratacao ?? integracao.dataContratacaoFaixa ?? lf.dataContratacao ?? ''),
     statusContrato: String(integracao.statusContrato ?? lf.statusContrato ?? ''),
   };
+}
+
+export function resolveCanalFromChamado(chamado: IChamadoN1): string {
+  if (isProconChamado(chamado)) return 'Procon';
+  for (const reg of chamado.registro ?? []) {
+    const meta = (reg.metadados && typeof reg.metadados === 'object' ? reg.metadados : {}) as Record<string, unknown>;
+    const source = String(meta.source ?? meta.channel ?? '').trim().toLowerCase();
+    if (source.includes('reclame')) return 'Reclame Aqui';
+    if (source.includes('procon')) return 'Procon';
+    if (source === 'email-inbound') return 'E-mail';
+  }
+  return '';
+}
+
+export function buildWorkflowTicketContextFromChamado(chamado: IChamadoN1): {
+  tabulacao: Array<Record<string, string>>;
+  lateralForm?: Record<string, unknown>;
+  channel?: string;
+} {
+  const tab = readTabulacaoSnapshot(chamado.tabulacao?.[0]);
+  const canal = resolveCanalFromChamado(chamado);
+  return {
+    tabulacao: [tab as unknown as Record<string, string>],
+    ...(canal ? { lateralForm: { canal }, channel: canal } : {}),
+  };
+}
+
+export function buildTabulationFieldsFromChamado(chamado: IChamadoN1): Record<string, string> {
+  return buildTabulationFieldsFromTicket(buildWorkflowTicketContextFromChamado(chamado));
 }
 
 export function resolveAtribuidoForPasso(

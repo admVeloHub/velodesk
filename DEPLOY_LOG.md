@@ -1,10 +1,28 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.62.0 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.63.0 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Backend: fix build GCP workflow (contexto tabulação IChamadoN1)
+
+- **Data/Hora**: 2026-08-04
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.63.0
+  - **Backend**: workflowMatcher.service v1.6.1, workflowTicket.service v1.6.1
+- **Arquivos principais**:
+  - `backend/src/services/workflowMatcher.service.ts` — `resolveCanalFromChamado`, `buildWorkflowTicketContextFromChamado`, `buildTabulationFieldsFromChamado` (canal via `registro[].metadados`, sem `metadados` na raiz)
+  - `backend/src/services/workflowTicket.service.ts` — `startWorkflowForChamado` e ativação usam helpers; remove acesso inválido a `chamado.metadados`
+- **Descrição**: Corrige falha de build TypeScript no Cloud Build (`Property 'metadados' does not exist on type 'IChamadoN1'`). Contexto de tabulação/canal para match de workflow passa a ser montado a partir da estrutura real do chamado N1.
+- **Validação**: `npm run build` backend OK (`tsc` sem erros).
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — Desk: busca avançada de tickets e mesclagem (fusão)
 
