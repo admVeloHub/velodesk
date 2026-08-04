@@ -11,7 +11,7 @@
 - **Data/Hora**: 2026-08-04
 - **Tipo**: GitHub Push
 - **Repositório**: https://github.com/admVeloHub/velodesk
-- **Branch**: dev
+- **Branch**: dev + main
 - **Versão (componentes)**:
   - DEPLOY_LOG v1.62.0
   - **Backend**: index v1.13.0, ChamadoN1 v1.9.0, chamado.mapper, ticketSearch.routes v1.1.0, ticketSearch.service, ticketFusao.routes v1.0.1, ticketFusao.service v1.1.1, ticketFusao.helpers
@@ -26,7 +26,7 @@
   - `frontend/src/services/desk/utils.js` — tickets absorvidos pela fusão saem das filas abertas
 - **Descrição**: Nova página de busca avançada de tickets no Desk e mesclagem de chamados do mesmo cliente (estilo Ouvidoria VeloHub): ticket ativo permanece aberto, absorvidos vão para resolvido com vínculo `fusao` e badge "Mesclado" no histórico.
 - **Validação**: Rotas novas registradas em `index.ts`; fluxo UI histórico → seleção → confirmação → POST fusão.
-- **Status**: Push dev
+- **Status**: Push dev + main
 
 ---
 
