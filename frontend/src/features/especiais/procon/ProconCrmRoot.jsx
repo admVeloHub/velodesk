@@ -8,7 +8,7 @@ import { usePcNovaDemandaModals } from '../../../hooks/usePcNovaDemandaModals';
 import { PC_GROUPS } from '../../../services/especiais/proconData';
 import { loadDemandas } from '../../../services/especiais/proconStore';
 import { matchesTicketCpfSearch } from '../../../services/especiais/especiaisCrmSearch';
-import { fetchPcTicketView } from '../../../services/especiais/proconTicketService';
+import { fetchPcTicketView, loadProconTicketsFromApi } from '../../../services/especiais/proconTicketService';
 import PcQueuePanel from './PcQueuePanel';
 import PcTicketList from './PcTicketList';
 import PcTicketMain from './PcTicketMain';
@@ -33,12 +33,16 @@ export default function ProconCrmRoot() {
   const [listVersion, setListVersion] = useState(0);
 
   useEffect(() => {
+    const refreshFromApi = () => {
+      loadProconTicketsFromApi().catch(() => {});
+    };
+    refreshFromApi();
     const bumpList = () => setListVersion((v) => v + 1);
     window.addEventListener('velodesk:procon-sync', bumpList);
-    window.addEventListener('velodesk:refresh-tickets', bumpList);
+    window.addEventListener('velodesk:refresh-tickets', refreshFromApi);
     return () => {
       window.removeEventListener('velodesk:procon-sync', bumpList);
-      window.removeEventListener('velodesk:refresh-tickets', bumpList);
+      window.removeEventListener('velodesk:refresh-tickets', refreshFromApi);
     };
   }, []);
 
@@ -214,6 +218,7 @@ export default function ProconCrmRoot() {
         waChatOpen={waChatOpen}
         onOpenChat={handleOpenChat}
         onCloseChat={handleCloseChat}
+        onTicketUpdated={handleTicketUpdated}
       />
 
       {demandaModals}

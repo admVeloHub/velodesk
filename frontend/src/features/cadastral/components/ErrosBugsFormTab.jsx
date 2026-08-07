@@ -35,6 +35,7 @@ const EMPTY_ATTACHMENTS = {
 export default function ErrosBugsFormTab({
   onSaved,
   onSubmitted,
+  onTeamForward,
   ticketOverride,
   clientOverride,
 }) {
@@ -95,12 +96,16 @@ export default function ErrosBugsFormTab({
         || findTicketEntry(activeTabId)?.ticket?.id
         || findTicketEntry(form.ticketId)?.ticket?.id;
 
-      if (ticketRef) {
+      if (onTeamForward) {
+        await onTeamForward(request);
+      } else if (ticketRef) {
         await persistSolicitacaoProdutosOnTicket(ticketRef, request);
       }
 
       revokeAttachmentPreviews(attachments.imagens, attachments.videos);
-      showNotification('Erro/bug registrado e enviado ao time de Produtos.', 'success');
+      if (!onTeamForward) {
+        showNotification('Erro/bug registrado e enviado ao time de Produtos.', 'success');
+      }
       setForm({ ...EMPTY_FORM, cpf: form.cpf, ticketId: form.ticketId });
       setAttachments(EMPTY_ATTACHMENTS);
       onSaved?.();

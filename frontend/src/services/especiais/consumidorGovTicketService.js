@@ -1,0 +1,397 @@
+/**
+ * consumidorGovTicketService — bridge ConsumidorGov ↔ API tickets
+ */
+import { clientsApi, ticketsApi, boxesApi } from '../../api/client';
+import { mapClienteDocToContact } from '../../api/adapters/clienteAdapter';
+import { apiTicketToCockpit, adaptColumnsFromApi } from '../../api/adapters/ticketAdapter';
+import { getAgentName } from '../clientDb';
+import { createWorkflowState, getWorkflowTemplateById } from '../desk/workflowEngine';
+import { CG_STATUS } from './consumidorGovData';
+import {
+  buildRegistroDefaults,
+  createEmptyDemanda,
+  registerDemanda,
+  getDemandaById,
+  getDemandaByTicketId,
+  mirrorDemandaFromTicket,
+} from './consumidorGovStore';
+
+const CG_WORKFLOW_SLUG = 'consumidor-gov-tratativa';
+
+function normalizeCpf(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function buildConsumidorGovMeta(form) {
+  const defaults = buildRegistroDefaults(form);
+  return {
+    protocoloGov: defaults.protocoloGov,
+    idDemanda: defaults.idDemanda || defaults.protocoloGov,
+    statusGov: CG_STATUS.NAO_RESPONDIDA,
+    prazoLegal: defaults.prazoLegal,
+    dataDemanda: defaults.dataDemanda,
+    assunto: defaults.assunto,
+    descricao: defaults.descricao,
+    consumidor: defaults.consumidor,
+    cpf: defaults.cpf,
+    produto: defaults.produto,
+    tipo: defaults.tipo,
+    motivo: defaults.motivo,
+    orgaoGov: defaults.orgaoGov,
+    cidade: defaults.cidade,
+    uf: defaults.uf,
+  };
+}
+
+export function buildTicketPayloadFromDemanda(form, workflow = null) {
+  const meta = buildConsumidorGovMeta(form);
+  const cpf = normalizeCpf(form.cpf);
+  const author = getAgentName();
+
+  return {
+    chamadoTitulo: String(form.assunto || '').trim() || 'Demanda Consumidor.Gov',
+    title: String(form.assunto || '').trim() || 'Demanda Consumidor.Gov',
+    text: String(form.descricao || '').trim(),
+    description: String(form.descricao || '').trim(),
+    status: 'novo',
+    clientName: String(form.consumidor || '').trim(),
+    clientCPF: cpf || undefined,
+    author,
+    lateralForm: {
+      classificacaoTipo: form.tipo || 'Reclamação',
+      tipoChamado: form.tipo || 'Reclamação',
+      produto: form.produto || '',
+      motivo: form.motivo || form.assunto || '',
+      detalhe: 'Demanda Consumidor.Gov',
+      canal: 'Consumidor.Gov',
+      responsavel: author,
+      clienteCpf: cpf,
+      cpf,
+      clienteNome: form.consumidor || '',
+      clienteTelefone: form.telefoneWhatsapp ? [form.telefoneWhatsapp] : [],
+      clienteEmail: form.email ? [form.email] : [],
+      consumidorGov: meta,
+      workflow: workflow || undefined,
+    },
+  };
+}
+
+function buildFallbackCgWorkflow() {
+  const now = new Date().toISOString();
+  const author = getAgentName() || 'sistema';
+  return {
+    templateId: CG_WORKFLOW_SLUG,
+    definicaoSlug: CG_WORKFLOW_SLUG,
+    title: 'TRATATIVA CONSUMIDOR.GOV',
+    currentStepId: 'cg-triagem',
+    step: 0,
+    startedAt: now,
+    stepHistory: [{
+      stepId: 'cg-triagem',
+      status: 'active',
+      at: now,
+      by: author,
+      trigger: 'consumidor-gov-register',
+    }],
+    status: 'active',
+    systemMessageInjected: false,
+  };
+}
+
+export function buildCgWorkflowState() {
+  const template = getWorkflowTemplateById(CG_WORKFLOW_SLUG);
+  if (template) {
+    return createWorkflowState(template, {
+      by: getAgentName() || 'sistema',
+      trigger: 'consumidor-gov-register',
+    });
+  }
+  return buildFallbackCgWorkflow();
+}
+
+export async function registerDemandaAndCreateTicket(form) {
+  const workflow = buildCgWorkflowState();
+  const payload = buildTicketPayloadFromDemanda(form, workflow);
+  const created = await ticketsApi.create(payload);
+  const ticket = apiTicketToCockpit(created);
+  const ticketId = String(ticket.id || ticket._id);
+
+  const publicText = String(form.respostaPublica || '').trim();
+  if (publicText) {
+    await ticketsApi.addMessage(ticketId, {
+      text: publicText,
+      author: getAgentName(),
+      sender: 'me',
+    });
+  }
+
+  const cgItem = registerDemanda({
+    ...form,
+    ticketId,
+    chamadoProtocolo: ticket.chamadoProtocolo,
+    workflowAtivo: true,
+    workflow: 'Tratativa Consumidor.Gov',
+    statusGov: CG_STATUS.NAO_RESPONDIDA,
+  });
+
+  return {
+    id: cgItem.id,
+    ticketId,
+    cgItem,
+    ticket,
+  };
+}
+
+export async function ensureCgTicketForRespond(cgItem) {
+  if (!cgItem?.id) {
+    throw new Error('Demanda inválida.');
+  }
+
+  const current = getDemandaById(cgItem.id) || cgItem;
+
+  if (current.ticketId) {
+    const view = await fetchCgTicketView(current.id);
+    if (!view?.cgItem) {
+      throw new Error('Demanda não encontrada.');
+    }
+    return {
+      cgItem: view.cgItem,
+      ticket: view.ticket,
+    };
+  }
+
+  const form = {
+    ...buildRegistroDefaults(current),
+    ...current,
+    id: current.id,
+    consumidor: String(current.consumidor || '').trim() || 'Consumidor',
+    assunto: String(current.assunto || '').trim() || 'Demanda Consumidor.Gov',
+    descricao: String(current.descricao || current.assunto || '').trim() || 'Demanda Consumidor.Gov',
+    isDraft: false,
+  };
+
+  const result = await registerDemandaAndCreateTicket(form);
+  return {
+    cgItem: result.cgItem,
+    ticket: result.ticket,
+  };
+}
+
+export function buildDemandaFromCliente(doc) {
+  const contact = mapClienteDocToContact(doc);
+  if (!contact) return null;
+  const consumidor = String(contact.clientName || '').trim() || 'Consumidor';
+  const assunto = `Demanda Consumidor.Gov — ${consumidor}`;
+  const empty = createEmptyDemanda();
+  return {
+    ...empty,
+    ...buildRegistroDefaults({
+      ...empty,
+      consumidor,
+      cpf: contact.clientCPF,
+      email: contact.email || contact.emails?.[0] || '',
+      telefoneWhatsapp: contact.whatsappPhone || contact.phone || contact.phones?.[0] || '',
+      assunto,
+      descricao: '',
+      produto: 'Empréstimo',
+      tipo: 'Reclamação',
+      motivo: assunto,
+      isDraft: false,
+    }),
+    id: empty.id,
+  };
+}
+
+export async function createDemandaFromCliente(doc) {
+  const form = buildDemandaFromCliente(doc);
+  if (!form) {
+    throw new Error('Dados do cliente inválidos.');
+  }
+  return registerDemandaAndCreateTicket(form);
+}
+
+export async function createDemandaFromCpf(cpfRaw) {
+  const cpf = normalizeCpf(cpfRaw);
+  const cliente = await clientsApi.getByCpf(cpf);
+  return createDemandaFromCliente(cliente);
+}
+
+export async function fetchCgTicketView(cgId) {
+  const cgItem = getDemandaById(cgId);
+  if (!cgItem) return null;
+
+  if (!cgItem.ticketId) {
+    return { cgItem, ticket: null };
+  }
+
+  const raw = await ticketsApi.get(cgItem.ticketId);
+  const ticket = apiTicketToCockpit(raw);
+  const apiCg = ticket.lateralForm?.consumidorGov;
+
+  return {
+    cgItem: {
+      ...cgItem,
+      ...(apiCg && typeof apiCg === 'object' ? apiCg : {}),
+      ticketId: cgItem.ticketId,
+      chamadoProtocolo: ticket.chamadoProtocolo || cgItem.chamadoProtocolo,
+    },
+    ticket,
+  };
+}
+
+export async function sendCgWaMessage(ticketId, text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return null;
+  await ticketsApi.addMessage(ticketId, {
+    text: trimmed,
+    author: getAgentName(),
+    sender: 'me',
+  });
+  const raw = await ticketsApi.get(ticketId);
+  return apiTicketToCockpit(raw);
+}
+
+export async function publishCgPublicResponse(ticketId, text) {
+  await ticketsApi.addMessage(ticketId, {
+    text: String(text || '').trim(),
+    author: getAgentName(),
+    sender: 'me',
+  });
+  const raw = await ticketsApi.get(ticketId);
+  return apiTicketToCockpit(raw);
+}
+
+export async function saveCgInternalNote(ticketId, text) {
+  await ticketsApi.addMessage(ticketId, {
+    internalText: String(text || '').trim(),
+    text: '',
+    author: getAgentName(),
+    sender: 'me',
+  });
+  const raw = await ticketsApi.get(ticketId);
+  return apiTicketToCockpit(raw);
+}
+
+export function getCgThreadMessages(ticket, cgItem) {
+  const messages = ticket?.messages || [];
+  if (!messages.length) return [];
+
+  const complaintText = String(cgItem?.descricao || messages[0]?.text || '').trim();
+  return messages.filter((msg, index) => {
+    if (index === 0 && msg.fromClient && String(msg.text || '').trim() === complaintText) {
+      return false;
+    }
+    return Boolean(String(msg.text || '').trim());
+  });
+}
+
+export function formatCgDeadlineLabel(iso) {
+  if (!iso) return '—';
+  const diff = new Date(iso).getTime() - Date.now();
+  if (diff <= 0) return 'Prazo vencido';
+  const totalHours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  if (days > 0) {
+    return `${days} dia${days > 1 ? 's' : ''} e ${hours} hora${hours !== 1 ? 's' : ''}`;
+  }
+  return `${hours} hora${hours !== 1 ? 's' : ''}`;
+}
+
+function normalizeCanal(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+export function isConsumidorGovChannelTicket(ticket) {
+  if (!ticket) return false;
+  const channel = normalizeCanal(ticket.channel ?? ticket.source);
+  if (channel === 'consumidor-gov' || channel === 'consumidorgov') return true;
+  const lf = ticket.lateralForm || {};
+  const canal = normalizeCanal(lf.canal);
+  if (canal.includes('consumidor') && canal.includes('gov')) return true;
+  const gov = lf.consumidorGov;
+  return Boolean(gov && typeof gov === 'object' && !Array.isArray(gov));
+}
+
+export function buildDemandaFromTicket(ticket) {
+  const lf = ticket.lateralForm || {};
+  const pc = (lf.consumidorGov && typeof lf.consumidorGov === 'object' && !Array.isArray(lf.consumidorGov))
+    ? lf.consumidorGov
+    : {};
+  const ticketId = String(ticket.id || ticket._id || '');
+  const consumidor = String(
+    pc.consumidor || ticket.clientName || lf.clienteNome || '',
+  ).trim();
+  const assunto = String(
+    pc.assunto || ticket.chamadoTitulo || ticket.title || 'Demanda Consumidor.Gov',
+  ).trim();
+  const cpf = String(pc.cpf || ticket.clientCPF || lf.clienteCpf || lf.cpf || '').trim();
+  const prazoLegal = pc.prazoLegal || null;
+  const defaults = buildRegistroDefaults({
+    protocoloGov: pc.protocoloGov || ticket.chamadoProtocolo || undefined,
+    consumidor,
+    assunto,
+    cpf,
+    descricao: String(pc.descricao || ticket.description || ticket.text || '').trim(),
+    idDemanda: pc.idDemanda || '',
+    dataDemanda: pc.dataDemanda || ticket.createdAt,
+    orgaoGov: pc.orgaoGov || '',
+    cidade: pc.cidade || '',
+    uf: pc.uf || '',
+    produto: pc.produto || lf.produto || 'Empréstimo',
+    tipo: pc.tipo || lf.tipoChamado || lf.classificacaoTipo || 'Reclamação',
+    motivo: pc.motivo || lf.motivo || assunto,
+    prazoLegal,
+    statusGov: pc.statusGov || CG_STATUS.NAO_RESPONDIDA,
+    tabulacao: lf.produto || pc.produto || '—',
+    atendente: lf.responsavel || ticket.responsibleAgent || '—',
+    ticketId,
+    chamadoProtocolo: ticket.chamadoProtocolo || '',
+    groupKey: 'nao-respondidas',
+    aberta: true,
+    workflowAtivo: false,
+    respostaAction: 'responder',
+  });
+
+  return {
+    ...defaults,
+    id: `cg-ticket-${ticketId}`,
+    ticketId,
+    chamadoProtocolo: ticket.chamadoProtocolo || defaults.chamadoProtocolo,
+  };
+}
+
+export function syncConsumidorGovDemandaFromTicket(ticket) {
+  if (!isConsumidorGovChannelTicket(ticket)) return null;
+  const ticketId = String(ticket.id || ticket._id || '');
+  if (!ticketId) return null;
+  if (getDemandaByTicketId(ticketId)) return null;
+  return mirrorDemandaFromTicket(buildDemandaFromTicket(ticket));
+}
+
+export function syncConsumidorGovDemandasFromTickets(tickets = []) {
+  let synced = 0;
+  (tickets || []).forEach((entry) => {
+    const ticket = entry?.ticket ?? entry;
+    if (syncConsumidorGovDemandaFromTicket(ticket)) synced += 1;
+  });
+  return synced;
+}
+
+export async function loadConsumidorGovTicketsFromApi() {
+  try {
+    const data = await boxesApi.list({ fila: 'consumidor-gov' });
+    const columns = adaptColumnsFromApi(data, { fila: 'consumidor-gov' });
+    const entries = columns.flatMap((box) =>
+      (box.tickets || []).map((ticket) => ({ ticket, boxId: box.id })),
+    );
+    const synced = syncConsumidorGovDemandasFromTickets(entries);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('velodesk:consumidor-gov-sync'));
+    }
+    return synced;
+  } catch (err) {
+    console.warn('consumidorGovTicketService: falha ao carregar fila consumidor-gov', err?.message || err);
+    return 0;
+  }
+}

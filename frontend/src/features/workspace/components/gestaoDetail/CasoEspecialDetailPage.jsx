@@ -20,6 +20,7 @@ import {
   Legend,
 } from 'chart.js';
 import { gestaoInsightsApi } from '../../../../api/client';
+import { getGestaoOrgaoTheme } from '../../../../config/especiaisTheme';
 import GestaoPeriodFilter from '../gestaoInsights/GestaoPeriodFilter';
 import GestaoGranularityToggle from '../gestaoInsights/GestaoGranularityToggle';
 import '../gestaoInsights/gestaoInsights.css';
@@ -37,12 +38,28 @@ ChartJS.register(
   Legend,
 );
 
-const ORGAO_META = {
-  bacen: { color: '#000058', icon: 'ti-building-bank', label: 'Bacen' },
-  procon: { color: '#1634FF', icon: 'ti-scale', label: 'Procon' },
-  consumidorGov: { color: '#006AB9', icon: 'ti-gavel', label: 'Consumidor.gov' },
-  reclameAqui: { color: '#FCC200', icon: 'ti-message-report', label: 'Reclame Aqui' },
+const ORGAO_ICONS = {
+  bacen: 'ti-building-bank',
+  procon: 'ti-scale',
+  consumidorGov: 'ti-gavel',
+  reclameAqui: 'ti-message-report',
 };
+
+const ORGAO_LABELS = {
+  bacen: 'Bacen',
+  procon: 'Procon',
+  consumidorGov: 'Consumidor.gov',
+  reclameAqui: 'Reclame Aqui',
+};
+
+function getOrgaoMeta(orgaoId) {
+  const theme = getGestaoOrgaoTheme(orgaoId);
+  return {
+    color: theme.accent,
+    icon: ORGAO_ICONS[orgaoId] ?? 'ti-flag',
+    label: ORGAO_LABELS[orgaoId] ?? orgaoId,
+  };
+}
 
 function formatCompareLabel(mode) {
   if (mode === 'mom') return 'período imediatamente anterior';
@@ -53,7 +70,7 @@ function formatCompareLabel(mode) {
 export default function CasoEspecialDetailPage() {
   const { orgao } = useParams();
   const navigate = useNavigate();
-  const meta = ORGAO_META[orgao] ?? { color: '#1634FF', icon: 'ti-flag', label: orgao };
+  const meta = getOrgaoMeta(orgao);
 
   const [period, setPeriod] = useState({ period: 'mes' });
   const [compareMode, setCompareMode] = useState('');

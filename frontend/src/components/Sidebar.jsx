@@ -1,11 +1,11 @@
-﻿/**
+/**
  * Sidebar rail unificada — 3 estados: 10px | hover 52px | chevron fixa 220px
  * VERSION: v1.11.0 | DATE: 2026-07-27
  * Perfil: VeloHub (sem botÃ£o local na barra)
  */
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { NAV_ITEMS } from '../config/profiles';
+import { isEspeciaisNavId, NAV_ITEMS } from '../config/profiles';
 import { useAuth } from '../context/AuthContext';
 import { useProfile } from '../context/ProfileContext';
 import { useVeloNews } from '../features/velonews/VeloNewsProvider';
@@ -81,11 +81,40 @@ export default function Sidebar() {
       return (orderA === -1 ? 999 : orderA) - (orderB === -1 ? 999 : orderB);
     });
 
+  const { primaryNav, especiaisNav } = useMemo(() => {
+    const primary = [];
+    const especiais = [];
+    visibleNav.forEach((item) => {
+      if (isEspeciaisNavId(item.id)) especiais.push(item);
+      else primary.push(item);
+    });
+    return { primaryNav: primary, especiaisNav: especiais };
+  }, [visibleNav]);
+
   const handleNavClick = useCallback((item) => {
     const path = item.id === 'tickets' ? '/tickets?desk=v2' : item.path;
+    // Canais Especiais usam React Router direto — navigateToPage remove .active cedo demais
+    if (isEspeciaisNavId(item.id)) {
+      const mainContent = document.querySelector('.main-content');
+      if (mainContent) {
+        mainContent.classList.remove('tickets-active');
+        mainContent.style.background = 'transparent';
+      }
+      window.syncMainSidebarNav?.(item.id);
+      navigate(path);
+      return;
+    }
     if (typeof window.navigateToPage === 'function' && item.id !== 'workflow-inbox') {
       window.navigateToPage(item.id);
       return;
+    }
+    if (item.id === 'workflow-inbox') {
+      const mainContent = document.querySelector('.main-content');
+      if (mainContent) {
+        mainContent.classList.remove('tickets-active');
+        mainContent.style.background = 'transparent';
+      }
+      window.syncMainSidebarNav?.('workflow-inbox');
     }
     navigate(path);
   }, [navigate]);
@@ -100,6 +129,38 @@ export default function Sidebar() {
     isOpen ? 'is-open' : '',
     pinned ? 'is-pinned' : '',
   ].filter(Boolean).join(' ');
+
+  const renderNavItem = (item) => (
+    <li
+      key={item.id}
+      className={'nav-item' + (isActive(item) ? ' active' : '')}
+      data-page={item.id}
+      data-tooltip={item.tooltip}
+      title={item.tooltip}
+      onClick={() => handleNavClick(item)}
+      onKeyDown={(e) => navKeyActivate(e, () => handleNavClick(item))}
+      role="button"
+      tabIndex={0}
+    >
+      <i className={'ti ' + item.icon} />
+      <span>{item.label}</span>
+      {item.badge && <span className="nav-item__badge" aria-hidden="true" />}
+    </li>
+  );
+
+  const renderEspeciaisSection = () => {
+    if (!especiaisNav.length) return null;
+    if (!pinned) return especiaisNav.map(renderNavItem);
+    return (
+      <>
+        <li className="velo-nav-rail__nav-section" role="presentation">
+          <div className="velo-nav-rail__section-divider" aria-hidden="true" />
+          <span className="velo-nav-rail__section-label">Especiais</span>
+        </li>
+        {especiaisNav.map(renderNavItem)}
+      </>
+    );
+  };
 
   return (
     <div
@@ -136,23 +197,8 @@ export default function Sidebar() {
           </button>
         </div>
         <ul className="nav-list">
-          {visibleNav.map((item) => (
-            <li
-              key={item.id}
-              className={'nav-item' + (isActive(item) ? ' active' : '')}
-              data-page={item.id}
-              data-tooltip={item.tooltip}
-              title={item.tooltip}
-              onClick={() => handleNavClick(item)}
-              onKeyDown={(e) => navKeyActivate(e, () => handleNavClick(item))}
-              role="button"
-              tabIndex={0}
-            >
-              <i className={'ti ' + item.icon} />
-              <span>{item.label}</span>
-              {item.badge && <span className="nav-item__badge" aria-hidden="true" />}
-            </li>
-          ))}
+          {primaryNav.map(renderNavItem)}
+          {renderEspeciaisSection()}
         </ul>
         <div className="velo-nav-rail__foot">
           <div ref={bellAnchorRef} className="velo-nav-rail__foot-actions" data-tooltip="VeloNews">

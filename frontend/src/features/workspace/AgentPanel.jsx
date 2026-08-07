@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Painel 360° — Agente
  * VERSION: v3.1.0 | DATE: 2026-07-31
  */

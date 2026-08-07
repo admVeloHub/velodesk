@@ -10,6 +10,10 @@ import { ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import { getWorkflowInfoRequests, resolveDeskTicketIdForInfoRequest } from '../workflow/workflowInfoNotifications';
 import { getWorkflowTeamQueueMeta, ticketMatchesWorkflowTeam } from '../workflow/workflowTeamQueues';
 import {
+  resolveComunicacaoResumo,
+  ticketAwaitingProdutosComunicacaoReview,
+} from '../workflow/workflowDecisionHandlers';
+import {
   canActOnTicket,
   resolveWorkflowTeamQueueForUser,
 } from '../permissions/permissionService';
@@ -132,7 +136,7 @@ function buildTags(ticket) {
   return tags.slice(0, 3);
 }
 
-export function mapEntryToRow(entry, sectionVariant) {
+export function mapEntryToRow(entry, sectionVariant, options = {}) {
   const { ticket, queueId } = entry;
   const sla = getSlaClass(ticket);
   const channel = ticket.lateralForm?.canal || ticket.channel || ticket.source || '';
@@ -158,9 +162,10 @@ export function mapEntryToRow(entry, sectionVariant) {
   }
 
   const slaTone = sla === 'critical' ? 'critical' : sla === 'warning' ? 'warn' : 'ok';
-  const meta = queueId === 'novos' && ticket.createdAt
-    ? formatOpenDuration(ticket.createdAt)
-    : formatRelativeTime(updatedAt);
+  const meta = options.metaOverride
+    ?? (queueId === 'novos' && ticket.createdAt
+      ? formatOpenDuration(ticket.createdAt)
+      : formatRelativeTime(updatedAt));
 
   return {
     id: String(ticket.id),
@@ -174,8 +179,19 @@ export function mapEntryToRow(entry, sectionVariant) {
     slaTone,
     tags: buildTags(ticket),
     accent,
-    unread: queueId === 'novos' || String(ticket?.status || '').trim().toLowerCase() === 'em-aberto',
+    unread: options.unread ?? (
+      queueId === 'novos' || String(ticket?.status || '').trim().toLowerCase() === 'em-aberto'
+    ),
   };
+}
+
+function mapRespondidoEntryToRow(entry) {
+  const resumo = resolveComunicacaoResumo(entry.ticket);
+  const repliedAt = resumo.ultimaData || entry.ticket.updatedAt || entry.ticket.createdAt;
+  return mapEntryToRow(entry, 'replied', {
+    unread: resumo.ultimaOrigem === 'responsavel',
+    metaOverride: `respondido ${formatRelativeTime(repliedAt)}`,
+  });
 }
 
 function mapInfoRequestToRow(request) {
@@ -529,6 +545,7 @@ export function computeWorkflow360View(teamId = null) {
   let awaitingExternal = 0;
   let awaitingDecision = 0;
   let completedToday = 0;
+  let respondidosCount = 0;
 
   const enriched = entries.map((entry) => {
     const { ticket } = entry;
@@ -538,6 +555,13 @@ export function computeWorkflow360View(teamId = null) {
     if (progress?.awaitingTeamLabel) awaitingExternal++;
     if (ticketAwaitingDecision(ticket, progress)) awaitingDecision++;
     if (progress?.workflow?.status === 'completed') completedToday++;
+    if (
+      teamId
+      && progress?.workflow?.status !== 'completed'
+      && ticketAwaitingProdutosComunicacaoReview(ticket)
+    ) {
+      respondidosCount += 1;
+    }
     return { ...entry, sla, progress };
   }).sort((a, b) => {
     const prio = { critical: 0, warning: 1, ok: 2 };
@@ -549,16 +573,25 @@ export function computeWorkflow360View(teamId = null) {
     .slice(0, 8)
     .map((entry) => mapEntryToRow(entry, 'workflow'));
 
-  const externalRows = enriched
-    .filter(({ progress, ticket }) => {
-      if (teamId) {
-        return ticketAwaitingDecision(ticket, progress)
-          || progress?.activeStep?.team === teamId;
-      }
-      return progress?.awaitingTeamLabel;
-    })
-    .slice(0, 5)
-    .map((entry) => mapEntryToRow(entry, 'workflow'));
+  const respondidosEntries = teamId
+    ? enriched
+      .filter(({ progress, ticket }) => (
+        progress?.workflow?.status !== 'completed'
+        && ticketAwaitingProdutosComunicacaoReview(ticket)
+      ))
+      .sort((a, b) => {
+        const aDate = new Date(resolveComunicacaoResumo(a.ticket).ultimaData || a.ticket.updatedAt || 0).getTime();
+        const bDate = new Date(resolveComunicacaoResumo(b.ticket).ultimaData || b.ticket.updatedAt || 0).getTime();
+        return bDate - aDate;
+      })
+    : [];
+
+  const externalRows = teamId
+    ? respondidosEntries.slice(0, 5).map((entry) => mapRespondidoEntryToRow(entry))
+    : enriched
+      .filter(({ progress }) => progress?.awaitingTeamLabel)
+      .slice(0, 5)
+      .map((entry) => mapEntryToRow(entry, 'workflow'));
 
   const teamLabel = teamMeta?.name || 'Workflow';
   const sections = [
@@ -570,14 +603,23 @@ export function computeWorkflow360View(teamId = null) {
       count: enriched.filter(({ progress }) => progress?.workflow?.status !== 'completed').length,
       tickets: activeRows,
     },
-    {
-      id: 'workflow-external',
-      title: teamId ? `Aguardando ação · ${teamLabel}` : 'Aguardando time externo',
-      icon: 'ti ti-building-bank',
-      variant: 'workflow',
-      count: teamId ? awaitingDecision : awaitingExternal,
-      tickets: externalRows,
-    },
+    teamId
+      ? {
+        id: 'workflow-respondidos',
+        title: 'Respondidos',
+        icon: 'ti ti-message-check',
+        variant: 'replied',
+        count: respondidosCount,
+        tickets: externalRows,
+      }
+      : {
+        id: 'workflow-external',
+        title: 'Aguardando time externo',
+        icon: 'ti ti-building-bank',
+        variant: 'workflow',
+        count: awaitingExternal,
+        tickets: externalRows,
+      },
   ];
 
   return {
@@ -589,7 +631,14 @@ export function computeWorkflow360View(teamId = null) {
     kpis: [
       { id: 'total', label: teamId ? `Fila ${teamLabel}` : 'Em workflow', value: String(enriched.length), hint: 'ativos', tone: 'neutral', icon: 'ti ti-arrows-exchange' },
       { id: 'sla', label: 'SLA em risco', value: String(slaCritical), hint: slaCritical > 0 ? 'atenção' : null, tone: slaCritical > 0 ? 'warn' : 'neutral', icon: 'ti ti-clock-exclamation' },
-      { id: 'external', label: teamId ? 'Aguardando decisão' : 'Aguardando time', value: String(teamId ? awaitingDecision : awaitingExternal), hint: teamId ? teamLabel : 'externo', tone: (teamId ? awaitingDecision : awaitingExternal) > 0 ? 'warn' : 'neutral', icon: 'ti ti-users' },
+      {
+        id: 'external',
+        label: teamId ? 'Respondidos' : 'Aguardando time',
+        value: String(teamId ? respondidosCount : awaitingExternal),
+        hint: teamId ? 'comunicação' : 'externo',
+        tone: (teamId ? respondidosCount : awaitingExternal) > 0 ? 'warn' : 'neutral',
+        icon: teamId ? 'ti ti-message-check' : 'ti ti-users',
+      },
       { id: 'done', label: 'Concluídos hoje', value: String(completedToday), hint: 'workflow', tone: 'success', icon: 'ti ti-circle-check' },
     ],
     sections,

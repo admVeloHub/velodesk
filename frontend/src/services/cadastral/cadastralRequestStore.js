@@ -67,6 +67,19 @@ function normalizeLegacyItem(item) {
     };
   }
 
+  if (item.categoria === 'documentos') {
+    return {
+      ...item,
+      status: item.status === 'feito' ? SOLICITACAO_STATUS.FEITO : SOLICITACAO_STATUS.ENVIADO,
+      ticketId: item.ticketId || '',
+      documentosSolicitados: item.documentosSolicitados || '',
+      dadoNovo: item.dadoNovo || item.descricao || item.observacoes || '',
+      observacoes: item.observacoes || item.descricao || item.dadoNovo || '',
+      urgente: Boolean(item.urgente),
+      titulo: item.titulo || buildTitulo('documentos', item.cpf, item),
+    };
+  }
+
   if (item.categoria && item.status) return item;
 
   return {

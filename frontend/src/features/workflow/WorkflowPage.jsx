@@ -1,13 +1,35 @@
 /**
- * WorkflowPage v1.1.0 — console de aprovação (/workflow)
- * VERSION: v1.1.0 | DATE: 2026-07-22
+ * WorkflowPage v1.2.0 — console de aprovação (/workflow)
+ * VERSION: v1.2.0 | DATE: 2026-08-05
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { hasWorkflowPortalAccess } from '../../services/permissions/permissionService';
 import WorkflowApprovalShell from './components/WorkflowApprovalShell';
 
 export default function WorkflowPage() {
+  useEffect(() => {
+    const mainContent = document.querySelector('.main-content');
+    if (!mainContent) return undefined;
+
+    mainContent.classList.remove('tickets-active');
+    mainContent.style.background = 'transparent';
+    mainContent.style.display = 'flex';
+    mainContent.style.flexDirection = 'column';
+    mainContent.style.minHeight = '0';
+    mainContent.style.overflow = 'hidden';
+    mainContent.style.padding = '0';
+    window.syncMainSidebarNav?.('workflow-inbox');
+
+    return () => {
+      mainContent.style.display = '';
+      mainContent.style.flexDirection = '';
+      mainContent.style.minHeight = '';
+      mainContent.style.overflow = '';
+      mainContent.style.padding = '';
+    };
+  }, []);
+
   if (!hasWorkflowPortalAccess()) {
     return <Navigate to="/workspace" replace />;
   }

@@ -36,11 +36,22 @@ export interface IChamadoWorkflowComunicacao {
   autor: string;
 }
 
+export type ComunicacaoWorkflowOrigem = 'workflow' | 'responsavel';
+
+export interface IChamadoWorkflowComunicacaoResumo {
+  ultimaOrigem: ComunicacaoWorkflowOrigem | null;
+  ultimaData: Date | null;
+  temRespostaAgente: boolean;
+}
+
 export interface IChamadoWorkflowRequisicao {
   preenchidaEm: Date;
   preenchidaPor: string;
   valores: Record<string, unknown>;
   comunicacaoWorkflow?: IChamadoWorkflowComunicacao[];
+  comunicacaoResumo?: IChamadoWorkflowComunicacaoResumo;
+  solicitacaoProdutos?: Record<string, unknown>;
+  solicitacaoFinanceiro?: Record<string, unknown>;
 }
 
 export const REQUISICAO_FIELD_DENYLIST = [

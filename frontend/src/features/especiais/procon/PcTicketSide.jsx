@@ -1,12 +1,19 @@
 /**
- * PcTicketSide — sidebar direita do ticket RA
+ * PcTicketSide — sidebar direita do ticket Procon
  */
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useNotifications } from '../../../context/NotificationContext';
 import { getStatusLabel } from '../../../services/especiais/proconData';
 import { formatPcDeadlineLabel } from '../../../services/especiais/proconTicketService';
 import { formatComplaintDate } from './pcTicketFormatters';
+import EspeciaisWorkflowSolicitacoesSection from '../shared/EspeciaisWorkflowSolicitacoesSection';
+
+function formatLocal(value, uf) {
+  const city = String(value || '').trim();
+  const state = String(uf || '').trim();
+  if (city && state) return `${city} / ${state}`;
+  return city || state || '';
+}
 
 export default function PcTicketSide({
   pcItem,
@@ -14,38 +21,51 @@ export default function PcTicketSide({
   waChatOpen = false,
   onOpenChat,
   onCloseChat,
+  onTicketUpdated,
 }) {
   const navigate = useNavigate();
-  const { showNotification } = useNotifications();
-
-  const handleModeracao = () => {
-    showNotification('Módulo de moderação em breve.', 'info');
-  };
 
   if (!pcItem) return null;
 
   const protocoloDisplay = pcItem.protocoloProcon ? `#${pcItem.protocoloProcon}` : '—';
   const deadlineLabel = formatPcDeadlineLabel(pcItem.prazoLegal);
-  const emails = ticket?.lateralForm?.clienteEmail || (pcItem.email ? [pcItem.email] : []);
-  const phones = ticket?.lateralForm?.clienteTelefone || (pcItem.telefoneWhatsapp ? [pcItem.telefoneWhatsapp] : []);
+  const localDisplay = formatLocal(pcItem.cidade, pcItem.uf);
 
   return (
     <aside className="ra-crm-side">
       <div className="ra-ticket__side">
         <section className="ra-ticket__side-card">
-          <h2>RECLAME AQUI — DADOS</h2>
+          <h2>PROCON — DADOS</h2>
           <span className={`ra-badge ra-badge--${pcItem.statusPc}`}>
             {getStatusLabel(pcItem.statusPc)}
           </span>
           <dl>
             <div>
-              <dt>Protocolo RA</dt>
+              <dt>Protocolo Procon</dt>
               <dd>{protocoloDisplay}</dd>
             </div>
+            {pcItem.idDemanda ? (
+              <div>
+                <dt>ID da demanda</dt>
+                <dd>{pcItem.idDemanda}</dd>
+              </div>
+            ) : null}
             <div>
               <dt>Assunto</dt>
               <dd>{pcItem.assunto || '—'}</dd>
             </div>
+            {pcItem.orgaoProcon ? (
+              <div>
+                <dt>Órgão Procon</dt>
+                <dd>{pcItem.orgaoProcon}</dd>
+              </div>
+            ) : null}
+            {localDisplay ? (
+              <div>
+                <dt>Local</dt>
+                <dd>{localDisplay}</dd>
+              </div>
+            ) : null}
             <div>
               <dt>Prazo de resposta</dt>
               <dd className="ra-ticket__deadline-value">{deadlineLabel}</dd>
@@ -57,45 +77,16 @@ export default function PcTicketSide({
             {pcItem.workflowAtivo ? (
               <div>
                 <dt>Workflow</dt>
-                <dd>{pcItem.workflow || 'Tratativa RA'}</dd>
+                <dd>{pcItem.workflow || 'Tratativa Procon'}</dd>
               </div>
             ) : null}
           </dl>
         </section>
 
-        <section className="ra-ticket__side-card">
-          <h2>CONTATO DO CONSUMIDOR</h2>
-          <dl>
-            <div>
-              <dt>CPF</dt>
-              <dd>{pcItem.cpf || '—'}</dd>
-            </div>
-            <div>
-              <dt>E-mail</dt>
-              <dd>{emails[0] || '—'}</dd>
-            </div>
-            <div>
-              <dt>Telefone principal</dt>
-              <dd>{phones[0] || '—'}</dd>
-            </div>
-            <div>
-              <dt>Telefone secundário</dt>
-              <dd>{phones[1] || '—'}</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section className="ra-registro__moderacao ra-ticket__moderacao">
-          <div className="ra-registro__moderacao-icon">
-            <i className="ti ti-shield" aria-hidden="true" />
-          </div>
-          <div className="ra-registro__moderacao-content">
-            <h3>Solicitar moderação</h3>
-            <button type="button" className="ra-registro__moderacao-btn" onClick={handleModeracao}>
-              Abrir módulo de moderação
-            </button>
-          </div>
-        </section>
+        <EspeciaisWorkflowSolicitacoesSection
+          ticket={ticket}
+          onTicketUpdated={onTicketUpdated}
+        />
 
         <div className="ra-ticket__side-footer">
           <button

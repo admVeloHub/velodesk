@@ -1,4 +1,4 @@
-/* Reset e configurações básicas */
+/* Reset e configura??es b?sicas */
 * {
     margin: 0;
     padding: 0;
@@ -17,7 +17,7 @@ body {
     min-height: 100%;
 }
 
-/* Sem rolagem na página ? scroll só nas colunas internas (tickets, chat, etc.) */
+/* Sem rolagem na p?gina ? scroll s? nas colunas internas (tickets, chat, etc.) */
 body:has(.main-app[style*="grid"]) {
     overflow: hidden;
     height: 100%;
@@ -57,7 +57,7 @@ body {
     animation: fadeIn 0.8s ease-out;
 }
 
-/* Animação de entrada da tela de login */
+/* Anima??o de entrada da tela de login */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -69,7 +69,7 @@ body {
     }
 }
 
-/* Animação de saída da tela de login */
+/* Anima??o de sa?da da tela de login */
 @keyframes fadeOut {
     from {
         opacity: 1;
@@ -93,7 +93,7 @@ body {
     animation: slideInUp 0.6s ease-out 0.2s both;
 }
 
-/* Animação de entrada da caixa de login */
+/* Anima??o de entrada da caixa de login */
 @keyframes slideInUp {
     from {
         opacity: 0;
@@ -118,7 +118,7 @@ body {
     animation: logoGlow 2s ease-in-out infinite alternate;
 }
 
-/* Animação do logo */
+/* Anima??o do logo */
 @keyframes logoGlow {
     from {
         text-shadow: 0 0 5px rgba(0, 0, 88, 0.3);
@@ -168,7 +168,7 @@ body {
     transform: translateY(-1px);
 }
 
-/* Botões */
+/* Bot?es */
 .btn-primary {
     background: linear-gradient(135deg, var(--accent-blue) 0%, var(--primary-blue) 100%);
     color: var(--white);
@@ -223,7 +223,7 @@ body {
     background: var(--light-gray);
 }
 
-/* Sidebar não ocupa espaço no grid pois é fixo */
+/* Sidebar n?o ocupa espa?o no grid pois ? fixo */
 .main-app .sidebar {
     grid-area: unset;
     position: fixed;
@@ -357,7 +357,7 @@ body {
     /* Prevenir qualquer movimento */
     margin: 0;
     border: none;
-    /* Garantir que não se mova com scroll */
+    /* Garantir que n?o se mova com scroll */
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
 }
@@ -493,7 +493,7 @@ body {
     font-size: 1.1rem;
 }
 
-/* Conteúdo principal */
+/* Conte?do principal */
 .main-content {
     grid-area: content;
     background: var(--light-gray);
@@ -503,11 +503,11 @@ body {
     height: 100%;
     max-height: 100%;
     transition: margin-left 0.3s ease, background 0.3s ease;
-    margin-left: 250px; /* Espaço para o sidebar fixo */
+    margin-left: 250px; /* Espa?o para o sidebar fixo */
     margin-top: 0;
 }
 
-/* Remover background e margin-top quando páginas principais estiverem ativas */
+/* Remover background e margin-top quando p?ginas principais estiverem ativas */
 .main-content:has(#tickets.active),
 .main-content.tickets-active,
 .main-content:has(#chat.active),
@@ -521,7 +521,7 @@ body {
     min-height: 0;
 }
 
-/* Relatórios: área principal precisa rolar (conteúdo longo + gráficos) */
+/* Relat?rios: ?rea principal precisa rolar (conte?do longo + gr?ficos) */
 .main-content:has(#reports.active) {
     background: transparent !important;
     padding: 0 !important;
@@ -530,16 +530,16 @@ body {
     overflow-y: auto !important;
 }
 
-/* Páginas com conteúdo longo: rolagem só no main-content, não no body */
-.main-content:has(.page.active:not(#tickets):not(#chat):not(#config):not(#preferencias):not(#especiais-reclame-aqui):not(#especiais-procon):not(#workflow)) {
+/* P?ginas com conte?do longo: rolagem s? no main-content, n?o no body */
+.main-content:has(.page.active:not(#tickets):not(#chat):not(#config):not(#preferencias):not(#especiais-reclame-aqui):not(#especiais-procon):not(#especiais-consumidor-gov):not(#workflow)) {
     overflow-y: auto;
     overflow-x: hidden;
     padding-top: var(--velo-chrome-top);
     box-sizing: border-box;
 }
 
-/* Ajustar padding apenas para páginas que não são tickets, chat, reports ou config */
-.main-content .page:not(#tickets):not(#chat):not(#reports):not(#config):not(#preferencias):not(#especiais-reclame-aqui):not(#especiais-procon):not(#workflow) {
+/* Ajustar padding apenas para p?ginas que n?o s?o tickets, chat, reports ou config */
+.main-content .page:not(#tickets):not(#chat):not(#reports):not(#config):not(#preferencias):not(#especiais-reclame-aqui):not(#especiais-procon):not(#especiais-consumidor-gov):not(#workflow) {
     padding: 0.5rem 1rem;
     padding-top: 0.25rem;
 }
@@ -565,7 +565,7 @@ body.has-ticket-tabs-visible {
     --velo-ticket-tabs-height: 36px;
 }
 
-/* Ajustar margin-top nas páginas principais */
+/* Ajustar margin-top nas p?ginas principais */
 .main-content #chat,
 .main-content #config {
     margin-top: 0 !important;
@@ -603,7 +603,7 @@ body.has-ticket-tabs-visible {
     min-height: 0;
 }
 
-/* Relatórios: permite rolagem vertical; conteúdo pode ultrapassar a viewport */
+/* Relat?rios: permite rolagem vertical; conte?do pode ultrapassar a viewport */
 .main-content #reports {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
@@ -621,7 +621,7 @@ body.has-ticket-tabs-visible {
     flex-direction: column;
 }
 
-/* Área de tickets: abaixo do header fixo + guias; scroll só nas colunas internas */
+/* ?rea de tickets: abaixo do header fixo + guias; scroll s? nas colunas internas */
 #tickets .tickets-layout,
 #tickets .ticket-tabs-content {
     margin-top: var(--velo-tickets-content-gap);
@@ -643,7 +643,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     max-height: calc(100% - var(--velo-ticket-tabs-height) - var(--velo-tickets-content-gap));
 }
 
-/* Com aba de ticket aberta: barra fixa no topo e área de conteúdo preenche o restante (scroll suave na coluna lateral) */
+/* Com aba de ticket aberta: barra fixa no topo e ?rea de conte?do preenche o restante (scroll suave na coluna lateral) */
 #tickets.ticket-tab-open {
     min-height: 0;
 }
@@ -658,7 +658,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 #tickets.ticket-tab-open .ticket-tabs-content {
-    /* basis 0% evita que o conteúdo ?empurre? a altura e corte a rolagem no fim */
+    /* basis 0% evita que o conte?do ?empurre? a altura e corte a rolagem no fim */
     flex: 1 1 0;
     min-height: 0;
     overflow: hidden;
@@ -666,13 +666,13 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     flex-direction: column;
 }
 
-/* Remover background do main-content quando estiver na página de tickets */
+/* Remover background do main-content quando estiver na p?gina de tickets */
 .main-content:has(#tickets.active),
 .main-content #tickets.active ~ * {
     background: transparent;
 }
 
-/* Alternativa para navegadores que não suportam :has() */
+/* Alternativa para navegadores que n?o suportam :has() */
 #tickets.active ~ * {
     background: transparent;
 }
@@ -686,7 +686,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: var(--primary-blue);
 }
 
-/* Remover background da página de tickets */
+/* Remover background da p?gina de tickets */
 #tickets {
     background: transparent !important;
     padding-left: 0 !important;
@@ -699,14 +699,14 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     display: block !important;
 }
 
-/* Tickets: .page.active vira block e quebra flex/altura das abas ? precisa de coluna flex para carregar o conteúdo */
+/* Tickets: .page.active vira block e quebra flex/altura das abas ? precisa de coluna flex para carregar o conte?do */
 #tickets.page.active,
 #tickets.active.page {
     display: flex !important;
     flex-direction: column;
 }
 
-/* Configurações: idem ? sem flex a área útil não ganha altura e a rolagem corta o fim do conteúdo */
+/* Configura??es: idem ? sem flex a ?rea ?til n?o ganha altura e a rolagem corta o fim do conte?do */
 #config.page.active,
 #config.active.page {
     display: flex !important;
@@ -722,7 +722,39 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     min-height: 0;
 }
 
-/* Remover regra que força display baseado em style inline - apenas ativa se tiver classe active */
+#especiais-reclame-aqui.page.active,
+#especiais-reclame-aqui.active.page,
+#especiais-procon.page.active,
+#especiais-procon.active.page,
+#especiais-consumidor-gov.page.active,
+#especiais-consumidor-gov.active.page,
+#workflow.page.active,
+#workflow.active.page {
+    display: flex !important;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+    padding: 0 !important;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.main-content:has(#especiais-reclame-aqui.active),
+.main-content:has(#especiais-procon.active),
+.main-content:has(#especiais-consumidor-gov.active),
+.main-content:has(#workflow.active) {
+    background: transparent !important;
+    padding: 0 !important;
+    margin-top: 0 !important;
+    overflow: hidden !important;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Remover regra que for?a display baseado em style inline - apenas ativa se tiver classe active */
 .page[style*="display: block"]:not(.active) {
     display: none !important;
 }
@@ -742,7 +774,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border-radius: 0;
 }
 
-/* Ocultar page-header na página de tickets e configurações */
+/* Ocultar page-header na p?gina de tickets e configura??es */
 #tickets .page-header,
 #config .page-header {
     display: none;
@@ -916,7 +948,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 .priority-media { background: #fff3cd; color: #856404; }
 .priority-alta { background: #f8d7da; color: #721c24; }
 
-/* Formulário de ticket */
+/* Formul?rio de ticket */
 @keyframes ticketSidebarFadeIn {
     from {
         opacity: 0;
@@ -1092,7 +1124,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     gap: 1rem;
 }
 
-/* Rodapé fixo do ticket */
+/* Rodap? fixo do ticket */
 .ticket-footer-fixed {
     position: fixed;
     bottom: 0;
@@ -1119,7 +1151,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 .ticket-footer-left {
     flex: 1;
-    /* Espaço para alinhar com o conteúdo principal */
+    /* Espa?o para alinhar com o conte?do principal */
 }
 
 .ticket-footer-right {
@@ -1134,7 +1166,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     position: fixed;
     bottom: 0;
     left: 250px;
-    /* Não cobre o formulário lateral ? só a coluna principal */
+    /* N?o cobre o formul?rio lateral ? s? a coluna principal */
     right: calc(var(--velo-ticket-lateral-width, clamp(280px, 32vw, 380px)) + 2.4rem);
     background: var(--white);
     border-top: 2px solid #e9ecef;
@@ -1296,7 +1328,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 0.72rem !important;
 }
 
-/* Botão de atualização */
+/* Bot?o de atualiza??o */
 #refreshTicketsBtn {
     background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
     color: white;
@@ -1358,7 +1390,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: rgba(255, 255, 255, 0.2);
 }
 
-/* CSS específico para o botão Criar Ticket */
+/* CSS espec?fico para o bot?o Criar Ticket */
 #createTicketBtn {
     padding: 0.54rem 0.81rem !important;
     font-size: 0.7rem !important;
@@ -1375,7 +1407,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 /* .config-layout removido - usando config-page-wrapper */
 
 /* ============================================
-   CONFIGURAÇÕES - LAYOUT ROBUSTO DE CRM
+   CONFIGURA??ES - LAYOUT ROBUSTO DE CRM
    ============================================ */
 
 .config-page-wrapper {
@@ -1476,7 +1508,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     flex: 1;
 }
 
-/* Layout da página Configurações (sidebar + área principal) */
+/* Layout da p?gina Configura??es (sidebar + ?rea principal) */
 #config .config-layout {
     display: flex;
     flex: 1 1 0;
@@ -2052,7 +2084,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     transition: all 0.25s ease;
 }
 
-/* Cores específicas para cada ícone */
+/* Cores espec?ficas para cada ?cone */
 .profile-menu-item:first-child i {
     color: #667eea;
 }
@@ -2113,7 +2145,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.12) 100%);
 }
 
-/* Ícones dentro dos links */
+/* ?cones dentro dos links */
 .profile-menu a i {
     width: 20px;
     text-align: center;
@@ -2206,7 +2238,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     min-height: 400px;
 }
 
-/* Cabeçalho do Ticket */
+/* Cabe?alho do Ticket */
 .ticket-header {
     display: flex;
     align-items: center;
@@ -2265,7 +2297,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Informações do Ticket */
+/* Informa??es do Ticket */
 .ticket-details {
     margin-bottom: 2rem;
     animation: ticketDetailsFadeIn 0.5s ease-out 0.3s both;
@@ -2306,7 +2338,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: var(--dark-gray);
 }
 
-/* Descrição do Ticket */
+/* Descri??o do Ticket */
 .ticket-description {
     margin-bottom: 2rem;
     padding: 1rem;
@@ -2430,7 +2462,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border: 2px dashed #ddd;
 }
 
-/* Área de Resposta */
+/* ?rea de Resposta */
 .ticket-response {
     margin-bottom: 2rem;
 }
@@ -2965,7 +2997,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 0.8rem;
     color: var(--dark-gray);
     margin-bottom: 0.25rem;
-    display: none; /* Ocultar descrição na lista compacta */
+    display: none; /* Ocultar descri??o na lista compacta */
 }
 
 .box-item.active .box-description {
@@ -2976,7 +3008,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 0.8rem;
     color: var(--info);
     margin-top: 0.25rem;
-    display: none; /* Ocultar usuários na lista compacta */
+    display: none; /* Ocultar usu?rios na lista compacta */
 }
 
 .box-item.active .box-users {
@@ -3137,7 +3169,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border: 2px dashed var(--accent-blue);
 }
 
-/* Botões de ação */
+/* Bot?es de a??o */
 .page-actions {
     display: flex;
     gap: 1rem;
@@ -3436,7 +3468,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: var(--white);
     border-radius: 12px;
     padding: 1.35rem 1.5rem;
-    /* Espaço no fim da rolagem para o conteúdo não ficar sob o rodapé fixo (.ticket-tab-footer-fixed) */
+    /* Espa?o no fim da rolagem para o conte?do n?o ficar sob o rodap? fixo (.ticket-tab-footer-fixed) */
     padding-bottom: calc(1.25rem + 5.25rem + env(safe-area-inset-bottom, 0px));
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 14px rgba(0, 0, 88, 0.06);
     border: 1px solid rgba(0, 0, 88, 0.06);
@@ -3557,7 +3589,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Conteúdo principal do ticket: blocos mais compactos */
+/* Conte?do principal do ticket: blocos mais compactos */
 .ticket-tab-main-column .ticket-header {
     margin-bottom: 0.85rem;
     padding-bottom: 0.65rem;
@@ -4042,7 +4074,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     line-height: 1.45;
 }
 
-/* --- Histórico e resposta estilo Octadesk (timeline + painel de comentário) --- */
+/* --- Hist?rico e resposta estilo Octadesk (timeline + painel de coment?rio) --- */
 .ticket-tab-main-column .ticket-timeline.ticket-history-octa,
 .ticket-main-column .ticket-timeline.ticket-history-octa {
     margin-top: 0.5rem;
@@ -4062,7 +4094,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border-bottom: 1px solid rgba(0, 0, 88, 0.08);
 }
 
-/* Histórico sem scroll próprio: rola junto com a coluna principal */
+/* Hist?rico sem scroll pr?prio: rola junto com a coluna principal */
 .ticket-tab-main-column .ticket-timeline.ticket-history-octa .timeline-container,
 .ticket-main-column .ticket-timeline.ticket-history-octa .timeline-container {
     max-height: none;
@@ -4361,7 +4393,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     min-height: 140px;
 }
 
-/* Formulário lateral: seções mais leves */
+/* Formul?rio lateral: se??es mais leves */
 .ticket-tab-sidebar .sidebar-section {
     margin-bottom: 1.1rem;
 }
@@ -4411,7 +4443,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 0.8rem;
 }
 
-/* Um único scroll no painel lateral: campos do formulário fluem em altura (sem caixa minúscula dentro) */
+/* Um ?nico scroll no painel lateral: campos do formul?rio fluem em altura (sem caixa min?scula dentro) */
 .ticket-tab-sidebar .form-section .form-fields,
 .ticket-tab-sidebar #ticketFormFields-placeholder,
 .ticket-tab-sidebar [id^="ticketFormFields-"] {
@@ -4428,7 +4460,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     line-height: 1.4;
 }
 
-/* Informações do cliente: mesmo quadro que "Campos do Formulário" (form-section), campos mais compactos */
+/* Informa??es do cliente: mesmo quadro que "Campos do Formul?rio" (form-section), campos mais compactos */
 .ticket-tab-sidebar .client-info-section {
     background: linear-gradient(135deg, #f3e5f5 0%, #e8f5e8 100%);
     border: 1px solid rgba(0, 0, 88, 0.1);
@@ -4645,7 +4677,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-style: italic;
 }
 
-/* Configurações */
+/* Configura??es */
 .config-tabs {
     background: var(--white);
     border-radius: 10px;
@@ -4694,7 +4726,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     overflow: visible !important;
 }
 
-/* Aba Automações (configurações ? id único configAutomationTab) */
+/* Aba Automa??es (configura??es ? id ?nico configAutomationTab) */
 #configAutomationTab.config-tab-content.active {
     display: block !important;
     visibility: visible !important;
@@ -5131,7 +5163,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 
 /* ===== NOVOS ESTILOS PARA TICKETS REESTRUTURADOS ===== */
 
-/* Cabeçalho do Ticket */
+/* Cabe?alho do Ticket */
 .ticket-header {
     display: flex;
     justify-content: space-between;
@@ -5271,7 +5303,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     box-shadow: 0 0 0 2px rgba(0, 0, 88, 0.1);
 }
 
-/* Formulário de Tabulação (Lateral) */
+/* Formul?rio de Tabula??o (Lateral) */
 .ticket-form-sidebar {
     width: 350px;
     background: var(--light-gray);
@@ -5329,9 +5361,9 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     padding: 0.5rem 0;
 }
 
-/* ===== SISTEMA DE USUÁRIOS ===== */
+/* ===== SISTEMA DE USU?RIOS ===== */
 
-/* Lista de Usuários */
+/* Lista de Usu?rios */
 .users-list {
     max-height: 400px;
     overflow-y: auto;
@@ -5428,7 +5460,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: #dc2626;
 }
 
-/* Modal de Usuário */
+/* Modal de Usu?rio */
 .user-modal .form-group {
     margin-bottom: 1rem;
 }
@@ -5457,7 +5489,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     box-shadow: 0 0 0 2px rgba(0, 0, 88, 0.1);
 }
 
-/* Abas de Configuração */
+/* Abas de Configura??o */
 .config-tab-content {
     display: none;
 }
@@ -5818,7 +5850,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Estilos para página de Relatórios */
+/* Estilos para p?gina de Relat?rios */
 .reports-container {
     padding: 0 0 1.5rem 0;
     margin-top: 0 !important;
@@ -5937,7 +5969,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     box-shadow: 0 0 0 3px rgba(0, 0, 88, 0.1);
 }
 
-/* Responsividade para relatórios */
+/* Responsividade para relat?rios */
 @media (max-width: 768px) {
     .reports-grid {
         grid-template-columns: 1fr;
@@ -6538,7 +6570,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: var(--primary-blue);
 }
 
-/* Upload para anotações internas */
+/* Upload para anota??es internas */
 .internal-upload .file-upload-area {
     background: #fffbf0;
     border-color: #f0d000;
@@ -6553,7 +6585,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: #8b4513;
 }
 
-/* Estilos para Anotações Internas */
+/* Estilos para Anota??es Internas */
 .internal-form {
     background: #fffbf0;
     border: 2px solid #f0d000;
@@ -6610,7 +6642,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     100% { transform: scale(1); }
 }
 
-/* Estilos para timeline de anotações internas */
+/* Estilos para timeline de anota??es internas */
 .timeline-item.internal {
     background: #fffbf0;
     border-left: 4px solid #f0d000;
@@ -6659,7 +6691,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: white;
 }
 
-/* Estilos para botão de anotação interna */
+/* Estilos para bot?o de anota??o interna */
 .internal-form .btn-primary {
     background: linear-gradient(135deg, #f0d000 0%, #ffd700 100%);
     color: #8b4513;
@@ -6673,7 +6705,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     box-shadow: 0 4px 12px rgba(240, 208, 0, 0.3);
 }
 
-/* Estilos para botões na aba de anotação interna */
+/* Estilos para bot?es na aba de anota??o interna */
 .internal-form .ai-assistant-btn {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -6816,7 +6848,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     line-height: 1.4;
 }
 
-/* ===== SISTEMA DE NOTIFICAÇÕES ===== */
+/* ===== SISTEMA DE NOTIFICA??ES ===== */
 
 .notifications-container {
     position: fixed;
@@ -6886,7 +6918,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: var(--dark-gray);
 }
 
-/* Tipos de notificação */
+/* Tipos de notifica??o */
 .notification-success {
     border-left-color: var(--success);
 }
@@ -6919,7 +6951,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: var(--info);
 }
 
-/* Responsividade para notificações */
+/* Responsividade para notifica??es */
 @media (max-width: 768px) {
     .notifications-container {
         left: 10px;
@@ -6932,7 +6964,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* ===== SISTEMA DE NOTIFICAÇÕES AVANÇADO ===== */
+/* ===== SISTEMA DE NOTIFICA??ES AVAN?ADO ===== */
 
 .header-actions {
     display: flex;
@@ -7000,7 +7032,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     51%, 100% { opacity: 0.3; }
 }
 
-/* Painel de Notificações */
+/* Painel de Notifica??es */
 .notification-panel {
     position: fixed;
     top: var(--velo-chrome-top);
@@ -7228,7 +7260,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     transform: translateY(-1px);
 }
 
-/* ===== TOASTS DE NOTIFICAÇÃO ===== */
+/* ===== TOASTS DE NOTIFICA??O ===== */
 
 .notification-toast {
     background: var(--white);
@@ -7309,7 +7341,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* ===== RELATÓRIOS AVANÇADOS ===== */
+/* ===== RELAT?RIOS AVAN?ADOS ===== */
 
 .reports-filters {
     background: var(--white);
@@ -7486,7 +7518,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: #721c24;
 }
 
-/* Responsividade para relatórios */
+/* Responsividade para relat?rios */
 @media (max-width: 768px) {
     .reports-filters {
         flex-direction: column;
@@ -7685,7 +7717,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* ===== PÁGINA DE CONFIGURAÇÕES ===== */
+/* ===== P?GINA DE CONFIGURA??ES ===== */
 
 .config-sections {
     display: grid;
@@ -7749,7 +7781,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 1rem;
 }
 
-/* Responsividade para configurações */
+/* Responsividade para configura??es */
 @media (max-width: 768px) {
     .config-sections {
         grid-template-columns: 1fr;
@@ -8411,7 +8443,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     height: 250px !important;
 }
 
-/* Seção de Satisfação */
+/* Se??o de Satisfa??o */
 .satisfaction-section {
     background: var(--white);
     border-radius: 12px;
@@ -8979,7 +9011,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
         display: block;
     }
     
-/* Botão de menu mobile */
+/* Bot?o de menu mobile */
 .mobile-menu-btn {
     display: none;
     background: none;
@@ -9129,7 +9161,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
         padding: 1rem;
     }
     
-    /* Formulários mobile */
+    /* Formul?rios mobile */
     .form-actions {
         flex-direction: column;
     }
@@ -9346,7 +9378,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     white-space: nowrap;
 }
 
-/* Estilos para sistema de atribuição de conversas */
+/* Estilos para sistema de atribui??o de conversas */
 .chat-filters {
     padding: 0.5rem;
     border-bottom: 1px solid var(--border-color);
@@ -9991,7 +10023,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 0.9rem;
 }
 
-/* Botões adicionais */
+/* Bot?es adicionais */
 .btn-info {
     background: var(--info);
     color: var(--white);
@@ -10118,7 +10150,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Lista de tickets: rolagem só na lista, não na página */
+/* Lista de tickets: rolagem s? na lista, n?o na p?gina */
 .tickets-panel {
     overflow: hidden !important;
     min-height: 0;
@@ -10131,7 +10163,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     overflow-x: hidden;
 }
 
-/* Responsividade para página de tickets */
+/* Responsividade para p?gina de tickets */
 @media (max-width: 768px) {
     .tickets-layout {
         grid-template-columns: 1fr;
@@ -10268,7 +10300,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: #c82333;
 }
 
-/* Estilos para Configuração de Campo */
+/* Estilos para Configura??o de Campo */
 .field-config {
     display: flex;
     flex-direction: column;
@@ -10364,7 +10396,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: #c82333;
 }
 
-/* Estilos para Seleção Simples */
+/* Estilos para Sele??o Simples */
 .options-list {
     display: flex;
     flex-direction: column;
@@ -10403,7 +10435,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: #c82333;
 }
 
-/* Estilos para Lista de Formulários */
+/* Estilos para Lista de Formul?rios */
 .form-item {
     background: #f8f9fa;
     padding: 20px;
@@ -10577,7 +10609,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Estilos para Árvore de Seleção Dinâmica */
+/* Estilos para ?rvore de Sele??o Din?mica */
 .tree-explanation {
     background: #e3f2fd;
     padding: 15px;
@@ -10822,7 +10854,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     transform: translateY(0);
 }
 
-/* Estilos para Campos do Formulário no Ticket */
+/* Estilos para Campos do Formul?rio no Ticket */
 .ticket-form-field {
     margin-bottom: 11px;
 }
@@ -10880,7 +10912,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border: 2px dashed #e9ecef;
 }
 
-/* Estilos para Formulários nos Tickets */
+/* Estilos para Formul?rios nos Tickets */
 .form-fields-container {
     background: #f8f9fa;
     padding: 20px;
@@ -10937,7 +10969,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     min-height: 80px;
 }
 
-/* Estilos para Árvore de Seleção em Cascata nos Tickets */
+/* Estilos para ?rvore de Sele??o em Cascata nos Tickets */
 .tree-selection-container {
     border: none;
     background: transparent;
@@ -10957,7 +10989,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border-left: 2px solid #e9ecef;
 }
 
-/* Estilos para o select de árvore */
+/* Estilos para o select de ?rvore */
 .tree-select-container {
     position: relative;
 }
@@ -11092,7 +11124,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     cursor: pointer;
 }
 
-/* Responsividade para formulários nos tickets */
+/* Responsividade para formul?rios nos tickets */
 @media (max-width: 768px) {
     .form-fields-container {
         padding: 15px;
@@ -11220,7 +11252,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Estilos para edição de formulários */
+/* Estilos para edi??o de formul?rios */
 .form-fields-section {
     margin-top: 20px;
     padding-top: 20px;
@@ -11236,7 +11268,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     margin-bottom: 15px;
 }
 
-/* Config ? aba Formulários (lista + modais) */
+/* Config ? aba Formul?rios (lista + modais) */
 #formsTab .forms-config-section {
     max-width: 920px;
 }
@@ -11479,7 +11511,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     padding-right: 0.5rem;
 }
 
-/* Modais de formulário */
+/* Modais de formul?rio */
 .forms-editor-modal .modal-content--forms-editor:not(.modal--ticket-size),
 .forms-new-modal .modal-content--forms-new {
     max-width: 640px;
@@ -11494,7 +11526,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     max-width: 520px;
 }
 
-/* Modais de edição no tamanho da área do ticket aberto */
+/* Modais de edi??o no tamanho da ?rea do ticket aberto */
 .modal--ticket-size {
     width: min(1680px, 99vw) !important;
     max-width: min(1680px, 99vw) !important;
@@ -11533,7 +11565,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     padding: 1rem 1.25rem 1.5rem;
 }
 
-/* Construtor de árvore sequencial (modais de campo) */
+/* Construtor de ?rvore sequencial (modais de campo) */
 .modal-content--tree-modal {
     width: min(1680px, 99vw) !important;
     max-width: min(1680px, 99vw) !important;
@@ -11598,7 +11630,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     gap: 0.65rem;
 }
 
-/* Cada nova raiz = bloco próprio; filhos ficam abaixo da linha da raiz */
+/* Cada nova raiz = bloco pr?prio; filhos ficam abaixo da linha da raiz */
 .tree-root-block {
     border: 1px solid rgba(0, 0, 88, 0.12);
     border-radius: 12px;
@@ -12111,7 +12143,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-size: 12px;
 }
 
-/* Estilos para campos de formulário em tickets */
+/* Estilos para campos de formul?rio em tickets */
 .form-fields-section {
     margin-top: 20px;
     padding: 15px;
@@ -12538,7 +12570,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border-color: #004085;
 }
 
-/* Estilos para campos de árvore como selects */
+/* Estilos para campos de ?rvore como selects */
 .tree-field-container {
     display: flex;
     flex-direction: column;
@@ -12565,7 +12597,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     padding: 8px;
 }
 
-/* Estilos para Árvore Sequencial (Zendesk) */
+/* Estilos para ?rvore Sequencial (Zendesk) */
 .tree-sequential-container {
     display: flex;
     flex-direction: column;
@@ -12630,7 +12662,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border-radius: 6px;
 }
 
-/* Estilos para árvore de seleção */
+/* Estilos para ?rvore de sele??o */
 .tree-selection-container {
     border: 1px solid #ddd;
     border-radius: 6px;
@@ -12813,7 +12845,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     font-style: italic;
 }
 
-/* Estilos específicos por tipo */
+/* Estilos espec?ficos por tipo */
 .timeline-item.creation .timeline-content {
     border-left: 4px solid #1976d2;
 }
@@ -12859,7 +12891,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
    ============================================ */
 
 /* ============================================
-   FILTRO AVANÇADO DE TICKETS
+   FILTRO AVAN?ADO DE TICKETS
    ============================================ */
 
 .ticket-filters-advanced {
@@ -13044,7 +13076,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border-left-width: 4px;
 }
 
-/* Cabeçalho do ticket fino */
+/* Cabe?alho do ticket fino */
 .ticket-slim-header {
     display: flex;
     justify-content: space-between;
@@ -13085,7 +13117,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     white-space: nowrap;
 }
 
-/* Status específicos */
+/* Status espec?ficos */
 .ticket-item-slim[data-status="novos"] .ticket-slim-status,
 .ticket-item-slim[data-status="novo"] .ticket-slim-status {
     background: #e3f2fd;
@@ -13115,7 +13147,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: #dc3545;
 }
 
-/* Conteúdo do ticket fino */
+/* Conte?do do ticket fino */
 .ticket-slim-content {
     margin-bottom: 5.4px;
 }
@@ -13131,7 +13163,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     overflow: hidden;
 }
 
-/* Rodapé do ticket fino */
+/* Rodap? do ticket fino */
 .ticket-slim-footer {
     display: flex;
     justify-content: space-between;
@@ -13260,10 +13292,10 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 /* ============================================
-   RELATÓRIOS - LEITURA DE TICKETS
+   RELAT?RIOS - LEITURA DE TICKETS
    ============================================ */
 
-/* Tabs de Relatórios */
+/* Tabs de Relat?rios */
 .reports-tabs {
     display: flex;
     gap: 10px;
@@ -13316,7 +13348,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     display: block;
 }
 
-/* Seção de Importação */
+/* Se??o de Importa??o */
 .import-section {
     background: white;
     border-radius: 10px;
@@ -13430,7 +13462,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: #667eea;
 }
 
-/* Seção de Leitura */
+/* Se??o de Leitura */
 .reading-section {
     background: white;
     border-radius: 10px;
@@ -13533,7 +13565,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-/* Card de avaliações expandido - segunda linha */
+/* Card de avalia??es expandido - segunda linha */
 .stat-card-rating {
     grid-column: 1 / -1;
     flex-direction: row;
@@ -13832,7 +13864,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     color: #28a745;
 }
 
-/* Avaliação por Texto */
+/* Avalia??o por Texto */
 .rating-text {
     padding: 4px 12px;
     border-radius: 12px;
@@ -13853,7 +13885,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     border: 1px solid #f5c6cb;
 }
 
-/* Gráficos */
+/* Gr?ficos */
 .reading-charts {
     margin-bottom: 30px;
     padding: 20px;
@@ -14206,7 +14238,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     line-height: 1.4;
 }
 
-/* Área principal de mensagens */
+/* ?rea principal de mensagens */
 .chat-main {
     flex: 1;
     display: flex;
@@ -14287,7 +14319,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     transform: scale(0.95);
 }
 
-/* Área de mensagens */
+/* ?rea de mensagens */
 .chat-messages {
     flex: 1;
     overflow-y: auto;
@@ -14489,7 +14521,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     transform: scale(1.05);
 }
 
-/* Container de configuração quando não conectado */
+/* Container de configura??o quando n?o conectado */
 .whatsapp-setup-container {
     display: flex;
     align-items: center;
@@ -14592,7 +14624,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     }
 }
 
-/* Ocultar modal de configuração de campo - não deve aparecer na aba de tickets */
+/* Ocultar modal de configura??o de campo - n?o deve aparecer na aba de tickets */
 #fieldConfigModal {
     display: none !important;
     visibility: hidden !important;
@@ -14600,7 +14632,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
     pointer-events: none !important;
 }
 
-/* Estilos para configurações de e-mail */
+/* Estilos para configura??es de e-mail */
 .email-settings-form {
     background: var(--white);
     padding: 1.5rem;
@@ -14656,7 +14688,7 @@ body.has-ticket-tabs-visible #tickets .ticket-tabs-content {
 }
 
 /* ============================================
-   ESTILOS PARA PÁGINA DE AUTOMAÇÕES
+   ESTILOS PARA P?GINA DE AUTOMA??ES
    ============================================ */
 
 .automation-container {
@@ -14993,7 +15025,7 @@ input:checked + .slider:before {
     color: var(--dark-gray);
 }
 
-/* Responsividade para automações */
+/* Responsividade para automa??es */
 @media (max-width: 768px) {
     .automation-tabs {
         flex-direction: column;
@@ -15019,7 +15051,7 @@ input:checked + .slider:before {
     }
 }
 
-/* Estilos para Workflows e Automações */
+/* Estilos para Workflows e Automa??es */
 .workflow-item,
 .automation-rule-item,
 .automation-flow-item {
@@ -15110,7 +15142,7 @@ input:checked + .slider:before {
 }
 
 /* ============================================
-   CONFIGURAÇÕES ? visual moderno (V2)
+   CONFIGURA??ES ? visual moderno (V2)
    VERSION: v2.4.6 | DATE: 2026-06-30
    ============================================ */
 #config.config-page {
@@ -15869,7 +15901,7 @@ input:checked + .slider:before {
     gap: 1rem;
 }
 
-/* Config ? aba Formulários / tabulação */
+/* Config ? aba Formul?rios / tabula??o */
 #config .config-tabulation .btn-forms-primary {
     display: inline-flex;
     align-items: center;
@@ -16336,7 +16368,7 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     margin: 0 0 0.75rem;
 }
 
-/* Config ? aba Formulários / tabulação (legado #formsTab removido) */
+/* Config ? aba Formul?rios / tabula??o (legado #formsTab removido) */
 #config .config-status-badge {
     display: inline-flex;
     align-items: center;
@@ -16637,7 +16669,7 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     }
 }
 
-/* ===== Header global: busca, registro rápido, tema ===== */
+/* ===== Header global: busca, registro r?pido, tema ===== */
 .header-global-search {
     display: flex;
     align-items: center;
@@ -16694,7 +16726,7 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     padding: 0.45rem 0.65rem;
 }
 
-/* Macros na área de tickets */
+/* Macros na ?rea de tickets */
 .ticket-footer-macros,
 .ticket-inline-macros,
 .ticket-macro-hub {
@@ -16763,7 +16795,7 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     gap: 0.5rem;
 }
 
-/* Botão cliente dentro do ticket */
+/* Bot?o cliente dentro do ticket */
 .ticket-header-top {
     display: flex;
     flex-wrap: wrap;
@@ -16799,7 +16831,7 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     font-size: 1rem;
 }
 
-/* Busca na página de tickets */
+/* Busca na p?gina de tickets */
 .tickets-panel-header .ticket-filters {
     flex: 1;
     justify-content: flex-end;
@@ -16815,7 +16847,7 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     padding-right: 2rem;
 }
 
-/* Modo escuro ? tokens e overrides em velodesk-dark-theme.css (import por último) */
+/* Modo escuro ? tokens e overrides em velodesk-dark-theme.css (import por ?ltimo) */
 body.velodesk-dark .header {
     background: #1a1f26;
     border-bottom-color: rgba(255, 255, 255, 0.1);
@@ -16831,7 +16863,7 @@ body.velodesk-dark .sidebar {
 }
 
 /* ============================================
-   PREFERÊNCIAS ? v1.0.2 | DATE: 2026-07-31
+   PREFER?NCIAS ? v1.0.2 | DATE: 2026-07-31
    ============================================ */
 #preferencias.preferencias-page {
     --pref-bg: #f0f4f8;

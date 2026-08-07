@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Ponte global — navegação e ações do cockpit ↔ React Router
  * VERSION: v2.4.0 | DATE: 2026-08-04
  */
@@ -24,6 +24,18 @@ const PAGE_ROUTES = {
   'client-portal': '/client-portal',
 };
 
+const ESPECIAIS_PAGE_IDS = new Set([
+  'especiais-reclame-aqui',
+  'especiais-procon',
+  'especiais-consumidor-gov',
+  'especiais-bacen',
+  'especiais-processos',
+]);
+
+function isEspeciaisPageId(page) {
+  return ESPECIAIS_PAGE_IDS.has(page);
+}
+
 function resolveOpenTicketPath(profileId, ticketId) {
   if (profileId === 'workflow') {
     return ticketId ? `/workflow?ticket=${ticketId}` : '/workflow';
@@ -43,8 +55,8 @@ export function installCockpitBridge(navigate, showNotification, ticketActions =
     const route = PAGE_ROUTES[page] || '/workspace';
     const targetPath = String(route).split('?')[0];
 
-    // Só remove .active quando a rota muda — evita tela em branco se cair no fallback /workspace
-    if (targetPath !== window.location.pathname) {
+    // React Router monta páginas com .active — remover antes do navigate causa tela em branco
+    if (!isEspeciaisPageId(page) && targetPath !== '/workflow' && targetPath !== window.location.pathname) {
       document.querySelectorAll('.page').forEach((p) => {
         p.classList.remove('active', 'ticket-tab-open');
       });
@@ -55,6 +67,9 @@ export function installCockpitBridge(navigate, showNotification, ticketActions =
       if (page === 'tickets') {
         mainContent.style.background = 'transparent';
         mainContent.classList.add('tickets-active');
+      } else if (isEspeciaisPageId(page)) {
+        mainContent.classList.remove('tickets-active');
+        mainContent.style.background = 'transparent';
       } else {
         mainContent.classList.remove('tickets-active');
         mainContent.style.background = 'var(--light-gray)';

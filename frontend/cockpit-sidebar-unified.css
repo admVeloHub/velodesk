@@ -422,6 +422,37 @@
     margin-left: auto;
 }
 
+/* Seção Especiais — menu fixado 220px */
+.velo-nav-rail-wrap.is-pinned #mainSidebar.velo-nav-rail .velo-nav-rail__nav-section,
+.velo-nav-rail-wrap.is-pinned .velo-nav-rail__nav-section {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    margin: 8px 0 4px;
+    padding: 0;
+    list-style: none;
+    pointer-events: none;
+}
+
+.velo-nav-rail-wrap.is-pinned #mainSidebar.velo-nav-rail .velo-nav-rail__section-divider,
+.velo-nav-rail-wrap.is-pinned .velo-nav-rail__section-divider {
+    height: 1px;
+    margin: 0 4px 8px;
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.velo-nav-rail-wrap.is-pinned #mainSidebar.velo-nav-rail .velo-nav-rail__section-label,
+.velo-nav-rail-wrap.is-pinned .velo-nav-rail__section-label {
+    display: block;
+    padding: 0 12px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+
 .velo-nav-rail-wrap.is-pinned #mainSidebar.velo-nav-rail .profile-section,
 .velo-nav-rail-wrap.is-pinned .profile-section {
     padding: 10px;

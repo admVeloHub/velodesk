@@ -25,6 +25,8 @@ export default function ProdSolicAttachments({
   recusouEvidencias = false,
   onChange,
   showNotification,
+  hideLabel = false,
+  hideRecusa = false,
 }) {
   const imageInputRef = useRef(null);
   const videoInputRef = useRef(null);
@@ -127,7 +129,9 @@ export default function ProdSolicAttachments({
 
   return (
     <div className="prod-solic-attachments">
-      <span className="prod-solic-form__label prod-solic-attachments__label">Anexos</span>
+      {!hideLabel ? (
+        <span className="prod-solic-form__label prod-solic-attachments__label">Anexos</span>
+      ) : null}
 
       <div className="prod-solic-attachments__toolbar">
         <input
@@ -168,14 +172,16 @@ export default function ProdSolicAttachments({
           Selecionar vídeos
         </button>
 
-        <label className="prod-solic-form__check prod-solic-attachments__recusa">
-          <input
-            type="checkbox"
-            checked={recusouEvidencias}
-            onChange={toggleRecusa}
-          />
-          <span>Cliente Recusou Evidencias</span>
-        </label>
+        {!hideRecusa ? (
+          <label className="prod-solic-form__check prod-solic-attachments__recusa">
+            <input
+              type="checkbox"
+              checked={recusouEvidencias}
+              onChange={toggleRecusa}
+            />
+            <span>Cliente Recusou Evidencias</span>
+          </label>
+        ) : null}
       </div>
 
       {hasFiles ? (

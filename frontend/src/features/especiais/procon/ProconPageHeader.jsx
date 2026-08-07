@@ -11,7 +11,7 @@ export default function ProconPageHeader({ activeTab, onTabChange }) {
         <h1 className="ra-page-header__title">Demandas Procon</h1>
         <span className="ra-page-header__badge">Canal exclusivo</span>
       </div>
-      <ProconTabs activeTab={activeTab} onTabChange={onTabChange} />
+      <ProconTabs activeTab={activeTab} onChange={onTabChange} />
     </div>
   );
 }

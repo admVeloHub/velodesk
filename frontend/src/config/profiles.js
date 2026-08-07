@@ -2,6 +2,20 @@
  * Perfis operacionais — Agente / Gestão / Workflow / Especiais
  * VERSION: v1.7.0 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team
  */
+export const ESPECIAIS_NAV_IDS = [
+  'especiais-reclame-aqui',
+  'especiais-procon',
+  'especiais-consumidor-gov',
+  'especiais-bacen',
+  'especiais-processos',
+];
+
+const ESPECIAIS_NAV_SET = new Set(ESPECIAIS_NAV_IDS);
+
+export function isEspeciaisNavId(id) {
+  return ESPECIAIS_NAV_SET.has(id);
+}
+
 export const PROFILES = {
   agent: {
     id: 'agent',
@@ -9,7 +23,7 @@ export const PROFILES = {
     icon: 'fa-headset',
     color: '#1634FF',
     desc: 'Tickets, fila operacional e registro rápido',
-    nav: ['workspace', 'tickets', 'busca-tickets', 'preferencias', 'atendimento-ia-telefonico', 'chat'],
+    nav: ['workspace', 'tickets', 'busca-tickets', 'preferencias', 'atendimento-ia-telefonico', 'chat', ...ESPECIAIS_NAV_IDS],
     defaultPage: 'workspace',
   },
   gestao: {
@@ -18,7 +32,7 @@ export const PROFILES = {
     icon: 'fa-user-tie',
     color: '#000058',
     desc: 'SLA, performance da equipe e escalonamentos',
-    nav: ['workspace', 'dashboard', 'tickets', 'busca-tickets', 'preferencias', 'atendimento-ia-telefonico', 'config'],
+    nav: ['workspace', 'dashboard', 'tickets', 'busca-tickets', 'preferencias', 'atendimento-ia-telefonico', 'config', ...ESPECIAIS_NAV_IDS],
     defaultPage: 'workspace',
   },
   workflow: {
@@ -39,11 +53,7 @@ export const PROFILES = {
     nav: [
       'workspace',
       'busca-tickets',
-      'especiais-reclame-aqui',
-      'especiais-procon',
-      'especiais-consumidor-gov',
-      'especiais-bacen',
-      'especiais-processos',
+      ...ESPECIAIS_NAV_IDS,
     ],
     defaultPage: 'workspace',
   },

@@ -26,6 +26,7 @@ import { notifyAgentReplyAsync, notifyChamadoCreatedAsync } from '../services/em
 import {
   advanceWorkflowManual,
   advanceWorkflowWithDecision,
+  attachTeamSolicitationToChamado,
   cancelWorkflowForChamado,
   setWorkflowPendingDecision,
   startWorkflowForChamado,
@@ -428,8 +429,39 @@ router.post('/:id/workflow/start', authMiddleware, async (req, res: Response) =>
     assertChamadoModifiable(chamado);
     await assertCanActOnTicket(req.user!, chamado);
     const requisicaoValores = req.body?.requisicao?.valores as Record<string, unknown> | undefined;
+    const solicitacaoProdutos = req.body?.solicitacaoProdutos as Record<string, unknown> | undefined;
     const definicaoSlug = req.body?.definicaoSlug as string | undefined;
-    await startWorkflowForChamado(chamado, req.user, requisicaoValores, definicaoSlug);
+    await startWorkflowForChamado(
+      chamado,
+      req.user,
+      requisicaoValores,
+      definicaoSlug,
+      solicitacaoProdutos,
+    );
+    await chamado.save();
+    const boxes = await loadBoxes();
+    res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  } catch (err) {
+    if (handleTicketMutationError(err, res)) return;
+    throw err;
+  }
+});
+
+router.post('/:id/workflow/team-solicitation', authMiddleware, async (req, res: Response) => {
+  const chamado = await ChamadoN1.findById(req.params.id);
+  if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+
+  try {
+    assertChamadoModifiable(chamado);
+    await assertCanActOnTicket(req.user!, chamado);
+    const team = String(req.body?.team || '').trim().toLowerCase();
+    const solicitacaoProdutos = req.body?.solicitacaoProdutos as Record<string, unknown> | undefined;
+    const solicitacaoFinanceiro = req.body?.solicitacaoFinanceiro as Record<string, unknown> | undefined;
+    await attachTeamSolicitationToChamado(chamado, req.user, {
+      team: team as 'produtos' | 'financeiro',
+      solicitacaoProdutos,
+      solicitacaoFinanceiro,
+    });
     await chamado.save();
     const boxes = await loadBoxes();
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));

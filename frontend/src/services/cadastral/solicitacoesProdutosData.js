@@ -87,6 +87,7 @@ export function getErrosBugsItemSubtitle(item) {
 export function getCategoriaTitulo(categoria, payload = {}) {
   if (categoria === 'erros-bugs') return 'Erros/Bugs';
   if (categoria === 'liberacao-pix') return 'Liberação chave pix';
+  if (categoria === 'documentos') return 'Solicitação de documentos';
   return getTipoSolicitacaoLabel(payload.tipoSolicitacao || 'alteracao-dados-cadastrais');
 }
 

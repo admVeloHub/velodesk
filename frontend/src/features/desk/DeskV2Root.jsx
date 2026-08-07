@@ -1252,9 +1252,12 @@ export default function DeskV2Root() {
     return resolveWorkflowForTicket(ticket, fields, runtimeWorkflows);
   }, [ticket, rightFields, config, runtimeWorkflows]);
 
-  const executeWorkflowStart = useCallback(async (requisicaoValores) => {
+  const executeWorkflowStart = useCallback(async (payload) => {
     const template = pendingWorkflowTemplateRef.current || workflowStartTemplate;
-    if (!ticket || !template || startingWorkflow || isTicketInWorkflow(ticket)) return;
+    if (!ticket || !template || startingWorkflow || isTicketInWorkflow(ticket)) return false;
+
+    const requisicaoValores = payload?.valores ?? payload;
+    const solicitacaoProdutos = payload?.solicitacaoProdutos ?? null;
 
     if (!isClientIdentifiedForWorkflow(ticket)) {
       showNotification(WORKFLOW_REQUIRES_CLIENT_MESSAGE, 'warning');
@@ -1266,19 +1269,52 @@ export default function DeskV2Root() {
     try {
       const ticketId = ticket.id || ticket._id;
       const entry = findTicketEntry(ticketId);
-      const base = { ...(entry?.ticket || ticket) };
+
+      const tabOnly = { ...(entry?.ticket || ticket) };
+      applyRightFieldsToTicket(tabOnly, fields);
+      if (tabOnly.lateralForm?.workflow) {
+        const nextLf = { ...tabOnly.lateralForm };
+        delete nextLf.workflow;
+        tabOnly.lateralForm = nextLf;
+      }
+      await updateTicketInCache(ticketId, () => tabOnly);
+
+      const entryAfterTab = findTicketEntry(ticketId);
+      const base = { ...(entryAfterTab?.ticket || tabOnly) };
       applyRightFieldsToTicket(base, fields);
+      if (solicitacaoProdutos) {
+        base.lateralForm = {
+          ...(base.lateralForm || {}),
+          solicitacaoProdutos,
+        };
+      }
       applyPendingWorkflowStartToTicket(base, template, requisicaoValores, getAgentName());
       patchTicket(ticketId, base);
-      showNotification(
-        `Workflow "${template.title}" preparado. Será ativado ao salvar o ticket.`,
-        'success',
-      );
+
+      const flushResult = await flushPendingWorkflowOnSave(ticketId, base, {
+        ticketsApi,
+        apiTicketToCockpit,
+        patchTicket,
+        injectWorkflowSystemMessage,
+      });
+      if (flushResult.error) {
+        showNotification(
+          flushResult.error?.response?.data?.message
+            || 'Não foi possível iniciar o workflow.',
+          'warning',
+        );
+        return false;
+      }
+
+      showNotification(`Workflow "${template.title}" iniciado.`, 'success');
       pendingWorkflowTemplateRef.current = null;
       setWorkflowStartTemplate(null);
+      await syncTicketViews();
+      return true;
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Não foi possível preparar o workflow.';
+      const msg = err?.response?.data?.message || err?.message || 'Não foi possível iniciar o workflow.';
       showNotification(msg, 'error');
+      return false;
     } finally {
       setStartingWorkflow(false);
     }
@@ -1289,6 +1325,7 @@ export default function DeskV2Root() {
     ticket,
     workflowStartTemplate,
     patchTicket,
+    syncTicketViews,
   ]);
 
   const handleOpenComunicacaoModal = useCallback(async () => {
@@ -1369,8 +1406,8 @@ export default function DeskV2Root() {
   ]);
 
   const handleWorkflowStartModalSubmitted = useCallback(async (valores) => {
-    setWorkflowStartModalOpen(false);
-    await executeWorkflowStart(valores);
+    const ok = await executeWorkflowStart(valores);
+    if (ok) setWorkflowStartModalOpen(false);
   }, [executeWorkflowStart]);
 
   const handleWorkflowStartModalClose = useCallback(() => {
@@ -1389,6 +1426,20 @@ export default function DeskV2Root() {
     if (!workflowProgress || workflowProgress.workflow?.status === 'completed') return false;
     const step = workflowProgress.activeStep;
     if (!step) return false;
+    if (isAtendimentoAgent) {
+      if (workflowProgress.externalTeamActive) return false;
+      const stepTeam = step.team;
+      if (stepTeam && !['n1', 'agent'].includes(stepTeam)) return false;
+      const requisicaoValores = ticket?.workflow?.requisicao?.valores;
+      const hasRequisicao = requisicaoValores && Object.keys(requisicaoValores).length > 0;
+      if (
+        hasRequisicao
+        && step.acao?.tipo === 'manual'
+        && ['n1', 'agent'].includes(stepTeam || 'n1')
+      ) {
+        return false;
+      }
+    }
     if (step.acao?.tipo === 'automatica' || step.atribuicao?.tipo === 'sistema') {
       const modo = resolveAutomaticaConfig(step)?.modo;
       return modo === 'call_to_action';
@@ -1488,7 +1539,7 @@ export default function DeskV2Root() {
 
   const showTableQueueMain = isTableQueueView && tableQueueBrowsing && !createOpen;
   const showTicketMain = Boolean(ticket) && !showTableQueueMain;
-  const showOpenTabsBar = openTabs.length > 0 && !createOpen;
+  const showOpenTabsBar = openTabs.length > 0 && !createOpen && !showTableQueueMain;
 
   return (
     <div className={'app-shell' + (isTableQueueView ? ' app-shell--table-queue' : '')} id="deskAppShell">
@@ -1561,7 +1612,7 @@ export default function DeskV2Root() {
             ) : !showTicketMain ? (
               <div className="crm-empty-state" id="crmEmptyMain">Selecione um ticket na lista ao lado</div>
             ) : (
-              <div className="crm-ticket-view">
+              <div className="crm-ticket-view desk-crm-ticket-scope">
                 <DeskClientProfileBar
               ticket={ticket}
               client={client}
@@ -1711,7 +1762,7 @@ export default function DeskV2Root() {
         )}
       </main>
 
-      {ticket && !createOpen && !(isMyTicketsQueue && showTableQueueMain) && (
+      {ticket && !createOpen && !showTableQueueMain && (
         <DeskRightPanel
           ticket={ticket}
           client={client}
@@ -1766,6 +1817,7 @@ export default function DeskV2Root() {
       <ProdutosForwardPopover
         open={workflowStartModalOpen}
         workflowDef={workflowStartTemplate}
+        ticket={ticket}
         submitting={startingWorkflow}
         onClose={handleWorkflowStartModalClose}
         onSubmitted={handleWorkflowStartModalSubmitted}

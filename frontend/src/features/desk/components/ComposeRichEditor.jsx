@@ -113,81 +113,83 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
 
   return (
     <div className={wrapClass}>
-      <div
-        ref={editorRef}
-        id={id}
-        className={'compose-rich-editor response-textarea spell-textarea-input '
-          + className
-          + (expanded ? ' compose-rich-editor--expanded' : '')}
-        contentEditable={!readOnly}
-        suppressContentEditableWarning
-        role="textbox"
-        aria-multiline="true"
-        aria-readonly={readOnly || undefined}
-        data-placeholder={placeholder || ''}
-        data-ai-skip="true"
-        spellCheck={!readOnly}
-        lang="pt-BR"
-        onInput={() => {
-          if (readOnly) return;
-          emitChange();
-          notifyFormatState();
-        }}
-        onKeyUp={readOnly ? undefined : notifyFormatState}
-        onMouseUp={readOnly ? undefined : notifyFormatState}
-        onFocus={readOnly ? undefined : notifyFormatState}
-        onKeyDown={readOnly ? undefined : onKeyDown}
-        onBlur={readOnly ? undefined : ((event) => {
-          emitChange();
-          onFormatStateChange?.({
-            bold: false,
-            italic: false,
-            underline: false,
-            bulletList: false,
-            numberedList: false,
-          });
-          onBlur?.({
-            ...event,
-            target: {
-              ...event.target,
-              selectionStart: getPlainOffset(editorRef.current),
-              value: htmlToPlainText(readEditorHtml(editorRef.current)),
-            },
-          });
-        })}
-        onSelect={readOnly ? undefined : ((event) => {
-          notifyFormatState();
-          onSelect?.({
-            ...event,
-            target: {
-              ...event.target,
-              selectionStart: getPlainOffset(editorRef.current),
-            },
-          });
-        })}
-        onClick={readOnly ? undefined : ((event) => {
-          notifyFormatState();
-          onClick?.({
-            ...event,
-            target: {
-              ...event.target,
-              selectionStart: getPlainOffset(editorRef.current),
-            },
-          });
-        })}
-      />
-      {expandable ? (
-        <button
-          type="button"
-          className="compose-rich-editor__expand-btn"
-          aria-label={expanded ? 'Recolher editor' : 'Expandir editor'}
-          aria-pressed={expanded}
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => setExpanded((value) => !value)}
-        >
-          <i className={'ti ' + (expanded ? 'ti-arrows-minimize' : 'ti-arrows-maximize')} aria-hidden="true" />
-        </button>
-      ) : null}
+      <div className="compose-rich-editor__surface">
+        <div
+          ref={editorRef}
+          id={id}
+          className={'compose-rich-editor response-textarea spell-textarea-input '
+            + className
+            + (expanded ? ' compose-rich-editor--expanded' : '')}
+          contentEditable={!readOnly}
+          suppressContentEditableWarning
+          role="textbox"
+          aria-multiline="true"
+          aria-readonly={readOnly || undefined}
+          data-placeholder={placeholder || ''}
+          data-ai-skip="true"
+          spellCheck={!readOnly}
+          lang="pt-BR"
+          onInput={() => {
+            if (readOnly) return;
+            emitChange();
+            notifyFormatState();
+          }}
+          onKeyUp={readOnly ? undefined : notifyFormatState}
+          onMouseUp={readOnly ? undefined : notifyFormatState}
+          onFocus={readOnly ? undefined : notifyFormatState}
+          onKeyDown={readOnly ? undefined : onKeyDown}
+          onBlur={readOnly ? undefined : ((event) => {
+            emitChange();
+            onFormatStateChange?.({
+              bold: false,
+              italic: false,
+              underline: false,
+              bulletList: false,
+              numberedList: false,
+            });
+            onBlur?.({
+              ...event,
+              target: {
+                ...event.target,
+                selectionStart: getPlainOffset(editorRef.current),
+                value: htmlToPlainText(readEditorHtml(editorRef.current)),
+              },
+            });
+          })}
+          onSelect={readOnly ? undefined : ((event) => {
+            notifyFormatState();
+            onSelect?.({
+              ...event,
+              target: {
+                ...event.target,
+                selectionStart: getPlainOffset(editorRef.current),
+              },
+            });
+          })}
+          onClick={readOnly ? undefined : ((event) => {
+            notifyFormatState();
+            onClick?.({
+              ...event,
+              target: {
+                ...event.target,
+                selectionStart: getPlainOffset(editorRef.current),
+              },
+            });
+          })}
+        />
+        {expandable ? (
+          <button
+            type="button"
+            className="compose-rich-editor__expand-btn"
+            aria-label={expanded ? 'Recolher editor' : 'Expandir editor'}
+            aria-pressed={expanded}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            <i className={'ti ' + (expanded ? 'ti-arrows-minimize' : 'ti-arrows-maximize')} aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 });

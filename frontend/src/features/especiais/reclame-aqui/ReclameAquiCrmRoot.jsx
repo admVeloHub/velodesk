@@ -207,6 +207,7 @@ export default function ReclameAquiCrmRoot() {
         waChatOpen={waChatOpen}
         onOpenChat={handleOpenChat}
         onCloseChat={handleCloseChat}
+        onTicketUpdated={handleTicketUpdated}
       />
 
       {novaModals}

@@ -8,17 +8,26 @@ import {
   getErrosBugsTipoLabel,
   getTipoSolicitacaoLabel,
 } from '../cadastral/solicitacoesProdutosData';
-import { getSlaClass, getWorkflowProgress, isTicketInWorkflow, getTicketProtocolLabel, getWorkflowTemplateForTicket } from '../desk/utils';
+import { getFinanceiroTipoLabel } from '../cadastral/solicitacoesFinanceiroData';
+import {
+  getSlaClass,
+  getWorkflowProgress,
+  isTicketInWorkflow,
+  getTicketProtocolLabel,
+  getWorkflowTemplateForTicket,
+} from '../desk/utils';
 import { resolveApprovalHeader, ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import {
   agentCanDecideTicket as permAgentCanDecide,
   canActOnTicket,
   canApproveWorkflow,
 } from '../permissions/permissionService';
+import { ticketAwaitingProdutosComunicacaoReview } from './workflowDecisionHandlers';
 import {
   getWorkflowTeamQueueMeta,
   isTeamStepActive,
   ticketMatchesWorkflowTeam,
+  WORKFLOW_TEAM_QUEUES,
 } from './workflowTeamQueues';
 import {
   buildTicketContextFields,
@@ -211,13 +220,101 @@ export function resolveSolicitacaoProdutosForTicket(ticket) {
   if (!ticket) return null;
 
   const lf = ticket.lateralForm || {};
-  const embedded = lf.solicitacaoProdutos;
-  if (embedded?.categoria === 'solicitacoes' || embedded?.categoria === 'erros-bugs') return embedded;
+  const embedded = lf.solicitacaoProdutos
+    || ticket?.workflow?.requisicao?.solicitacaoProdutos;
+  if (
+    embedded?.categoria === 'solicitacoes'
+    || embedded?.categoria === 'erros-bugs'
+    || embedded?.categoria === 'liberacao-pix'
+    || embedded?.categoria === 'documentos'
+  ) {
+    return embedded;
+  }
+
+  const financeiroLegacy = lf.solicitacaoFinanceiro
+    || ticket?.workflow?.requisicao?.solicitacaoFinanceiro;
+  if (financeiroLegacy?.categoria === 'documentos') {
+    return financeiroLegacy;
+  }
 
   const protocol = getTicketProtocolLabel(ticket) || String(ticket.id || '');
   return findCadastralRequestByTicketId(protocol)
     || findCadastralRequestByTicketId(String(ticket.id || ''))
     || null;
+}
+
+export function resolveSolicitacaoFinanceiroForTicket(ticket) {
+  if (!ticket) return null;
+
+  const lf = ticket.lateralForm || {};
+  const embedded = lf.solicitacaoFinanceiro
+    || ticket?.workflow?.requisicao?.solicitacaoFinanceiro;
+  if (
+    embedded?.categoria === 'estorno'
+    || embedded?.categoria === 'cobranca'
+    || embedded?.categoria === 'outros'
+  ) {
+    return embedded;
+  }
+
+  return null;
+}
+
+function buildFinanceiroSolicitacaoDetail(ticket, progress, solicitacao) {
+  const startedAt = solicitacao.createdAt || progress?.workflow?.startedAt || ticket.createdAt;
+  const cpfDigits = String(solicitacao.cpf || '').replace(/\D/g, '');
+  const cpfDisplay = cpfDigits || String(solicitacao.cpf || '').trim();
+  const { slaLabel, slaPct } = buildSlaDetail(progress || { slaRemainingLabel: null, slaTotalHours: null, slaRemainingMs: null });
+  const lf = ticket.lateralForm || {};
+  const tipoLabel = getFinanceiroTipoLabel(solicitacao.categoria);
+  const descricao = solicitacao.descricao || solicitacao.observacoes || '';
+
+  return {
+    layout: 'financeiro-solicitacao',
+    cardTitle: solicitacao.titulo || `${cpfDisplay} · ${tipoLabel}`,
+    cardSubtext: `Solicitado em ${formatDateTime(startedAt)} · aguardando há ${formatElapsedSince(startedAt)}`,
+    slaLabel,
+    slaPct,
+    typeBar: tipoLabel,
+    submittedAt: solicitacao.createdAt || startedAt,
+    dadoAntigo: '',
+    dadoNovo: descricao,
+    descricao,
+    rows: [
+      ...(solicitacao.documentosSolicitados
+        ? [{ icon: 'ti-file-text', label: 'Documentos', value: solicitacao.documentosSolicitados, tone: 'default' }]
+        : []),
+      { icon: 'ti-user', label: 'Colaborador', value: solicitacao.colaborador || lf.responsavel || ticket.responsibleAgent || '—', tone: 'default' },
+    ],
+    highlightCpf: cpfDisplay,
+    fields: [],
+    justificationQuote: getFirstClientMessage(ticket),
+    internalNote: solicitacao.observacoes || null,
+  };
+}
+
+function buildFinanceiroApprovalEssentials(ticket, solicitacao, options = {}) {
+  const lf = ticket.lateralForm || {};
+  const context = buildTicketContextFields(ticket);
+  const cpfContext = context.find((f) => f.label === 'CPF')?.value;
+  const descricao = solicitacao?.descricao || solicitacao?.observacoes || '';
+
+  return {
+    cpf: formatCpfDisplay(solicitacao?.cpf || cpfContext),
+    produto: lf.produto || context.find((f) => f.label === 'Produto')?.value || '—',
+    motivo: lf.motivo || context.find((f) => f.label === 'Motivo')?.value || ticket?.title || '—',
+    detalhe: lf.detalhe || context.find((f) => f.label === 'Detalhe')?.value || '',
+    responsavel: lf.responsavel || ticket?.responsibleAgent || context.find((f) => f.label === 'Responsável')?.value || '—',
+    dadoAntigo: '',
+    dadoNovo: descricao,
+    descricao,
+    tipoLabel: getFinanceiroTipoLabel(solicitacao?.categoria),
+    attachments: null,
+    layout: 'financeiro-solicitacao',
+    requisicaoFields: options.requisicaoFields || [],
+    protocol: getTicketProtocolLabel(ticket) || String(ticket?.id || ''),
+    clientName: ticket?.clientName || ticket?.solicitante || 'Cliente',
+  };
 }
 
 function readOctadeskTicketId(ticket) {
@@ -303,6 +400,73 @@ function buildAttachmentPayload(solicitacao) {
   };
 }
 
+function formatCpfDisplay(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 11) {
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  }
+  return String(value || '').trim() || '—';
+}
+
+function extractRequisicaoFieldsFromDetail(detail) {
+  const section = detail?.fieldSections?.find((s) => s.title === 'Dados da requisição');
+  return section?.fields || [];
+}
+
+/** Ficha unificada para layout clean do console /workflow */
+export function buildWorkflowApprovalEssentials(ticket, solicitacao = null, options = {}) {
+  const lf = ticket?.lateralForm || {};
+  const context = buildTicketContextFields(ticket);
+  const cpfContext = context.find((f) => f.label === 'CPF')?.value;
+
+  let layout = solicitacao?.categoria === 'erros-bugs'
+    ? 'produtos-erros-bugs'
+    : solicitacao?.categoria === 'liberacao-pix'
+      ? 'produtos-pix'
+      : solicitacao
+        ? 'produtos-cadastral'
+        : 'generic';
+
+  let dadoAntigo = '';
+  let dadoNovo = '';
+  let descricao = '';
+  let tipoLabel = '';
+  let attachments = null;
+
+  if (solicitacao?.categoria === 'erros-bugs') {
+    descricao = solicitacao.observacoes || solicitacao.dadoNovo || '';
+    attachments = buildAttachmentPayload(solicitacao);
+    tipoLabel = `Erros/Bugs · ${getErrosBugsTipoLabel(solicitacao.tipoErro || 'app')}`;
+  } else if (solicitacao?.categoria === 'liberacao-pix') {
+    dadoNovo = solicitacao.dadoNovo || solicitacao.chavePix || '';
+    tipoLabel = `Liberação PIX · ${solicitacao.tipoInformacao || solicitacao.tipoChave || 'cpf'}`;
+  } else if (solicitacao) {
+    dadoAntigo = solicitacao.dadoAntigo || '';
+    dadoNovo = solicitacao.dadoNovo || '';
+    tipoLabel = getTipoSolicitacaoLabel(solicitacao.tipoSolicitacao);
+    if (solicitacao.tipoInformacao) {
+      tipoLabel = `${tipoLabel} · ${solicitacao.tipoInformacao}`;
+    }
+  }
+
+  return {
+    cpf: formatCpfDisplay(solicitacao?.cpf || cpfContext),
+    produto: lf.produto || context.find((f) => f.label === 'Produto')?.value || '—',
+    motivo: lf.motivo || context.find((f) => f.label === 'Motivo')?.value || ticket?.title || '—',
+    detalhe: lf.detalhe || context.find((f) => f.label === 'Detalhe')?.value || '',
+    responsavel: lf.responsavel || ticket?.responsibleAgent || context.find((f) => f.label === 'Responsável')?.value || '—',
+    dadoAntigo,
+    dadoNovo,
+    descricao,
+    tipoLabel,
+    attachments,
+    layout,
+    requisicaoFields: options.requisicaoFields || [],
+    protocol: getTicketProtocolLabel(ticket) || String(ticket?.id || ''),
+    clientName: ticket?.clientName || ticket?.solicitante || 'Cliente',
+  };
+}
+
 function buildProdutosErrosBugsDetail(ticket, progress, header, solicitacao) {
   const startedAt = solicitacao.createdAt || progress.workflow?.startedAt || ticket.createdAt;
   const tipoLabel = getErrosBugsTipoLabel(solicitacao.tipoErro || 'app');
@@ -358,6 +522,82 @@ function buildProdutosErrosBugsDetail(ticket, progress, header, solicitacao) {
     justificationQuote: null,
     internalNote: null,
   };
+}
+
+function buildProdutosPixDetail(ticket, progress, header, solicitacao) {
+  const startedAt = solicitacao.createdAt || progress.workflow?.startedAt || ticket.createdAt;
+  const cpfDigits = String(solicitacao.cpf || '').replace(/\D/g, '');
+  const cpfDisplay = cpfDigits || String(solicitacao.cpf || '').trim();
+  const { slaLabel, slaPct } = buildSlaDetail(progress);
+  const lf = ticket.lateralForm || {};
+  const chavePix = solicitacao.dadoNovo || solicitacao.chavePix || '';
+  const tipoChave = solicitacao.tipoInformacao || solicitacao.tipoChave || 'cpf';
+
+  return {
+    layout: 'produtos-pix',
+    cardTitle: solicitacao.titulo || `${cpfDisplay} · Liberação PIX`,
+    cardSubtext: `Solicitado em ${formatDateTime(startedAt)} · aguardando há ${formatElapsedSince(startedAt)}`,
+    slaLabel,
+    slaPct,
+    typeBar: `Liberação PIX · ${tipoChave}`,
+    submittedAt: solicitacao.createdAt || startedAt,
+    dadoAntigo: '',
+    dadoNovo: chavePix,
+    rows: [
+      { icon: 'ti-key', label: 'Chave PIX', value: chavePix, tone: 'default' },
+      { icon: 'ti-user', label: 'Colaborador', value: solicitacao.colaborador || lf.responsavel || ticket.responsibleAgent || '—', tone: 'default' },
+    ],
+    highlightCpf: cpfDisplay,
+    fields: [],
+    justificationQuote: null,
+    internalNote: solicitacao.observacoes || null,
+  };
+}
+
+function buildProdutosDocumentosDetail(ticket, progress, header, solicitacao) {
+  const startedAt = solicitacao.createdAt || progress.workflow?.startedAt || ticket.createdAt;
+  const cpfDigits = String(solicitacao.cpf || '').replace(/\D/g, '');
+  const cpfDisplay = cpfDigits || String(solicitacao.cpf || '').trim();
+  const { slaLabel, slaPct } = buildSlaDetail(progress);
+  const lf = ticket.lateralForm || {};
+  const descricao = solicitacao.descricao || solicitacao.observacoes || solicitacao.dadoNovo || '';
+
+  return {
+    layout: 'produtos-documentos',
+    cardTitle: solicitacao.titulo || `${cpfDisplay} · Solicitação de documentos`,
+    cardSubtext: `Solicitado em ${formatDateTime(startedAt)} · aguardando há ${formatElapsedSince(startedAt)}`,
+    slaLabel,
+    slaPct,
+    typeBar: 'Solicitação de documentos',
+    submittedAt: solicitacao.createdAt || startedAt,
+    dadoAntigo: '',
+    dadoNovo: descricao,
+    descricao,
+    rows: [
+      ...(solicitacao.documentosSolicitados
+        ? [{ icon: 'ti-file-text', label: 'Documentos', value: solicitacao.documentosSolicitados, tone: 'default' }]
+        : []),
+      { icon: 'ti-user', label: 'Colaborador', value: solicitacao.colaborador || lf.responsavel || ticket.responsibleAgent || '—', tone: 'default' },
+    ],
+    highlightCpf: cpfDisplay,
+    fields: [],
+    justificationQuote: getFirstClientMessage(ticket),
+    internalNote: solicitacao.observacoes || null,
+  };
+}
+
+function buildProdutosSolicitacaoAddon(ticket, progress, solicitacao) {
+  if (!solicitacao) return null;
+  if (solicitacao.categoria === 'erros-bugs') {
+    return buildProdutosErrosBugsDetail(ticket, progress, {}, solicitacao);
+  }
+  if (solicitacao.categoria === 'liberacao-pix') {
+    return buildProdutosPixDetail(ticket, progress, {}, solicitacao);
+  }
+  if (solicitacao.categoria === 'documentos') {
+    return buildProdutosDocumentosDetail(ticket, progress, {}, solicitacao);
+  }
+  return buildProdutosCadastralDetail(ticket, progress, {}, solicitacao);
 }
 
 function buildProdutosGenericDetail(ticket, progress, header) {
@@ -547,7 +787,7 @@ function buildDetailView(ticket, progress) {
       };
     });
 
-    return {
+    const partialDetail = {
       ticketId: String(ticket.id),
       title: header.title,
       statusBadge: header.statusLabel,
@@ -557,13 +797,103 @@ function buildDetailView(ticket, progress) {
       actionLabels: {},
       cardTitle: ticket.title || lf.motivo || 'Workflow',
       cardSubtext: `Atualizado ${formatRelativeTime(ticket.updatedAt)}`,
+      fieldSections: requisicaoFields.length
+        ? [{ title: 'Dados da requisição', fields: requisicaoFields }]
+        : [],
       fields: [...contextFields, ...requisicaoFields],
       justificationQuote: getFirstClientMessage(ticket),
       internalNote: getInternalForwardingNote(ticket),
     };
+
+    const solicitacaoFinanceiro = resolveSolicitacaoFinanceiroForTicket(ticket);
+    const solicitacaoProdutos = resolveSolicitacaoProdutosForTicket(ticket);
+
+    if (solicitacaoFinanceiro) {
+      const financeiroDetail = buildFinanceiroSolicitacaoDetail(ticket, null, solicitacaoFinanceiro);
+      return {
+        ...partialDetail,
+        ...financeiroDetail,
+        essentials: buildFinanceiroApprovalEssentials(ticket, solicitacaoFinanceiro, { requisicaoFields }),
+      };
+    }
+
+    return {
+      ...partialDetail,
+      essentials: buildWorkflowApprovalEssentials(
+        ticket,
+        solicitacaoProdutos,
+        { requisicaoFields },
+      ),
+    };
   }
 
-  const detail = buildDynamicApprovalDetail(ticket, progress, header);
+  const template = getWorkflowTemplateForTicket(ticket);
+  const wfSlug = lf.workflow?.definicaoSlug
+    || lf.workflow?.templateId
+    || template?.id
+    || ticket.workflow?.workflowId
+    || '';
+  const detailResolver = header.detailResolver === 'generic' && wfSlug === 'escalonar-produtos'
+    ? 'escalonar-produtos'
+    : header.detailResolver;
+
+  let resolver = buildDynamicApprovalDetail;
+  let resolverArgs = [ticket, progress, header];
+  let detail = null;
+
+  if (detailResolver === 'reembolso-7dias') {
+    resolver = buildReembolsoApprovalDetail;
+  } else if (detailResolver === 'escalonar-produtos') {
+    const solicitacao = resolveSolicitacaoProdutosForTicket(ticket);
+    if (solicitacao) {
+      const baseDetail = buildDynamicApprovalDetail(ticket, progress, header);
+      const produtosAddon = buildProdutosSolicitacaoAddon(ticket, progress, solicitacao);
+      detail = {
+        ...baseDetail,
+        produtosAddon,
+        layout: produtosAddon?.layout || 'produtos-generic',
+      };
+    } else {
+      resolver = buildProdutosGenericDetail;
+    }
+  } else {
+    const solicitacaoFinanceiro = resolveSolicitacaoFinanceiroForTicket(ticket);
+    const solicitacao = resolveSolicitacaoProdutosForTicket(ticket);
+    if (solicitacaoFinanceiro) {
+      resolver = buildFinanceiroSolicitacaoDetail;
+      resolverArgs = [ticket, progress, solicitacaoFinanceiro];
+    } else if (solicitacao?.categoria === 'erros-bugs') {
+      resolver = buildProdutosErrosBugsDetail;
+      resolverArgs = [ticket, progress, header, solicitacao];
+    } else if (solicitacao?.categoria === 'liberacao-pix') {
+      resolver = buildProdutosPixDetail;
+      resolverArgs = [ticket, progress, header, solicitacao];
+    } else if (solicitacao?.categoria === 'documentos') {
+      resolver = buildProdutosDocumentosDetail;
+      resolverArgs = [ticket, progress, header, solicitacao];
+    } else if (solicitacao?.categoria === 'solicitacoes' || solicitacao?.tipoSolicitacao) {
+      resolver = buildProdutosCadastralDetail;
+      resolverArgs = [ticket, progress, header, solicitacao];
+    }
+  }
+
+  if (!detail) {
+    detail = resolver(...resolverArgs);
+  }
+
+  const solicitacaoFinanceiro = resolveSolicitacaoFinanceiroForTicket(ticket);
+  const solicitacao = resolveSolicitacaoProdutosForTicket(ticket);
+  const essentials = solicitacaoFinanceiro
+    ? buildFinanceiroApprovalEssentials(
+      ticket,
+      solicitacaoFinanceiro,
+      { requisicaoFields: extractRequisicaoFieldsFromDetail(detail) },
+    )
+    : buildWorkflowApprovalEssentials(
+      ticket,
+      solicitacao,
+      { requisicaoFields: extractRequisicaoFieldsFromDetail(detail) },
+    );
 
   return {
     ticketId: String(ticket.id),
@@ -573,6 +903,7 @@ function buildDetailView(ticket, progress) {
     responsibleAgent: openedBy,
     actions: header.actions,
     actionLabels: Object.fromEntries((header.rotas || []).map((r) => [r.variavel, r.rotulo]).filter(([k]) => k)),
+    essentials,
     ...detail,
   };
 }
@@ -703,10 +1034,14 @@ function countApprovedToday() {
   return count || 8;
 }
 
-export function computeWorkflowTeamQueue(teamId) {
+export function computeWorkflowTeamQueue(teamId, options = {}) {
   const meta = getWorkflowTeamQueueMeta(teamId);
   const label = meta?.name || teamId;
-  const entries = sortTeamQueueEntries(collectTeamWorkflowEntries(teamId), teamId);
+  const respondidosView = options.view === 'respondidos';
+  let entries = sortTeamQueueEntries(collectTeamWorkflowEntries(teamId), teamId);
+  if (respondidosView) {
+    entries = entries.filter(({ entry }) => ticketAwaitingProdutosComunicacaoReview(entry.ticket));
+  }
   let slaCritical = 0;
   let awaitingDecisionCount = 0;
 
@@ -717,7 +1052,7 @@ export function computeWorkflowTeamQueue(teamId) {
 
   return {
     teamId,
-    queueLabel: label,
+    queueLabel: respondidosView ? `${label} · Respondidos` : label,
     queue: entries.map((item) => item.queueItem),
     summary: {
       pendingCount: entries.length,
@@ -726,6 +1061,7 @@ export function computeWorkflowTeamQueue(teamId) {
       slaCriticalCount: slaCritical,
     },
     entries,
+    view: respondidosView ? 'respondidos' : null,
   };
 }
 
@@ -825,4 +1161,14 @@ export function findTicketEntryById(ticketId) {
   const id = String(ticketId);
   return getAllCockpitTickets().find(({ ticket }) => String(ticket.id) === id)
     || null;
+}
+
+export function getWorkflowTeamActionCounts() {
+  const counts = {};
+  for (const { id } of WORKFLOW_TEAM_QUEUES) {
+    counts[id] = collectTeamWorkflowEntries(id).filter(
+      ({ queueItem }) => queueItem.awaitingDecision || queueItem.teamStepActive,
+    ).length;
+  }
+  return counts;
 }

@@ -12,6 +12,7 @@ import {
   groupDemandasByStatus,
   loadDemandas,
 } from '../../../services/especiais/proconStore';
+import { loadProconTicketsFromApi, ensurePcTicketForRespond } from '../../../services/especiais/proconTicketService';
 import ProconTopBar from './ProconTopBar';
 import ProconPageHeader from './ProconPageHeader';
 import ProconToolbar from './ProconToolbar';
@@ -39,14 +40,19 @@ export default function ProconPanel() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [page, setPage] = useState(1);
   const [listVersion, setListVersion] = useState(0);
+  const [respondingId, setRespondingId] = useState(null);
 
   useEffect(() => {
+    const refreshFromApi = () => {
+      loadProconTicketsFromApi().catch(() => {});
+    };
+    refreshFromApi();
     const bumpList = () => setListVersion((v) => v + 1);
     window.addEventListener('velodesk:procon-sync', bumpList);
-    window.addEventListener('velodesk:refresh-tickets', bumpList);
+    window.addEventListener('velodesk:refresh-tickets', refreshFromApi);
     return () => {
       window.removeEventListener('velodesk:procon-sync', bumpList);
-      window.removeEventListener('velodesk:refresh-tickets', bumpList);
+      window.removeEventListener('velodesk:refresh-tickets', refreshFromApi);
     };
   }, []);
 
@@ -89,12 +95,17 @@ export default function ProconPanel() {
     setSelectedIds(select ? [...ids] : []);
   }, []);
 
-  const handleRowAction = useCallback((action, item) => {
+  const handleRowAction = useCallback(async (action, item) => {
     if (action === 'responder' && item?.id) {
-      if (item.ticketId) {
-        navigate(`/especiais/procon/ticket/${item.id}`);
-      } else {
-        navigate(`/especiais/procon/registro/${item.id}`);
+      setRespondingId(item.id);
+      try {
+        const ensured = await ensurePcTicketForRespond(item);
+        setListVersion((v) => v + 1);
+        navigate(`/especiais/procon/ticket/${ensured.pcItem.id}`);
+      } catch (err) {
+        showNotification(err?.message || 'Não foi possível abrir o ticket.', 'error');
+      } finally {
+        setRespondingId(null);
       }
       return;
     }
@@ -132,6 +143,7 @@ export default function ProconPanel() {
             <ProconTableView
               groups={view.groups}
               selectedIds={selectedIds}
+              respondingId={respondingId}
               onToggleSelect={handleToggleSelect}
               onToggleSelectAll={handleToggleSelectAll}
               onRowAction={handleRowAction}

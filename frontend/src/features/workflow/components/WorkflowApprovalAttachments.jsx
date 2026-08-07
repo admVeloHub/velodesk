@@ -66,7 +66,7 @@ function useAttachmentPreviews(attachments) {
   return { items, loading, imagens, videos };
 }
 
-export default function WorkflowApprovalAttachments({ attachments }) {
+export default function WorkflowApprovalAttachments({ attachments, compact = false }) {
   const { items, loading, imagens, videos } = useAttachmentPreviews(attachments);
   const [lightboxIndex, setLightboxIndex] = useState(null);
 
@@ -112,16 +112,20 @@ export default function WorkflowApprovalAttachments({ attachments }) {
   if (!imagens.length && !videos.length) return null;
 
   return (
-    <div className="wf-approval-produtos-attachments">
-      <div className="wf-approval-produtos-attachments__head">
-        <span className="wf-approval-produtos-attachments__title">
-          <i className="ti ti-paperclip" aria-hidden="true" />
-          Evidências anexadas
-        </span>
-        {loading ? (
-          <span className="wf-approval-produtos-attachments__loading">Carregando…</span>
-        ) : null}
-      </div>
+    <div className={`wf-approval-produtos-attachments${compact ? ' wf-approval-produtos-attachments--compact' : ''}`}>
+      {!compact ? (
+        <div className="wf-approval-produtos-attachments__head">
+          <span className="wf-approval-produtos-attachments__title">
+            <i className="ti ti-paperclip" aria-hidden="true" />
+            Evidências anexadas
+          </span>
+          {loading ? (
+            <span className="wf-approval-produtos-attachments__loading">Carregando…</span>
+          ) : null}
+        </div>
+      ) : loading ? (
+        <span className="wf-approval-produtos-attachments__loading">Carregando…</span>
+      ) : null}
 
       {imageItems.length ? (
         <div className="wf-approval-produtos-attachments__grid" role="list">

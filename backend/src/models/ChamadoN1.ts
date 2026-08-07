@@ -132,12 +132,24 @@ const ComunicacaoWorkflowSchema = new Schema(
   { _id: false },
 );
 
+const ComunicacaoResumoSchema = new Schema(
+  {
+    ultimaOrigem: { type: String, default: null },
+    ultimaData: { type: Date, default: null },
+    temRespostaAgente: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
 const ChamadoWorkflowRequisicaoSchema = new Schema(
   {
     preenchidaEm: { type: Date, default: null },
     preenchidaPor: { type: String, default: '' },
     valores: { type: Schema.Types.Mixed, default: {} },
     comunicacaoWorkflow: { type: [ComunicacaoWorkflowSchema], default: [] },
+    comunicacaoResumo: { type: ComunicacaoResumoSchema, default: undefined },
+    solicitacaoProdutos: { type: Schema.Types.Mixed, default: undefined },
+    solicitacaoFinanceiro: { type: Schema.Types.Mixed, default: undefined },
   },
   { _id: false },
 );

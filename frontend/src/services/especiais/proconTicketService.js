@@ -1,13 +1,15 @@
 /**
  * proconTicketService — bridge Procon ↔ API tickets
  */
-import { ticketsApi } from '../../api/client';
-import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
+import { clientsApi, ticketsApi, boxesApi } from '../../api/client';
+import { mapClienteDocToContact } from '../../api/adapters/clienteAdapter';
+import { apiTicketToCockpit, adaptColumnsFromApi } from '../../api/adapters/ticketAdapter';
 import { getAgentName } from '../clientDb';
 import { createWorkflowState, getWorkflowTemplateById } from '../desk/workflowEngine';
 import { PC_STATUS } from './proconData';
 import {
   buildRegistroDefaults,
+  createEmptyDemanda,
   registerDemanda,
   getDemandaById,
   getDemandaByTicketId,
@@ -138,6 +140,80 @@ export async function registerDemandaAndCreateTicket(form) {
     pcItem,
     ticket,
   };
+}
+
+export async function ensurePcTicketForRespond(pcItem) {
+  if (!pcItem?.id) {
+    throw new Error('Demanda inválida.');
+  }
+
+  const current = getDemandaById(pcItem.id) || pcItem;
+
+  if (current.ticketId) {
+    const view = await fetchPcTicketView(current.id);
+    if (!view?.pcItem) {
+      throw new Error('Demanda não encontrada.');
+    }
+    return {
+      pcItem: view.pcItem,
+      ticket: view.ticket,
+    };
+  }
+
+  const form = {
+    ...buildRegistroDefaults(current),
+    ...current,
+    id: current.id,
+    consumidor: String(current.consumidor || '').trim() || 'Consumidor',
+    assunto: String(current.assunto || '').trim() || 'Demanda Procon',
+    descricao: String(current.descricao || current.assunto || '').trim() || 'Demanda Procon',
+    isDraft: false,
+  };
+
+  const result = await registerDemandaAndCreateTicket(form);
+  return {
+    pcItem: result.pcItem,
+    ticket: result.ticket,
+  };
+}
+
+export function buildDemandaFromCliente(doc) {
+  const contact = mapClienteDocToContact(doc);
+  if (!contact) return null;
+  const consumidor = String(contact.clientName || '').trim() || 'Consumidor';
+  const assunto = `Demanda Procon — ${consumidor}`;
+  const empty = createEmptyDemanda();
+  return {
+    ...empty,
+    ...buildRegistroDefaults({
+      ...empty,
+      consumidor,
+      cpf: contact.clientCPF,
+      email: contact.email || contact.emails?.[0] || '',
+      telefoneWhatsapp: contact.whatsappPhone || contact.phone || contact.phones?.[0] || '',
+      assunto,
+      descricao: '',
+      produto: 'Empréstimo',
+      tipo: 'Reclamação',
+      motivo: assunto,
+      isDraft: false,
+    }),
+    id: empty.id,
+  };
+}
+
+export async function createDemandaFromCliente(doc) {
+  const form = buildDemandaFromCliente(doc);
+  if (!form) {
+    throw new Error('Dados do cliente inválidos.');
+  }
+  return registerDemandaAndCreateTicket(form);
+}
+
+export async function createDemandaFromCpf(cpfRaw) {
+  const cpf = normalizeCpf(cpfRaw);
+  const cliente = await clientsApi.getByCpf(cpf);
+  return createDemandaFromCliente(cliente);
 }
 
 export async function fetchPcTicketView(pcId) {
@@ -299,4 +375,22 @@ export function syncProconDemandasFromTickets(tickets = []) {
     if (syncProconDemandaFromTicket(ticket)) synced += 1;
   });
   return synced;
+}
+
+export async function loadProconTicketsFromApi() {
+  try {
+    const data = await boxesApi.list({ fila: 'procon' });
+    const columns = adaptColumnsFromApi(data, { fila: 'procon' });
+    const entries = columns.flatMap((box) =>
+      (box.tickets || []).map((ticket) => ({ ticket, boxId: box.id })),
+    );
+    const synced = syncProconDemandasFromTickets(entries);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('velodesk:procon-sync'));
+    }
+    return synced;
+  } catch (err) {
+    console.warn('proconTicketService: falha ao carregar fila procon', err?.message || err);
+    return 0;
+  }
 }

@@ -13,8 +13,10 @@ import {
   isDraftTicket,
 } from '../api/adapters/ticketAdapter';
 import { readDeskProfileId, shouldUseMeusChamadosFila, ticketBelongsInAgentNovosQueue } from './desk/responsavelSegmentation';
+import { isEspeciaisDeskExcludedTicket } from './especiais/especiaisChannelDetection';
 import { getAgentName } from './clientDb';
 import { syncProconDemandasFromTickets } from './especiais/proconTicketService';
+import { syncConsumidorGovDemandasFromTickets } from './especiais/consumidorGovTicketService';
 
 const BOXES_CACHE_KEY = 'velodesk_boxes_cache_v2';
 const BOXES_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -102,6 +104,26 @@ function stripDraftsFromColumns(cols) {
   }));
 }
 
+function readAutorOrigemForMerge(autor) {
+  const normalized = String(autor || '').trim().toLowerCase();
+  if (normalized.startsWith('responsavel:')) return 'responsavel';
+  if (normalized.startsWith('wf:')) return 'workflow';
+  return null;
+}
+
+function buildComunicacaoResumoForMerge(thread = []) {
+  if (!thread.length) return undefined;
+  const temRespostaAgente = thread.some(
+    (item) => readAutorOrigemForMerge(item.autor) === 'responsavel',
+  );
+  const last = thread[thread.length - 1];
+  return {
+    ultimaOrigem: readAutorOrigemForMerge(last.autor),
+    ultimaData: last.data || null,
+    temRespostaAgente,
+  };
+}
+
 function mergeTicketWorkflow(prev, next) {
   if (!next) return prev;
   if (!prev) return next;
@@ -114,6 +136,9 @@ function mergeTicketWorkflow(prev, next) {
   const comunicacaoWorkflow = hasNextComunicacao
     ? nextReq.comunicacaoWorkflow
     : (prevReq.comunicacaoWorkflow || []);
+  const comunicacaoResumo = nextReq.comunicacaoResumo
+    ?? prevReq.comunicacaoResumo
+    ?? buildComunicacaoResumoForMerge(comunicacaoWorkflow);
   return {
     ...prev,
     ...next,
@@ -122,6 +147,7 @@ function mergeTicketWorkflow(prev, next) {
       ...nextReq,
       valores: nextReq.valores ?? prevReq.valores,
       comunicacaoWorkflow,
+      comunicacaoResumo,
       comunicacaoPendente: nextReq.comunicacaoPendente
         ?? prevReq.comunicacaoPendente
         ?? comunicacaoWorkflow.length > 0,
@@ -390,9 +416,11 @@ function assertApiReady(action = 'salvar ticket') {
 
 function filterColumnsForAgent(columns) {
   if (!shouldUseMeusChamadosFila()) return columns;
+  const profileId = readDeskProfileId();
   return (columns || []).map((box) => ({
     ...box,
     tickets: (box.tickets || []).filter((ticket) => {
+      if (isEspeciaisDeskExcludedTicket(ticket, profileId)) return false;
       if (box.id === 'resolvidos') return true;
       if (box.id === 'novos') return ticketBelongsInAgentNovosQueue(ticket);
       return true;
@@ -442,8 +470,10 @@ export async function loadBoxesFromApi(userEmail = '') {
       (box.tickets || []).map((ticket) => ({ ticket, boxId: box.id })),
     );
     syncProconDemandasFromTickets(cockpitEntries);
+    syncConsumidorGovDemandasFromTickets(cockpitEntries);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('velodesk:procon-sync'));
+      window.dispatchEvent(new CustomEvent('velodesk:consumidor-gov-sync'));
     }
   } catch (err) {
     const message = err?.response?.data?.message || err?.message || 'Erro desconhecido';

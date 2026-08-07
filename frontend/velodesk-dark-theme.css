@@ -840,13 +840,15 @@ body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor-wrap--has-errors .co
     box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.18);
 }
 
-body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor__expand-btn {
+body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor__expand-btn,
+body.velodesk-dark .desk-crm-ticket-scope .compose-rich-editor__expand-btn {
     background: rgba(15, 23, 42, 0.92);
     border-color: rgba(148, 163, 184, 0.35);
     color: #94a3b8;
 }
 
-body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor__expand-btn:hover {
+body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor__expand-btn:hover,
+body.velodesk-dark .desk-crm-ticket-scope .compose-rich-editor__expand-btn:hover {
     background: rgba(30, 41, 59, 0.95);
     border-color: rgba(148, 163, 184, 0.55);
     color: #93c5fd;
@@ -1192,6 +1194,15 @@ body.velodesk-dark #velodeskDeskV2Root .desk-workflow-timeline__title {
 
 body.velodesk-dark #velodeskDeskV2Root .desk-workflow-stepper__status {
     color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-stepper__progress-hint {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .desk-workflow-stepper--header-stack {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border);
 }
 
 body.velodesk-dark #velodeskDeskV2Root .desk-workflow-stepper__status--sla {

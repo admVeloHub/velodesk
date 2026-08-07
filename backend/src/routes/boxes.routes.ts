@@ -21,7 +21,7 @@ import {
   shouldUseAtribuidoFuncaoQueue,
   shouldUseMeusChamadosFilter,
 } from '../services/permission.service';
-import { listWorkflows } from '../services/workflowDefinicao.service';
+import { resolveWorkflowDefinitionIdsForFuncoes } from '../services/workflowDefinicao.service';
 
 const router = Router();
 
@@ -30,35 +30,13 @@ async function resolveDbUser(userId?: string) {
   return User.findById(userId).select('name email');
 }
 
-async function resolveWorkflowDefinitionIdsForFuncoes(funcaoSlugs: string[]) {
-  const slugs = [
-    ...new Set(
-      (funcaoSlugs || [])
-        .map((s) => String(s || '').trim().toLowerCase())
-        .filter(Boolean)
-        .flatMap((s) => [`escalonar-${s}`, s]),
-    ),
-  ];
-  if (!slugs.length) return [] as string[];
-
-  try {
-    const all = await listWorkflows(true);
-    return all
-      .filter((w) => slugs.includes(String(w.slug || '').trim().toLowerCase()))
-      .map((w) => String(w._id));
-  } catch (err) {
-    console.warn(
-      '[boxes] não foi possível carregar definições de workflow para filtro de fila:',
-      err instanceof Error ? err.message : err,
-    );
-    return [];
-  }
-}
-
 async function resolveQueueMode(
   resolved: Awaited<ReturnType<typeof resolveUserPermissions>>,
   queueParam?: string,
 ) {
+  if (queueParam === 'procon' || queueParam === 'consumidor-gov') {
+    return { queue: queueParam, extraFilter: undefined as Record<string, unknown> | undefined };
+  }
   if (hasPermission(resolved.permissoes, 'tickets', 'ver_todos')) {
     return { queue: queueParam, extraFilter: undefined as Record<string, unknown> | undefined };
   }
@@ -219,7 +197,7 @@ router.get('/', authMiddleware, async (req, res: Response) => {
     const responsavelCandidates = buildResponsavelCandidates(req.user!, dbUser);
     const { queue, extraFilter } = await resolveQueueMode(resolved, queueParam);
 
-    if (queue === 'meus-chamados') {
+    if (queue === 'meus-chamados' || queue === 'procon' || queue === 'consumidor-gov') {
       const result = await loadBoxesWithListTickets(
         MEUS_CHAMADOS_COLUMNS.map((column) => ({
           id: column.id,

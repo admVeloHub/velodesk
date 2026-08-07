@@ -1,6 +1,6 @@
 /**
- * workflowTeamQueues v1.2.1 — remove fallback lateralForm.escalonar
- * VERSION: v1.2.1 | DATE: 2026-08-03
+ * workflowTeamQueues v1.3.0 — match por solicitacaoProdutos e passosResumo
+ * VERSION: v1.3.0 | DATE: 2026-08-06
  */
 import {
   getWorkflowProgress,
@@ -17,6 +17,37 @@ export const WORKFLOW_TEAM_QUEUES = [
 ];
 
 const WORKFLOW_TEAM_QUEUE_IDS = new Set(WORKFLOW_TEAM_QUEUES.map((q) => q.id));
+
+const PRODUTOS_SOLICITACAO_CATEGORIAS = new Set([
+  'erros-bugs',
+  'solicitacoes',
+  'liberacao-pix',
+  'documentos',
+]);
+
+const FINANCEIRO_SOLICITACAO_CATEGORIAS = new Set([
+  'estorno',
+  'cobranca',
+  'outros',
+]);
+
+function readSolicitacaoProdutos(ticket) {
+  return ticket?.lateralForm?.solicitacaoProdutos
+    || ticket?.workflow?.requisicao?.solicitacaoProdutos
+    || null;
+}
+
+function readSolicitacaoFinanceiro(ticket) {
+  return ticket?.lateralForm?.solicitacaoFinanceiro
+    || ticket?.workflow?.requisicao?.solicitacaoFinanceiro
+    || null;
+}
+
+function passosResumoMatchesTeam(ticket, team) {
+  const passos = ticket?.lateralForm?.workflow?.passosResumo;
+  if (!Array.isArray(passos) || !passos.length) return false;
+  return passos.some((passo) => normalizeTeamSlug(passo.team) === team);
+}
 
 function normalizeAtribuido(value) {
   const raw = String(value ?? '').trim();
@@ -75,6 +106,24 @@ export function ticketMatchesWorkflowTeam(ticket, teamId) {
   if (templateSlug === `escalonar-${team}`) return true;
   if (templateSlug === team) return true;
   if (templateSlug.endsWith(`-${team}`)) return true;
+
+  if (team === 'produtos') {
+    const solicitacao = readSolicitacaoProdutos(ticket);
+    if (solicitacao && PRODUTOS_SOLICITACAO_CATEGORIAS.has(solicitacao.categoria)) {
+      return true;
+    }
+    const financeiroLegacy = readSolicitacaoFinanceiro(ticket);
+    if (financeiroLegacy?.categoria === 'documentos') return true;
+  }
+
+  if (team === 'financeiro') {
+    const solicitacao = readSolicitacaoFinanceiro(ticket);
+    if (solicitacao && FINANCEIRO_SOLICITACAO_CATEGORIAS.has(solicitacao.categoria)) {
+      return true;
+    }
+  }
+
+  if (passosResumoMatchesTeam(ticket, team)) return true;
 
   const atribuido = normalizeAtribuido(lf.atribuido);
   if (atribuido === `funcao:${team}`) return true;
@@ -149,10 +198,11 @@ export function getClient360WorkflowIconMeta(ticket) {
   return CLIENT360_WORKFLOW_ICON[teamId] || null;
 }
 
-export function buildWorkflowNavigationUrl({ teamId, ticketId } = {}) {
+export function buildWorkflowNavigationUrl({ teamId, ticketId, view } = {}) {
   const params = new URLSearchParams();
   if (teamId) params.set('team', teamId);
   if (ticketId) params.set('ticket', String(ticketId));
+  if (view) params.set('view', view);
   const qs = params.toString();
   return qs ? `/workflow?${qs}` : '/workflow';
 }

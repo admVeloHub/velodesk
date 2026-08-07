@@ -5,6 +5,7 @@ import React, { useCallback, useState } from 'react';
 import {
   resolveOpenTarget,
   searchTicketsByQuery,
+  validateWorkflowTeamAccess,
 } from '../../../../services/workflow/workflowTicketSearch';
 
 export default function Workflow360Search({
@@ -19,7 +20,13 @@ export default function Workflow360Search({
 
   const openResult = useCallback((result) => {
     if (!result?.id) return;
-    const target = resolveOpenTarget(result.ticket, teamQueueId);
+    const access = validateWorkflowTeamAccess(result.ticket, teamQueueId);
+    if (!access.allowed) {
+      setError(access.message || 'Ticket não pertence à sua fila de workflow.');
+      setResults([]);
+      return;
+    }
+    const target = access.target || resolveOpenTarget(result.ticket, teamQueueId);
     setResults([]);
     setError('');
     setQuery('');
