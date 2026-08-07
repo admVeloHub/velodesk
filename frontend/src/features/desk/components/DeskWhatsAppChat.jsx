@@ -1,6 +1,6 @@
 /**
- * DeskWhatsAppChat v1.2.1 — oculta sugestão IA após usar resposta
- * VERSION: v1.2.1 | DATE: 2026-07-07
+ * DeskWhatsAppChat v1.3.0 — envio contínuo (onSend leve, sem commit de ticket)
+ * VERSION: v1.3.0 | DATE: 2026-08-06
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {

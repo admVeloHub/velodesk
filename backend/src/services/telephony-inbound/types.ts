@@ -60,11 +60,19 @@ export interface TelephonyInboundResult {
 }
 
 export interface TelephonyRecadosInboundResponse {
+  schemaVersion: '2.0';
   updatedAt: string;
   items: Array<{
     id: string;
     titulo: string;
-    mensagem: string;
+    areas: string[];
+    tipo: string;
+    mensagemCliente: string;
+    orientacaoAtendimento: string;
+    politicaChamado: string;
+    criterioChamado: string | null;
     prioridade: string;
+    telefonesOrigemLiberados: string[] | null;
+    updatedAt: string;
   }>;
 }

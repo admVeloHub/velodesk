@@ -1,13 +1,28 @@
-/** TelephonyRecado v1.0.0 — recados emergenciais para a IA telefônica consultar antes de cada ligação */
+/** TelephonyRecado v2.0.0 — recados operacionais v2 para IA telefônica (LetícIA) */
 import mongoose, { Document, Schema } from 'mongoose';
+import type {
+  TelephonyRecadoArea,
+  TelephonyRecadoPolitica,
+  TelephonyRecadoPrioridade,
+  TelephonyRecadoTipo,
+} from '../services/telephonyRecado.constants';
 
-export type TelephonyRecadoPrioridade = 'alta' | 'media' | 'baixa';
+export type { TelephonyRecadoPrioridade } from '../services/telephonyRecado.constants';
 
 export interface ITelephonyRecado extends Document {
+  recadoId: string;
   titulo: string;
-  mensagem: string;
+  areas: TelephonyRecadoArea[];
+  tipo: TelephonyRecadoTipo;
+  mensagemCliente: string;
+  orientacaoAtendimento: string;
+  politicaChamado: TelephonyRecadoPolitica;
+  criterioChamado: string | null;
+  telefonesOrigemLiberados: string[] | null;
   prioridade: TelephonyRecadoPrioridade;
   ativo: boolean;
+  /** @deprecated v1 — mantido para registros legados */
+  mensagem?: string;
   criadoPor?: string;
   atualizadoPor?: string;
   createdAt: Date;
@@ -29,14 +44,30 @@ export function compareRecadoPrioridade(
 
 const TelephonyRecadoSchema = new Schema<ITelephonyRecado>(
   {
+    recadoId: { type: String, required: true, unique: true, trim: true, index: true },
     titulo: { type: String, required: true, trim: true },
-    mensagem: { type: String, required: true, trim: true },
+    areas: { type: [String], default: ['geral'] },
+    tipo: {
+      type: String,
+      enum: ['indisponibilidade', 'instabilidade', 'aviso'],
+      default: 'aviso',
+    },
+    mensagemCliente: { type: String, default: '' },
+    orientacaoAtendimento: { type: String, default: '' },
+    politicaChamado: {
+      type: String,
+      enum: ['fluxo_normal', 'nao_abrir', 'abrir_se_persistir', 'abrir_imediatamente'],
+      default: 'fluxo_normal',
+    },
+    criterioChamado: { type: String, default: null },
+    telefonesOrigemLiberados: { type: [String], default: null },
     prioridade: {
       type: String,
       enum: ['alta', 'media', 'baixa'],
       default: 'media',
     },
     ativo: { type: Boolean, default: true, index: true },
+    mensagem: { type: String },
     criadoPor: { type: String },
     atualizadoPor: { type: String },
   },

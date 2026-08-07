@@ -14,7 +14,6 @@
     "migrate:sequence-counters": "tsx scripts/migrate-sequence-counters.ts",
     "clear:demo-chamados": "tsx scripts/clear-demo-chamados.ts",
     "purge:bot-evaluation": "tsx scripts/purge-bot-evaluation-tickets.ts",
-    "seed:workflow-test": "tsx scripts/seed-workflow-test-tickets.ts",
     "seed:email-transport": "tsx scripts/seed-email-transport.ts",
     "update:email-mailbox": "tsx scripts/update-email-mailbox.ts",
     "test:mongo": "tsx scripts/test-mongo-connection.ts",
@@ -28,6 +27,11 @@
     "test:status-lifecycle": "tsx scripts/test-status-lifecycle.ts",
     "test:ticket-ia": "tsx scripts/test-ticket-ia-adapter.ts",
     "test:telephony-inbound": "tsx scripts/test-telephony-inbound.ts",
+    "test:whatsapp-send": "tsx scripts/test-whatsapp-send.ts",
+    "create:twilio-subaccount": "tsx scripts/create-twilio-subaccount.ts",
+    "register:twilio-whatsapp-sender": "tsx scripts/register-twilio-whatsapp-sender.ts",
+    "test:twilio-auth": "tsx scripts/test-twilio-auth.ts",
+    "test:casos-especiais-precheck": "tsx scripts/test-casos-especiais-precheck.ts",
     "backfill:ticket-ia": "tsx scripts/backfill-ticket-ia.ts"
   },
   "dependencies": {
@@ -46,6 +50,7 @@
     "multer": "^2.2.0",
     "openai": "^4.104.0",
     "qrcode-terminal": "^0.12.0",
+    "twilio": "^6.0.2",
     "whatsapp-web.js": "^1.23.0"
   },
   "devDependencies": {

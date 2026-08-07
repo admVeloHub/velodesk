@@ -1,6 +1,6 @@
 /**
- * responsavelSegmentation v1.6.1 — fila Novos: atribuídos ao agente ou sem responsável
- * VERSION: v1.6.1 | DATE: 2026-08-04
+ * responsavelSegmentation v1.6.2 — meus tickets inclui atribuído colaborador
+ * VERSION: v1.6.2 | DATE: 2026-08-06
  */
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 import { normalizeProfileId } from '../../config/profiles';
@@ -109,6 +109,21 @@ export function readTicketResponsavel(ticket) {
   return sanitizeResponsavel(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
 }
 
+function normalizeAtribuidoColaborador(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw || raw.startsWith('funcao:') || raw.startsWith('grupo:')) return '';
+  return normalize(raw);
+}
+
+/** Atribuído individual (colaborador) igual ao agente logado — não funcao:/grupo:. */
+export function ticketAtribuidoToCurrentAgent(ticket) {
+  const atribuido = normalizeAtribuidoColaborador(ticket?.lateralForm?.atribuido);
+  if (!atribuido) return false;
+  const candidates = buildResponsavelCandidates();
+  if (candidates.includes(atribuido)) return true;
+  return candidates.some((c) => atribuido.includes(c) || c.includes(atribuido));
+}
+
 /**
  * Fila Novos (sidebar) — agentes veem só tickets novos atribuídos a si ou sem responsável real.
  * Gestão / ver_todos: todos os novos.
@@ -142,14 +157,12 @@ export function ticketMatchesAgentResponsavel(ticket, profileId = readDeskProfil
 
   if (!shouldUseMeusChamadosFila(profileId)) return true;
 
-  const responsavel = normalize(readTicketResponsavel(ticket));
+  if (ticketAssignedToCurrentAgent(ticket)) return true;
+  if (ticketAtribuidoToCurrentAgent(ticket)) return true;
+
   const status = normalize(ticket?.status || '');
-
-  if (!responsavel && status === 'novo') return true;
-  if (!responsavel) return false;
-
-  const candidates = buildResponsavelCandidates();
-  return candidates.includes(responsavel);
+  if (!readTicketResponsavel(ticket) && status === 'novo') return true;
+  return false;
 }
 
 /** Apenas tickets com responsável explícito igual ao agente logado. */
@@ -165,7 +178,7 @@ export function ticketAssignedToCurrentAgent(ticket) {
  * Não herda ver_todos/gestão: perfil de gestão vê totais nas outras filas, não aqui.
  */
 export function ticketBelongsInMeusTicketsList(ticket) {
-  return ticketAssignedToCurrentAgent(ticket);
+  return ticketAssignedToCurrentAgent(ticket) || ticketAtribuidoToCurrentAgent(ticket);
 }
 
 /** Responsável explícito diferente do agente logado (transferência para outro agente). */

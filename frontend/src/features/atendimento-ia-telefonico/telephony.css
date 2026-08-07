@@ -349,6 +349,106 @@
   color: #64748b;
 }
 
+.telephony-recados__form--v2 {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.telephony-recados__form-head {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.telephony-recados__form-head h3 {
+  margin: 0;
+  color: var(--eco-navy, #000058);
+}
+
+.telephony-recados__field--wide {
+  grid-column: 1 / -1;
+}
+
+.telephony-recados__areas {
+  border: 1px solid rgba(0, 0, 88, 0.12);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.telephony-recados__areas legend {
+  font-size: 0.78rem;
+  color: #64748b;
+  padding: 0 0.25rem;
+}
+
+.telephony-recados__area-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.45rem;
+}
+
+.telephony-recados__area-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--eco-navy, #000058);
+}
+
+.telephony-recados__form-actions {
+  grid-column: 1 / -1;
+}
+
+.telephony-recados__preview pre {
+  margin: 0.5rem 0 0;
+  padding: 0.75rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  overflow: auto;
+  font-size: 0.72rem;
+}
+
+.telephony-recados__meta,
+.telephony-recados__areas-list {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.telephony-recados-inline {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.telephony-recados-inline__item {
+  border: 1px solid rgba(0, 0, 88, 0.1);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  background: #fff;
+}
+
+.telephony-recados-inline__item p {
+  margin: 0.25rem 0;
+}
+
+.telephony-recados-inline__item small {
+  color: #64748b;
+}
+
+.telephony-detail__rationale {
+  display: block;
+  margin-top: 0.25rem;
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.telephony-empty-inline {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
 @media (max-width: 900px) {
   .telephony-detail__grid {
     grid-template-columns: 1fr;

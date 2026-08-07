@@ -1,6 +1,6 @@
 /**
- * permissionService v1.6.1 — team match sem lateralForm.escalonar
- * VERSION: v1.6.1 | DATE: 2026-08-03
+ * permissionService v1.6.2 — ver_meus inclui atribuído colaborador
+ * VERSION: v1.6.2 | DATE: 2026-08-06
  */
 import api from '../../api/client';
 import { normalizeProfileId } from '../../config/profiles';
@@ -364,8 +364,20 @@ export function agentCanDecideTicket(ticket, perm = readCachedPermissions()) {
   return agent && (normalizeText(atribuido) === agent || atribuido.toLowerCase().includes(agent));
 }
 
+function ticketAtribuidoMatchesSession(ticket, perm) {
+  const raw = String(ticket?.lateralForm?.atribuido ?? '').trim();
+  if (!raw || raw.startsWith('funcao:') || raw.startsWith('grupo:')) return false;
+  const atribuido = normalizeText(raw);
+  const candidates = buildResponsavelCandidatesFromSession();
+  if (candidates.includes(atribuido)) return true;
+  const agent = normalizeText(perm?.colaboradorNome);
+  return Boolean(agent && (atribuido === agent || atribuido.includes(agent) || agent.includes(atribuido)));
+}
+
 export function ticketMatchesAgentResponsavel(ticket, perm = readCachedPermissions()) {
   if (!shouldUseMeusChamadosFila(perm)) return true;
+
+  if (ticketAtribuidoMatchesSession(ticket, perm)) return true;
 
   const responsavel = normalizeText(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
   const status = normalizeText(ticket?.status || '');

@@ -1,6 +1,6 @@
 /**
- * API client v1.22.0 — ticketSearch by-cpf + ticketFusaoApi
- * VERSION: v1.22.0 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team
+ * API client v1.22.2 — GET /boxes/queue-counts (contadores reais das filas)
+ * VERSION: v1.22.2 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -107,6 +107,8 @@ export const ticketsApi = {
   create: (data) => api.post('/tickets', data).then((r) => r.data),
   update: (id, data) => api.put(`/tickets/${id}`, data).then((r) => r.data),
   commit: (id, data) => api.post(`/tickets/${id}/commit`, data).then((r) => r.data),
+  sendWhatsAppMessage: (id, data) =>
+    api.post(`/tickets/${id}/whatsapp/messages`, data).then((r) => r.data),
   delete: (id) => api.delete(`/tickets/${id}`).then((r) => r.data),
   addMessage: (id, data) =>
     api.post(`/tickets/${id}/messages`, data).then((r) => r.data),
@@ -138,6 +140,7 @@ export const uploadsApi = {
 
 export const boxesApi = {
   list: (params) => api.get('/boxes', { params }).then((r) => r.data),
+  queueCounts: (params) => api.get('/boxes/queue-counts', { params }).then((r) => r.data),
 };
 
 export const agentQueueBoxesApi = {
@@ -311,6 +314,8 @@ export const ticketSearchApi = {
     api.post('/ticket-search', payload).then((r) => r.data),
   byCpf: (cpf) =>
     api.get(`/ticket-search/by-cpf/${encodeURIComponent(String(cpf || '').replace(/\D/g, ''))}`).then((r) => r.data),
+  deskBarByCpf: (cpf) =>
+    api.get(`/ticket-search/desk-bar/cpf/${encodeURIComponent(String(cpf || '').replace(/\D/g, ''))}`).then((r) => r.data),
 };
 
 export const ticketFusaoApi = {

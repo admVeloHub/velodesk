@@ -1,6 +1,6 @@
 /**
  * Modal — cadastro cliente b2c_cadastros.clientes
- * VERSION: v1.1.1 | DATE: 2026-08-03
+ * VERSION: v1.2.0 | DATE: 2026-08-06
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -14,6 +14,7 @@ export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
   const { showNotification } = useNotifications();
   const [nome, setNome] = useState('');
   const [emails, setEmails] = useState(['']);
+  const [replyEmail, setReplyEmail] = useState('');
   const [phones, setPhones] = useState(['']);
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [emailErrors, setEmailErrors] = useState({});
@@ -25,6 +26,7 @@ export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
     if (!open) return;
     setNome('');
     setEmails(['']);
+    setReplyEmail('');
     setPhones(['']);
     setWhatsappPhone('');
     setEmailErrors({});
@@ -46,6 +48,7 @@ export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
     const validation = validateClientContactDraft({
       name: nome,
       emails,
+      replyEmail,
       phones,
       whatsappPhone,
     });
@@ -64,6 +67,7 @@ export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
         emails: validation.emailList,
         phones: validation.phoneList,
         whatsappPhone: validation.whatsappPhone,
+        replyEmail: validation.replyEmail,
       });
       const cliente = await clientsApi.create(body);
       showNotification('Cliente cadastrado.', 'success');
@@ -126,6 +130,8 @@ export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
             onNameChange={setNome}
             emails={emails}
             onEmailsChange={setEmails}
+            replyEmail={replyEmail}
+            onReplyEmailChange={setReplyEmail}
             phones={phones}
             onPhonesChange={setPhones}
             whatsappPhone={whatsappPhone}

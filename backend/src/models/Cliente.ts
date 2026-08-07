@@ -1,4 +1,4 @@
-/** Cliente v1.1.0 — b2c_cadastros.clientes; telefone WhatsApp em clienteTelefone.whatsapp */
+/** Cliente v1.2.0 — e-mail de resposta em clienteEmail.resposta */
 import { Schema, Document, Model } from 'mongoose';
 import { getCadastrosConnection } from '../config/database';
 
@@ -7,10 +7,15 @@ export interface IClienteTelefone {
   whatsapp?: string;
 }
 
+export interface IClienteEmail {
+  lista: string[];
+  resposta?: string;
+}
+
 export interface IClienteDados {
   clienteCpf: string;
   clienteNome: string;
-  clienteEmail: { lista: string[] };
+  clienteEmail: IClienteEmail;
   clienteTelefone: IClienteTelefone;
 }
 
@@ -31,7 +36,10 @@ const ClienteDadosSchema = new Schema<IClienteDados>(
   {
     clienteCpf: { type: String, default: '' },
     clienteNome: { type: String, default: '' },
-    clienteEmail: { lista: { type: [String], default: [] } },
+    clienteEmail: {
+      lista: { type: [String], default: [] },
+      resposta: { type: String, default: '' },
+    },
     clienteTelefone: {
       lista: { type: [String], default: [] },
       whatsapp: { type: String, default: '' },

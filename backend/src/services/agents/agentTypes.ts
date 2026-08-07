@@ -159,7 +159,6 @@ export interface GestaoHandoffInput {
 export interface GestaoHandoffResult {
   success: boolean;
   responsavelAtribuido?: string;
-  escalonar?: string;
   statusAtualizado?: string;
   notificacoesEnviadas?: string[];
   alertId?: string;

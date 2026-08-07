@@ -24,7 +24,6 @@ export const SUB_LABELS = {
   atuar_canal_especial: 'Atuar em canal especial',
   painel_360_proprio: 'Painel 360° — próprios dados',
   painel_360_equipe: 'Painel 360° — equipe',
-  escalonar: 'Escalonar tickets',
   avancar: 'Avançar workflow',
   aprovar: 'Aprovar workflow',
   rejeitar: 'Rejeitar workflow',

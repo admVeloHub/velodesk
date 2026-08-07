@@ -1,6 +1,6 @@
 /**
  * Painel 360° — Gestão
- * VERSION: v3.2.1 | DATE: 2026-07-14
+ * VERSION: v3.2.2 | DATE: 2026-08-06
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,7 +13,6 @@ import Workspace360EscalatedCasesList from './components/ws360/Workspace360Escal
 import Workspace360OperationalLeaderboard from './components/ws360/Workspace360OperationalLeaderboard';
 import Workspace360SupervisorReports from './components/ws360/Workspace360SupervisorReports';
 import Workspace360RedistributeModal from './components/ws360/Workspace360RedistributeModal';
-import Workspace360EscalateModal from './components/ws360/Workspace360EscalateModal';
 import GestaoVolumeCard from './components/gestaoInsights/GestaoVolumeCard';
 import GestaoVolumeStatsCard from './components/gestaoInsights/GestaoVolumeStatsCard';
 import GestaoMotivosCard from './components/gestaoInsights/GestaoMotivosCard';
@@ -30,7 +29,6 @@ export default function GestaoPanel() {
   const { data, loading, error, refresh } = useWorkspace360();
   const [escalatedListOpen, setEscalatedListOpen] = useState(false);
   const [redistributeOpen, setRedistributeOpen] = useState(false);
-  const [escalateOpen, setEscalateOpen] = useState(false);
   const [insightsPeriod, setInsightsPeriod] = useState({ period: 'mes' });
 
   const view = useMemo(() => {
@@ -69,12 +67,6 @@ export default function GestaoPanel() {
     showNotification('Redirecionamento concluído', 'success');
   }, [refreshTickets, refresh, showNotification]);
 
-  const handleEscalateComplete = useCallback(async ({ label }) => {
-    await refreshTickets();
-    await refresh();
-    showNotification(`Ticket escalonado ${label}`, 'success');
-  }, [refreshTickets, refresh, showNotification]);
-
   if (loading && !view) {
     return <div className="ws-super-desk"><p className="ws360-loading">Carregando painel…</p></div>;
   }
@@ -97,9 +89,6 @@ export default function GestaoPanel() {
           onClick={() => setRedistributeOpen(true)}
         >
           Redistribuir
-        </button>
-        <button type="button" className="btn-secondary" onClick={() => setEscalateOpen(true)}>
-          Escalonar
         </button>
         <button type="button" className="btn-secondary" onClick={() => navigate('/tickets?desk=v2')}>
           Abrir fila
@@ -162,11 +151,6 @@ export default function GestaoPanel() {
         open={redistributeOpen}
         onClose={() => setRedistributeOpen(false)}
         onComplete={handleRedistributeComplete}
-      />
-      <Workspace360EscalateModal
-        open={escalateOpen}
-        onClose={() => setEscalateOpen(false)}
-        onComplete={handleEscalateComplete}
       />
     </div>
   );

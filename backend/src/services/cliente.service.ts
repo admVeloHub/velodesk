@@ -1,4 +1,4 @@
-/** cliente.service v1.4.0 — whatsapp em clienteTelefone + listas múltiplas */
+/** cliente.service v1.5.0 — e-mail de resposta em clienteEmail.resposta */
 import mongoose from 'mongoose';
 import { getClienteModel, ICliente, IClienteDados } from '../models/Cliente';
 import type { IClienteRef } from '../models/ChamadoN1';
@@ -44,6 +44,13 @@ function normalizeTelefoneWhatsapp(value: unknown, phoneList: string[]): string 
   return '';
 }
 
+function normalizeEmailResposta(value: unknown, emailList: string[]): string {
+  const selected = normalizeEmail(value);
+  if (selected && emailList.some((item) => normalizeEmail(item) === selected)) return selected;
+  if (emailList.length === 1) return normalizeEmail(emailList[0]);
+  return '';
+}
+
 function dadosFromBody(body: Record<string, unknown>): IClienteDados | null {
   const lateral = (body.lateralForm ?? {}) as Record<string, unknown>;
   const cpf = normalizeCpf(body.clientCPF ?? lateral.clienteCpf ?? lateral.cpf);
@@ -54,13 +61,21 @@ function dadosFromBody(body: Record<string, unknown>): IClienteDados | null {
     lateral.clienteTelefoneWhatsapp
     ?? (lateral.clienteTelefone as { whatsapp?: unknown } | undefined)?.whatsapp
     ?? (body.clienteTelefoneWhatsapp as unknown);
+  const emailRespostaRaw =
+    lateral.clienteEmailResposta
+    ?? (lateral.clienteEmail as { resposta?: unknown } | undefined)?.resposta
+    ?? (body.clienteEmailResposta as unknown);
 
   if (!cpf && !nome) return null;
 
+  const emailResposta = normalizeEmailResposta(emailRespostaRaw, emailLista);
   const dados: IClienteDados = {
     clienteCpf: cpf,
     clienteNome: nome,
-    clienteEmail: { lista: emailLista },
+    clienteEmail: {
+      lista: emailLista,
+      ...(emailResposta ? { resposta: emailResposta } : {}),
+    },
     clienteTelefone: {
       lista: telLista,
       whatsapp: normalizeTelefoneWhatsapp(whatsappRaw, telLista),
@@ -241,7 +256,16 @@ function applyDadosToCliente(existing: ICliente, dados: IClienteDados): void {
   }
   if (dados.clienteNome) existing.clienteDados[0].clienteNome = dados.clienteNome;
   if (dados.clienteCpf) existing.clienteDados[0].clienteCpf = dados.clienteCpf;
-  if (dados.clienteEmail.lista.length) existing.clienteDados[0].clienteEmail = dados.clienteEmail;
+  if (dados.clienteEmail.lista.length || dados.clienteEmail.resposta) {
+    existing.clienteDados[0].clienteEmail = {
+      lista: dados.clienteEmail.lista.length
+        ? dados.clienteEmail.lista
+        : (existing.clienteDados[0].clienteEmail?.lista ?? []),
+      ...(dados.clienteEmail.resposta
+        ? { resposta: dados.clienteEmail.resposta }
+        : {}),
+    };
+  }
   if (dados.clienteTelefone.lista.length) existing.clienteDados[0].clienteTelefone = dados.clienteTelefone;
 }
 

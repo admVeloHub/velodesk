@@ -1,4 +1,4 @@
-/** workflowTicket.service v1.6.1 — startWorkflow usa contexto de tabulação do chamado */
+/** workflowTicket.service v1.6.2 — bloqueia start sem cliente identificado (CPF) */
 import { isAutomaticaStep, resolveAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
@@ -6,6 +6,7 @@ import type { IChamadoN1, IChamadoWorkflow, IRegistro } from '../models/ChamadoN
 import type { IWorkflowDefinicao, IWorkflowPassoEnvelope } from '../models/WorkflowDefinicao';
 import {
   currentStatus,
+  isClientIdentifiedOnChamado,
   readTabulacaoSnapshot,
 } from './chamado.mapper';
 import { getWorkflowById, getWorkflowBySlug, resolveWorkflowForTicket } from './workflowDefinicao.service';
@@ -245,6 +246,13 @@ export async function startWorkflowForChamado(
   const wf = chamado.workflow;
   if (wf?.active && wf.workflowId) {
     throw new WorkflowAdvanceError('Workflow já está ativo neste ticket', 400);
+  }
+
+  if (!isClientIdentifiedOnChamado(chamado)) {
+    throw new WorkflowAdvanceError(
+      'Identifique o cliente (CPF válido) antes de iniciar o workflow.',
+      400,
+    );
   }
 
   const ticketCtx = buildWorkflowTicketContextFromChamado(chamado);

@@ -1,6 +1,6 @@
 /**
- * openaiAgent.util v1.0.0 — cliente OpenAI e helpers compartilhados dos agentes
- * VERSION: v1.0.0 | DATE: 2026-07-13
+ * openaiAgent.util v1.0.1 — isAgentsConfigured aceita qualquer vector store configurada
+ * VERSION: v1.0.1 | DATE: 2026-08-07
  */
 import OpenAI from 'openai';
 import { env } from '../../config/env';
@@ -83,10 +83,19 @@ export function parseAiJson<T>(raw: string): T | null {
   }
 }
 
+function hasAnyVectorStoreConfigured(): boolean {
+  return Boolean(
+    env.openaiPopVectorStoreId?.trim()
+    || env.openaiPublicVectorStoreId?.trim()
+    || env.openaiVectorStoreId?.trim()
+  );
+}
+
 export function getAtendimentoVectorStoreIds(): string[] {
   const ids = [
     env.openaiPublicVectorStoreId,
     env.openaiPopVectorStoreId,
+    env.openaiVectorStoreId,
   ].filter(Boolean);
   return [...new Set(ids)];
 }
@@ -110,8 +119,9 @@ export function getAgentsStatus(): {
 } {
   const missing: string[] = [];
   if (!env.openaiApiKey?.trim()) missing.push('OPENAI_API_KEY');
-  if (!env.openaiPopVectorStoreId?.trim()) missing.push('OPENAI_POP_VECTOR_STORE_ID');
-  if (!env.openaiPublicVectorStoreId?.trim()) missing.push('OPENAI_PUBLIC_VECTOR_STORE_ID');
+  if (!hasAnyVectorStoreConfigured()) {
+    missing.push('OPENAI_POP_VECTOR_STORE_ID, OPENAI_PUBLIC_VECTOR_STORE_ID ou OPENAI_VECTOR_STORE_ID');
+  }
   return {
     configured: missing.length === 0,
     missing,

@@ -1,6 +1,6 @@
 /**
- * agents.routes v1.2.1 — nomeOperador resolvido no servidor pelo colaborador logado
- * VERSION: v1.2.1 | DATE: 2026-07-29
+ * agents.routes v1.2.2 — revisar-sugestao retorna 503 quando agentes incompletos
+ * VERSION: v1.2.2 | DATE: 2026-08-07
  */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
@@ -81,7 +81,12 @@ router.post('/pipeline', authMiddleware, async (req: Request, res: Response) => 
     return res.status(400).json({ success: false, error: parsed.error });
   }
   if (!isAgentsConfigured()) {
-    return res.status(503).json({ success: false, error: 'Agentes não configurados no servidor.' });
+    const status = getAgentsStatus();
+    return res.status(503).json({
+      success: false,
+      error: 'Agentes não configurados no servidor.',
+      missing: status.missing,
+    });
   }
 
   const pipelineModo = req.body?.pipelineModo === 'auto_envio' ? 'auto_envio' : 'desk';
@@ -122,6 +127,15 @@ router.post('/revisar-sugestao', authMiddleware, async (req: Request, res: Respo
     return res.status(400).json({ success: false, error: 'respostaAtual e tabulacaoAtual são obrigatórios' });
   }
 
+  if (!isAgentsConfigured()) {
+    const status = getAgentsStatus();
+    return res.status(503).json({
+      success: false,
+      error: 'Agentes não configurados no servidor.',
+      missing: status.missing,
+    });
+  }
+
   const nomeOperador = await resolveOperadorDisplayNameForAuthEmail(req.user?.email || '');
 
   const result = await runRevisarSugestao({
@@ -140,7 +154,12 @@ router.post('/revisar-sugestao', authMiddleware, async (req: Request, res: Respo
   });
 
   if (!result.success) {
-    return res.status(500).json({ success: false, error: result.error });
+    const isConfigError = result.error === 'Agentes não configurados';
+    return res.status(isConfigError ? 503 : 500).json({
+      success: false,
+      error: result.error,
+      ...(isConfigError ? { missing: getAgentsStatus().missing } : {}),
+    });
   }
 
   return res.json({ ...result, success: true, source: 'agents_revisar_sugestao' });

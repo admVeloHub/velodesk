@@ -1,9 +1,8 @@
 /**
  * Badge Mesclado + botão lista de filhos — linha do status
- * VERSION: v1.1.0 | DATE: 2026-08-04
+ * VERSION: v1.2.0 | DATE: 2026-08-07
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import FusaoFundidoBadge from './FusaoFundidoBadge';
 
 function resolveFusaoChildren(fusao) {
@@ -29,8 +28,7 @@ function resolveFusaoChildren(fusao) {
   return rows;
 }
 
-export default function TicketFusaoStatusControls({ ticket }) {
-  const navigate = useNavigate();
+export default function TicketFusaoStatusControls({ ticket, onOpenChild }) {
   const [open, setOpen] = useState(false);
   const fusao = ticket?.fusao;
   const children = useMemo(() => resolveFusaoChildren(fusao), [fusao]);
@@ -38,8 +36,10 @@ export default function TicketFusaoStatusControls({ ticket }) {
   const openChild = useCallback((childId) => {
     if (!childId) return;
     setOpen(false);
-    navigate(`/tickets?desk=v2&ticket=${encodeURIComponent(childId)}`);
-  }, [navigate]);
+    if (typeof onOpenChild === 'function') {
+      onOpenChild(childId);
+    }
+  }, [onOpenChild]);
 
   if (!fusao?.fundido) return null;
 

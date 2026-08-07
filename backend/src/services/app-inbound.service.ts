@@ -1,11 +1,11 @@
-/** app-inbound.service v1.2.0 — protocolo oficial + pipeline agentes pós-notify */
+/** app-inbound.service v1.3.0 — hooks Agente 4 + pipeline pós-notify */
 import mongoose from 'mongoose';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { applyAssignmentToChamado } from './assignmentRouter.service';
 import { assignProtocolIfNeeded } from './chamadoProtocoloAssign.service';
 import { hasOfficialProtocolo } from './protocoloUtils';
-import { runInboundAgentPipeline } from './agents/inboundAgentPipeline.service';
+import { runInboundPostCreateHooks } from './agents/inboundAgentPipeline.service';
 
 export interface AppNotifyPayload {
   chamadoId?: string;
@@ -85,8 +85,8 @@ export async function processAppNotify(payload: AppNotifyPayload): Promise<AppNo
   await applyAssignmentToChamado(chamado, { source: 'app-integrado' });
   await chamado.save();
 
-  void runInboundAgentPipeline(chamado, { source: 'app-integrado' }).catch((err: Error) => {
-    console.warn('[app-inbound] pipeline agentes fail-soft:', err.message);
+  void runInboundPostCreateHooks(chamado, { source: 'app-integrado' }).catch((err: Error) => {
+    console.warn('[app-inbound] hooks inbound fail-soft:', err.message);
   });
 
   return {

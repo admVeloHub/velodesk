@@ -1,6 +1,6 @@
 /**
- * openaiTicketSuggest.service v1.2.0 — prompt legado inclui anotações internas junto ao histórico público
- * VERSION: v1.2.0 | DATE: 2026-07-29
+ * openaiTicketSuggest.service v1.2.1 — user block reforça resposta direta sem eco do cliente
+ * VERSION: v1.2.1 | DATE: 2026-08-07
  */
 import OpenAI from 'openai';
 import { env } from '../config/env';
@@ -213,11 +213,10 @@ function buildUserBlock(params: TicketAiSuggestInput, tabulationCatalog: string)
   if (clientFirstName) {
     parts.push(
       '',
-      '## Nome do cliente (usar na saudação — OBRIGATÓRIO)',
+      '## Nome do cliente',
       '',
       `- **Nome completo:** ${clientFullName}`,
-      `- **Primeiro nome do cliente:** ${clientFirstName}`,
-      `- **Primeira linha de respostaSugerida:** Olá, ${clientFirstName}`,
+      `- **Primeiro nome:** ${clientFirstName} (saudação breve apenas no primeiro contato; não repita a pergunta do cliente)`,
     );
   }
 
@@ -249,7 +248,7 @@ function buildUserBlock(params: TicketAiSuggestInput, tabulationCatalog: string)
     '',
     '## Tarefa',
     '',
-    'Consulte os POPs na base de conhecimento. Retorne JSON com respostaSugerida (texto ao cliente no formato padrão: saudação, identificação do agente, desenvolvimento e despedida com assinatura Velotax) e tabulacao (tipo, produto, motivo, detalhe) usando apenas valores da lista fechada.',
+    'Consulte os POPs na base de conhecimento. Retorne JSON com respostaSugerida (direta ao ponto, sem eco nem clichê de abertura) e tabulacao (tipo, produto, motivo, detalhe) usando apenas valores da lista fechada.',
   );
 
   return parts.join('\n');

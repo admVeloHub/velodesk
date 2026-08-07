@@ -1,4 +1,4 @@
-/** telephony.routes v1.0.0 — API interna JWT para ligações e recados emergenciais */
+/** telephony.routes v2.0.0 — API interna JWT para ligações e recados operacionais v2 */
 import { NextFunction, Request, Response, Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { env } from '../config/env';
@@ -9,12 +9,19 @@ import {
   listTelephonyCalls,
 } from '../services/telephony.service';
 import {
+  RECADO_AREA_LABELS,
+  RECADO_LIMITS,
+  RECADO_POLITICAS,
+  RECADO_PRIORIDADES,
+  RECADO_TIPOS,
+  RECADOS_SCHEMA_VERSION,
+} from '../services/telephonyRecado.constants';
+import {
   createRecado,
   deleteRecado,
   listAllRecados,
+  migrateLegacyRecadosIfNeeded,
   updateRecado,
-  countActiveRecados,
-  getLatestActiveRecadoUpdatedAt,
 } from '../services/telephonyRecado.service';
 import { getPartnerPayloadExample } from '../services/telephony-inbound/telephonyInbound.service';
 
@@ -63,6 +70,8 @@ function queryFromRequest(req: Request) {
     direction: typeof req.query.direction === 'string' ? req.query.direction : undefined,
     agent: typeof req.query.agent === 'string' ? req.query.agent : undefined,
     converted: typeof req.query.converted === 'string' ? req.query.converted : undefined,
+    desfecho: typeof req.query.desfecho === 'string' ? req.query.desfecho : undefined,
+    rotaAtendida: typeof req.query.rotaAtendida === 'string' ? req.query.rotaAtendida : undefined,
   };
 }
 
@@ -103,8 +112,20 @@ router.get('/calls/:id', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/recados/schema', (_req: Request, res: Response) => {
+  res.json({
+    schemaVersion: RECADOS_SCHEMA_VERSION,
+    areas: RECADO_AREA_LABELS,
+    tipos: RECADO_TIPOS,
+    politicasChamado: RECADO_POLITICAS,
+    prioridades: RECADO_PRIORIDADES,
+    limits: RECADO_LIMITS,
+  });
+});
+
 router.get('/recados', async (_req: Request, res: Response) => {
   try {
+    await migrateLegacyRecadosIfNeeded();
     const items = await listAllRecados();
     return res.json({ items });
   } catch (err) {

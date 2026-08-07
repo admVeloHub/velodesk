@@ -1,10 +1,37 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.64.0 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.65.0 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Backend: Agente 4 casos especiais, telefonia/Twilio e prompts anti-eco
+
+- **Data/Hora**: 2026-08-07
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.65.0
+  - **Agente 4**: agentRegistry v1.0.0, casosEspeciaisTrigger v1.0.0, casosEspeciaisAgent v1.0.0, casosEspeciaisRouting v1.0.0, assignmentRouter v1.4.0, inboundAgentPipeline v1.1.0, agentOrchestrator v1.0.5, env v1.30.0
+  - **Prompts**: clientResponseFormatPersona v1.1.1, atendimentoPersona v1.3.1, auditoriaPersona v1.2.2, gestaoChamadosPersona v1.2.1
+  - **Telefonia**: telephonyRecado validation/constants, Twilio webhook auth, scripts test twilio/whatsapp
+  - **Desk**: filas/contagens, telefonia IA UI, remoção legado escalonar/supervisorEscalate
+- **Arquivos principais**:
+  - `backend/src/services/agents/` — Agente 4 (triagem RA/Procon/Bacen/consumidor.gov na entrada), registry numerado 1–4, handoff Agente 3 em ameaça vazia, roteamento por função especial
+  - `backend/src/services/email-inbound.service.ts`, `app-inbound.service.ts` — hooks pós-create
+  - `backend/src/config/env.ts` — `AGENT_CASOS_ESPECIAIS_ENABLED`, alertas por órgão
+  - `backend/scripts/test-casos-especiais-precheck.ts` — smoke pre-check
+  - `backend/src/services/twilio/`, `inbound.routes.ts` — WhatsApp inbound Twilio
+  - `backend/src/services/clientResponseFormatPersona.ts` — regras anti-eco/clichê consolidadas
+  - `frontend/src/features/atendimento-ia-telefonico/` — recados operacionais e painéis telefonia
+  - Removidos: `migrateEscalonarPermissao`, `workflowTestSeed`, `supervisorEscalateData`, `Workspace360EscalateModal`
+- **Descrição**: Agente 4 classifica silenciosamente tickets com sinal regulatório na entrada, roteia casos formais ao time do órgão (função especial + workflow/CTA) e encaminha ameaças vazias ao Agente 3. Inclui nomenclatura numerada dos agentes, melhorias de prompt anti-eco, integração Twilio/WhatsApp e evoluções Desk/telefonia IA.
+- **Validação**: `npm run build` backend OK; `npm run test:casos-especiais-precheck` OK.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — Desk: filas Meus Tickets e Novos por responsável do agente
 

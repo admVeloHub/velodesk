@@ -1,4 +1,4 @@
-/** telephony.service v1.1.0 — listagem interna de ligações e KPIs */
+/** telephony.service v1.2.0 — listagem interna de ligações e KPIs */
 import mongoose from 'mongoose';
 import { env } from '../config/env';
 import { TelephonyCall, ITelephonyCall } from '../models/TelephonyCall';
@@ -16,6 +16,8 @@ export interface TelephonyCallsQuery {
   direction?: string;
   agent?: string;
   converted?: string;
+  desfecho?: string;
+  rotaAtendida?: string;
   page?: number;
   limit?: number;
 }
@@ -40,6 +42,18 @@ function endOfDay(date: Date): Date {
   return d;
 }
 
+function extractDataCollectedValue(
+  dataCollected: Record<string, unknown> | undefined,
+  key: string,
+): unknown {
+  if (!dataCollected || typeof dataCollected !== 'object') return null;
+  const entry = dataCollected[key];
+  if (entry && typeof entry === 'object' && 'value' in (entry as Record<string, unknown>)) {
+    return (entry as { value?: unknown }).value ?? null;
+  }
+  return entry ?? null;
+}
+
 function buildDateFilter(query: TelephonyCallsQuery): Record<string, unknown> {
   const filter: Record<string, unknown> = {};
   const range = resolvePeriodRange({
@@ -60,6 +74,10 @@ function buildDateFilter(query: TelephonyCallsQuery): Record<string, unknown> {
   if (agent) filter.agentName = { $regex: agent, $options: 'i' };
   if (query.converted === 'true') filter.isConverted = true;
   if (query.converted === 'false') filter.isConverted = false;
+  const desfecho = String(query.desfecho ?? '').trim();
+  if (desfecho) filter['dataCollected.desfecho.value'] = desfecho;
+  const rotaAtendida = String(query.rotaAtendida ?? '').trim();
+  if (rotaAtendida) filter['dataCollected.rota_atendida.value'] = rotaAtendida;
   const q = String(query.q ?? '').trim();
   if (q) {
     filter.$or = [
@@ -86,6 +104,7 @@ function formatTransfer(doc: ITelephonyCall) {
 }
 
 function callListItem(doc: ITelephonyCall) {
+  const dataCollected = doc.dataCollected as Record<string, unknown> | undefined;
   return {
     id: String(doc._id),
     externalCallId: doc.externalCallId,
@@ -106,6 +125,10 @@ function callListItem(doc: ITelephonyCall) {
     ticketStatus: doc.ticketStatus,
     hasCliente: Boolean(doc.clienteId),
     hasTransfer: Boolean(doc.transfer?.destinationType || doc.transfer?.answeredByName),
+    desfecho: extractDataCollectedValue(dataCollected, 'desfecho'),
+    rotaAtendida: extractDataCollectedValue(dataCollected, 'rota_atendida'),
+    chamadoRegistrado: extractDataCollectedValue(dataCollected, 'chamado_octadesk_registrado'),
+    recadosStatus: extractDataCollectedValue(dataCollected, 'recados_operacionais_status'),
   };
 }
 

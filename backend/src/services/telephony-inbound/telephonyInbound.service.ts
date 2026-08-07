@@ -1,11 +1,11 @@
-/** telephonyInbound.service v1.1.0 — recebe ligações Contact Tel / parceira */
+/** telephonyInbound.service v2.0.0 — recebe ligações Contact Tel / parceira */
 import { TelephonyCall } from '../../models/TelephonyCall';
 import { findClienteByCpf, findClienteByPhone } from '../cliente.service';
 import { parsePartnerTelephonyPayload } from './adapters/partner.adapter';
 import { CONTACT_TEL_COMPLETED_FIXTURE } from './fixtures/contact-tel.fixture';
 import { sanitizeTelephonyRawPayload } from './sanitizePayload';
-import type { TelephonyCallInput, TelephonyInboundResult, TelephonyRecadosInboundResponse } from './types';
-import { listActiveRecadosForPartner } from '../telephonyRecado.service';
+import type { TelephonyCallInput, TelephonyInboundResult } from './types';
+import { buildPartnerRecadosEnvelope } from '../telephonyRecado.service';
 
 async function resolveClienteId(input: TelephonyCallInput) {
   if (input.clientCpf) {
@@ -90,20 +90,8 @@ export async function processInboundTelephonyCall(
   };
 }
 
-export async function getInboundTelephonyRecados(): Promise<TelephonyRecadosInboundResponse> {
-  const items = await listActiveRecadosForPartner();
-  const updatedAt = items.length
-    ? items.reduce((max, item) => (item.updatedAt > max ? item.updatedAt : max), items[0].updatedAt)
-    : new Date();
-  return {
-    updatedAt: updatedAt.toISOString(),
-    items: items.map((item) => ({
-      id: item.id,
-      titulo: item.titulo,
-      mensagem: item.mensagem,
-      prioridade: item.prioridade,
-    })),
-  };
+export async function getInboundTelephonyRecados() {
+  return buildPartnerRecadosEnvelope();
 }
 
 export function getPartnerPayloadExample(): Record<string, unknown> {

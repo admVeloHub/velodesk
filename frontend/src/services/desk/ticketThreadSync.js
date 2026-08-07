@@ -1,6 +1,6 @@
 /**
- * ticketThreadSync v1.1.1 — última interação agente pausa sugestão IA
- * VERSION: v1.1.1 | DATE: 2026-07-31
+ * ticketThreadSync v1.2.0 — refresh IA só por thread/notas (não tabulação aplicada)
+ * VERSION: v1.2.0 | DATE: 2026-08-07
  */
 
 function normalizeMsgText(value) {
@@ -75,17 +75,14 @@ export function buildAiSuggestionRefreshKey({
   isPhone,
   convMsgs,
   ticket,
-  produtoHint,
 }) {
   const id = String(ticketId || '');
-  const hint = String(produtoHint || '').trim();
   if (isPhone) {
     return [
       id,
       contextSource,
       'phone',
       buildPersistedInternalNotesFingerprint(ticket),
-      hint,
     ].join('::');
   }
   return [
@@ -93,7 +90,6 @@ export function buildAiSuggestionRefreshKey({
     contextSource,
     'client',
     buildClientThreadFingerprint(convMsgs),
-    hint,
   ].join('::');
 }
 

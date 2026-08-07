@@ -1,12 +1,15 @@
 /**
- * inboundAgentPipeline.service v1.0.0 — pipeline de agentes no inbound (fail-soft)
- * VERSION: v1.0.0 | DATE: 2026-07-13
+ * inboundAgentPipeline.service v1.1.0 — respeita skipAgentPipeline (Agente 4)
+ * VERSION: v1.1.0 | DATE: 2026-08-07
  */
 import type { IChamadoN1 } from '../../models/ChamadoN1';
 import { env } from '../../config/env';
 import { currentStatus } from '../chamado.mapper';
 import { runAgentPipeline } from './agentOrchestrator.service';
 import type { TicketAiMessageInput } from './agentTypes';
+import { shouldSkipAgentPipeline } from './casosEspeciais.util';
+import { runCasosEspeciaisTriagem } from './casosEspeciaisTrigger.service';
+import { ChamadoN1 } from '../../models/ChamadoN1';
 
 function extractClientName(chamado: IChamadoN1): string {
   const reg = chamado.registro?.[0];
@@ -37,6 +40,12 @@ export async function runInboundAgentPipeline(
   context: { source: string },
 ): Promise<void> {
   if (!env.agentsEnabled) return;
+  if (shouldSkipAgentPipeline(chamado)) {
+    console.info('[inbound-agent-pipeline] skip — triagem casos especiais', {
+      protocolo: chamado.chamadoProtocolo,
+    });
+    return;
+  }
 
   try {
     const messages = extractMessagesFromChamado(chamado);
@@ -73,4 +82,21 @@ export async function runInboundAgentPipeline(
   } catch (err) {
     console.warn('[inbound-agent-pipeline] fail-soft:', (err as Error).message);
   }
+}
+
+/** Triagem Agente 4 (se habilitada) e pipeline Agente 1→2 na entrada do ticket. */
+export async function runInboundPostCreateHooks(
+  chamado: IChamadoN1,
+  context: { source: string },
+): Promise<void> {
+  try {
+    await runCasosEspeciaisTriagem(chamado, context);
+  } catch (err) {
+    console.warn('[inbound-post-create] casos-especiais fail-soft:', (err as Error).message);
+  }
+
+  const fresh = chamado._id
+    ? await ChamadoN1.findById(chamado._id)
+    : null;
+  await runInboundAgentPipeline(fresh ?? chamado, context);
 }

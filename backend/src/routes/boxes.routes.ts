@@ -1,4 +1,4 @@
-/** boxes.routes v1.7.0 — fila workflow: atribuido OU definição escalonar-{funcao} */
+/** boxes.routes v1.8.0 — GET /boxes/queue-counts (contadores reais, independente da listagem) */
 import { Router, Response } from 'express';
 import mongoose from 'mongoose';
 import { authMiddleware } from '../middleware/auth';
@@ -82,6 +82,53 @@ async function resolveQueueMode(
   return { queue: queueParam, extraFilter: undefined };
 }
 
+const TERMINAL_COLUMN_STATUSES = new Set(['resolvido', 'cancelado', 'fechado']);
+
+function deskQueueIdFromColumn(column: { id: string; status: string }): string {
+  const id = String(column.id || '').trim();
+  if (id === 'meus-novos') return 'novos';
+  if (id === 'meus-em-aberto' || id === 'meus-em-andamento') return 'em-andamento';
+  if (id === 'meus-pendente') return 'pendente';
+  if (id === 'meus-resolvidos') return 'resolvidos';
+
+  const status = String(column.status || '').trim().toLowerCase();
+  if (status === 'novo') return 'novos';
+  if (status === 'em-aberto' || status === 'em-andamento') return 'em-andamento';
+  if (status === 'pendente' || status === 'em-espera') return 'pendente';
+  if (TERMINAL_COLUMN_STATUSES.has(status)) return 'resolvidos';
+  return 'em-andamento';
+}
+
+async function loadQueueCounts(
+  columns: Array<{ id: string; name: string; order: number; status: string }>,
+  queue: string | undefined,
+  responsavelCandidates: string[],
+  extraFilter?: Record<string, unknown>,
+) {
+  const counts: Record<string, number> = {
+    novos: 0,
+    'em-andamento': 0,
+    pendente: 0,
+    resolvidos: 0,
+  };
+
+  await Promise.all(
+    columns.map(async (column) => {
+      const { filter } = buildBoxListFindOptions(
+        column.status,
+        queue,
+        responsavelCandidates,
+        extraFilter,
+      );
+      const deskQueueId = deskQueueIdFromColumn(column);
+      const total = await ChamadoN1.countDocuments(filter);
+      counts[deskQueueId] = (counts[deskQueueId] || 0) + total;
+    }),
+  );
+
+  return counts;
+}
+
 async function loadBoxesWithListTickets(
   columns: Array<{ id: string; name: string; order: number; status: string }>,
   queue: string | undefined,
@@ -111,6 +158,53 @@ async function loadBoxesWithListTickets(
     tickets: chamados.map((chamado) => chamadoToTicketListItem(chamado, column.id, ctx)),
   }));
 }
+
+router.get('/queue-counts', authMiddleware, async (req, res: Response) => {
+  const queueParam = typeof req.query.fila === 'string' ? req.query.fila : undefined;
+  const userId = req.user?.userId;
+
+  try {
+    if (!isMongoConnected()) {
+      return res.status(503).json({ message: 'Banco de chamados indisponível' });
+    }
+    const dbUser = await resolveDbUser(userId);
+    const resolved = await resolveUserPermissions(req.user!);
+    const responsavelCandidates = buildResponsavelCandidates(req.user!, dbUser);
+    const { queue, extraFilter } = await resolveQueueMode(resolved, queueParam);
+
+    let counts: Record<string, number>;
+    if (queue === 'meus-chamados') {
+      counts = await loadQueueCounts(
+        MEUS_CHAMADOS_COLUMNS.map((column) => ({
+          id: column.id,
+          name: column.name,
+          order: column.order,
+          status: column.status,
+        })),
+        queue,
+        responsavelCandidates,
+      );
+    } else {
+      const boxes = await Box.find().sort({ order: 1 });
+      const columns = boxes.map((box) => ({
+        id: box.id,
+        name: box.name,
+        order: box.order,
+        status: statusFromBoxName(box.name),
+      }));
+      counts = await loadQueueCounts(columns, queue, responsavelCandidates, extraFilter);
+    }
+
+    return res.json({
+      counts,
+      fetchedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[boxes] GET /queue-counts falhou:', message);
+    return res.status(500).json({ message: 'Erro ao carregar contadores das filas' });
+  }
+});
 
 router.get('/', authMiddleware, async (req, res: Response) => {
   const queueParam = typeof req.query.fila === 'string' ? req.query.fila : undefined;

@@ -1,9 +1,15 @@
 /**
- * TelephonyCallDetail v1.1.0 — detalhe da ligação Contact Tel
+ * TelephonyCallDetail v2.0.0 — detalhe da ligação Contact Tel com dicionário LetícIA
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { telephonyApi } from '../../api/client';
+import {
+  areaLabel,
+  politicaLabel,
+  tipoLabel,
+} from './telephonyRecadoConstants';
+import { buildDataCollectedSections } from './telephonyDataCollected';
 
 function formatDate(value) {
   if (!value) return '—';
@@ -27,12 +33,25 @@ function formatBool(value) {
   return '—';
 }
 
-function formatDataCollected(dataCollected) {
-  if (!dataCollected || typeof dataCollected !== 'object') return [];
-  return Object.entries(dataCollected).map(([key, raw]) => {
-    const value = raw && typeof raw === 'object' && 'value' in raw ? raw.value : raw;
-    return { key, value: value == null ? '—' : String(value) };
-  });
+function RecadosAtivosCards({ recados }) {
+  if (!recados.length) return <p className="telephony-empty-inline">Nenhum recado ativo na ligação.</p>;
+  return (
+    <div className="telephony-recados-inline">
+      {recados.map((recado) => (
+        <article key={recado.id || recado.titulo} className="telephony-recados-inline__item">
+          <strong>{recado.titulo}</strong>
+          <p>{recado.mensagemCliente}</p>
+          <small>
+            {(recado.areas || []).map((area) => areaLabel(area)).join(' · ')}
+            {' · '}
+            {tipoLabel(recado.tipo)}
+            {' · '}
+            {politicaLabel(recado.politicaChamado)}
+          </small>
+        </article>
+      ))}
+    </div>
+  );
 }
 
 export default function TelephonyCallDetail() {
@@ -53,10 +72,13 @@ export default function TelephonyCallDetail() {
     return () => { active = false; };
   }, [id]);
 
+  const dataSections = useMemo(
+    () => buildDataCollectedSections(data?.dataCollected),
+    [data?.dataCollected],
+  );
+
   if (loading) return <p className="telephony-loading">Carregando detalhe…</p>;
   if (error || !data) return <p className="telephony-error">{error || 'Ligação não encontrada.'}</p>;
-
-  const collectedItems = formatDataCollected(data.dataCollected);
 
   return (
     <div className="telephony-detail">
@@ -123,16 +145,28 @@ export default function TelephonyCallDetail() {
           </section>
         ) : null}
 
-        {collectedItems.length > 0 ? (
-          <section className="telephony-detail__card">
-            <h3>Dados coletados</h3>
+        {dataSections.map((section) => (
+          <section key={section.id} className="telephony-detail__card telephony-detail__card--wide">
+            <h3>{section.title}</h3>
             <dl>
-              {collectedItems.map((item) => (
-                <div key={item.key}><dt>{item.key}</dt><dd>{item.value}</dd></div>
+              {section.items.map((item) => (
+                <div key={item.key}>
+                  <dt>{item.label}</dt>
+                  <dd>
+                    {item.isRecadosJson ? (
+                      <RecadosAtivosCards recados={item.recados} />
+                    ) : (
+                      item.displayValue
+                    )}
+                    {item.rationale ? (
+                      <small className="telephony-detail__rationale">{item.rationale}</small>
+                    ) : null}
+                  </dd>
+                </div>
               ))}
             </dl>
           </section>
-        ) : null}
+        ))}
 
         <section className="telephony-detail__card telephony-detail__card--wide">
           <h3>Transcrição</h3>

@@ -1,6 +1,6 @@
 /**
- * DeskMyTicketsTable v1.5.2 — apenas seções Novos / Cliente respondeu / Em andamento
- * VERSION: v1.5.2 | DATE: 2026-08-04
+ * DeskMyTicketsTable v1.5.3 — seção Pendentes (status pendente + agente logado)
+ * VERSION: v1.5.3 | DATE: 2026-08-07
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {

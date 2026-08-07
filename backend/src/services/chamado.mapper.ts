@@ -1,10 +1,11 @@
-/** chamado.mapper v2.8.0 — list workflow lateral completo (stepper) */
+/** chamado.mapper v2.9.4 — workflow não ativa em PUT/commit; só POST /workflow/start */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
 import {
   batchLoadDadosForRefs,
   loadDadosForRef,
+  normalizeCpf,
   resolveClienteRefFromBody,
   resolveDadosFromBatch,
   type ClienteDadosBatchContext,
@@ -13,13 +14,17 @@ import { allocateNextProtocolo } from './protocolo.service';
 import type { IClienteDados } from '../models/Cliente';
 import type { IWorkflowDefinicao } from '../models/WorkflowDefinicao';
 import { assertTabulacaoForStatus } from './tabulation.service';
-import { buildLateralWorkflowDto, loadWorkflowDefForChamado, syncLegacyWorkflowFromBody } from './workflowDto.util';
+import { buildLateralWorkflowDto, loadWorkflowDefForChamado } from './workflowDto.util';
 import { getWorkflowsByIds } from './workflowDefinicao.service';
 import { extractEmailReplyContent } from './emailReplyContent.util';
 import { sanitizeResponsavel, inferResponsavelFromAgentRegistro } from './responsavel.util';
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { filterRealAttachmentUrls } from './attachmentFilter.util';
 import { excludeFusaoAbsorvidosFilter, serializeFusaoDto } from './ticketFusao.helpers';
+import {
+  readWhatsAppMensagens,
+  WHATSAPP_THREAD_SOURCE,
+} from './twilio/whatsappThread.service';
 
 function normalizeTicketMessageText(raw: string): string {
   return decodeBasicHtmlEntities(String(raw ?? '').trim());
@@ -35,6 +40,7 @@ export interface TicketMessageDto {
   author?: string;
   registroIndex?: number;
   type?: string;
+  channel?: string;
   time: Date;
   attachments?: string[];
 }
@@ -678,7 +684,7 @@ for (const [status, name] of Object.entries(BOX_NAME_BY_STATUS)) {
 /** Campos legados embutidos em cliente[] antes da migraÃ§Ã£o v1.1.0 */
 type LegacyClienteEmbed = IClienteRef & {
   clienteNome?: string;
-  clienteEmail?: { lista?: string[] };
+  clienteEmail?: { lista?: string[]; resposta?: string };
   clienteTelefone?: { lista?: string[] };
 };
 
@@ -687,7 +693,10 @@ function legacyDadosFromRef(ref?: LegacyClienteEmbed | null): IClienteDados | nu
   return {
     clienteCpf: ref.clienteCpf ?? '',
     clienteNome: ref.clienteNome ?? '',
-    clienteEmail: { lista: ref.clienteEmail?.lista ?? [] },
+    clienteEmail: {
+      lista: ref.clienteEmail?.lista ?? [],
+      ...(ref.clienteEmail?.resposta ? { resposta: ref.clienteEmail.resposta } : {}),
+    },
     clienteTelefone: { lista: ref.clienteTelefone?.lista ?? [] },
   };
 }
@@ -941,22 +950,7 @@ export async function prepareChamadoFromBody(
     chamado.tabulacao = [merged];
   }
 
-  const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
-  syncLegacyWorkflowFromBody(chamado, lf.workflow as Record<string, unknown> | undefined);
-  const nextEscalonar = String(lf.escalonar ?? '').trim();
-  const prevWorkflow = findLatestWorkflowFromRegistro(chamado);
-  const nextWorkflow = lf.workflow;
-  const prevWorkflowStr = prevWorkflow ? JSON.stringify(prevWorkflow) : '';
-  const nextWorkflowStr = nextWorkflow ? JSON.stringify(nextWorkflow) : '';
-  const workflowChanged = Boolean(nextWorkflow) && nextWorkflowStr !== prevWorkflowStr;
-
-  if (nextEscalonar && nextEscalonar !== String(lf.lastWorkflow ?? '').trim()) {
-    pendingChanges.escalonar = nextEscalonar;
-  }
-
-  if (workflowChanged) {
-    pendingChanges.workflow = nextWorkflow;
-  }
+  // Workflow pendente fica só no cache do Desk até o save; persistência via POST /workflow/start.
 
   let targetStatus = currentStatus(chamado);
   if (body.status !== undefined && String(body.status).trim()) {
@@ -984,6 +978,17 @@ function buildAlteracoesFromPending(pendingChanges: Record<string, unknown>): {
       ? workflowMeta as Record<string, unknown>
       : undefined,
   };
+}
+
+function isValidCpfDigitsForWorkflow(cpf: string): boolean {
+  const digits = normalizeCpf(cpf);
+  return digits.length === 11;
+}
+
+/** CPF completo no ticket — obrigatório para iniciar workflow; save de status segue sem cliente. */
+export function isClientIdentifiedOnChamado(chamado: IChamadoN1): boolean {
+  const ref = chamado.cliente?.[0];
+  return isValidCpfDigitsForWorkflow(String(ref?.clienteCpf ?? ''));
 }
 
 export class ChamadoCommitValidationError extends Error {
@@ -1341,8 +1346,27 @@ function buildTicketDtoCore(
         anotacaoInterna: String(reg.anotacaoInterna ?? '').trim() || undefined,
       });
       const regAutor = resolveStoredRegistroAutor(reg, origin, clientName);
-      if (reg.mensagemPublica || (reg.anexosMensagemPublica?.length ?? 0) > 0) {
-        const meta = registroMetadados(reg);
+      const meta = registroMetadados(reg);
+      const isWhatsAppThread = String(meta.source ?? '') === WHATSAPP_THREAD_SOURCE;
+
+      if (isWhatsAppThread) {
+        const waMsgs = readWhatsAppMensagens(reg);
+        waMsgs.forEach((wa, waIdx) => {
+          const waOrigin = wa.origin;
+          messages.push({
+            id: `${index}-wa-${waIdx}`,
+            text: normalizeTicketMessageText(wa.texto),
+            sender: senderFromOrigin(waOrigin),
+            origin: waOrigin,
+            author: wa.autor || regAutor || undefined,
+            type: 'public',
+            channel: 'whatsapp',
+            time: wa.data ? new Date(wa.data) : reg.data,
+            registroIndex: index,
+            attachments: filterRealAttachmentUrls(wa.anexos),
+          });
+        });
+      } else if (reg.mensagemPublica || (reg.anexosMensagemPublica?.length ?? 0) > 0) {
         const isEmailInbound = String(meta.source ?? '').toLowerCase() === 'email-inbound';
         const publicText = normalizeTicketMessageText(
           isEmailInbound
@@ -1465,6 +1489,7 @@ function buildTicketDtoCore(
       clienteCpf: clientCpf,
       clienteNome: clientName,
       clienteEmail: listOnly ? [] : (cadastro?.clienteEmail?.lista ?? []),
+      clienteEmailResposta: listOnly ? undefined : (cadastro?.clienteEmail?.resposta ?? undefined),
       clienteTelefone: listOnly ? [] : (cadastro?.clienteTelefone?.lista ?? []),
       clienteTelefoneWhatsapp: listOnly ? undefined : (cadastro?.clienteTelefone?.whatsapp ?? undefined),
       cpf: clientCpf,
@@ -1567,6 +1592,45 @@ export function meusChamadosResponsavelFilter(candidates: string[]) {
   };
 }
 
+/** Atribuído individual (colaborador) — exclui funcao:/grupo: (escopo de time). */
+export function meusChamadosAtribuidoColaboradorFilter(candidates: string[]) {
+  if (candidates.length === 0) {
+    return { _id: { $exists: false } };
+  }
+
+  const normalized = candidates.map((value) => value.toLowerCase());
+
+  return {
+    $and: [
+      {
+        $expr: {
+          $not: {
+            $regexMatch: {
+              input: lastTabulacaoAtribuidoExpr(),
+              regex: '^(funcao:|grupo:)',
+            },
+          },
+        },
+      },
+      {
+        $expr: {
+          $in: [lastTabulacaoAtribuidoExpr(), normalized],
+        },
+      },
+    ],
+  };
+}
+
+/** Meus chamados: responsável OU atribuído colaborador igual ao agente logado. */
+export function meusChamadosAgentScopeFilter(candidates: string[]) {
+  return {
+    $or: [
+      meusChamadosResponsavelFilter(candidates),
+      meusChamadosAtribuidoColaboradorFilter(candidates),
+    ],
+  };
+}
+
 /** Novos sem responsável = fila compartilhada; com responsável = só o agente dono */
 export function meusChamadosNovosResponsavelFilter(candidates: string[]) {
   if (candidates.length === 0) {
@@ -1575,7 +1639,7 @@ export function meusChamadosNovosResponsavelFilter(candidates: string[]) {
 
   return {
     $or: [
-      meusChamadosResponsavelFilter(candidates),
+      meusChamadosAgentScopeFilter(candidates),
       {
         $expr: {
           $eq: [lastTabulacaoResponsavelExpr(), ''],
@@ -1668,7 +1732,7 @@ export function buildChamadoQueryFilter(status: string, queue?: string, responsa
   if (queue === 'meus-chamados' && responsavelCandidates?.length && status !== 'resolvido') {
     const responsavelFilter = status === 'novo'
       ? meusChamadosNovosResponsavelFilter(responsavelCandidates)
-      : meusChamadosResponsavelFilter(responsavelCandidates);
+      : meusChamadosAgentScopeFilter(responsavelCandidates);
     filters.push(responsavelFilter);
   }
 

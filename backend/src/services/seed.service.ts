@@ -1,17 +1,18 @@
-/** seed.service v1.7.0 — sem seed de usuário admin de fachada */
+/** seed.service v1.7.2 — purge WF-TEST e permissões legadas escalonar */
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { getClienteModel } from '../models/Cliente';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
+import { getDeskFuncaoPermissaoModel } from '../models/DeskFuncaoPermissao';
 import {
   DEFAULT_TABULACAO_PRODUTOS,
   invalidateTabulationCache,
 } from './tabulation.service';
-import { WORKFLOW_TEST_PROTOCOL_PREFIX } from './workflowTestSeed.service';
 import { seedWorkflowConfig } from './workflowConfigSeed.service';
-import { seedFuncoesPermissoes } from './funcaoPermissao.service';
+import { seedFuncoesPermissoes, invalidateFuncaoPermissaoCache } from './funcaoPermissao.service';
 import { migrateGrupoToFuncao } from './migrateGrupoToFuncao.service';
-import { migrateEscalonarPermissao } from './migrateEscalonarPermissao.service';
 import { env } from '../config/env';
+
+const WORKFLOW_TEST_PROTOCOL_PREFIX = 'WF-TEST-';
 
 const DEMO_CPFS = ['12345678901', '11122233300'];
 
@@ -61,8 +62,31 @@ export async function purgeLegacyDemoData() {
   await purgeAllMockTickets();
 }
 
+/** Remove permissões legadas do mecanismo experimental escalonar */
+async function purgeLegacyEscalonarPermissao(): Promise<void> {
+  const Model = getDeskFuncaoPermissaoModel();
+  const result = await Model.updateMany(
+    {
+      $or: [
+        { 'permissoes.workspace.escalonar': { $exists: true } },
+        { 'permissoes.tickets.escalonar': { $exists: true } },
+      ],
+    },
+    {
+      $unset: {
+        'permissoes.workspace.escalonar': '',
+        'permissoes.tickets.escalonar': '',
+      },
+    },
+  );
+  if (result.modifiedCount) {
+    invalidateFuncaoPermissaoCache();
+    console.log(`Purge: permissão escalonar removida de ${result.modifiedCount} função(ões)`);
+  }
+}
+
 export async function runDeskConfigMigrations(): Promise<void> {
-  await migrateEscalonarPermissao();
+  await purgeLegacyEscalonarPermissao();
   await migrateGrupoToFuncao();
 }
 

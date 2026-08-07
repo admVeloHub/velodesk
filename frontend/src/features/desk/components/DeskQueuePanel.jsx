@@ -1,6 +1,6 @@
 /**
- * DeskQueuePanel v1.4.0 — fila de atendimento (caixas via Preferências)
- * VERSION: v1.4.0 | DATE: 2026-07-30
+ * DeskQueuePanel v1.5.0 — contadores via queueCounts (Mongo, não lista cacheada)
+ * VERSION: v1.5.0 | DATE: 2026-08-07
  */
 import React from 'react';
 import { countByQueue } from '../../../services/desk/utils';
@@ -13,7 +13,9 @@ export default function DeskQueuePanel({
   onCollapse,
   onExpand,
   onCreateTicket,
+  refreshKey = 0,
 }) {
+  void refreshKey;
   return (
     <aside
       className={'queue-panel' + (collapsed ? ' is-collapsed' : '')}

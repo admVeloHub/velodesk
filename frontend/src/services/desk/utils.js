@@ -1,14 +1,16 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.10.2 | DATE: 2026-08-04
- * — Meus Tickets: apenas novos, cliente respondeu e em andamento (sem resolvidos/pendente)
- * — Novos: agente vê só atribuídos a si ou sem responsável
+ * VERSION: v3.11.7 | DATE: 2026-08-07
+ * — Contadores via GET /boxes/queue-counts (cache + polling + delta otimista)
  */
-import { getTicketColumns, saveTicketColumns, getAllCockpitTickets } from '../ticketsStorage';
+import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
+import { getDeskQueueDisplayCount, markTicketResolvedOptimistic } from './queueCounts';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
 import { ticketBelongsInMeusTicketsList, ticketBelongsInAgentNovosQueue, ticketMatchesAgentResponsavel, shouldUseMeusChamadosFila, shouldViewAllDeskTickets } from './responsavelSegmentation';
 import { normalizeMessageDisplayText } from '../../utils/htmlText.util';
 import { sanitizeResponsavel } from '../tabulationConfig';
+import { ticketsApi, ticketSearchApi } from '../../api/client';
+import { upsertDeskSearchTicketsInCache, isApiMode } from '../ticketsCache';
 import {
   MEUS_TICKETS_QUEUE_ID,
   QUEUE_STATUSES,
@@ -356,6 +358,11 @@ export function getClientContactFields(ticket, client) {
   const emailList = Array.isArray(emailsRaw)
     ? emailsRaw.map((item) => String(item || '').trim()).filter(Boolean)
     : (emailsRaw?.lista || []).map((item) => String(item || '').trim()).filter(Boolean);
+  const replyFromLf = String(lf.clienteEmailResposta || emailsRaw?.resposta || '').trim().toLowerCase();
+  const replyFromList = replyFromLf
+    ? emailList.find((item) => String(item).trim().toLowerCase() === replyFromLf)
+    : '';
+  const replyEmail = replyFromList || emailList[0] || '';
   const phoneListRaw = Array.isArray(phonesRaw)
     ? phonesRaw.map((item) => String(item || '').trim()).filter(Boolean)
     : (phonesRaw?.lista || []).map((item) => String(item || '').trim()).filter(Boolean);
@@ -364,7 +371,7 @@ export function getClientContactFields(ticket, client) {
   const whatsappFromClient = String(client?.whatsappPhone || client?.telefoneWhatsapp || '').trim();
   const whatsappRaw = whatsappFromLf || whatsappFromClient || phoneListRaw[0] || '';
   const whatsappPhone = whatsappRaw ? formatPhone(whatsappRaw) : '';
-  const emailFromLf = emailList[0];
+  const emailFromLf = replyEmail;
   const phoneFromLf = whatsappPhone || phoneList[0];
   return {
     name: lf.clienteNome || ticket?.clientName || ticket?.solicitante || client?.name || '',
@@ -372,6 +379,7 @@ export function getClientContactFields(ticket, client) {
     email: emailFromLf || ticket?.clientEmail || client?.email || '',
     phone: phoneFromLf ? formatPhone(phoneFromLf) : formatPhone(ticket?.clientPhone || client?.telefone || ''),
     emails: emailList,
+    replyEmail: replyEmail || '',
     phones: phoneList.length ? phoneList : (phoneFromLf ? [formatPhone(phoneFromLf)] : []),
     whatsappPhone,
   };
@@ -449,33 +457,21 @@ export function buildIaTabulation(ticket, fields) {
   return parts.length ? parts.join(' → ') : 'Tabulação incompleta';
 }
 
-export function getEscalonarLabel(id) {
-  const map = { n2: 'N2', financeiro: 'Financeiro', produtos: 'Produtos', suporte: 'Suporte' };
-  return map[id] || 'Selecionar escalonamento';
-}
-
 export const TICKET_OPERATION_STEPS = [
   { id: 1, title: 'Caixa de entrada e atendimento N1', subtitle: 'N1', icon: 'ti-inbox' },
   { id: 2, title: 'Workflow', subtitle: 'Workflow', icon: 'ti-arrows-exchange' },
   { id: 3, title: 'Retorno ao atendimento N1', subtitle: 'Finalização', icon: 'ti-home' },
 ];
 
-function resolveWorkflowArea(escalonar, group, lastWorkflow) {
-  if (escalonar === 'n2' || lastWorkflow === 'n2' || group.includes('n2')) return 'N2';
-  if (escalonar === 'financeiro' || lastWorkflow === 'financeiro' || group.includes('financeiro')) {
-    return 'Financeiro';
-  }
-  if (escalonar === 'produtos' || lastWorkflow === 'produtos' || group.includes('produtos')) {
-    return 'Produtos';
-  }
-  if (escalonar === 'suporte' || lastWorkflow === 'suporte' || group.includes('suporte')) {
-    return 'Suporte';
-  }
+function resolveWorkflowAreaFromGroup(group) {
+  if (group.includes('n2')) return 'N2';
+  if (group.includes('financeiro')) return 'Financeiro';
+  if (group.includes('produtos')) return 'Produtos';
+  if (group.includes('suporte')) return 'Suporte';
   return null;
 }
 
 export function getTicketOperationProgress(ticket, queueId) {
-  const lf = ticket?.lateralForm || {};
   const group = String(ticket?.group || '').toLowerCase();
   const resolved = queueId === 'resolvidos' || ticket?.status === 'resolvido';
   const inWorkflow = isTicketInWorkflow(ticket);
@@ -484,17 +480,14 @@ export function getTicketOperationProgress(ticket, queueId) {
     const progress = getWorkflowProgress(ticket);
     workflowArea = progress?.awaitingTeamLabel || null;
   } else {
-    workflowArea = resolveWorkflowArea(null, group, lf.lastWorkflow);
+    workflowArea = resolveWorkflowAreaFromGroup(group);
   }
-  const retornoN1 = lf.retornoN1 === true || (lf.wasEscalated && !inWorkflow && !resolved);
 
   let activeStep = 1;
   if (resolved) {
     activeStep = 4;
   } else if (inWorkflow) {
     activeStep = 2;
-  } else if (retornoN1) {
-    activeStep = 3;
   } else if (queueId === 'novos' || ticket?.status === 'novo') {
     activeStep = 1;
   }
@@ -1000,9 +993,10 @@ export const MY_TICKETS_STATUS_SECTIONS = [
   { id: 'novos', label: 'Novos', dot: '#1634FF' },
   { id: 'cliente-respondeu', label: 'Cliente respondeu', dot: '#E85D04' },
   { id: 'em-andamento', label: 'Em andamento', dot: '#15A237' },
+  { id: 'pendentes', label: 'Pendentes', dot: '#FCC200' },
 ];
 
-const MEUS_TICKETS_ACTIVE_QUEUE_IDS = new Set(['novos', 'em-andamento']);
+const MEUS_TICKETS_ACTIVE_QUEUE_IDS = new Set(['novos', 'em-andamento', 'em-espera']);
 const MEUS_TICKETS_ACTIVE_STATUSES = new Set(['novo', 'em-aberto', 'em-andamento', '']);
 
 function matchesTicketByCpf(ticket, rawQuery) {
@@ -1057,7 +1051,11 @@ function filterMyTicketsEntries(searchQuery) {
     if (isTicketTerminalStatus(entry.ticket)) return false;
 
     const status = normalizeTicketStatusKey(entry.ticket?.status);
-    if (status === 'pendente') return false;
+
+    if (entry.queueId === 'em-espera' || status === 'pendente') {
+      return status === 'pendente' && matchesTicketSearch(entry, q);
+    }
+
     if (entry.queueId === 'novos') {
       if (status && status !== 'novo') return false;
     } else if (!MEUS_TICKETS_ACTIVE_STATUSES.has(status)) {
@@ -1099,6 +1097,7 @@ function matchesMyTicketsStatusSection(entry, sectionId) {
 
   if (sectionId === 'cliente-respondeu') return status === 'em-aberto';
   if (sectionId === 'em-andamento') return status === 'em-andamento';
+  if (sectionId === 'pendentes') return status === 'pendente';
   if (sectionId === 'novos') return status === 'novo' || status === '' || entry.queueId === 'novos';
   return entry.queueId === sectionId;
 }
@@ -1142,7 +1141,7 @@ export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOld
   return sortTicketEntries(filtered, activeSort, 'desc', entrySortOldestFirst);
 }
 
-/** Busca global por Enter: CPF ou protocolo (detecção automática). */
+/** Busca global por Enter: CPF ou protocolo — ignora visão meus-chamados (cache local). */
 export function resolveDeskSearchEntries(
   rawQuery,
   activeSort,
@@ -1155,11 +1154,75 @@ export function resolveDeskSearchEntries(
   const all = getAllCockpitTickets();
   const filtered = all.filter(({ ticket: t }) => {
     if (isFusaoAbsorvido(t)) return false;
-    if (!ticketMatchesAgentResponsavel(t)) return false;
     return matchesTicketSearch({ ticket: t }, trimmed, searchMode);
   });
 
   return sortTicketEntries(filtered, activeSort, 'desc', entrySortOldestFirst);
+}
+
+function cockpitEntryFromApiTicket(apiTicket) {
+  const ticket = upsertDeskSearchTicketsInCache(apiTicket);
+  const boxId = ticket.boxId || mapTicketQueueId(ticket, ticket.boxId);
+  return {
+    ticket,
+    boxId,
+    queueId: mapTicketQueueId(ticket, boxId),
+  };
+}
+
+/**
+ * Busca Desk com fallback na API — barra de busca ignora overrides de visão do agente.
+ */
+export async function resolveDeskSearchEntriesAsync(
+  rawQuery,
+  activeSort,
+  entrySortOldestFirst = false,
+  searchMode,
+) {
+  const trimmed = String(rawQuery || '').trim();
+  if (!trimmed) return [];
+
+  const local = resolveDeskSearchEntries(rawQuery, activeSort, entrySortOldestFirst, searchMode);
+  if (local.length) return local;
+
+  if (!isApiMode() || !localStorage.getItem('velodesk_token')) return [];
+
+  const mode = searchMode || inferDeskSearchMode(trimmed);
+  const entries = [];
+  const seen = new Set();
+
+  const pushApiTicket = (apiTicket) => {
+    if (!apiTicket) return;
+    const entry = cockpitEntryFromApiTicket(apiTicket);
+    const id = String(entry.ticket?.id || entry.ticket?._id || '');
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    entries.push(entry);
+  };
+
+  const protocolQuery = trimmed.replace(/^#/, '').trim();
+
+  if (mode === DESK_SEARCH_MODE_TICKET || mode === DESK_SEARCH_MODE_BOTH) {
+    try {
+      pushApiTicket(await ticketsApi.getByProtocol(protocolQuery));
+    } catch {
+      /* protocolo não encontrado */
+    }
+  }
+
+  if (mode === DESK_SEARCH_MODE_CPF || mode === DESK_SEARCH_MODE_BOTH) {
+    const digits = normalizeCpf(trimmed);
+    if (digits.length >= 4) {
+      try {
+        const data = await ticketSearchApi.deskBarByCpf(digits);
+        (data?.tickets || []).forEach(pushApiTicket);
+      } catch {
+        /* CPF não encontrado ou inválido */
+      }
+    }
+  }
+
+  return sortTicketEntries(entries, activeSort, 'desc', entrySortOldestFirst);
 }
 
 export function countByQueue(queueId) {
@@ -1170,6 +1233,12 @@ export function countByQueue(queueId) {
   if (customBox) {
     return filterCustomQueueEntries(customBox, '').length;
   }
+
+  const authoritativeCount = getDeskQueueDisplayCount(queueId);
+  if (typeof authoritativeCount === 'number') {
+    return authoritativeCount;
+  }
+
   const filterByResponsavel = shouldFilterByAgentResponsavel(queueId);
   const trustBackendQueues = shouldUseMeusChamadosFila();
   return getAllCockpitTickets().filter((e) => {
@@ -1430,6 +1499,19 @@ export function buildRegistroThread(ticket) {
   return combined;
 }
 
+/** Mensagens exclusivas da conversa WhatsApp (thread contínua, sem e-mail/outros canais). */
+export function buildWhatsAppConvMsgs(ticket) {
+  if (!ticket) return [];
+  const waOnly = (ticket.messages || []).filter((m) => {
+    if (!m || m.type === 'internal') return false;
+    if (m.channel === 'whatsapp') return true;
+    const metaSource = String(m.source || m.metadados?.source || '').toLowerCase();
+    return metaSource === 'whatsapp-thread';
+  });
+  if (!waOnly.length) return [];
+  return buildRegistroThread({ ...ticket, messages: waOnly });
+}
+
 export function getClientAnalise(client) {
   if (client?.analise) return client.analise;
   if ((client?.termometro ?? 0) >= 55 || client?.risco === 'Alto') {
@@ -1577,6 +1659,12 @@ export function isClientIdentifiedForHistory(cpf) {
   return isValidCpfDigits(cpf);
 }
 
+/** CPF completo no ticket — obrigatório para iniciar workflow. */
+export function isClientIdentifiedForWorkflow(ticket) {
+  if (!ticket) return false;
+  return isValidCpfDigits(getTicketCpfDigits(ticket));
+}
+
 export function collectClientTickets(cpf, _clientName) {
   const cpfDigits = normalizeCpf(cpf);
   if (!isValidCpfDigits(cpfDigits)) {
@@ -1662,7 +1750,6 @@ const ALTERACAO_FIELD_LABELS = {
   detalhe: 'Detalhe',
   responsavel: 'Responsável',
   atribuido: 'Atribuído',
-  escalonar: 'Escalonar',
   status: 'Status',
   workflowActivated: 'Workflow ativado',
   workflowStep: 'Passo workflow',
@@ -2022,6 +2109,7 @@ export function moveTicketToBox(entry, targetBoxId) {
   const ticket = entry.ticket;
   const ticketId = String(ticket.id);
   const resolvedTargetId = resolveDeskBoxColumnId(targetBoxId) || targetBoxId;
+  const sourceQueueId = mapTicketQueueId(ticket, entry.boxId);
 
   columns.forEach((box) => {
     if (!box.tickets) return;
@@ -2034,9 +2122,17 @@ export function moveTicketToBox(entry, targetBoxId) {
 
   if (!target.tickets) target.tickets = [];
   target.tickets.push(ticket);
+  if (target.id === 'resolvidos' && sourceQueueId !== 'resolvidos') {
+    markTicketResolvedOptimistic(sourceQueueId);
+  }
   saveTicketColumns(columns);
   entry.boxId = target.id;
   ticket.boxId = target.id;
+  try {
+    window.dispatchEvent(new CustomEvent('velodesk:queues-changed'));
+  } catch {
+    /* ignore */
+  }
 }
 
 export { getAgentName };

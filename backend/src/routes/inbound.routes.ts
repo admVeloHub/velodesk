@@ -1,8 +1,15 @@
-﻿/** inbound.routes v1.4.0 — telephony inbound: health com apiVersion para homologação parceira */
+/** inbound.routes v1.6.0 — WhatsApp Twilio inbound (quickstart webhook + TwiML) */
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { env } from '../config/env';
 import { inboundAppAuthMiddleware, inboundEmailAuthMiddleware, inboundTelephonyAuthMiddleware } from '../middleware/inboundAuth';
+import { twilioWebhookAuthMiddleware } from '../middleware/twilioWebhookAuth';
+import {
+  buildInboundTwimlReply,
+  getWhatsAppInboundHealth,
+  parseTwilioWhatsAppWebhook,
+  processInboundWhatsAppMessage,
+} from '../services/twilio/whatsappInbound.service';
 import { processAppNotify } from '../services/app-inbound.service';
 import { isAllowedRecipient, processInboundEmail } from '../services/email-inbound.service';
 import { parseInboundEmailPayload } from '../services/inbound-email/adapters';
@@ -13,7 +20,7 @@ import {
   getInboundTelephonyRecados,
   processInboundTelephonyCall,
 } from '../services/telephony-inbound/telephonyInbound.service';
-import { countActiveRecados, getLatestActiveRecadoUpdatedAt } from '../services/telephonyRecado.service';
+import { countActiveRecados, getRecadosEnvelopeUpdatedAt, migrateLegacyRecadosIfNeeded } from '../services/telephonyRecado.service';
 
 const router = Router();
 const upload = multer({
@@ -104,11 +111,12 @@ router.post('/gmail/pubsub', async (req: Request, res: Response) => {
 /** Telefonia IA — health check para parceira (sem autenticação) */
 router.get('/telephony/health', async (_req, res: Response) => {
   const activeRecados = await countActiveRecados();
-  const lastRecadoUpdate = await getLatestActiveRecadoUpdatedAt();
+  const lastRecadoUpdate = await getRecadosEnvelopeUpdatedAt();
   res.json({
     status: 'ok',
     enabled: env.inboundTelephonyEnabled,
     apiVersion: '1.0.0',
+    recadosSchemaVersion: '2.0',
     activeRecados,
     lastRecadoUpdate,
   });
@@ -131,11 +139,41 @@ router.post('/telephony/calls', inboundTelephonyAuthMiddleware, async (req, res:
 
 router.get('/telephony/recados', inboundTelephonyAuthMiddleware, async (_req, res: Response) => {
   try {
+    await migrateLegacyRecadosIfNeeded();
     const result = await getInboundTelephonyRecados();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.json(result);
   } catch (err) {
     console.error('[inbound/telephony/recados]', err);
     return res.status(500).json({ message: 'Falha ao carregar recados ativos' });
+  }
+});
+
+/** WhatsApp Twilio — health (sem autenticação) */
+router.get('/whatsapp/health', (req: Request, res: Response) => {
+  const proto = String(req.headers['x-forwarded-proto'] ?? req.protocol);
+  const host = String(req.headers['x-forwarded-host'] ?? req.get('host') ?? 'localhost:8001');
+  const baseUrl = `${proto}://${host}`;
+  res.json(getWhatsAppInboundHealth(baseUrl));
+});
+
+/** WhatsApp Twilio — webhook inbound (quickstart: log + resposta TwiML) */
+router.post('/whatsapp/messages', twilioWebhookAuthMiddleware, async (req, res: Response) => {
+  try {
+    const payload = parseTwilioWhatsAppWebhook(req.body as Record<string, unknown>);
+    if (!payload.messageSid) {
+      return res.status(400).type('text/plain').send('MessageSid ausente');
+    }
+
+    await processInboundWhatsAppMessage(payload);
+
+    return res
+      .status(200)
+      .type('text/xml')
+      .send(buildInboundTwimlReply());
+  } catch (err) {
+    console.error('[inbound/whatsapp/messages]', err);
+    return res.status(500).type('text/plain').send('Falha ao processar mensagem WhatsApp');
   }
 });
 

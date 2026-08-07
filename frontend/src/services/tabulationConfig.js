@@ -1,6 +1,6 @@
 /**
- * tabulationConfig v1.8.0 — responsável só quando atribuído (roleta/ação manual)
- * VERSION: v1.8.0 | DATE: 2026-07-28 | AUTHOR: VeloHub Development Team
+ * tabulationConfig v1.8.1 — tabulação completa = campos preenchidos (manual, ticket ou IA)
+ * VERSION: v1.8.1 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team
  */
 
 /** Rótulos de visão/perfil e termos genéricos nunca representam atribuição real. */
@@ -192,14 +192,32 @@ export function buildDefaultRightFields(_config, ticket, getAgentName) {
   };
 }
 
+function overlayNonEmptyTabulationFields(base, partial) {
+  if (!partial) return { ...(base || {}) };
+  const next = { ...(base || {}) };
+  ['tipo', 'canal', 'produto', 'motivo', 'detalhe'].forEach((key) => {
+    const val = String(partial[key] ?? '').trim();
+    if (val) next[key] = partial[key];
+  });
+  if (partial.responsavel !== undefined) {
+    next.responsavel = sanitizeResponsavel(partial.responsavel) || base?.responsavel || '';
+  }
+  return next;
+}
+
 /** Garante defaults (tipo, canal) mesmo quando sessão salva veio incompleta — responsável só se já existir no ticket */
 export function mergeRightFieldsWithDefaults(partial, ticket, getAgentName) {
   const defaults = buildDefaultRightFields(null, ticket, getAgentName);
-  const merged = { ...defaults, ...(partial || {}) };
+  const merged = overlayNonEmptyTabulationFields(defaults, partial);
   merged.tipo = String(merged.tipo || defaults.tipo || DEFAULT_TIPO).trim() || DEFAULT_TIPO;
   merged.responsavel = sanitizeResponsavel(merged.responsavel) || defaults.responsavel;
   merged.canal = String(merged.canal || defaults.canal || 'WhatsApp').trim() || defaults.canal;
   return merged;
+}
+
+/** Campos efetivos para validação: ticket salvo + edição local (origem irrelevante). */
+export function resolveEffectiveTabulationFields(rightFields, ticket, getAgentName) {
+  return mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
 }
 
 export function applyCascadeFieldChange(prev, key, value) {
@@ -349,6 +367,9 @@ export function validateTabulationForSendStatus(statusId, rightFields, config) {
 }
 
 /** Tabulação completa (tipo, produto, motivo/detalhe quando existirem opções) */
-export function isTabulationComplete(rightFields, config) {
-  return validateTabulationForSendStatus('em-andamento', rightFields, config).ok;
+export function isTabulationComplete(rightFields, config, ticket = null, getAgentName = null) {
+  const fields = ticket
+    ? mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName || (() => ''))
+    : (rightFields || {});
+  return validateTabulationForSendStatus('em-andamento', fields, config).ok;
 }

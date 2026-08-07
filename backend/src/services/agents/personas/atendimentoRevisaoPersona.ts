@@ -1,6 +1,6 @@
 /**
- * atendimentoRevisaoPersona v1.1.0 — alinhado ao feedback da auditoria
- * VERSION: v1.1.0 | DATE: 2026-07-14
+ * atendimentoRevisaoPersona v1.2.0 — revisão remove clichê e eco da mensagem do cliente
+ * VERSION: v1.2.0 | DATE: 2026-08-07
  */
 import { getAtendimentoPersona } from './atendimentoPersona';
 
@@ -23,6 +23,11 @@ export function getAtendimentoRevisaoPersona(params: RevisaoPersonaParams): stri
     '# MODO REVISÃO',
     '',
     'Você está em modo REVISÃO. Uma resposta anterior foi reprovada ou solicitada para melhoria.',
+    '',
+    'Prioridades da revisão:',
+    '- Eliminar aberturas clichê ("tudo bem?", apresentação longa do agente, "como posso ajudar").',
+    '- Eliminar eco ou parafrase da pergunta/reclamação do cliente — ir direto à solução.',
+    '- Manter correções pedidas pelo operador ou auditoria sem reintroduzir os vícios acima.',
     '',
     `## Origem da revisão: ${origemLabel}`,
   ];

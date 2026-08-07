@@ -2098,6 +2098,35 @@
     background: #F3F4F8;
 }
 
+#velodeskDeskV2Root .client-contact-fields__row--email,
+.queue-box-modal .client-contact-fields__row--email {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+#velodeskDeskV2Root .client-contact-fields__reply,
+.queue-box-modal .client-contact-fields__reply {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #2563eb;
+    white-space: nowrap;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+#velodeskDeskV2Root .client-contact-fields__reply.is-disabled,
+.queue-box-modal .client-contact-fields__reply.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+#velodeskDeskV2Root .client-contact-fields__reply input,
+.queue-box-modal .client-contact-fields__reply input {
+    margin: 0;
+}
+
 #velodeskDeskV2Root .client-contact-fields__wa,
 .queue-box-modal .client-contact-fields__wa {
     display: inline-flex;
@@ -2440,6 +2469,19 @@
 }
 
 .register-client-modal .client-contact-fields__wa.is-disabled {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #94a3b8;
+}
+
+.register-client-modal .client-contact-fields__reply {
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: #eff6ff;
+    border: 0.5px solid #bfdbfe;
+}
+
+.register-client-modal .client-contact-fields__reply.is-disabled {
     background: #f8fafc;
     border-color: #e2e8f0;
     color: #94a3b8;

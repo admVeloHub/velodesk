@@ -1,6 +1,6 @@
 /**
- * agentOrchestrator.service v1.0.3 — contexto de auditoria inclui anotações internas
- * VERSION: v1.0.3 | DATE: 2026-07-29
+ * agentOrchestrator.service v1.0.5 — evita handoff duplicado pós triagem Agente 4
+ * VERSION: v1.0.5 | DATE: 2026-08-07
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -24,6 +24,7 @@ import { validateAuditoria } from './auditoriaAgent.service';
 import { saveAgentFeedback } from './agentFeedback.service';
 import { evaluateAutonomy } from './autonomyRules.service';
 import { executeGestaoHandoff } from './gestaoChamadosHandoff.service';
+import { hasCasosEspeciaisTriagem } from './casosEspeciais.util';
 
 function resolveDeskTabulacao(
   audit: AuditoriaResult,
@@ -201,21 +202,30 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
   }
 
   if (audit.notificarAgente3 && input.ticketId && input.protocolo) {
-    const tabHandoff = resolveDeskTabulacao(audit, tabulacaoAtual, atendimento.tabulacaoDisplay);
-    await executeGestaoHandoff({
-      ticketId: input.ticketId,
-      protocolo: input.protocolo,
-      nivelCriticidade: audit.nivelCriticidade || 'alta',
-      palavrasCriticas: audit.palavrasCriticasDetectadas,
-      categoriaAtendimento: audit.categoriaAtendimento,
-      origem: 'agente_auditoria',
-      auditScore: audit.score,
-      produto: tabHandoff.tabulacao.produto,
-      motivo: tabHandoff.tabulacao.motivo,
-    });
+    const skipHandoff = chamado ? hasCasosEspeciaisTriagem(chamado) : false;
+    if (!skipHandoff) {
+      const tabHandoff = resolveDeskTabulacao(audit, tabulacaoAtual, atendimento.tabulacaoDisplay);
+      await executeGestaoHandoff({
+        ticketId: input.ticketId,
+        protocolo: input.protocolo,
+        nivelCriticidade: audit.nivelCriticidade || 'alta',
+        palavrasCriticas: audit.palavrasCriticasDetectadas,
+        categoriaAtendimento: audit.categoriaAtendimento,
+        origem: 'agente_auditoria',
+        auditScore: audit.score,
+        produto: tabHandoff.tabulacao.produto,
+        motivo: tabHandoff.tabulacao.motivo,
+      });
+    }
   }
 
-  const deskTab = resolveDeskTabulacao(audit, tabulacaoAtual, atendimento.tabulacaoDisplay);
+  const deskTab = input.pipelineModo === 'desk'
+    ? {
+      tabulacao: tabulacaoAtual,
+      tabulacaoDisplay: atendimento.tabulacaoDisplay || buildTabulationDisplay(tabulacaoAtual),
+      tabulacaoFonte: 'atendimento' as TabulacaoFonte,
+    }
+    : resolveDeskTabulacao(audit, tabulacaoAtual, atendimento.tabulacaoDisplay);
 
   const pipelineResult: PipelineResult = {
     success: true,

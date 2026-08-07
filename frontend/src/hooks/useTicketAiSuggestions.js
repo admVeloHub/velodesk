@@ -1,6 +1,6 @@
 /**
- * useTicketAiSuggestions v1.7.1 — sem sugestão após resposta do agente (rascunho não reativa)
- * VERSION: v1.7.1 | DATE: 2026-07-31
+ * useTicketAiSuggestions v1.8.0 — refresh IA só por thread; tabulação aplicada não refaz Agente 1
+ * VERSION: v1.8.0 | DATE: 2026-08-07
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ticketAiApi, agentsApi } from '../api/client';
@@ -262,9 +262,8 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       isPhone,
       convMsgs,
       ticket,
-      produtoHint: rightFields?.produto,
     });
-  }, [ticket, canFetch, contextSource, isPhone, convMsgs, rightFields?.produto]);
+  }, [ticket, canFetch, contextSource, isPhone, convMsgs]);
 
   fetchContextRef.current = {
     ticket,

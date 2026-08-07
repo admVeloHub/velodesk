@@ -1,10 +1,16 @@
 /**
- * TicketsContext v1.7.6 — ao sumir da fila, limpa aba ativa (evita tela em branco pós-mesclagem)
- * VERSION: v1.7.6 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.8.1 — catch em refreshQueueCounts (evita AxiosError não tratado)
+ * VERSION: v1.8.1 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi } from '../services/ticketsStorage';
 import { hydrateColumnsFromStorage, patchTicketInCache, fingerprintQueueColumns } from '../services/ticketsCache';
+import {
+  hydrateQueueCountsFromStorage,
+  refreshQueueCountsFromApi,
+  fingerprintQueueCounts,
+  QUEUE_COUNTS_POLL_MS,
+} from '../services/desk/queueCounts';
 import { getTicketProtocolLabel } from '../services/desk/utils';
 import deskLog from '../utils/deskDebugLog';
 import deskPlatformTrace from '../utils/deskPlatformTrace';
@@ -107,18 +113,68 @@ export function TicketsProvider({ children }) {
         deskLog.tickets('TicketsContext: cache local hidratado');
         setRefreshKey((k) => k + 1);
       }
+      if (hydrateQueueCountsFromStorage(user?.email)) {
+        deskLog.tickets('TicketsContext: contadores de fila hidratados');
+        setRefreshKey((k) => k + 1);
+      }
     }
+    void refreshQueueCountsFromApi(user?.email)
+      .catch(() => { /* falha de rede/Mongo — usa cache hidratado */ })
+      .finally(() => {
+        setRefreshKey((k) => k + 1);
+      });
     refreshTickets();
   }, [isAuthenticated, refreshTickets, user?.email, user?.role]);
 
   useEffect(() => {
     if (!isAuthenticated) return undefined;
+
+    let inFlight = false;
+    const pollQueueCounts = async () => {
+      if (inFlight || document.hidden) return;
+      inFlight = true;
+      const before = fingerprintQueueCounts();
+      try {
+        await refreshQueueCountsFromApi(user?.email);
+        const after = fingerprintQueueCounts();
+        if (before !== after) {
+          setRefreshKey((k) => k + 1);
+        }
+      } catch {
+        /* poll silencioso */
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const onCountsChanged = () => {
+      setRefreshKey((k) => k + 1);
+    };
+
+    const timer = window.setInterval(pollQueueCounts, QUEUE_COUNTS_POLL_MS);
+    window.addEventListener('velodesk:queue-counts-changed', onCountsChanged);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('velodesk:queue-counts-changed', onCountsChanged);
+    };
+  }, [isAuthenticated, user?.email]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
     const reloadOnPermissions = () => {
       deskLog.tickets('TicketsContext: permissões atualizadas → recarregar filas');
+      void refreshQueueCountsFromApi(user?.email);
       void refreshTickets();
     };
+    const reloadOnQueuesChanged = () => {
+      setRefreshKey((k) => k + 1);
+    };
     window.addEventListener('velodesk:permissions', reloadOnPermissions);
-    return () => window.removeEventListener('velodesk:permissions', reloadOnPermissions);
+    window.addEventListener('velodesk:queues-changed', reloadOnQueuesChanged);
+    return () => {
+      window.removeEventListener('velodesk:permissions', reloadOnPermissions);
+      window.removeEventListener('velodesk:queues-changed', reloadOnQueuesChanged);
+    };
   }, [isAuthenticated, refreshTickets]);
 
   useEffect(() => {

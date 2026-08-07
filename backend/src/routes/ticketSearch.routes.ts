@@ -1,6 +1,6 @@
 /**
  * Rotas de busca avançada de tickets
- * VERSION: v1.1.0 | DATE: 2026-08-04
+ * VERSION: v1.2.0 | DATE: 2026-08-06
  */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
@@ -10,6 +10,7 @@ import {
   normalizeSearchCriterios,
   searchTickets,
   searchTicketsByCpf,
+  searchTicketsByCpfDeskBar,
 } from '../services/ticketSearch.service';
 
 const router = Router();
@@ -103,6 +104,35 @@ router.get('/by-cpf/:cpf', authMiddleware, async (req: Request, res: Response) =
       return res.status(status).json({ success: false, message, tickets: [], total: 0 });
     }
     console.error('[ticket-search/by-cpf] falhou:', err);
+    return res.status(500).json({ success: false, message: 'Erro ao buscar tickets por CPF', tickets: [], total: 0 });
+  }
+});
+
+/** Barra de busca do Desk — ignora visão meus-chamados (lookup operacional por CPF). */
+router.get('/desk-bar/cpf/:cpf', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    if (!isMongoConnected()) {
+      return res.status(503).json({ success: false, message: 'MongoDB indisponível' });
+    }
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Não autenticado' });
+    }
+
+    const result = await searchTicketsByCpfDeskBar(req.user, String(req.params.cpf || ''));
+    return res.json({
+      success: true,
+      tickets: result.tickets,
+      total: result.total,
+      cpf: result.cpf,
+      source: 'ticket_search_desk_bar_cpf',
+    });
+  } catch (err) {
+    const status = (err as { status?: number })?.status || 500;
+    const message = err instanceof Error ? err.message : 'Erro ao buscar tickets por CPF';
+    if (status >= 400 && status < 500) {
+      return res.status(status).json({ success: false, message, tickets: [], total: 0 });
+    }
+    console.error('[ticket-search/desk-bar/cpf] falhou:', err);
     return res.status(500).json({ success: false, message: 'Erro ao buscar tickets por CPF', tickets: [], total: 0 });
   }
 });

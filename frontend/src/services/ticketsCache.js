@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.10.3 — fila Novos filtrada por responsável no cache do agente
- * VERSION: v1.10.3 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.11.3 — preserva clienteEmailResposta no merge da fila
+ * VERSION: v1.11.3 | DATE: 2026-08-06 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -129,8 +129,46 @@ function mergeTicketWorkflow(prev, next) {
   };
 }
 
+function normalizeContactStringList(raw) {
+  if (Array.isArray(raw)) {
+    return raw.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+  if (raw?.lista) {
+    return (raw.lista || []).map((item) => String(item || '').trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function mergeContactListField(prevVal, nextVal) {
+  const prevList = normalizeContactStringList(prevVal);
+  const nextList = normalizeContactStringList(nextVal);
+  if (nextList.length > 0) return nextVal;
+  if (prevList.length > 0) return prevVal;
+  return nextVal;
+}
+
 function mergeLateralFormPreservingWorkflow(prevLf = {}, nextLf = {}) {
   const merged = { ...prevLf, ...nextLf };
+  merged.clienteEmail = mergeContactListField(prevLf.clienteEmail, nextLf.clienteEmail);
+  merged.clienteTelefone = mergeContactListField(prevLf.clienteTelefone, nextLf.clienteTelefone);
+  if (!String(nextLf.clienteTelefoneWhatsapp || '').trim() && String(prevLf.clienteTelefoneWhatsapp || '').trim()) {
+    merged.clienteTelefoneWhatsapp = prevLf.clienteTelefoneWhatsapp;
+  }
+  if (!String(nextLf.clienteNome || '').trim() && String(prevLf.clienteNome || '').trim()) {
+    merged.clienteNome = prevLf.clienteNome;
+  }
+  if (!String(nextLf.clienteEmailResposta || '').trim() && String(prevLf.clienteEmailResposta || '').trim()) {
+    merged.clienteEmailResposta = prevLf.clienteEmailResposta;
+  }
+  const nextCpf = String(nextLf.clienteCpf || nextLf.cpf || '').trim();
+  const prevCpf = String(prevLf.clienteCpf || prevLf.cpf || '').trim();
+  if (!nextCpf && prevCpf) {
+    merged.clienteCpf = prevLf.clienteCpf || prevLf.cpf;
+    merged.cpf = prevLf.cpf || prevLf.clienteCpf;
+  }
+  if (!nextLf.clienteId && prevLf.clienteId) {
+    merged.clienteId = prevLf.clienteId;
+  }
   const prevWf = prevLf.workflow || {};
   const nextWf = nextLf.workflow;
   if (!nextWf) {
@@ -155,6 +193,20 @@ function ticketHasDetailContent(ticket) {
     || (ticket.registroHistorico?.length || 0) > 0;
 }
 
+function ticketHasClientContactData(ticket) {
+  if (!ticket) return false;
+  const lf = ticket.lateralForm || {};
+  return normalizeContactStringList(lf.clienteEmail).length > 0
+    || normalizeContactStringList(lf.clienteTelefone).length > 0
+    || Boolean(String(lf.clienteNome || ticket.clientName || '').trim())
+    || Boolean(String(ticket.clientEmail || '').trim());
+}
+
+function shouldPreserveTicketDetail(ticket) {
+  if (!ticket?._detailLoaded || isDraftTicket(ticket)) return false;
+  return ticketHasDetailContent(ticket) || ticketHasClientContactData(ticket);
+}
+
 function sanitizeTicketDetailFlags(ticket) {
   if (!ticket || isDraftTicket(ticket)) return ticket;
   if (!ticket._detailLoaded || ticketHasDetailContent(ticket)) return ticket;
@@ -172,8 +224,7 @@ function mergePreservedDetails(prevCols, nextCols) {
   const preserved = new Map();
   (prevCols || []).forEach((box) => {
     (box.tickets || []).forEach((ticket) => {
-      if (!ticket._detailLoaded || isDraftTicket(ticket)) return;
-      if (!ticketHasDetailContent(ticket)) return;
+      if (!shouldPreserveTicketDetail(ticket)) return;
       preserved.set(String(ticket.id || ticket._id), ticket);
     });
   });
@@ -191,6 +242,9 @@ function mergePreservedDetails(prevCols, nextCols) {
         createdAt: ticket.createdAt,
         boxId: ticket.boxId,
         clientName: ticket.clientName ?? prev.clientName,
+        clientEmail: prev.clientEmail || ticket.clientEmail,
+        clientPhone: prev.clientPhone || ticket.clientPhone,
+        clienteId: prev.clienteId || ticket.clienteId,
         responsibleAgent: ticket.responsibleAgent ?? prev.responsibleAgent,
         slaBreached: ticket.slaBreached ?? prev.slaBreached,
         workflow: prev.workflow?.pendingPersist
@@ -344,6 +398,12 @@ function filterColumnsForAgent(columns) {
       return true;
     }),
   }));
+}
+
+export function upsertDeskSearchTicketsInCache(apiTicket) {
+  const ticket = apiTicketToCockpit(apiTicket);
+  insertTicketIntoColumnsIfMissing(ticket);
+  return ticket;
 }
 
 export async function loadBoxesFromApi(userEmail = '') {
@@ -507,6 +567,53 @@ export async function addMessageViaApi(ticketId, payload) {
         author,
       });
     }
+    t.updatedAt = ts;
+    return t;
+  });
+}
+
+export async function sendWhatsAppMessageViaApi(ticketId, payload) {
+  const apiId = String(ticketId);
+  const text = String(payload?.text ?? '').trim();
+  if (!text) return null;
+
+  if (useApi && !isDraftTicket({ id: apiId })) {
+    assertApiReady('enviar WhatsApp');
+    const result = await ticketsApi.sendWhatsAppMessage(apiId, {
+      text,
+      waChatId: payload?.waChatId,
+      attachments: payload?.attachments,
+    });
+    if (result?.ticket) {
+      const full = apiTicketToCockpit(result.ticket);
+      patchTicketInCache(apiId, full);
+      try {
+        window.dispatchEvent(new CustomEvent('velodesk:ticket-detail-changed', {
+          detail: { ticketId: apiId },
+        }));
+      } catch {
+        /* ignore */
+      }
+      return full;
+    }
+    return null;
+  }
+
+  return updateTicketViaApi(ticketId, (t) => {
+    const ts = new Date().toISOString();
+    const author = payload?.author || getAgentName() || '';
+    if (!t.messages) t.messages = [];
+    t.messages.push({
+      id: `wa-${Date.now()}`,
+      type: 'agent',
+      channel: 'whatsapp',
+      fromClient: false,
+      origin: 'agente',
+      text,
+      timestamp: ts,
+      time: ts,
+      author,
+    });
     t.updatedAt = ts;
     return t;
   });

@@ -27,8 +27,15 @@ async function main(): Promise<void> {
   });
 
   await TelephonyRecado.create({
+    recadoId: 'teste-pix-intermitente',
     titulo: 'TESTE PIX intermitente',
-    mensagem: 'Informe instabilidade temporária no envio de PIX.',
+    areas: ['conta_e_pix'],
+    tipo: 'instabilidade',
+    mensagemCliente: 'Informe instabilidade temporária no envio de PIX.',
+    orientacaoAtendimento: 'Use somente quando o cliente relatar falha no envio de PIX.',
+    politicaChamado: 'nao_abrir',
+    criterioChamado: null,
+    telefonesOrigemLiberados: [],
     prioridade: 'alta',
     ativo: true,
     criadoPor: 'test-script',
@@ -53,6 +60,7 @@ async function main(): Promise<void> {
     duplicate,
     noAnswer,
     recadosCount: recados.items.length,
+    recadosSchemaVersion: recados.schemaVersion,
     savedCompleted: savedCompleted ? {
       provider: savedCompleted.provider,
       status: savedCompleted.status,

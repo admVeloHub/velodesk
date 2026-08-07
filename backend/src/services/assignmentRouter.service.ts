@@ -1,4 +1,4 @@
-/** assignmentRouter.service v1.3.0 — 1ª interação em ticket novo = responsável mandatório */
+/** assignmentRouter.service v1.4.0 — atribuição por função especial (Agente 4) */
 import { env } from '../config/env';
 import type { AuthPayload } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -19,7 +19,7 @@ type RoletaPoolAgent = {
 };
 
 export interface AssignmentContext {
-  source: 'email-inbound' | 'app-integrado' | 'api-tickets' | 'backfill' | 'manual-retry';
+  source: 'email-inbound' | 'app-integrado' | 'api-tickets' | 'backfill' | 'manual-retry' | 'casos-especiais';
   canal?: string;
 }
 
@@ -391,6 +391,95 @@ export async function applyAssignmentIfNeeded(
   }
 
   applyRoletaAssignment(partial, assignment, context);
+}
+
+function agentMatchesFuncaoSlug(
+  agent: RoletaPoolAgent,
+  funcaoSlug: string,
+): boolean {
+  if (agent.afastado) return false;
+  const slug = String(funcaoSlug ?? '').trim().toLowerCase();
+  if (!slug) return false;
+  const funcoes = extractFuncoes(agent.atuacao);
+  return agent.funcaoSlug === slug || funcoes.includes(slug);
+}
+
+async function resolveFuncaoEspecialAgent(funcaoSlug: string): Promise<AssignmentResult | null> {
+  const [onlineKeys, agentes, countByResponsavel] = await Promise.all([
+    listOnlineEligiblePresenceKeys(),
+    loadRoletaPoolAgents(),
+    aggregateRoletaOpenCounts(),
+  ]);
+
+  const slug = String(funcaoSlug ?? '').trim().toLowerCase();
+  const eligible = agentes.filter((agente) => agentMatchesFuncaoSlug(agente, slug));
+  if (eligible.length === 0) return null;
+
+  const onlineSet = new Set(onlineKeys.map((key) => key.toLowerCase()));
+  const onlineEligible = eligible.filter((agente) => {
+    const responsavel = provisionalResponsavelFromUser({
+      name: agente.colaboradorNome,
+      email: agente.email,
+    });
+    return responsavel && onlineSet.has(responsavel.toLowerCase());
+  });
+
+  const poolSource = onlineEligible.length > 0 ? onlineEligible : eligible;
+  const agents = poolSource.map((agente) => {
+    const responsavel = provisionalResponsavelFromUser({
+      name: agente.colaboradorNome,
+      email: agente.email,
+    });
+    return {
+      responsavel,
+      candidates: buildAgentCandidates({
+        name: agente.colaboradorNome,
+        email: agente.email,
+      }),
+    };
+  }).filter((item) => item.responsavel);
+
+  return pickLeastLoadedAgent(agents, countByResponsavel);
+}
+
+function markChamadoAtribuicaoFuncaoEspecial(
+  chamado: Partial<IChamadoN1> | IChamadoN1,
+  funcaoSlug: string,
+): void {
+  const registros = chamado.registro ?? [];
+  const target = registros[registros.length - 1] ?? registros[0];
+  if (!target) return;
+  target.metadados = {
+    ...(target.metadados ?? {}),
+    atribuicaoFuncaoEspecial: funcaoSlug,
+    atribuidoEm: new Date().toISOString(),
+  };
+}
+
+export async function applyFuncaoEspecialAssignment(
+  chamado: IChamadoN1,
+  funcaoSlug: string,
+  context: AssignmentContext,
+): Promise<boolean> {
+  const assignment = await resolveFuncaoEspecialAgent(funcaoSlug);
+  if (!assignment) {
+    console.warn(
+      `[assignmentRouter] função especial "${funcaoSlug}" sem agente elegível — chamado permanece sem responsavel`,
+      context,
+    );
+    return false;
+  }
+
+  ensureTabulacaoSlot(chamado);
+  const idx = chamado.tabulacao!.length - 1;
+  chamado.tabulacao![idx].responsavel = assignment.responsavel;
+  markChamadoAtribuicaoFuncaoEspecial(chamado, funcaoSlug);
+  chamado.markModified('tabulacao');
+
+  console.info(
+    `[assignmentRouter] funcaoEspecial=${funcaoSlug} responsavel=${assignment.responsavel} (carga=${assignment.carga}) source=${context.source}`,
+  );
+  return true;
 }
 
 export async function applyAssignmentToChamado(

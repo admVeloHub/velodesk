@@ -1,9 +1,9 @@
 /**
- * DeskRightPanel v1.12.0 — preferências de salvar movidas para /preferencias
- * VERSION: v1.12.0 | DATE: 2026-07-30
+ * DeskRightPanel v1.12.1 — tabulação completa considera ticket + campos locais
+ * VERSION: v1.12.1 | DATE: 2026-08-07
  */
-import React, { useState } from 'react';
-import { DEFAULT_TIPO, hasApplyableTabulation, isTabulationComplete, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
+import React, { useMemo, useState } from 'react';
+import { DEFAULT_TIPO, hasApplyableTabulation, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
 import { useTabulation } from '../../../context/TabulationContext';
 import { DeskStatusCommitButton } from './DeskComposePanel';
 import ProcessosPopover from './ProcessosPopover';
@@ -75,12 +75,18 @@ export default function DeskRightPanel({
   const thermoColor = thermo >= 55 ? '#FCC200' : thermo >= 45 ? '#FCC200' : '#15A237';
 
   const produtoOptions = getProdutoNames();
-  const motivoOptions = rightFields.produto ? getMotivos(rightFields.produto) : [];
-  const detalheOptions = rightFields.produto && rightFields.motivo
-    ? getDetalhes(rightFields.produto, rightFields.motivo)
+
+  const effectiveRightFields = useMemo(
+    () => mergeRightFieldsWithDefaults(rightFields, ticket, () => ''),
+    [rightFields, ticket],
+  );
+
+  const motivoOptions = effectiveRightFields.produto ? getMotivos(effectiveRightFields.produto) : [];
+  const detalheOptions = effectiveRightFields.produto && effectiveRightFields.motivo
+    ? getDetalhes(effectiveRightFields.produto, effectiveRightFields.motivo)
     : [];
 
-  const tabulationComplete = isTabulationComplete(rightFields, config);
+  const tabulationComplete = isTabulationComplete(effectiveRightFields, config);
   const showIaTabulationPanel = !tabulationComplete && iaShowSection;
 
   const tabulationText = iaTabulationLoading
@@ -123,7 +129,7 @@ export default function DeskRightPanel({
             id="selCanal"
             label="Canal"
             fieldKey="canal"
-            value={rightFields.canal}
+            value={effectiveRightFields.canal}
             options={canalOptions.length ? canalOptions : CANAL_OPTIONS_FALLBACK}
             readonly={tabulationReadonly}
             onFieldChange={onFieldChange}
@@ -132,7 +138,7 @@ export default function DeskRightPanel({
             id="selTipo"
             label="Tipo"
             fieldKey="tipo"
-            value={rightFields.tipo || DEFAULT_TIPO}
+            value={effectiveRightFields.tipo || DEFAULT_TIPO}
             options={tipoOptions.length ? tipoOptions : TIPO_OPTIONS_FALLBACK}
             readonly={tabulationReadonly}
             onFieldChange={onFieldChange}
@@ -141,30 +147,30 @@ export default function DeskRightPanel({
             id="selProduto"
             label="Produto"
             fieldKey="produto"
-            value={rightFields.produto}
+            value={effectiveRightFields.produto}
             options={produtoOptions}
             showPlaceholder
             readonly={tabulationReadonly}
             onFieldChange={onFieldChange}
           />
-          {rightFields.produto && motivoOptions.length > 0 && (
+          {effectiveRightFields.produto && motivoOptions.length > 0 && (
             <SelectField
               id="selMotivo"
               label="Motivo"
               fieldKey="motivo"
-              value={rightFields.motivo}
+              value={effectiveRightFields.motivo}
               options={motivoOptions}
               showPlaceholder
               readonly={tabulationReadonly}
               onFieldChange={onFieldChange}
             />
           )}
-          {rightFields.motivo && detalheOptions.length > 0 && (
+          {effectiveRightFields.motivo && detalheOptions.length > 0 && (
             <SelectField
               id="selDetalhe"
               label="Detalhe"
               fieldKey="detalhe"
-              value={rightFields.detalhe}
+              value={effectiveRightFields.detalhe}
               options={detalheOptions}
               showPlaceholder
               readonly={tabulationReadonly}

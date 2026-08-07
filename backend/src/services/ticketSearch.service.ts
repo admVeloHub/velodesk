@@ -1,6 +1,7 @@
 /**
  * Busca avançada de tickets — builder Mongo + escopo de permissão
- * VERSION: v1.1.0 | DATE: 2026-08-04
+ * VERSION: v1.2.0 | DATE: 2026-08-06
+ * — desk-bar CPF: ignora visão meus-chamados (lookup direto por CPF)
  */
 import mongoose from 'mongoose';
 import { ChamadoN1, type IChamadoN1 } from '../models/ChamadoN1';
@@ -14,6 +15,7 @@ import {
   currentStatus,
   isSlaBreached,
   meusChamadosResponsavelFilter,
+  meusChamadosAgentScopeFilter,
   resolveBoxIdForChamado,
   workflowActorQueueFilter,
   type TicketDto,
@@ -491,7 +493,7 @@ async function buildVisibilityFilter(
   }
 
   if (shouldUseMeusChamadosFilter(resolved)) {
-    return meusChamadosResponsavelFilter(resolved.responsavelCandidates);
+    return meusChamadosAgentScopeFilter(resolved.responsavelCandidates);
   }
 
   return null;
@@ -641,6 +643,44 @@ export async function searchTicketsByCpf(
   if (visibility) andClauses.push(visibility);
 
   const filter = { $and: andClauses };
+  const chamados = await ChamadoN1.find(filter).sort({ updatedAt: -1 }).limit(BY_CPF_LIMIT);
+  const boxes = await Box.find().sort({ order: 1 });
+  const ctx = await buildChamadoMapContext(chamados, 'list');
+
+  const tickets: TicketDto[] = [];
+  for (const chamado of chamados) {
+    const boxId = await resolveBoxIdForChamado(chamado, boxes);
+    tickets.push(chamadoToTicketListItem(chamado, boxId, ctx));
+  }
+
+  return { tickets, total: tickets.length, cpf };
+}
+
+/**
+ * Barra de busca do Desk — CPF/protocolo ignoram filtro de visão (ver_meus).
+ * Retorna tickets do cliente sem restringir responsável/atribuído.
+ */
+export async function searchTicketsByCpfDeskBar(
+  _authUser: AuthPayload,
+  cpfRaw: string,
+): Promise<{ tickets: TicketDto[]; total: number; cpf: string }> {
+  const cpf = digitsOnlyCpf(cpfRaw);
+  if (cpf.length !== 11) {
+    throw Object.assign(new Error('CPF inválido'), { status: 400 });
+  }
+
+  const filter = {
+    $and: [
+      {
+        $or: [
+          { 'cliente.clienteCpf': cpf },
+          { 'cliente.clienteCpf': { $regex: escapeRegex(cpf) } },
+        ],
+      },
+      excludeFusaoAbsorvidosFilter(),
+    ],
+  };
+
   const chamados = await ChamadoN1.find(filter).sort({ updatedAt: -1 }).limit(BY_CPF_LIMIT);
   const boxes = await Box.find().sort({ order: 1 });
   const ctx = await buildChamadoMapContext(chamados, 'list');

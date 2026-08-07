@@ -1,6 +1,6 @@
 /**
- * ticketsStorage v1.3.0 — fila resolvidos inclui fechado/cancelado
- * VERSION: v1.3.0 | DATE: 2026-07-29
+ * ticketsStorage v1.4.1 — mapTicketQueueId prioriza box físico (evita contagem errada em resolvidos)
+ * VERSION: v1.4.1 | DATE: 2026-08-07
  */
 import {
   getCachedColumns,
@@ -9,6 +9,7 @@ import {
   updateTicketViaApi,
   commitTicketViaApi,
   addMessageViaApi,
+  sendWhatsAppMessageViaApi,
   createTicketViaApi,
   createDraftTicketInCache,
   persistDraftTicket,
@@ -64,15 +65,21 @@ export function mapTicketQueueId(ticket, boxId) {
   const custom = loadCustomQueues().find((item) => item.id === boxId || item.boxes?.includes(boxId));
   if (custom) return custom.id;
 
-  const status = ticket.status || boxId || '';
+  const normalizedBox = String(boxId || ticket?.boxId || '').trim();
+  if (normalizedBox === 'resolvidos') return 'resolvidos';
+  if (normalizedBox === 'novos') return 'novos';
+  if (normalizedBox === 'em-espera' || normalizedBox === 'pendentes') return 'pendente';
+  if (normalizedBox === 'em-andamento') return 'em-andamento';
+
+  const status = String(ticket?.status || '').trim().toLowerCase();
   const entries = Object.entries(QUEUE_MAP);
   for (let i = 0; i < entries.length; i++) {
     const [queueId, boxes] = entries[i];
-    if (boxes.indexOf(status) >= 0 || boxes.indexOf(boxId) >= 0) return queueId;
+    if (boxes.indexOf(status) >= 0) return queueId;
   }
-  if (boxId === 'novos') return 'novos';
-  if (boxId === 'resolvidos') return 'resolvidos';
-  if (boxId === 'pendentes' || boxId === 'em-espera') return 'pendente';
+  if (normalizedBox === 'novos') return 'novos';
+  if (normalizedBox === 'resolvidos') return 'resolvidos';
+  if (normalizedBox === 'pendentes' || normalizedBox === 'em-espera') return 'pendente';
   return 'em-andamento';
 }
 
@@ -80,7 +87,7 @@ export async function updateTicketInCache(ticketId, updater) {
   return updateTicketViaApi(ticketId, updater);
 }
 
-export { commitTicketViaApi };
+export { commitTicketViaApi, sendWhatsAppMessageViaApi };
 
 export async function sendTicketMessage(ticketId, text, author) {
   return addMessageViaApi(ticketId, { text, internal: false, author });

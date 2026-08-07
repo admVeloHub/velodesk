@@ -1,4 +1,4 @@
-/** env v1.27.0 — x-api-key (fonte da verdade) para Customer Data API */
+/** env v1.30.0 — Agente 4 casos especiais */
 import fs from 'fs';
 import path from 'path';
 
@@ -91,6 +91,27 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET || 'velodesk-dev-secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   enableWhatsapp: process.env.ENABLE_WHATSAPP !== 'false',
+  twilioAccountSid: (process.env.TWILIO_ACCOUNT_SID || '').trim(),
+  twilioAuthToken: (process.env.TWILIO_AUTH_TOKEN || '').trim(),
+  /** Subconta Velodesk — prioridade para WhatsApp / Senders API */
+  twilioSubaccountSid: (process.env.TWILIO_SUBACCOUNT_SID || '').trim(),
+  twilioSubaccountAuthToken: (process.env.TWILIO_SUBACCOUNT_AUTH_TOKEN || '').trim(),
+  /** API Key (SK...) — alternativa ao Auth Token; exige TWILIO_SUBACCOUNT_SID */
+  twilioApiKeySid: (process.env.TWILIO_API_KEY_SID || process.env.API_KEY_SID || '').trim(),
+  twilioApiKeySecret: (process.env.TWILIO_API_KEY_SECRET || process.env.API_KEY_SECRET || '').trim(),
+  /** Sandbox default: whatsapp:+14155238886 */
+  twilioWhatsappFrom: (process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886').trim(),
+  /** Template Appointment Reminder (Sandbox quickstart) */
+  twilioWhatsappContentSid: (
+    process.env.TWILIO_WHATSAPP_CONTENT_SID || 'HXb5b62575e6e4ff6129ad7c8efe1f983e'
+  ).trim(),
+  whatsappInboundEnabled: process.env.WHATSAPP_INBOUND_ENABLED !== 'false',
+  twilioWhatsappAutoReply: (
+    process.env.TWILIO_WHATSAPP_AUTO_REPLY
+    || 'Message received! Hello again from the Twilio Sandbox for WhatsApp.'
+  ).trim(),
+  /** Dev only — pular validação X-Twilio-Signature (ngrok/local) */
+  twilioWebhookSkipValidation: process.env.TWILIO_WEBHOOK_SKIP_VALIDATION === 'true',
   gcpStorageBucket: (process.env.GCP_STORAGE_BUCKET || 'velodesk_storage').trim(),
   /** E-mail recebido (inbound Gmail) */
   gcpStorageInboundAttachmentsPrefix: (
@@ -157,6 +178,18 @@ export const env = {
   openaiModel: (process.env.OPENAI_MODEL || 'gpt-4.1-mini').trim(),
   agentsEnabled: process.env.AGENTS_ENABLED === 'true',
   agentsAutonomyEnabled: process.env.AGENTS_AUTONOMY_ENABLED === 'true',
+  /** Agente 4 — triagem silenciosa de casos especiais na entrada do ticket */
+  agentCasosEspeciaisEnabled: process.env.AGENT_CASOS_ESPECIAIS_ENABLED === 'true',
+  casosEspeciaisAlertEmails: {
+    reclame_aqui: (process.env.CASOS_ESPECIAIS_ALERT_RECLAME_AQUI || '')
+      .split(',').map((item) => item.trim()).filter(Boolean),
+    procon: (process.env.CASOS_ESPECIAIS_ALERT_PROCON || '')
+      .split(',').map((item) => item.trim()).filter(Boolean),
+    bacen: (process.env.CASOS_ESPECIAIS_ALERT_BACEN || '')
+      .split(',').map((item) => item.trim()).filter(Boolean),
+    consumidor_gov: (process.env.CASOS_ESPECIAIS_ALERT_CONSUMIDOR_GOV || '')
+      .split(',').map((item) => item.trim()).filter(Boolean),
+  },
   agentAuditThresholdAuto: parseInt(process.env.AGENT_AUDIT_THRESHOLD_AUTO || '85', 10),
   agentAuditThresholdDesk: parseInt(process.env.AGENT_AUDIT_THRESHOLD_DESK || '70', 10),
   agentRevisionMaxAttempts: parseInt(process.env.AGENT_REVISION_MAX_ATTEMPTS || '2', 10),

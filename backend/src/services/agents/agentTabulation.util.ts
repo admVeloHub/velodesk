@@ -1,6 +1,6 @@
 /**
- * agentTabulation.util v1.2.0 — histórico público + anotações internas no prompt de composição
- * VERSION: v1.2.0 | DATE: 2026-07-29
+ * agentTabulation.util v1.2.2 — user block reforça resposta direta sem eco do cliente
+ * VERSION: v1.2.2 | DATE: 2026-08-07
  */
 import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from '../tabulation.service';
 import type { TicketAiMessageInput, TicketAiTabulationResult, AuditoriaInput } from './agentTypes';
@@ -81,7 +81,7 @@ export function buildAtendimentoUserBlock(
   ];
 
   if (clientFirstName) {
-    parts.push(`Primeira linha obrigatória: Olá, ${clientFirstName}`);
+    parts.push(`Primeiro nome do cliente (saudação breve só no 1º contato): ${clientFirstName}`);
   }
 
   if (params.produtoHint) {
@@ -108,7 +108,12 @@ export function buildAtendimentoUserBlock(
     parts.push('', '## Exemplos de correções anteriores (aprendizado)', '', params.feedbackExamples.trim());
   }
 
-  parts.push('', '## Tarefa', '', 'Retorne JSON com respostaSugerida, tabulacao, confidence e fontesConsultadas.');
+  parts.push(
+    '',
+    '## Tarefa',
+    '',
+    'Em UMA única resposta JSON, retorne respostaSugerida (texto ao cliente, direto e sem eco da pergunta) e tabulacao (tipo, produto, motivo, detalhe) juntos — mesma consulta, mesmo objeto. Inclua também confidence e fontesConsultadas.',
+  );
   return parts.join('\n');
 }
 

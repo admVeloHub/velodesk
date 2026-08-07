@@ -16,7 +16,7 @@ const P = (overrides: PermissoesMap): PermissoesMap => overrides;
 
 export const PERMISSION_CATALOG: Record<string, string[]> = {
   portal: ['agente', 'gestao', 'workflow', 'especiais'],
-  tickets: ['ver_todos', 'ver_meus', 'atuar_responsavel', 'atuar_atribuido', 'atuar_canal_especial', 'escalonar'],
+  tickets: ['ver_todos', 'ver_meus', 'atuar_responsavel', 'atuar_atribuido', 'atuar_canal_especial'],
   workspace: ['painel_360_proprio', 'painel_360_equipe'],
   workflow: ['avancar', 'aprovar', 'rejeitar', 'interromper'],
   preferencias: ['visualizar'],
@@ -40,7 +40,7 @@ export const PERMISSION_CATALOG: Record<string, string[]> = {
 
 const BASE_ATENDIMENTO = P({
   portal: { agente: true, gestao: false, workflow: false, especiais: false },
-  tickets: { ver_todos: false, ver_meus: true, atuar_responsavel: true, atuar_atribuido: false, atuar_canal_especial: false, escalonar: false },
+  tickets: { ver_todos: false, ver_meus: true, atuar_responsavel: true, atuar_atribuido: false, atuar_canal_especial: false },
   workspace: { painel_360_proprio: true, painel_360_equipe: false },
   workflow: { avancar: true, aprovar: false, rejeitar: false },
   preferencias: { visualizar: true },
@@ -230,7 +230,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
     portalVisivel: ['agent', 'gestao', 'workflow', 'especiais'],
     permissoes: P({
       portal: { agente: true, gestao: true, workflow: true, especiais: true },
-      tickets: { ver_todos: true, ver_meus: true, atuar_responsavel: true, atuar_atribuido: true, atuar_canal_especial: true, escalonar: true },
+      tickets: { ver_todos: true, ver_meus: true, atuar_responsavel: true, atuar_atribuido: true, atuar_canal_especial: true },
       workspace: { painel_360_proprio: true, painel_360_equipe: true },
       workflow: { avancar: true, aprovar: true, rejeitar: true, interromper: true },
       preferencias: { visualizar: true },

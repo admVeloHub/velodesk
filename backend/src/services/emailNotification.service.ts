@@ -1,6 +1,6 @@
-/** emailNotification.service v1.5.0 — thread única + header gradiente Velotax */
+/** emailNotification.service v1.6.0 — usa clienteEmail.resposta quando definido */
 import type { IChamadoN1 } from '../models/ChamadoN1';
-import { loadDadosForRef } from './cliente.service';
+import { loadDadosForRef, normalizeEmail } from './cliente.service';
 import { sendOutboundEmail } from './email-outbound.service';
 import { buildEmailHeaderHtml, loadVelotaxLogoInline } from './emailBrand.util';
 import { composeHtmlToEmailHtml, escapeHtmlAttribute, htmlToPlainTextForEmail } from './emailHtml.util';
@@ -35,7 +35,12 @@ export async function resolveClienteEmailFromChamado(chamado: IChamadoN1): Promi
   const ref = chamado.cliente?.[0];
   if (ref) {
     const dados = await loadDadosForRef(ref);
-    const email = dados?.clienteEmail?.lista?.[0];
+    const lista = dados?.clienteEmail?.lista ?? [];
+    const resposta = normalizeEmail(dados?.clienteEmail?.resposta);
+    if (resposta && lista.some((item) => normalizeEmail(item) === resposta)) {
+      return resposta;
+    }
+    const email = lista[0];
     if (email?.includes('@')) return email.trim().toLowerCase();
   }
 

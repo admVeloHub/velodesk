@@ -83,13 +83,6 @@ export const CASCADE_ACTIONS = [
   { id: 'estorno', label: 'Estorno' }
 ];
 
-export const ESCALONAR_OPTIONS = [
-  { id: 'n2', label: 'N2' },
-  { id: 'financeiro', label: 'Financeiro' },
-  { id: 'produtos', label: 'Produtos' },
-  { id: 'suporte', label: 'Suporte' },
-];
-
 export const SLA_LABELS = {
   ok: 'Dentro do prazo',
   warning: 'Atenção — SLA',

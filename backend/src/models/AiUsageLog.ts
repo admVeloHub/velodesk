@@ -1,6 +1,6 @@
 /**
- * AiUsageLog v1.0.0 — registro de tokens/custo por chamada de IA (OpenAI/Gemini)
- * VERSION: v1.0.0 | DATE: 2026-07-21
+ * AiUsageLog v1.0.1 — feature casos_especiais (Agente 4)
+ * VERSION: v1.0.1 | DATE: 2026-08-07
  */
 import mongoose, { Schema, Document } from 'mongoose';
 
@@ -10,6 +10,7 @@ export type AiUsageFeature =
   | 'atendimento'
   | 'auditoria'
   | 'gestao_chamados'
+  | 'casos_especiais'
   | 'ticket_suggest_legacy'
   | 'refinar_rascunho'
   | 'chamado_ia_analise';

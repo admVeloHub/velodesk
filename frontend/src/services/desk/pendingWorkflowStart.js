@@ -1,12 +1,34 @@
 /**
- * pendingWorkflowStart v1.1.0 — discardPendingWorkflowStart para interromper cache
- * VERSION: v1.1.0 | DATE: 2026-07-28
+ * pendingWorkflowStart v1.2.0 — stripPendingWorkflowForApiPayload evita persistir antes do save
+ * VERSION: v1.2.0 | DATE: 2026-08-07
  */
 import { getAgentName } from '../clientDb';
 import { createWorkflowState } from './workflowEngine';
 
 export function hasPendingWorkflowPersist(ticket) {
-  return Boolean(ticket?._pendingWorkflowStart?.definicaoSlug);
+  return Boolean(
+    ticket?._pendingWorkflowStart?.definicaoSlug
+    || ticket?.workflow?.pendingPersist,
+  );
+}
+
+/** Remove workflow pendente do payload enviado à API (PUT/commit). Persistência só no flush do save. */
+export function stripPendingWorkflowForApiPayload(ticket) {
+  if (!ticket || !hasPendingWorkflowPersist(ticket)) return ticket;
+
+  const next = { ...ticket };
+  if (next.workflow?.pendingPersist) {
+    const wf = { ...next.workflow };
+    delete wf.active;
+    delete wf.pendingPersist;
+    next.workflow = Object.keys(wf).length ? wf : undefined;
+  }
+  if (next.lateralForm?.workflow) {
+    const lf = { ...next.lateralForm };
+    delete lf.workflow;
+    next.lateralForm = lf;
+  }
+  return next;
 }
 
 export function buildStartWorkflowApiBody(pending) {

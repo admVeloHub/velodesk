@@ -1,4 +1,4 @@
-/** email-inbound.service v1.11.1 — resolvido <48h + resposta cliente → em-aberto */
+/** email-inbound.service v1.12.0 — triagem Agente 4 na entrada e em replies */
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
@@ -11,7 +11,8 @@ import {
 } from './chamado.mapper';
 import { normalizeEmail, resolveClienteRefFromEmail } from './cliente.service';
 import { notifyTicketOpenedAsync } from './emailNotification.service';
-import { runInboundAgentPipeline } from './agents/inboundAgentPipeline.service';
+import { runInboundPostCreateHooks } from './agents/inboundAgentPipeline.service';
+import { runCasosEspeciaisTriagem } from './agents/casosEspeciaisTrigger.service';
 import { matchMailRule } from './mailRules.service';
 import {
   claimInboundMessage,
@@ -240,6 +241,9 @@ async function runInboundEmailFlow(
       { chamadoId: existing._id, origem: { $ne: 'manual' } },
       { $set: { needsReanalysis: true } },
     );
+    void runCasosEspeciaisTriagem(existing, { source: 'email-inbound-reply' }).catch((err: Error) => {
+      console.warn('[email-inbound] triagem casos especiais fail-soft:', err.message);
+    });
     return {
       action: 'replied',
       chamadoProtocolo: existing.chamadoProtocolo,
@@ -263,6 +267,7 @@ async function runInboundEmailFlow(
     attachments,
     lateralForm: {
       clienteEmail: [payload.from.email],
+      clienteEmailResposta: payload.from.email,
       clienteNome: displayName,
       canal: 'E-mail',
       classificacaoTipo: 'Solicitação',
@@ -296,8 +301,8 @@ async function runInboundEmailFlow(
   const chamado = await ChamadoN1.create(partial);
   await notifyTicketOpenedAsync(chamado, payload.from.email);
 
-  void runInboundAgentPipeline(chamado, { source: 'email-inbound' }).catch((err: Error) => {
-    console.warn('[email-inbound] pipeline agentes fail-soft:', err.message);
+  void runInboundPostCreateHooks(chamado, { source: 'email-inbound' }).catch((err: Error) => {
+    console.warn('[email-inbound] hooks inbound fail-soft:', err.message);
   });
 
   return {

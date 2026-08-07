@@ -1,6 +1,6 @@
 /**
- * gestaoChamadosHandoff.service v1.0.0 — handoff crítico do Agente 2 para Gestão
- * VERSION: v1.0.0 | DATE: 2026-07-13
+ * gestaoChamadosHandoff.service v1.0.1 — handoff sem campo legado escalonar
+ * VERSION: v1.0.1 | DATE: 2026-08-06
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -10,23 +10,6 @@ import { applyAssignmentToChamado } from '../assignmentRouter.service';
 import { assertChamadoModifiable, currentStatus } from '../chamado.mapper';
 import type { GestaoHandoffInput, GestaoHandoffResult, NivelCriticidade } from './agentTypes';
 import { sendOutboundEmail } from '../email-outbound.service';
-
-function resolveEscalonar(
-  nivel: NivelCriticidade,
-  palavrasCriticas: string[] = [],
-  produto?: string,
-): string {
-  const text = [...palavrasCriticas, produto || ''].join(' ').toLowerCase();
-  if (nivel === 'critica') {
-    if (/financeiro|estorno|cobrança|cobranca|inadimpl/.test(text)) return 'financeiro';
-    return 'n2';
-  }
-  if (nivel === 'alta') {
-    if (/financeiro|estorno/.test(text)) return 'financeiro';
-    return 'suporte';
-  }
-  return '';
-}
 
 function resolveStatusForHandoff(nivel: NivelCriticidade, current: string): string {
   if (nivel === 'critica') return 'em-andamento';
@@ -90,7 +73,6 @@ export async function executeGestaoHandoff(input: GestaoHandoffInput): Promise<G
       notificacoes.push('atribuicao_roulette');
     }
 
-    const escalonar = resolveEscalonar(input.nivelCriticidade, input.palavrasCriticas, input.produto);
     const statusAtual = currentStatus(chamado);
     const statusNovo = resolveStatusForHandoff(input.nivelCriticidade, statusAtual);
 
@@ -101,7 +83,6 @@ export async function executeGestaoHandoff(input: GestaoHandoffInput): Promise<G
       auditScore: input.auditScore,
       palavrasCriticas: input.palavrasCriticas || [],
     };
-    if (escalonar) alteracoes.escalonar = escalonar;
     if (statusNovo !== statusAtual) alteracoes.status = statusNovo;
 
     chamado.registro.push({
@@ -132,7 +113,6 @@ export async function executeGestaoHandoff(input: GestaoHandoffInput): Promise<G
       resumo,
       detalhes: {
         palavrasCriticas: input.palavrasCriticas,
-        escalonar,
         responsavelAtribuido,
         auditScore: input.auditScore,
       },
@@ -155,14 +135,12 @@ export async function executeGestaoHandoff(input: GestaoHandoffInput): Promise<G
     console.info('[agent-gestao-handoff]', {
       protocolo: input.protocolo,
       nivel: input.nivelCriticidade,
-      escalonar,
       responsavel: responsavelAtribuido,
     });
 
     return {
       success: true,
       responsavelAtribuido,
-      escalonar: escalonar || undefined,
       statusAtualizado: statusNovo,
       notificacoesEnviadas: notificacoes,
       alertId: alert._id.toString(),

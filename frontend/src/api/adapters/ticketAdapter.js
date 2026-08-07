@@ -1,8 +1,9 @@
 /**
- * ticketAdapter v1.7.1 — remove campo escalonar do lateralForm
- * VERSION: v1.7.1 | DATE: 2026-08-03 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.7.4 — não envia workflow pendente em PUT/commit (só flush no save)
+ * VERSION: v1.7.4 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team
  */
 import { getAgentName } from '../../services/clientDb';
+import { stripPendingWorkflowForApiPayload } from '../../services/desk/pendingWorkflowStart';
 import { DEFAULT_TIPO, sanitizeResponsavel } from '../../services/tabulationConfig';
 import { repairUtf8Mojibake } from '../../services/desk/utils';
 
@@ -110,47 +111,50 @@ function adaptMeusChamadosColumns(columns) {
 }
 
 export function cockpitTicketToApi(ticket) {
-  const lf = ticket.lateralForm || {};
-  const emailList = lf.clienteEmail ?? (ticket.clientEmail ? [ticket.clientEmail] : []);
-  const phoneList = lf.clienteTelefone ?? (ticket.clientPhone ? [ticket.clientPhone] : []);
-  const clientName = ticket.clientName || ticket.solicitante || lf.clienteNome;
+  const safe = stripPendingWorkflowForApiPayload(ticket);
+  const lf = safe.lateralForm || {};
+  const emailList = lf.clienteEmail ?? (safe.clientEmail ? [safe.clientEmail] : []);
+  const replyEmail = lf.clienteEmailResposta
+    || (emailList.length === 1 ? emailList[0] : undefined)
+    || safe.clientEmail
+    || undefined;
+  const phoneList = lf.clienteTelefone ?? (safe.clientPhone ? [safe.clientPhone] : []);
+  const clientName = safe.clientName || safe.solicitante || lf.clienteNome;
   const tipo = String(lf.tipoChamado || lf.classificacaoTipo || DEFAULT_TIPO).trim() || DEFAULT_TIPO;
-  const responsavel = sanitizeResponsavel(lf.responsavel) || sanitizeResponsavel(ticket.responsibleAgent);
+  const responsavel = sanitizeResponsavel(lf.responsavel) || sanitizeResponsavel(safe.responsibleAgent);
   return {
-    chamadoProtocolo: ticket.chamadoProtocolo,
-    chamadoTitulo: ticket.chamadoTitulo || ticket.title,
-    title: ticket.title,
-    description: ticket.description,
-    text: ticket.text || ticket.description,
-    status: ticket.status,
-    priority: ticket.priority,
-    channel: ticket.channel,
-    source: ticket.source,
-    messageOrigin: ticket.messageOrigin,
-    boxId: ticket.boxId,
-    clienteId: ticket.clienteId || lf.clienteId,
+    chamadoProtocolo: safe.chamadoProtocolo,
+    chamadoTitulo: safe.chamadoTitulo || safe.title,
+    title: safe.title,
+    description: safe.description,
+    text: safe.text || safe.description,
+    status: safe.status,
+    priority: safe.priority,
+    channel: safe.channel,
+    source: safe.source,
+    messageOrigin: safe.messageOrigin,
+    boxId: safe.boxId,
+    clienteId: safe.clienteId || lf.clienteId,
     clientName,
-    clientCPF: ticket.clientCPF || lf.clienteCpf || lf.cpf,
+    clientCPF: safe.clientCPF || lf.clienteCpf || lf.cpf,
     responsibleAgent: responsavel,
-    author: ticket.author || getAgentName() || undefined,
+    author: safe.author || getAgentName() || undefined,
     lateralForm: {
       ...lf,
       classificacaoTipo: tipo,
       tipoChamado: tipo,
       responsavel,
-      cpf: ticket.clientCPF || lf.clienteCpf || lf.cpf,
-      clienteCpf: ticket.clientCPF || lf.clienteCpf || lf.cpf,
+      cpf: safe.clientCPF || lf.clienteCpf || lf.cpf,
+      clienteCpf: safe.clientCPF || lf.clienteCpf || lf.cpf,
       clienteNome: clientName || '',
       clienteEmail: emailList,
+      clienteEmailResposta: replyEmail,
       clienteTelefone: phoneList,
-      clienteTelefoneWhatsapp: lf.clienteTelefoneWhatsapp || ticket.clientPhone || phoneList[0] || undefined,
-      clienteId: ticket.clienteId || lf.clienteId,
-      wasEscalated: lf.wasEscalated,
-      lastWorkflow: lf.lastWorkflow,
-      retornoN1: lf.retornoN1,
-      workflow: lf.workflow,
+      clienteTelefoneWhatsapp: lf.clienteTelefoneWhatsapp || safe.clientPhone || phoneList[0] || undefined,
+      clienteId: safe.clienteId || lf.clienteId,
+      ...(lf.workflow ? { workflow: lf.workflow } : {}),
     },
-    formData: ticket.formData,
+    formData: safe.formData,
   };
 }
 
@@ -175,6 +179,7 @@ export function buildCreatePayload(form) {
       clienteCpf: cpf,
       clienteNome: form.clientName || lf.clienteNome || '',
       clienteEmail: lf.clienteEmail ?? (form.clientEmail ? [form.clientEmail] : []),
+      clienteEmailResposta: lf.clienteEmailResposta || form.clientEmail || undefined,
       clienteTelefone: lf.clienteTelefone ?? (form.clientPhone ? [form.clientPhone] : []),
       clienteId: form.clienteId || lf.clienteId,
       canal: form.channel || lf.canal,
@@ -183,9 +188,6 @@ export function buildCreatePayload(form) {
       motivo: form.motivo || lf.motivo,
       responsavel: (form.atribuir || lf.responsavel || '').replace(' (eu)', ''),
       detalhe: lf.detalhe || form.detalhe || '',
-      wasEscalated: lf.wasEscalated,
-      lastWorkflow: lf.lastWorkflow,
-      retornoN1: lf.retornoN1,
       workflow: lf.workflow,
     },
   };

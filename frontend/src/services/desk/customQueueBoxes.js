@@ -16,7 +16,6 @@ export const QUEUE_BOX_ACTIONS = [
   { id: 'em-andamento', label: 'Manter em andamento' },
   { id: 'pendente', label: 'Aguardar retorno / pendência' },
   { id: 'resolvidos', label: 'Encaminhar para resolvidos' },
-  { id: 'escalonar', label: 'Escalonar automaticamente' },
   { id: 'notificar', label: 'Notificar supervisor' },
 ];
 
@@ -25,7 +24,6 @@ const ACTION_DOTS = {
   'em-andamento': '#15A237',
   pendente: '#FCC200',
   resolvidos: '#9ca3af',
-  escalonar: '#9333ea',
   notificar: '#ea580c',
 };
 

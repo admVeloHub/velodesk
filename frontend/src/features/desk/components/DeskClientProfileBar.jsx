@@ -1,6 +1,6 @@
 /**
- * DeskClientProfileBar v1.13.2 — botões Avançar/Histórico: largura igual + ponta triangular
- * VERSION: v1.13.2 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team
+ * DeskClientProfileBar v1.14.0 — seleção de e-mail para resposta
+ * VERSION: v1.14.0 | DATE: 2026-08-06 | AUTHOR: VeloHub Development Team
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clientsApi } from '../../../api/client';
@@ -58,6 +58,7 @@ export default function DeskClientProfileBar({
     name: '',
     emails: [''],
     phones: [''],
+    replyEmail: '',
     whatsappPhone: '',
     clienteId: '',
   });
@@ -111,6 +112,7 @@ export default function DeskClientProfileBar({
         name: mapped.clientName,
         emails: mapped.emails.length ? mapped.emails : [''],
         phones: mapped.phones.length ? mapped.phones : [''],
+        replyEmail: mapped.replyEmail || '',
         whatsappPhone: mapped.whatsappPhone,
         clienteId: mapped.clienteId || '',
       });
@@ -160,6 +162,7 @@ export default function DeskClientProfileBar({
         name: validation.nome,
         emails: validation.emailList,
         phones: validation.phoneList,
+        replyEmail: validation.replyEmail,
         whatsappPhone: validation.whatsappPhone,
         clienteId: draft.clienteId,
       });
@@ -259,6 +262,8 @@ export default function DeskClientProfileBar({
                     onNameChange={(value) => setDraft((d) => ({ ...d, name: value }))}
                     emails={draft.emails}
                     onEmailsChange={(emails) => setDraft((d) => ({ ...d, emails }))}
+                    replyEmail={draft.replyEmail}
+                    onReplyEmailChange={(replyEmail) => setDraft((d) => ({ ...d, replyEmail }))}
                     phones={draft.phones}
                     onPhonesChange={(phones) => setDraft((d) => ({ ...d, phones }))}
                     whatsappPhone={draft.whatsappPhone}

@@ -22,7 +22,6 @@ const ACTIVE_STATUSES = new Set(['novo', 'em-aberto', 'em-andamento', 'pendente'
 
 const FINANCEIRO_KW = ['financeiro', 'cobrança', 'cobranca', 'fatura', 'inadimplência', 'inadimplencia'];
 const ESTORNO_KW = ['estorno', 'procon', 'devolução', 'devolucao'];
-const ESCALONAR_VALUES = new Set(['financeiro', 'n2', 'suporte']);
 
 const TZ = 'America/Sao_Paulo';
 
@@ -67,25 +66,6 @@ function periodRange(period = '7d'): { from: Date; to: Date } {
   }
   from.setDate(from.getDate() - 7);
   return { from, to };
-}
-
-function normalizeAlteracoes(alt: unknown): Record<string, unknown>[] {
-  if (Array.isArray(alt)) {
-    return alt.filter((item) => item && typeof item === 'object' && !Array.isArray(item)) as Record<string, unknown>[];
-  }
-  if (alt && typeof alt === 'object') return [alt as Record<string, unknown>];
-  return [];
-}
-
-function getLastEscalonar(chamado: IChamadoN1): string {
-  let last = '';
-  for (const reg of chamado.registro ?? []) {
-    for (const alt of normalizeAlteracoes(reg.alteracoes)) {
-      const val = String(alt.escalonar ?? '').trim();
-      if (val) last = val;
-    }
-  }
-  return last;
 }
 
 function tabulacaoText(chamado: IChamadoN1): string {
@@ -199,19 +179,17 @@ function isEscalationCandidate(chamado: IChamadoN1): boolean {
   const status = currentStatus(chamado);
   if (!ACTIVE_STATUSES.has(status)) return false;
   if (!isSlaBreached(chamado) && !isSlaAtRisk(chamado)) return false;
-  const escalonar = getLastEscalonar(chamado);
-  if (escalonar && ESCALONAR_VALUES.has(escalonar)) return true;
+  if (chamado.workflow?.active) return true;
   const text = tabulacaoText(chamado);
   return matchesKeywords(text, [...FINANCEIRO_KW, ...ESTORNO_KW]);
 }
 
 function escalationCategory(chamado: IChamadoN1): 'financeiro' | 'estorno' | null {
   if (!isEscalationCandidate(chamado)) return null;
-  const escalonar = getLastEscalonar(chamado);
   const text = tabulacaoText(chamado);
-  if (escalonar === 'financeiro' || matchesKeywords(text, FINANCEIRO_KW)) return 'financeiro';
+  if (matchesKeywords(text, FINANCEIRO_KW)) return 'financeiro';
   if (matchesKeywords(text, ESTORNO_KW)) return 'estorno';
-  if (escalonar && ESCALONAR_VALUES.has(escalonar)) return 'financeiro';
+  if (chamado.workflow?.active) return 'financeiro';
   return null;
 }
 

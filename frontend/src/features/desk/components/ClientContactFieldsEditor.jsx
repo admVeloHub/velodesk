@@ -1,6 +1,6 @@
 /**
- * ClientContactFieldsEditor v1.2.0 — máscara de telefone BR no input
- * VERSION: v1.2.0 | DATE: 2026-08-03 | AUTHOR: VeloHub Development Team
+ * ClientContactFieldsEditor v1.3.0 — seleção de e-mail para resposta ao cliente
+ * VERSION: v1.3.0 | DATE: 2026-08-06 | AUTHOR: VeloHub Development Team
  */
 import React from 'react';
 import { isValidEmailFormat, maskCpfInput, maskPhoneInput, normalizePhone } from '../../../services/desk/utils';
@@ -8,6 +8,16 @@ import { isValidEmailFormat, maskCpfInput, maskPhoneInput, normalizePhone } from
 function phoneMatches(a, b) {
   const left = normalizePhone(a);
   const right = normalizePhone(b);
+  return Boolean(left && right && left === right);
+}
+
+function normalizeEmailValue(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function emailMatches(a, b) {
+  const left = normalizeEmailValue(a);
+  const right = normalizeEmailValue(b);
   return Boolean(left && right && left === right);
 }
 
@@ -20,6 +30,8 @@ export default function ClientContactFieldsEditor({
   onNameChange,
   emails,
   onEmailsChange,
+  replyEmail,
+  onReplyEmailChange,
   phones,
   onPhonesChange,
   whatsappPhone,
@@ -38,18 +50,24 @@ export default function ClientContactFieldsEditor({
 
   const updateEmail = (index, value) => {
     const next = [...emailRows];
+    const prev = next[index];
     next[index] = value;
     onEmailsChange(next);
+    if (replyEmail && emailMatches(replyEmail, prev)) {
+      onReplyEmailChange(String(value || '').trim());
+    }
   };
 
   const addEmail = () => onEmailsChange([...emailRows, '']);
 
   const removeEmail = (index) => {
-    if (emailRows.length <= 1) {
-      onEmailsChange(['']);
-      return;
+    const removed = emailRows[index];
+    const next = emailRows.length <= 1 ? [''] : emailRows.filter((_, i) => i !== index);
+    onEmailsChange(next);
+    if (replyEmail && emailMatches(replyEmail, removed)) {
+      const fallback = next.map((item) => String(item || '').trim()).find(Boolean) || '';
+      onReplyEmailChange(fallback);
     }
-    onEmailsChange(emailRows.filter((_, i) => i !== index));
   };
 
   const updatePhone = (index, value) => {
@@ -77,6 +95,10 @@ export default function ClientContactFieldsEditor({
 
   const selectWhatsapp = (value) => {
     onWhatsappPhoneChange(String(value || '').trim());
+  };
+
+  const selectReplyEmail = (value) => {
+    onReplyEmailChange(String(value || '').trim());
   };
 
   return (
@@ -125,29 +147,50 @@ export default function ClientContactFieldsEditor({
             Adicionar
           </button>
         </div>
-        {emailRows.map((email, index) => (
-          <div className="client-contact-fields__row" key={`email-${index}`}>
-            <input
-              type="email"
-              className={'client-contact-fields__input' + (emailErrors[index] ? ' client-contact-fields__input--error' : '')}
-              id={`${idPrefix}Email-${index}`}
-              value={email}
-              onChange={(e) => updateEmail(index, e.target.value)}
-              onBlur={() => onEmailBlur?.(index, email)}
-              placeholder="nome@dominio.com"
-              autoComplete={index === 0 ? 'email' : 'off'}
-            />
-            <button
-              type="button"
-              className="client-contact-fields__remove-btn"
-              onClick={() => removeEmail(index)}
-              aria-label="Remover e-mail"
-              title="Remover"
-            >
-              <i className="ti ti-trash" aria-hidden="true" />
-            </button>
-          </div>
-        ))}
+        {emailRows.map((email, index) => {
+          const trimmed = String(email || '').trim();
+          const replyRadioName = `${idPrefix}-reply-email`;
+          return (
+            <div className="client-contact-fields__row client-contact-fields__row--email" key={`email-${index}`}>
+              <input
+                type="email"
+                className={'client-contact-fields__input' + (emailErrors[index] ? ' client-contact-fields__input--error' : '')}
+                id={`${idPrefix}Email-${index}`}
+                value={email}
+                onChange={(e) => updateEmail(index, e.target.value)}
+                onBlur={() => onEmailBlur?.(index, email)}
+                placeholder="nome@dominio.com"
+                autoComplete={index === 0 ? 'email' : 'off'}
+              />
+              <label
+                className={'client-contact-fields__reply' + (!trimmed ? ' is-disabled' : '')}
+                title="Usar este e-mail para responder ao cliente"
+              >
+                <input
+                  type="radio"
+                  name={replyRadioName}
+                  checked={Boolean(trimmed && emailMatches(replyEmail, trimmed))}
+                  disabled={!trimmed}
+                  onChange={() => selectReplyEmail(trimmed)}
+                />
+                <i className="ti ti-mail" aria-hidden="true" />
+                <span>Resposta</span>
+              </label>
+              <button
+                type="button"
+                className="client-contact-fields__remove-btn"
+                onClick={() => removeEmail(index)}
+                aria-label="Remover e-mail"
+                title="Remover"
+              >
+                <i className="ti ti-trash" aria-hidden="true" />
+              </button>
+            </div>
+          );
+        })}
+        <p className="client-contact-fields__hint">
+          Marque qual e-mail será usado para enviar respostas ao cliente.
+        </p>
       </div>
 
       <div className="client-contact-fields__group">
@@ -208,7 +251,14 @@ export default function ClientContactFieldsEditor({
   );
 }
 
-export function validateClientContactDraft({ cpf, name, emails, phones, whatsappPhone }, { requireName = true } = {}) {
+export function validateClientContactDraft({
+  cpf,
+  name,
+  emails,
+  phones,
+  whatsappPhone,
+  replyEmail,
+}, { requireName = true } = {}) {
   const nome = String(name || '').trim();
   const cpfDigits = String(cpf || '').replace(/\D/g, '').slice(0, 11);
   if (requireName && !nome) {
@@ -223,6 +273,14 @@ export function validateClientContactDraft({ cpf, name, emails, phones, whatsapp
     }
   }
 
+  const replySelected = String(replyEmail || '').trim();
+  if (emailList.length > 1 && replySelected && !emailList.some((item) => emailMatches(item, replySelected))) {
+    return { ok: false, message: 'Selecione um e-mail válido para resposta ao cliente.' };
+  }
+  if (emailList.length > 1 && !replySelected) {
+    return { ok: false, message: 'Selecione qual e-mail será usado para responder ao cliente.' };
+  }
+
   const phoneList = (phones || []).map((item) => String(item || '').trim()).filter(Boolean);
   const whatsappSelected = String(whatsappPhone || '').trim();
   if (phoneList.length > 1 && whatsappSelected && !phoneList.some((item) => phoneMatches(item, whatsappSelected))) {
@@ -232,7 +290,15 @@ export function validateClientContactDraft({ cpf, name, emails, phones, whatsapp
     return { ok: false, message: 'Selecione qual telefone será usado no WhatsApp.' };
   }
 
-  return { ok: true, nome, cpf: cpfDigits, emailList, phoneList, whatsappPhone: resolveWhatsappPhone(phoneList, whatsappPhone) };
+  return {
+    ok: true,
+    nome,
+    cpf: cpfDigits,
+    emailList,
+    phoneList,
+    whatsappPhone: resolveWhatsappPhone(phoneList, whatsappPhone),
+    replyEmail: resolveReplyEmail(emailList, replyEmail),
+  };
 }
 
 export function resolveWhatsappPhone(phoneList, whatsappPhone) {
@@ -244,6 +310,17 @@ export function resolveWhatsappPhone(phoneList, whatsappPhone) {
     if (match) return match;
   }
   return phones[0];
+}
+
+export function resolveReplyEmail(emailList, replyEmail) {
+  const emails = (emailList || []).map((item) => String(item || '').trim()).filter(Boolean);
+  if (!emails.length) return '';
+  const selected = String(replyEmail || '').trim();
+  if (selected) {
+    const match = emails.find((item) => emailMatches(item, selected));
+    if (match) return match;
+  }
+  return emails[0];
 }
 
 export function buildContactDraftFromFields(fields) {
@@ -258,6 +335,7 @@ export function buildContactDraftFromFields(fields) {
     name: fields.name || '',
     emails: emails.length ? emails : [''],
     phones: phones.length ? phones : [''],
+    replyEmail: fields.replyEmail || resolveReplyEmail(emails, fields.replyEmail),
     whatsappPhone: fields.whatsappPhone || resolveWhatsappPhone(phones, fields.whatsappPhone),
     clienteId: fields.clienteId || '',
   };

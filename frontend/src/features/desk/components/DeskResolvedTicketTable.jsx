@@ -1,6 +1,6 @@
 /**
  * DeskResolvedTicketTable — lista tabular de tickets finalizados
- * VERSION: v1.2.0 | DATE: 2026-07-31
+ * VERSION: v1.2.2 | DATE: 2026-08-07
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -32,6 +32,7 @@ function buildPageNumbers(current, total) {
 export default function DeskResolvedTicketTable({
   entries = [],
   searchActive: externalSearchActive = false,
+  displayTotal,
   onSelectTicket,
   onReload,
   refreshing = false,
@@ -55,7 +56,9 @@ export default function DeskResolvedTicketTable({
     [filteredEntries, sortField, sortDir],
   );
 
-  const total = sortedEntries.length;
+  const total = searchActive
+    ? sortedEntries.length
+    : (typeof displayTotal === 'number' ? displayTotal : sortedEntries.length);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   useEffect(() => {

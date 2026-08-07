@@ -1,6 +1,6 @@
 # API Inbound Telefonia IA — Guia para Parceira (Contact Tel)
 
-<!-- VERSION: v1.0.1 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v2.0.0 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team -->
 
 Documento para **homologação e uso** da API que recebe ligações da IA telefônica e consulta recados emergenciais.
 
@@ -66,6 +66,7 @@ GET https://velodesk-278491073220.us-east1.run.app/api/inbound/telephony/health
   "status": "ok",
   "enabled": true,
   "apiVersion": "1.0.0",
+  "recadosSchemaVersion": "2.0",
   "activeRecados": 2,
   "lastRecadoUpdate": "2026-07-29T18:41:56.527Z"
 }
@@ -74,8 +75,9 @@ GET https://velodesk-278491073220.us-east1.run.app/api/inbound/telephony/health
 | Campo | Significado |
 |-------|-------------|
 | `enabled` | Integração telefonia ativa no servidor |
+| `recadosSchemaVersion` | Versão do contrato de recados operacionais (`2.0`) |
 | `activeRecados` | Quantidade de recados emergenciais ativos |
-| `lastRecadoUpdate` | Última atualização de recado ativo (ISO 8601) ou `null` |
+| `lastRecadoUpdate` | Última alteração no conjunto de recados (ISO 8601 UTC) |
 
 ---
 
@@ -243,26 +245,35 @@ Chamadas sem conversa podem vir **sem** `segments` e **sem** transcrição:
 
 ---
 
-### 3. Consultar recados emergenciais
+### 3. Consultar recados operacionais (contrato v2)
 
-Antes de cada ligação, a parceira consulta recados ativos cadastrados no Velodesk (ex.: instabilidade PIX).
+Antes de cada ligação, a parceira consulta recados ativos cadastrados no Velodesk.
 
 ```http
 GET https://velodesk-278491073220.us-east1.run.app/api/inbound/telephony/recados
 X-Inbound-Secret: ulzj7zwywpw3u3rmliwfesp7z6bor8zb
+Accept: application/json; charset=utf-8
 ```
 
-**Resposta `200` — com recados:**
+**Resposta `200` — envelope v2 com recados:**
 
 ```json
 {
-  "updatedAt": "2026-07-29T18:41:56.527Z",
+  "schemaVersion": "2.0",
+  "updatedAt": "2026-08-05T14:30:00Z",
   "items": [
     {
-      "id": "6789abcd0123456789012345",
-      "titulo": "Envio de PIX com intermitência",
-      "mensagem": "Informe ao cliente que estamos com instabilidade no PIX.",
-      "prioridade": "alta"
+      "id": "pix-recebido-2026-08-05",
+      "titulo": "Instabilidade no Pix recebido",
+      "areas": ["conta_e_pix"],
+      "tipo": "instabilidade",
+      "mensagemCliente": "Estamos com uma instabilidade temporária na entrada de Pix nas contas.",
+      "orientacaoAtendimento": "Use este aviso somente quando o cliente disser que recebeu um Pix, mas o saldo ainda não foi atualizado.",
+      "politicaChamado": "nao_abrir",
+      "criterioChamado": null,
+      "prioridade": "alta",
+      "telefonesOrigemLiberados": [],
+      "updatedAt": "2026-08-05T14:30:00Z"
     }
   ]
 }
@@ -272,17 +283,28 @@ X-Inbound-Secret: ulzj7zwywpw3u3rmliwfesp7z6bor8zb
 
 ```json
 {
-  "updatedAt": "2026-07-31T20:00:00.000Z",
+  "schemaVersion": "2.0",
+  "updatedAt": "2026-08-05T18:00:00Z",
   "items": []
 }
 ```
 
 | Campo | Significado |
 |-------|-------------|
-| `updatedAt` | Timestamp ISO da última atualização entre os recados retornados |
-| `items[].prioridade` | `alta` \| `media` \| `baixa` — ordenação: alta primeiro |
+| `schemaVersion` | Sempre `"2.0"` nesta versão |
+| `updatedAt` | Última alteração do conjunto (criação, edição ou remoção) |
+| `items` | Sempre array — vazio quando não há recado ativo |
+| `items[].areas` | Uma ou mais das 11 áreas documentadas |
+| `items[].politicaChamado` | `fluxo_normal` \| `nao_abrir` \| `abrir_se_persistir` \| `abrir_imediatamente` |
+| `items[].telefonesOrigemLiberados` | `null` ou `[]` = publicação geral; lista não vazia = homologação restrita |
 
-Recados são cadastrados por supervisores no Desk em [Atendimento IA Telefônico](https://velodesk-278491073220.us-east1.run.app/atendimento-ia-telefonico) ou **Configurações → API Externa**.
+**Ordenação aplicada pelo servidor:** prioridade (`alta` → `media` → `baixa`), `updatedAt` desc, `id` asc.
+
+**Filtragem por telefone de origem:** responsabilidade da Contact-Tel/LetícIA — o Velodesk publica o campo `telefonesOrigemLiberados` sem filtrar no endpoint.
+
+Referência completa: `docs/Proposta de contrato v2 para recados operacionais.md`
+
+Recados são cadastrados por supervisores no Desk em **Atendimento IA Telefônico → Recados emergenciais**.
 
 ---
 
@@ -356,7 +378,8 @@ Valida: completed + no_answer + idempotência + strip de gravação + recados.
 - [ ] `POST /calls` sem secret em produção retorna `401`
 - [ ] `POST /calls` com secret errado retorna `401`
 - [ ] Chamada `no_answer` sem transcrição é aceita
-- [ ] `GET /recados` retorna `200` com `items` (vazio ou preenchido)
+- [ ] `GET /recados` retorna `200` com `schemaVersion: "2.0"` e `items` (vazio ou preenchido)
+- [ ] Campos v2 presentes em cada item (`areas`, `mensagemCliente`, `orientacaoAtendimento`, `politicaChamado`, etc.)
 - [ ] Ligação visível em [Atendimento IA Telefônico](https://velodesk-278491073220.us-east1.run.app/atendimento-ia-telefonico)
 - [ ] `recording_download_url` não aparece no payload persistido
 
