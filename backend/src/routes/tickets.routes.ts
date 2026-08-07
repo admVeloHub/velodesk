@@ -1,4 +1,4 @@
-/** tickets.routes v1.13.0 — envio WhatsApp contínuo (thread, sem mudar status) */
+/** tickets.routes v1.14.0 — commit/messages: interno para observadores; público exige atuação */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -37,7 +37,9 @@ import {
 } from '../services/workflowRequisicao.service';
 import {
   assertCanActOnTicket,
+  assertCanCommitTicket,
   assertCanInterruptWorkflow,
+  assertCanPostTicketMessage,
   assertCanWorkflowComunicacao,
   PermissionDeniedError,
 } from '../services/permission.service';
@@ -237,7 +239,7 @@ router.post('/:id/commit', authMiddleware, async (req, res: Response) => {
 
   try {
     assertChamadoModifiable(chamado);
-    await assertCanActOnTicket(req.user!, chamado);
+    await assertCanCommitTicket(req.user!, chamado, req.body);
   } catch (err) {
     if (handleTicketMutationError(err, res)) return;
     throw err;
@@ -292,7 +294,7 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
 
   try {
     assertChamadoModifiable(chamado);
-    await assertCanActOnTicket(req.user!, chamado);
+    await assertCanPostTicketMessage(req.user!, chamado, Boolean(internal));
   } catch (err) {
     if (handleTicketMutationError(err, res)) return;
     throw err;

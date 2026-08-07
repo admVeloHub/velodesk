@@ -1,6 +1,6 @@
 /**
- * DeskComposePanel v1.11.0 — botão Anexo ao lado do Revisor de Texto
- * VERSION: v1.11.0 | DATE: 2026-07-30
+ * DeskComposePanel v1.12.0 — compose público vs anotação interna por permissão
+ * VERSION: v1.12.0 | DATE: 2026-08-07
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { uploadsApi } from '../../../api/client';
@@ -350,6 +350,7 @@ export default function DeskComposePanel({
   onFlaggedErrorsChange,
   variant = 'full',
   workflowLocked = false,
+  internalComposeLocked = false,
   workflowTeamLabel = '',
   ticketReadOnly = false,
 }) {
@@ -364,8 +365,9 @@ export default function DeskComposePanel({
   const [attachUploading, setAttachUploading] = useState(false);
   const showPublic = variant === 'full' || variant === 'public-only';
   const showInternal = variant === 'full' || variant === 'internal-only';
-  const composeLocked = Boolean(workflowLocked || ticketReadOnly);
-  const publicLocked = composeLocked && (ticketReadOnly || composeMode === 'public');
+  const publicComposeLocked = Boolean(workflowLocked || ticketReadOnly);
+  const internalLocked = Boolean(internalComposeLocked || ticketReadOnly);
+  const publicLocked = publicComposeLocked;
   const internalPlaceholder = ticketReadOnly
     ? 'Ticket fechado — anotações indisponíveis'
     : workflowLocked
@@ -484,7 +486,7 @@ export default function DeskComposePanel({
     <div className={
       'crm-ticket-compose'
       + (variant === 'internal-only' ? ' crm-ticket-compose--notes' : '')
-      + (composeLocked ? ' crm-ticket-compose--workflow-locked' : '')
+      + (publicComposeLocked ? ' crm-ticket-compose--workflow-locked' : '')
       + (ticketReadOnly ? ' crm-ticket-compose--ticket-closed' : '')
     }>
       <div className="ticket-response octa-comment-panel crm-ticket-response">
@@ -497,7 +499,7 @@ export default function DeskComposePanel({
                 className={'response-tab octa-nav-tab octa-tab-public' + (composeMode === 'public' ? ' active' : '')}
                 data-compose="public"
                 onClick={() => onComposeModeChange('public')}
-                disabled={composeLocked}
+                disabled={publicComposeLocked}
               >
                 <i className="fas fa-envelope" /> Resposta pública
               </button>
@@ -581,13 +583,13 @@ export default function DeskComposePanel({
                 <InternalNoteFields
                   ticketId={ticketId}
                   internalText={internalText}
-                  onInternalTextChange={ticketReadOnly ? () => {} : onInternalTextChange}
+                  onInternalTextChange={internalLocked ? () => {} : onInternalTextChange}
                   tabulationConfig={tabulationConfig}
                   spellIgnoredWords={spellIgnoredWords}
                   onIgnoreSpellWord={onIgnoreSpellWord}
                   placeholder={internalPlaceholder}
                   showNotification={showNotification}
-                  readOnly={ticketReadOnly}
+                  readOnly={internalLocked}
                 />
               </div>
               ) : null}
@@ -600,10 +602,10 @@ export default function DeskComposePanel({
           <i className="ti ti-lock" aria-hidden="true" />
           <span>Ticket fechado — somente leitura</span>
         </div>
-      ) : workflowLocked ? (
+      ) : publicComposeLocked ? (
         <div className="desk-workflow-compose-lock" role="status">
           <i className="ti ti-lock" aria-hidden="true" />
-          <span>Workflow ativo • aprovação pendente</span>
+          <span>Sem permissão para resposta pública neste ticket • anotação interna disponível</span>
         </div>
       ) : null}
     </div>

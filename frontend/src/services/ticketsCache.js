@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.11.3 — preserva clienteEmailResposta no merge da fila
- * VERSION: v1.11.3 | DATE: 2026-08-06 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.11.4 — preserva workflow pendente no merge/reload pós-commit
+ * VERSION: v1.11.4 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -15,6 +15,10 @@ import {
 import { readDeskProfileId, shouldUseMeusChamadosFila, ticketBelongsInAgentNovosQueue } from './desk/responsavelSegmentation';
 import { getAgentName } from './clientDb';
 import { syncProconDemandasFromTickets } from './especiais/proconTicketService';
+import {
+  hasPendingWorkflowPersist,
+  mergeApiTicketPreservingPendingWorkflow,
+} from './desk/pendingWorkflowStart';
 
 const BOXES_CACHE_KEY = 'velodesk_boxes_cache_v2';
 const BOXES_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -203,7 +207,9 @@ function ticketHasClientContactData(ticket) {
 }
 
 function shouldPreserveTicketDetail(ticket) {
-  if (!ticket?._detailLoaded || isDraftTicket(ticket)) return false;
+  if (!ticket || isDraftTicket(ticket)) return false;
+  if (hasPendingWorkflowPersist(ticket)) return true;
+  if (!ticket._detailLoaded) return false;
   return ticketHasDetailContent(ticket) || ticketHasClientContactData(ticket);
 }
 
@@ -343,9 +349,14 @@ export async function loadTicketDetailFromApi(ticketId) {
     if (raw?.listOnly === true) {
       throw new Error('API retornou listagem resumida em vez do detalhe completo');
     }
-    const full = apiTicketToCockpit(raw);
+    const prevEntry = findInColumns(ticketId);
+    const prevTicket = prevEntry?.ticket;
+    let full = apiTicketToCockpit(raw);
     if (!full?.id && !full?._id) {
       throw new Error('Ticket inválido na resposta da API');
+    }
+    if (prevTicket && hasPendingWorkflowPersist(prevTicket)) {
+      full = mergeApiTicketPreservingPendingWorkflow(prevTicket, full);
     }
     full.listOnly = false;
     full._detailLoaded = true;
@@ -514,8 +525,20 @@ export async function commitTicketViaApi(ticketId, payload) {
   const apiId = String(ticketId);
   if (useApi && !isDraftTicket({ id: apiId })) {
     assertApiReady('salvar ticket');
+    const prevTicket = findInColumns(apiId)?.ticket;
+    const hadPendingWorkflow = hasPendingWorkflowPersist(prevTicket);
     await ticketsApi.commit(apiId, payload);
     await loadBoxesFromApi();
+    if (hadPendingWorkflow && prevTicket) {
+      const entry = findInColumns(apiId);
+      if (entry?.ticket) {
+        entry.box.tickets[entry.index] = mergeApiTicketPreservingPendingWorkflow(
+          prevTicket,
+          entry.ticket,
+        );
+        persistColumnsToStorage(columns);
+      }
+    }
     const detailed = await loadTicketDetailFromApi(apiId);
     return detailed || findInColumns(apiId)?.ticket;
   }

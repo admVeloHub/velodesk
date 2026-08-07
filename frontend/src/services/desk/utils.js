@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.11.7 | DATE: 2026-08-07
- * — Contadores via GET /boxes/queue-counts (cache + polling + delta otimista)
+ * VERSION: v3.11.9 | DATE: 2026-08-07
+ * — Meus Tickets confia filtro meus-chamados do backend (sem double-filter de responsável)
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
 import { getDeskQueueDisplayCount, markTicketResolvedOptimistic } from './queueCounts';
@@ -996,7 +996,7 @@ export const MY_TICKETS_STATUS_SECTIONS = [
   { id: 'pendentes', label: 'Pendentes', dot: '#FCC200' },
 ];
 
-const MEUS_TICKETS_ACTIVE_QUEUE_IDS = new Set(['novos', 'em-andamento', 'em-espera']);
+const MEUS_TICKETS_ACTIVE_QUEUE_IDS = new Set(['novos', 'em-andamento', 'pendente']);
 const MEUS_TICKETS_ACTIVE_STATUSES = new Set(['novo', 'em-aberto', 'em-andamento', '']);
 
 function matchesTicketByCpf(ticket, rawQuery) {
@@ -1043,17 +1043,17 @@ export function filterEntriesByDeskSearch(entries, rawQuery, searchMode) {
 
 function filterMyTicketsEntries(searchQuery) {
   const q = String(searchQuery || '').trim();
+  const trustBackend = shouldUseMeusChamadosFila();
 
   return getAllCockpitTickets().filter((entry) => {
     if (!MEUS_TICKETS_ACTIVE_QUEUE_IDS.has(entry.queueId)) return false;
     if (isFusaoAbsorvido(entry.ticket)) return false;
-    if (!ticketBelongsInMeusTicketsList(entry.ticket)) return false;
     if (isTicketTerminalStatus(entry.ticket)) return false;
 
     const status = normalizeTicketStatusKey(entry.ticket?.status);
 
-    if (entry.queueId === 'em-espera' || status === 'pendente') {
-      return status === 'pendente' && matchesTicketSearch(entry, q);
+    if (entry.queueId === 'pendente') {
+      return (status === 'pendente' || status === 'em-espera') && matchesTicketSearch(entry, q);
     }
 
     if (entry.queueId === 'novos') {
@@ -1061,6 +1061,9 @@ function filterMyTicketsEntries(searchQuery) {
     } else if (!MEUS_TICKETS_ACTIVE_STATUSES.has(status)) {
       return false;
     }
+
+    // /boxes?fila=meus-chamados já filtra responsável/atribuído — não re-filtrar no cliente
+    if (!trustBackend && !ticketBelongsInMeusTicketsList(entry.ticket)) return false;
 
     return matchesTicketSearch(entry, q);
   });
@@ -1095,9 +1098,11 @@ function normalizeTicketStatusKey(status) {
 function matchesMyTicketsStatusSection(entry, sectionId) {
   const status = normalizeTicketStatusKey(entry.ticket?.status);
 
-  if (sectionId === 'cliente-respondeu') return status === 'em-aberto';
+  if (sectionId === 'cliente-respondeu') {
+    return status === 'em-aberto' || status === 'em aberto';
+  }
   if (sectionId === 'em-andamento') return status === 'em-andamento';
-  if (sectionId === 'pendentes') return status === 'pendente';
+  if (sectionId === 'pendentes') return status === 'pendente' || status === 'em-espera';
   if (sectionId === 'novos') return status === 'novo' || status === '' || entry.queueId === 'novos';
   return entry.queueId === sectionId;
 }

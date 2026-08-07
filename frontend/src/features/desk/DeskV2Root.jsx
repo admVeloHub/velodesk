@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.26.0 | DATE: 2026-08-07
- * — fix loop ?ticket= filho mesclado reabrindo aba ao trocar tab
+ * VERSION: v3.28.0 | DATE: 2026-08-07
+ * — Persistência workflow: flush usa snapshot pré-save; stepper/badge mantidos após commit
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -39,7 +39,9 @@ import {
   applyPendingWorkflowStartToTicket,
   discardPendingWorkflowStart,
   flushPendingWorkflowOnSave,
+  hasPendingWorkflowPersist,
   mergeApiTicketPreservingPendingWorkflow,
+  resolveTicketSnapshotForWorkflowFlush,
 } from '../../services/desk/pendingWorkflowStart';
 import { refreshQueueCountsFromApi } from '../../services/desk/queueCounts';
 import {
@@ -58,8 +60,12 @@ import { useTickets } from '../../context/TicketsContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissionsOptional } from '../../context/PermissionContext';
-import { canInterruptWorkflow } from '../../services/permissions/permissionService';
-import { hasAtendimentoFuncao } from '../../services/desk/atuacaoVision';
+import {
+  canAdvanceWorkflowStep,
+  canInterruptWorkflow,
+  canSendInternalNoteOnTicket,
+  canSendPublicMessageOnTicket,
+} from '../../services/permissions/permissionService';
 import { getAllQueueStatuses, fetchAndHydrateCustomQueues } from '../../services/desk/customQueueBoxes';
 import CreateTicketPanel from './components/CreateTicketPanel';
 import DeskQueuePanel from './components/DeskQueuePanel';
@@ -811,6 +817,23 @@ export default function DeskV2Root() {
     const messagePayload = messageHtml || '';
     const internalNotePayload = internalNoteHtml || '';
 
+    const deskPerms = permsCtx?.permissions;
+    if (hasPublicPayload && !canSendPublicMessageOnTicket(ticket, deskPerms)) {
+      showNotification('Sem permissão para enviar mensagem pública neste ticket.', 'warning');
+      commitInProgressRef.current = false;
+      return null;
+    }
+    if (internalNoteText && !canSendInternalNoteOnTicket(ticket, deskPerms)) {
+      showNotification('Sem permissão para comentar neste ticket.', 'warning');
+      commitInProgressRef.current = false;
+      return null;
+    }
+    if (!hasPublicPayload && !internalNoteText && !canSendPublicMessageOnTicket(ticket, deskPerms)) {
+      showNotification('Sem permissão para alterar tabulação ou status deste ticket.', 'warning');
+      commitInProgressRef.current = false;
+      return null;
+    }
+
     const tabulationCheck = validateTabulationForSendStatus(
       status,
       mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
@@ -889,6 +912,28 @@ export default function DeskV2Root() {
         }
         const persisted = await persistDraftTicket(prepared, messageText || internalNoteText || attachmentUrls.length);
         const newId = persisted.id || persisted._id;
+        const draftFlushTicket = hasPendingWorkflowPersist(prepared)
+          ? { ...prepared, id: newId, _id: newId }
+          : null;
+        if (draftFlushTicket) {
+          const flushResult = await flushPendingWorkflowOnSave(
+            newId,
+            draftFlushTicket,
+            {
+              ticketsApi,
+              apiTicketToCockpit,
+              patchTicket,
+              injectWorkflowSystemMessage,
+            },
+          );
+          if (flushResult.error) {
+            showNotification(
+              flushResult.error?.response?.data?.message
+                || 'Ticket salvo, mas falhou ao ativar o workflow.',
+              'warning',
+            );
+          }
+        }
         delete tabSessionsRef.current[draftId];
         if (session) {
           tabSessionsRef.current[String(newId)] = {
@@ -924,6 +969,14 @@ export default function DeskV2Root() {
       syncTicketWorkflowOnCommit(prepared);
       applySendStatus({ ticket: prepared, boxId: entry.boxId }, status);
 
+      const ticketBeforeSave = findTicketEntry(ticket.id)?.ticket || ticket;
+      const workflowFlushDeps = {
+        ticketsApi,
+        apiTicketToCockpit,
+        patchTicket,
+        injectWorkflowSystemMessage,
+      };
+
       await commitTicketViaApi(ticket.id, {
         ...cockpitTicketToApi(prepared),
         text: messagePayload,
@@ -935,13 +988,8 @@ export default function DeskV2Root() {
       const entryAfterSave = findTicketEntry(ticket.id);
       const flushResult = await flushPendingWorkflowOnSave(
         ticket.id,
-        entryAfterSave?.ticket || ticket,
-        {
-          ticketsApi,
-          apiTicketToCockpit,
-          patchTicket,
-          injectWorkflowSystemMessage,
-        },
+        resolveTicketSnapshotForWorkflowFlush(ticketBeforeSave, entryAfterSave?.ticket || ticket),
+        workflowFlushDeps,
       );
       if (flushResult.error) {
         showNotification(
@@ -1380,12 +1428,15 @@ export default function DeskV2Root() {
   }, []);
 
   const workflowProgress = ticket ? getWorkflowProgress(ticket) : null;
-  const isAtendimentoAgent = hasAtendimentoFuncao(colaboradorAtuacao);
-  const workflowComposeLocked = Boolean(workflowProgress?.composeLocked) || !isAtendimentoAgent || ticketReadOnly;
-  const tabulationReadonly = !isAtendimentoAgent || ticketReadOnly;
+  const deskPermissions = permsCtx?.permissions;
+  const canPublicCompose = ticket ? canSendPublicMessageOnTicket(ticket, deskPermissions) : false;
+  const canInternalCompose = ticket ? canSendInternalNoteOnTicket(ticket, deskPermissions) : false;
+  const workflowPublicLocked = ticketReadOnly || !canPublicCompose;
+  const tabulationReadonly = ticketReadOnly || !canPublicCompose;
 
   const canAdvanceWorkflow = (() => {
     if (ticket?.workflow?.pendingPersist) return false;
+    if (!canAdvanceWorkflowStep(ticket, deskPermissions)) return false;
     if (!workflowProgress || workflowProgress.workflow?.status === 'completed') return false;
     const step = workflowProgress.activeStep;
     if (!step) return false;
@@ -1458,10 +1509,10 @@ export default function DeskV2Root() {
   ]);
 
   useEffect(() => {
-    if (workflowComposeLocked && composeMode === 'public') {
+    if (workflowPublicLocked && composeMode === 'public') {
       setComposeMode('internal');
     }
-  }, [workflowComposeLocked, composeMode]);
+  }, [workflowPublicLocked, composeMode]);
 
   const handleOpenAiRevision = useCallback(() => {
     setAiRevisionOpen(true);
@@ -1680,7 +1731,8 @@ export default function DeskV2Root() {
                         spellIgnoredWords={spellIgnoredWords}
                         onIgnoreSpellWord={handleIgnoreSpellWord}
                         onFlaggedErrorsChange={handleFlaggedErrorsChange}
-                        workflowLocked={workflowComposeLocked}
+                        workflowLocked={workflowPublicLocked}
+                        internalComposeLocked={!canInternalCompose || ticketReadOnly}
                         workflowTeamLabel={workflowProgress?.awaitingTeamLabel}
                         ticketReadOnly={ticketReadOnly}
                       />
@@ -1729,7 +1781,11 @@ export default function DeskV2Root() {
           waChatOpen={waChatOpen}
           onOpenChat={handleOpenChat}
           onCloseChat={() => setWaChatOpen(false)}
-          sendDisabled={sendDisabledBySpell || ticketReadOnly}
+          sendDisabled={
+            sendDisabledBySpell
+            || ticketReadOnly
+            || (composeMode === 'public' ? !canPublicCompose : !canInternalCompose)
+          }
           iaTabulationDisplay={ticketAi.tabulacaoDisplay}
           iaTabulation={ticketAi.tabulacao}
           iaTabulationFonte={ticketAi.tabulacaoFonte}

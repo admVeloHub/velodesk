@@ -1,10 +1,33 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.65.0 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.66.0 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk: permissões workflow/compose, Meus Tickets e persistência de workflow
+
+- **Data/Hora**: 2026-08-07
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.66.0
+  - **Backend**: permission.service v1.7.0, tickets.routes v1.14.0
+  - **Frontend**: permissionService v1.7.0, DeskComposePanel v1.12.0, DeskV2Root v3.28.0, utils v3.11.9, ticketsCache v1.11.4, DeskMyTicketsTable v1.5.4, pendingWorkflowStart
+- **Arquivos principais**:
+  - `backend/src/services/permission.service.ts` — avanço de workflow só para atribuído do passo; commit/messages com anotação interna para observadores
+  - `backend/src/routes/tickets.routes.ts` — `assertCanCommitTicket` e `assertCanPostTicketMessage`
+  - `frontend/src/services/permissions/permissionService.js` — compose público vs comentário interno; `canAdvanceWorkflowStep`
+  - `frontend/src/features/desk/components/DeskComposePanel.jsx` — lock separado para resposta pública e anotação interna
+  - `frontend/src/services/desk/utils.js`, `DeskMyTicketsTable.jsx` — Meus Tickets confia filtro backend; seções Cliente respondeu/Pendentes
+  - `frontend/src/services/ticketsCache.js`, `pendingWorkflowStart.js`, `DeskV2Root.jsx` — preserva workflow pendente pós-commit/reload
+- **Descrição**: Observadores de ticket em workflow podem registrar anotação interna sem alterar status/tabulacao ou enviar resposta pública. Avanço de workflow restringido ao atribuído do passo ativo. Corrige listagem Meus Tickets e mantém stepper/badge de workflow após salvar.
+- **Validação**: alterações de permissão alinhadas backend/frontend; filtros Meus Tickets sem double-filter de responsável.
+- **Status**: Push main
+
+---
 
 ### GitHub Push — Backend: Agente 4 casos especiais, telefonia/Twilio e prompts anti-eco
 
