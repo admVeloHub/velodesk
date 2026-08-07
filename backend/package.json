@@ -32,6 +32,7 @@
     "register:twilio-whatsapp-sender": "tsx scripts/register-twilio-whatsapp-sender.ts",
     "test:twilio-auth": "tsx scripts/test-twilio-auth.ts",
     "test:casos-especiais-precheck": "tsx scripts/test-casos-especiais-precheck.ts",
+    "test:inbound-especiais-channel": "tsx scripts/test-inbound-especiais-channel.ts",
     "backfill:ticket-ia": "tsx scripts/backfill-ticket-ia.ts"
   },
   "dependencies": {

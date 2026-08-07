@@ -1,6 +1,6 @@
 /**
- * workflowDecisionHandlers v2.2.0 — loadComunicacaoWorkflowForTicket (GET detalhe)
- * VERSION: v2.2.0 | DATE: 2026-07-24
+ * workflowDecisionHandlers v2.3.0 — comunicacaoResumo + Respondidos WS360
+ * VERSION: v2.3.0 | DATE: 2026-08-06
  */
 import { ticketsApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
@@ -84,6 +84,48 @@ export async function requestWorkflowInfo(ticketId, message = '', origem = 'work
 
 export async function replyWorkflowComunicacao(ticketId, message = '') {
   return requestWorkflowInfo(ticketId, message, 'responsavel');
+}
+
+function readAutorOrigem(autor) {
+  const normalized = String(autor || '').trim().toLowerCase();
+  if (normalized.startsWith('responsavel:')) return 'responsavel';
+  if (normalized.startsWith('wf:')) return 'workflow';
+  return null;
+}
+
+function buildComunicacaoResumoFromThread(thread = []) {
+  if (!thread.length) {
+    return { ultimaOrigem: null, ultimaData: null, temRespostaAgente: false };
+  }
+  const temRespostaAgente = thread.some(
+    (item) => readAutorOrigem(item.autor) === 'responsavel',
+  );
+  const last = thread[thread.length - 1];
+  return {
+    ultimaOrigem: readAutorOrigem(last.autor),
+    ultimaData: last.data || null,
+    temRespostaAgente,
+  };
+}
+
+export function resolveComunicacaoResumo(ticket) {
+  const fromApi = ticket?.workflow?.requisicao?.comunicacaoResumo;
+  if (fromApi && fromApi.ultimaOrigem !== undefined) {
+    return {
+      ultimaOrigem: fromApi.ultimaOrigem || null,
+      ultimaData: fromApi.ultimaData || null,
+      temRespostaAgente: fromApi.temRespostaAgente === true,
+    };
+  }
+  return buildComunicacaoResumoFromThread(readTicketComunicacaoWorkflow(ticket));
+}
+
+export function ticketAwaitingProdutosComunicacaoReview(ticket) {
+  if (!ticket?.workflow?.active) return false;
+  if (ticket.workflow?.completedAt) return false;
+  const lfStatus = ticket?.lateralForm?.workflow?.status;
+  if (lfStatus === 'completed') return false;
+  return resolveComunicacaoResumo(ticket).ultimaOrigem === 'responsavel';
 }
 
 function readComunicacaoFromRegistro(ticket) {

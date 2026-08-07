@@ -36,6 +36,7 @@ export function buildStartWorkflowApiBody(pending) {
   return {
     definicaoSlug: pending.definicaoSlug,
     ...(pending.requisicao ? { requisicao: pending.requisicao } : {}),
+    ...(pending.solicitacaoProdutos ? { solicitacaoProdutos: pending.solicitacaoProdutos } : {}),
   };
 }
 
@@ -56,11 +57,15 @@ export function applyPendingWorkflowStartToTicket(ticket, template, requisicaoVa
     active: true,
     pendingPersist: true,
   };
+  const solicitacaoProdutos = ticket.lateralForm?.solicitacaoProdutos;
   ticket._pendingWorkflowStart = {
     definicaoSlug: template.id,
     templateTitle: template.title,
     ...(requisicaoValores && Object.keys(requisicaoValores).length
       ? { requisicao: { valores: requisicaoValores } }
+      : {}),
+    ...(solicitacaoProdutos && Object.keys(solicitacaoProdutos).length
+      ? { solicitacaoProdutos }
       : {}),
   };
 

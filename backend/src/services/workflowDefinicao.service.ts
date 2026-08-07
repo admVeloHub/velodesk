@@ -201,3 +201,58 @@ export async function resolveWorkflowForTicket(ticket: {
     (wf) => evaluateGatilhoCriterios(wf.gatilho?.criterios || [], fields, grupos),
   ) || null;
 }
+
+function normalizeFuncaoSlug(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+/** Workflow cuja definição pertence à função (slug escalonar-{funcao} ou passo atribuído ao grupo). */
+export function workflowDefinitionMatchesFuncao(
+  definicao: IWorkflowDefinicao,
+  funcaoSlugs: string[],
+): boolean {
+  const funcoes = new Set(
+    (funcaoSlugs || []).map(normalizeFuncaoSlug).filter(Boolean),
+  );
+  if (!funcoes.size) return false;
+
+  const slug = normalizeFuncaoSlug(definicao.slug);
+  for (const funcao of funcoes) {
+    if (slug === funcao || slug === `escalonar-${funcao}`) return true;
+  }
+
+  return (definicao.passos || []).some((envelope) => {
+    const atribuicao = envelope.passo?.atribuicao;
+    if (!atribuicao) return false;
+    const grupo = normalizeFuncaoSlug(atribuicao.grupoSlug);
+    const funcao = normalizeFuncaoSlug(atribuicao.funcaoSlug);
+    return (grupo && funcoes.has(grupo)) || (funcao && funcoes.has(funcao));
+  });
+}
+
+/** IDs de definições visíveis na fila workflow de cada função (escalonar + passos do time). */
+export async function resolveWorkflowDefinitionIdsForFuncoes(
+  funcaoSlugs: string[],
+): Promise<string[]> {
+  const funcoes = [
+    ...new Set(
+      (funcaoSlugs || [])
+        .map(normalizeFuncaoSlug)
+        .filter(Boolean),
+    ),
+  ];
+  if (!funcoes.length) return [];
+
+  try {
+    const all = await listWorkflows(true);
+    return all
+      .filter((wf) => workflowDefinitionMatchesFuncao(wf, funcoes))
+      .map((wf) => String(wf._id));
+  } catch (err) {
+    console.warn(
+      '[workflow] não foi possível carregar definições para filtro de fila:',
+      err instanceof Error ? err.message : err,
+    );
+    return [];
+  }
+}

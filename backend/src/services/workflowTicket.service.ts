@@ -19,13 +19,19 @@ import {
   resolveAtribuidoForPasso,
 } from './workflowMatcher.service';
 import {
+  canApproveWorkflow,
   canUserActOnWorkflowStep,
+  resolveUserPermissions,
+  resolveWorkflowTeamQueueForUser,
+  ticketMatchesWorkflowTeamAsync,
 } from './permission.service';
 import { executeSistemaStep, isDevolutivaPasso } from './workflowSistemaExecutor.service';
 import { buildLateralWorkflowDto } from './workflowDto.util';
 import {
   applyRequisicaoToChamado,
   buildRequisicaoSnapshot,
+  mergeTeamSolicitationIntoChamado,
+  WorkflowRequisicaoError,
 } from './workflowRequisicao.service';
 import type { IChamadoWorkflowRequisicao } from '../config/workflowRequisicaoDefaults';
 
@@ -51,6 +57,15 @@ export function resolveDevolutivaStepIndex(definicao: IWorkflowDefinicao): numbe
   const passos = sortPassos(definicao);
   const idx = passos.findIndex((p) => isDevolutivaPasso(p.passo?.nome || ''));
   return idx >= 0 ? idx : passos.length - 1;
+}
+
+export function resolveProdutosApprovalStepIndex(definicao: IWorkflowDefinicao): number | null {
+  const passos = sortPassos(definicao);
+  const idx = passos.findIndex((p) => {
+    const grupoSlug = String(p.passo?.atribuicao?.grupoSlug || '').toLowerCase();
+    return grupoSlug === 'produtos' && p.passo?.acao?.tipo === 'aprovacao';
+  });
+  return idx >= 0 ? idx : null;
 }
 
 function ensureWorkflowState(chamado: IChamadoN1): IChamadoWorkflow {
@@ -237,11 +252,27 @@ export async function tryActivateWorkflowOnTabulation(
   return activateWorkflowForChamado(chamado, definicao, autor);
 }
 
+function shouldAutoForwardAfterRequisicaoStart(
+  definicao: IWorkflowDefinicao,
+  stepIndex: number,
+): boolean {
+  const passos = sortPassos(definicao);
+  if (stepIndex + 1 >= passos.length) return false;
+  const passo = passoAtIndex(definicao, stepIndex);
+  const p = passo?.passo;
+  return (
+    stepIndex === 0
+    && p?.acao?.tipo === 'manual'
+    && String(p?.atribuicao?.grupoSlug || '').toLowerCase() === 'n1'
+  );
+}
+
 export async function startWorkflowForChamado(
   chamado: IChamadoN1,
   authUser?: AuthPayload | null,
   requisicaoValores?: Record<string, unknown>,
   definicaoSlug?: string,
+  solicitacaoProdutos?: Record<string, unknown>,
 ): Promise<IChamadoN1> {
   const wf = chamado.workflow;
   if (wf?.active && wf.workflowId) {
@@ -278,7 +309,12 @@ export async function startWorkflowForChamado(
     throw new WorkflowAdvanceError('Tabulação não compatível com nenhum workflow ativo', 400);
   }
 
-  const requisicaoSnapshot = buildRequisicaoSnapshot(definicao, requisicaoValores, authUser);
+  const requisicaoSnapshot = buildRequisicaoSnapshot(
+    definicao,
+    requisicaoValores,
+    authUser,
+    solicitacaoProdutos,
+  );
   const autor = authUser?.name || authUser?.email || 'Agente';
   const activated = await activateWorkflowForChamado(chamado, definicao, autor, {
     requisicao: requisicaoSnapshot,
@@ -288,6 +324,90 @@ export async function startWorkflowForChamado(
   }
 
   applyRequisicaoToChamado(chamado, requisicaoSnapshot);
+
+  const hasRequisicaoPayload = Boolean(
+    (requisicaoValores && Object.keys(requisicaoValores).length)
+    || (solicitacaoProdutos && Object.keys(solicitacaoProdutos).length),
+  );
+  const currentStep = chamado.workflow?.step ?? 0;
+  if (
+    hasRequisicaoPayload
+    && shouldAutoForwardAfterRequisicaoStart(definicao, currentStep)
+  ) {
+    await advanceToStep(chamado, definicao, currentStep + 1, autor, {
+      trigger: 'requisicao-start-forward',
+    });
+  }
+
+  return chamado;
+}
+
+const PRODUTOS_SOLICITACAO_LABELS: Record<string, string> = {
+  solicitacoes: 'Alteração de dados',
+  'erros-bugs': 'Erros/Bugs',
+  'liberacao-pix': 'Liberação chave PIX',
+  documentos: 'Solicitação de documentos',
+};
+
+const FINANCEIRO_SOLICITACAO_LABELS: Record<string, string> = {
+  estorno: 'Estorno/Cobrança',
+  cobranca: 'Estorno/Cobrança',
+  outros: 'Outros',
+  documentos: 'Solicitação de documentos',
+};
+
+function buildTeamSolicitationLabel(
+  team: string,
+  solicitacaoProdutos?: Record<string, unknown>,
+  solicitacaoFinanceiro?: Record<string, unknown>,
+): string {
+  if (team === 'produtos') {
+    const categoria = String(solicitacaoProdutos?.categoria ?? '').trim().toLowerCase();
+    return PRODUTOS_SOLICITACAO_LABELS[categoria] || categoria || 'Solicitação Produtos';
+  }
+  const categoria = String(solicitacaoFinanceiro?.categoria ?? '').trim().toLowerCase();
+  return FINANCEIRO_SOLICITACAO_LABELS[categoria] || categoria || 'Solicitação Financeiro';
+}
+
+export async function attachTeamSolicitationToChamado(
+  chamado: IChamadoN1,
+  authUser: AuthPayload | null | undefined,
+  payload: {
+    team: 'produtos' | 'financeiro';
+    solicitacaoProdutos?: Record<string, unknown>;
+    solicitacaoFinanceiro?: Record<string, unknown>;
+  },
+): Promise<IChamadoN1> {
+  try {
+    mergeTeamSolicitationIntoChamado(chamado, payload, authUser);
+  } catch (err) {
+    if (err instanceof WorkflowRequisicaoError) {
+      throw new WorkflowAdvanceError(err.message, err.status);
+    }
+    throw err;
+  }
+
+  const team = String(payload.team || '').trim().toLowerCase();
+  const autor = authUser?.name || authUser?.email || 'Agente';
+  const label = buildTeamSolicitationLabel(
+    team,
+    payload.solicitacaoProdutos,
+    payload.solicitacaoFinanceiro,
+  );
+  const teamLabel = team === 'produtos' ? 'Produtos' : 'Financeiro';
+
+  appendWorkflowRegistro(chamado, {
+    autor,
+    anotacaoInterna: `Solicitação encaminhada ao time ${teamLabel} — ${label}`,
+    metadados: {
+      teamSolicitation: {
+        team,
+        ...(team === 'produtos'
+          ? { solicitacaoProdutos: payload.solicitacaoProdutos }
+          : { solicitacaoFinanceiro: payload.solicitacaoFinanceiro }),
+      },
+    },
+  });
 
   return chamado;
 }
@@ -377,11 +497,91 @@ export function setWorkflowPendingDecision(
   wf.pendingDecision = decision;
 }
 
+async function advanceWorkflowProdutosQueueDecision(
+  chamado: IChamadoN1,
+  decision: 'approve' | 'reject',
+  authUser?: AuthPayload | null,
+): Promise<IChamadoN1> {
+  if (!authUser) {
+    throw new WorkflowAdvanceError('Sem permissão para avançar esta etapa', 403);
+  }
+
+  const wf = chamado.workflow;
+  if (!wf?.active || !wf.workflowId) {
+    throw new WorkflowAdvanceError('Ticket sem workflow ativo', 400);
+  }
+
+  const resolved = await resolveUserPermissions(authUser);
+  if (!canApproveWorkflow(resolved)) {
+    throw new WorkflowAdvanceError('Sem permissão para aprovar/reprovar workflow', 403);
+  }
+  if (!(await ticketMatchesWorkflowTeamAsync(chamado, 'produtos'))) {
+    throw new WorkflowAdvanceError('Ticket não pertence à fila Produtos', 403);
+  }
+
+  const definicao = await getWorkflowById(String(wf.workflowId));
+  if (!definicao) throw new WorkflowAdvanceError('Definição de workflow não encontrada', 404);
+
+  const produtosStepIdx = resolveProdutosApprovalStepIndex(definicao);
+  if (produtosStepIdx == null) {
+    setWorkflowPendingDecision(chamado, decision);
+    return advanceWorkflowManual(chamado, authUser);
+  }
+
+  const autor = authUser.name || authUser.email || 'Agente';
+  const currentStep = wf.step ?? 0;
+
+  if (currentStep > produtosStepIdx) {
+    setWorkflowPendingDecision(chamado, decision);
+    return advanceWorkflowManual(chamado, authUser);
+  }
+
+  if (currentStep < produtosStepIdx) {
+    await advanceToStep(chamado, definicao, produtosStepIdx, autor, {
+      trigger: 'produtos-queue-skip',
+      skipped: true,
+    });
+  }
+
+  wf.pendingDecision = decision;
+
+  if (decision === 'reject') {
+    const devolutivaIdx = resolveDevolutivaStepIndex(definicao);
+    await advanceToStep(chamado, definicao, devolutivaIdx, autor, {
+      trigger: 'decision-reject',
+      skipped: devolutivaIdx > produtosStepIdx + 1,
+      decision: 'reject',
+    });
+    wf.pendingDecision = null;
+    return chamado;
+  }
+
+  appendWorkflowRegistro(chamado, {
+    autor,
+    alteracoes: [{ workflowDecision: 'approve' }],
+    metadados: { workflowDecision: 'approve' },
+  });
+  wf.pendingDecision = null;
+  await advanceToStep(chamado, definicao, produtosStepIdx + 1, autor, {
+    trigger: 'produtos-queue-feito',
+    decision: 'approve',
+  });
+  return chamado;
+}
+
 export async function advanceWorkflowWithDecision(
   chamado: IChamadoN1,
   decision: 'approve' | 'reject',
   authUser?: AuthPayload | null,
 ): Promise<IChamadoN1> {
+  if (authUser) {
+    const resolved = await resolveUserPermissions(authUser);
+    const teamQueue = resolveWorkflowTeamQueueForUser(resolved);
+    if (teamQueue === 'produtos' && await ticketMatchesWorkflowTeamAsync(chamado, 'produtos')) {
+      return advanceWorkflowProdutosQueueDecision(chamado, decision, authUser);
+    }
+  }
+
   setWorkflowPendingDecision(chamado, decision);
   return advanceWorkflowManual(chamado, authUser);
 }

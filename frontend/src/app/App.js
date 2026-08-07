@@ -52,6 +52,7 @@ import EspeciaisSelectPage from '../features/especiais/EspeciaisSelectPage';
 import EspeciaisChannelPage from '../features/especiais/EspeciaisChannelPage';
 import ReclameAquiChannelPage from '../features/especiais/ReclameAquiChannelPage';
 import ProconChannelPage from '../features/especiais/ProconChannelPage';
+import ConsumidorGovChannelPage from '../features/especiais/ConsumidorGovChannelPage';
 import CasoEspecialDetailPage from '../features/workspace/components/gestaoDetail/CasoEspecialDetailPage';
 import AiUsageDetailPage from '../features/workspace/components/gestaoDetail/AiUsageDetailPage';
 import AtendimentoIaTelefonicoPage from '../pages/AtendimentoIaTelefonicoPage';
@@ -104,6 +105,8 @@ function AppRoutes() {
             { path: 'especiais/reclame-aqui/*', element: React.createElement(ReclameAquiChannelPage) },
 
             { path: 'especiais/procon/*', element: React.createElement(ProconChannelPage) },
+
+            { path: 'especiais/consumidor-gov/*', element: React.createElement(ConsumidorGovChannelPage) },
 
             { path: 'especiais/:channelId', element: React.createElement(EspeciaisChannelPage) },
 

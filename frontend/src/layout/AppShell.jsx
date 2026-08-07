@@ -6,6 +6,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import TicketTabsBar from '../components/TicketTabsBar';
+import EspeciaisLayoutSync from '../components/EspeciaisLayoutSync';
 import AgentPresenceHeartbeat from '../components/AgentPresenceHeartbeat';
 import { VeloNewsProvider } from '../features/velonews/VeloNewsProvider';
 import VeloNewsCriticalBubble from '../features/velonews/VeloNewsCriticalBubble';
@@ -17,6 +18,7 @@ export default function AppShell() {
   return (
     <VeloNewsProvider>
       <AgentPresenceHeartbeat />
+      <EspeciaisLayoutSync />
       <div id="mainApp" className="main-app sidebar-collapsed velo-chromeless" style={{ display: 'grid' }}>
         <TicketTabsBar />
         <Sidebar />

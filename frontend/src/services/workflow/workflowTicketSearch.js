@@ -11,6 +11,7 @@ import {
 } from '../ticketsStorage';
 import { getTicketProtocolLabel, isTicketInWorkflow, normalizeCpf } from '../desk/utils';
 import {
+  getWorkflowTeamQueueMeta,
   resolveWorkflowTeamForTicket,
   ticketMatchesWorkflowTeam,
 } from './workflowTeamQueues';
@@ -146,4 +147,23 @@ export function resolveOpenTarget(ticket, teamQueueId) {
   if (teamQueueId && ticketMatchesWorkflowTeam(ticket, teamQueueId)) return 'workflow';
   if (!teamQueueId && resolveWorkflowTeamForTicket(ticket)) return 'workflow';
   return 'desk';
+}
+
+export function validateWorkflowTeamAccess(ticket, teamQueueId) {
+  if (!teamQueueId) {
+    return { allowed: true, target: resolveOpenTarget(ticket, teamQueueId) };
+  }
+  if (!isTicketInWorkflow(ticket)) {
+    return { allowed: true, target: 'desk' };
+  }
+  if (ticketMatchesWorkflowTeam(ticket, teamQueueId)) {
+    return { allowed: true, target: 'workflow' };
+  }
+  const ticketTeamId = resolveWorkflowTeamForTicket(ticket);
+  const ticketTeamMeta = ticketTeamId ? getWorkflowTeamQueueMeta(ticketTeamId) : null;
+  const userTeamMeta = getWorkflowTeamQueueMeta(teamQueueId);
+  const message = ticketTeamMeta
+    ? `Este ticket pertence à fila ${ticketTeamMeta.name}, não à fila ${userTeamMeta?.name || teamQueueId}.`
+    : `Este ticket não pertence à fila ${userTeamMeta?.name || teamQueueId}.`;
+  return { allowed: false, target: 'desk', message };
 }

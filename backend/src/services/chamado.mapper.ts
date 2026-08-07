@@ -14,7 +14,9 @@ import { allocateNextProtocolo } from './protocolo.service';
 import type { IClienteDados } from '../models/Cliente';
 import type { IWorkflowDefinicao } from '../models/WorkflowDefinicao';
 import { assertTabulacaoForStatus } from './tabulation.service';
-import { buildLateralWorkflowDto, loadWorkflowDefForChamado } from './workflowDto.util';
+import { buildLateralWorkflowDto, loadWorkflowDefForChamado, syncLegacyWorkflowFromBody } from './workflowDto.util';
+import { buildComunicacaoResumo } from './workflowRequisicao.service';
+import type { IChamadoWorkflowComunicacaoResumo } from '../config/workflowRequisicaoDefaults';
 import { getWorkflowsByIds } from './workflowDefinicao.service';
 import { extractEmailReplyContent } from './emailReplyContent.util';
 import { sanitizeResponsavel, inferResponsavelFromAgentRegistro } from './responsavel.util';
@@ -171,6 +173,128 @@ function ensureProconChannelStamp(
   chamado.registro = registro;
 }
 
+function readConsumidorGovFromBody(body: Record<string, unknown>): Record<string, unknown> | null {
+  const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
+  const gov = lf.consumidorGov;
+  if (gov && typeof gov === 'object' && !Array.isArray(gov)) {
+    return gov as Record<string, unknown>;
+  }
+  return null;
+}
+
+function findConsumidorGovFromChamado(chamado: IChamadoN1): Record<string, unknown> | null {
+  for (const reg of chamado.registro ?? []) {
+    const meta = registroMetadados(reg);
+    if (String(meta.source ?? '').toLowerCase() === 'consumidor-gov') {
+      const nested = meta.consumidorGov;
+      if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+        return nested as Record<string, unknown>;
+      }
+      return meta;
+    }
+  }
+  return null;
+}
+
+function isConsumidorGovCanalFromBody(body: Record<string, unknown>): boolean {
+  if (readConsumidorGovFromBody(body)) return true;
+  const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
+  const canal = normalizeCanalValue(lf.canal);
+  if (canal.includes('consumidor') && canal.includes('gov')) return true;
+  const channel = normalizeCanalValue(body.channel ?? body.source);
+  return channel === 'consumidor-gov' || channel === 'consumidorgov';
+}
+
+export function isConsumidorGovChamado(chamado: IChamadoN1): boolean {
+  return Boolean(findConsumidorGovFromChamado(chamado));
+}
+
+export function proconChannelMongoFilter(): Record<string, unknown> {
+  return {
+    $or: [
+      { 'registro.metadados.source': 'procon' },
+      { 'registro.metadados.procon': { $exists: true, $ne: null } },
+    ],
+  };
+}
+
+export function consumidorGovChannelMongoFilter(): Record<string, unknown> {
+  return {
+    $or: [
+      { 'registro.metadados.source': 'consumidor-gov' },
+      { 'registro.metadados.consumidorGov': { $exists: true, $ne: null } },
+    ],
+  };
+}
+
+export function excludeEspeciaisChannelsMongoFilter(): Record<string, unknown> {
+  return {
+    $nor: [
+      proconChannelMongoFilter(),
+      consumidorGovChannelMongoFilter(),
+    ],
+  };
+}
+
+function buildMinimalConsumidorGovMeta(
+  chamado: IChamadoN1,
+  body?: Record<string, unknown>,
+): Record<string, unknown> {
+  const lf = (body?.lateralForm ?? {}) as Record<string, unknown>;
+  const existing = readConsumidorGovFromBody(body ?? {}) || findConsumidorGovFromChamado(chamado);
+  if (existing) return existing;
+  const tab = readTabulacaoSnapshot(chamado.tabulacao?.[0]);
+  return {
+    protocoloGov: String(chamado.chamadoProtocolo ?? '').trim() || undefined,
+    consumidor: String(body?.clientName ?? tab.motivo ?? chamado.chamadoTitulo ?? '').trim(),
+    assunto: String(chamado.chamadoTitulo ?? body?.title ?? '').trim(),
+    descricao: String(body?.text ?? body?.description ?? '').trim(),
+    cpf: String(lf.cpf ?? lf.clienteCpf ?? body?.clientCPF ?? '').trim(),
+    produto: tab.produto,
+    tipo: tab.tipoChamado,
+    motivo: tab.motivo,
+    statusGov: 'nao-respondida',
+  };
+}
+
+function ensureConsumidorGovChannelStamp(
+  chamado: IChamadoN1,
+  body?: Record<string, unknown>,
+  status = 'novo',
+): void {
+  if (findConsumidorGovFromChamado(chamado)) return;
+  if (body && !isConsumidorGovCanalFromBody(body)) return;
+
+  const govMeta = buildMinimalConsumidorGovMeta(chamado, body);
+  const metadados: Record<string, unknown> = { source: 'consumidor-gov', consumidorGov: govMeta };
+  const registro = chamado.registro ?? [];
+  const targetStatus = currentStatus(chamado) || status;
+  const clienteIdx = registro.findIndex((reg) => String(reg.origin ?? '').toLowerCase() === 'cliente');
+
+  if (clienteIdx >= 0) {
+    const reg = registro[clienteIdx];
+    const existingMeta = registroMetadados(reg);
+    if (String(existingMeta.source ?? '').toLowerCase() !== 'consumidor-gov') {
+      reg.metadados = { ...existingMeta, ...metadados };
+    }
+    return;
+  }
+
+  registro.unshift({
+    data: new Date(),
+    origin: 'cliente',
+    autor: String(body?.clientName ?? chamado.chamadoTitulo ?? 'Consumidor').trim() || 'Consumidor',
+    mensagemPublica: '',
+    anexosMensagemPublica: [],
+    anotacaoInterna: '',
+    anexosAnotacaoInterna: [],
+    alteracoes: [],
+    metadados,
+    status: targetStatus,
+  });
+  chamado.registro = registro;
+}
+
 function readReclameAquiFromBody(body: Record<string, unknown>): Record<string, unknown> | null {
   const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
   const ra = lf.reclameAqui;
@@ -219,6 +343,7 @@ export function resolveRegistroOrigin(reg: IRegistro): RegistroOrigin {
   if (String(meta.source ?? '').toLowerCase() === 'email-inbound') return 'cliente';
   if (String(meta.source ?? '').toLowerCase() === 'reclame-aqui') return 'cliente';
   if (String(meta.source ?? '').toLowerCase() === 'procon') return 'cliente';
+  if (String(meta.source ?? '').toLowerCase() === 'consumidor-gov') return 'cliente';
 
   const legacy = legacyAlteracoesObject(reg);
   if (legacy) {
@@ -381,6 +506,11 @@ export interface TicketDto {
       valores?: Record<string, unknown>;
       comunicacaoWorkflow?: Array<{ mensagem: string; data: Date; autor: string }>;
       comunicacaoPendente?: boolean;
+      comunicacaoResumo?: {
+        ultimaOrigem: 'workflow' | 'responsavel' | null;
+        ultimaData?: Date | null;
+        temRespostaAgente?: boolean;
+      };
     };
   };
   messages?: TicketMessageDto[];
@@ -486,6 +616,20 @@ function buildLateralWorkflowListDto(
 ): Record<string, unknown> {
   // Mesmo payload do detalhe (passosResumo + stepHistory) — stepper não depende só do runtime
   return buildLateralWorkflowDto(chamado, definicao) || {};
+}
+
+function serializeComunicacaoResumo(
+  req: NonNullable<IChamadoN1['workflow']>['requisicao'],
+  comunicacao: Array<{ mensagem: string; data: Date; autor: string }>,
+): IChamadoWorkflowComunicacaoResumo {
+  if (req?.comunicacaoResumo?.ultimaOrigem !== undefined) {
+    return {
+      ultimaOrigem: req.comunicacaoResumo.ultimaOrigem ?? null,
+      ultimaData: req.comunicacaoResumo.ultimaData ?? null,
+      temRespostaAgente: req.comunicacaoResumo.temRespostaAgente === true,
+    };
+  }
+  return buildComunicacaoResumo(comunicacao);
 }
 
 function resolveQueueEntryAt(chamado: IChamadoN1): Date | undefined {
@@ -770,6 +914,7 @@ export async function createChamadoFromBody(
   const clientName = String(body.clientName ?? '').trim();
   const raData = readReclameAquiFromBody(body);
   const pcData = readProconFromBody(body);
+  const govData = readConsumidorGovFromBody(body);
   const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
   const workflowMeta = lf.workflow;
 
@@ -851,6 +996,44 @@ export async function createChamadoFromBody(
         status,
       });
     }
+  } else if (govData) {
+    const complaintText = String(govData.descricao ?? text ?? '').trim();
+    const govMetadados: Record<string, unknown> = {
+      source: 'consumidor-gov',
+      consumidorGov: govData,
+    };
+    const clienteRegistro: IRegistro = {
+      data: new Date(),
+      origin: 'cliente',
+      autor: clientName || String(govData.consumidor ?? '').trim() || 'Consumidor',
+      mensagemPublica: internal ? '' : complaintText,
+      anexosMensagemPublica: internal ? [] : attachments,
+      anotacaoInterna: '',
+      anexosAnotacaoInterna: [],
+      alteracoes: [],
+      metadados: govMetadados,
+      status,
+    };
+    registro = [clienteRegistro];
+
+    if (workflowMeta && typeof workflowMeta === 'object' && !Array.isArray(workflowMeta)) {
+      registro.push({
+        data: new Date(),
+        origin: 'agente',
+        autor: resolveRegistroAutor('agente', {
+          authUser,
+          authorHint: String(body.author ?? '').trim(),
+          clientName,
+        }),
+        mensagemPublica: '',
+        anexosMensagemPublica: [],
+        anotacaoInterna: '',
+        anexosAnotacaoInterna: [],
+        alteracoes: buildAlteracoesItem({ workflow: workflowMeta }),
+        metadados: { workflow: workflowMeta },
+        status,
+      });
+    }
   } else {
     const requestedOrigin = String(body.messageOrigin ?? '').trim().toLowerCase();
     const initialOrigin: RegistroOrigin = requestedOrigin === 'cliente' || body.sender === 'them'
@@ -887,6 +1070,7 @@ export async function createChamadoFromBody(
     registro,
   };
   ensureProconChannelStamp(partial as IChamadoN1, body, status);
+  ensureConsumidorGovChannelStamp(partial as IChamadoN1, body, status);
   return partial;
 }
 
@@ -1080,6 +1264,7 @@ export async function commitChamadoFromAgent(
   }
 
   ensureProconChannelStamp(chamado, body);
+  ensureConsumidorGovChannelStamp(chamado, body);
 
   return {
     messageResult,
@@ -1120,6 +1305,7 @@ export async function applyBodyToChamado(
   }
 
   ensureProconChannelStamp(chamado, body);
+  ensureConsumidorGovChannelStamp(chamado, body);
 }
 
 export interface AppendRegistroResult {
@@ -1269,6 +1455,7 @@ interface FullTicketExtras {
   persistedApproval?: Record<string, unknown>;
   reclameAqui?: Record<string, unknown> | null;
   procon?: Record<string, unknown> | null;
+  consumidorGov?: Record<string, unknown> | null;
 }
 
 async function chamadoToTicketFull(
@@ -1296,6 +1483,7 @@ async function chamadoToTicketFull(
     persistedApproval: findLatestApprovalFromRegistro(chamado) ?? undefined,
     reclameAqui: findReclameAquiFromChamado(chamado),
     procon: findProconFromChamado(chamado),
+    consumidorGov: findConsumidorGovFromChamado(chamado),
   });
 }
 
@@ -1425,10 +1613,24 @@ function buildTicketDtoCore(
   const persistedApproval = listOnly ? undefined : (extras.persistedApproval ?? findLatestApprovalFromRegistro(chamado) ?? undefined);
   const reclameAquiMeta = extras.reclameAqui ?? findReclameAquiFromChamado(chamado);
   const proconMeta = extras.procon ?? findProconFromChamado(chamado);
+  const consumidorGovMeta = extras.consumidorGov ?? findConsumidorGovFromChamado(chamado);
   const reclameAqui = listOnly ? null : reclameAquiMeta;
   const procon = listOnly ? null : proconMeta;
-  const especialChannel = reclameAquiMeta ? 'reclame-aqui' : proconMeta ? 'procon' : null;
-  const especialSource = reclameAquiMeta ? 'reclame-aqui' : proconMeta ? 'procon' : 'velodesk';
+  const consumidorGov = listOnly ? null : consumidorGovMeta;
+  const especialChannel = reclameAquiMeta
+    ? 'reclame-aqui'
+    : proconMeta
+      ? 'procon'
+      : consumidorGovMeta
+        ? 'consumidor-gov'
+        : null;
+  const especialSource = reclameAquiMeta
+    ? 'reclame-aqui'
+    : proconMeta
+      ? 'procon'
+      : consumidorGovMeta
+        ? 'consumidor-gov'
+        : 'velodesk';
 
   return {
     _id: chamado._id.toString(),
@@ -1458,22 +1660,27 @@ function buildTicketDtoCore(
           if (!req) return undefined;
           const comunicacao = Array.isArray(req.comunicacaoWorkflow) ? req.comunicacaoWorkflow : [];
           const comunicacaoPendente = comunicacao.length > 0;
+          const comunicacaoResumo = serializeComunicacaoResumo(req, comunicacao);
           if (listOnly) {
             return {
               valores: req.valores || {},
               comunicacaoPendente,
+              comunicacaoResumo,
             };
           }
           return {
             preenchidaEm: req.preenchidaEm,
             preenchidaPor: req.preenchidaPor,
             valores: req.valores || {},
+            solicitacaoProdutos: req.solicitacaoProdutos || undefined,
+            solicitacaoFinanceiro: req.solicitacaoFinanceiro || undefined,
             comunicacaoWorkflow: comunicacao.map((item) => ({
               mensagem: String(item.mensagem || ''),
               data: item.data,
               autor: String(item.autor || ''),
             })),
             comunicacaoPendente,
+            comunicacaoResumo,
           };
         })(),
       }
@@ -1493,11 +1700,20 @@ function buildTicketDtoCore(
       clienteTelefone: listOnly ? [] : (cadastro?.clienteTelefone?.lista ?? []),
       clienteTelefoneWhatsapp: listOnly ? undefined : (cadastro?.clienteTelefone?.whatsapp ?? undefined),
       cpf: clientCpf,
-      canal: reclameAquiMeta ? 'Reclame Aqui' : proconMeta ? 'Procon' : undefined,
+      canal: reclameAquiMeta
+        ? 'Reclame Aqui'
+        : proconMeta
+          ? 'Procon'
+          : consumidorGovMeta
+            ? 'Consumidor.Gov'
+            : undefined,
       reclameAqui: reclameAqui ?? undefined,
       procon: procon ?? undefined,
+      consumidorGov: consumidorGov ?? undefined,
       workflow: lateralWorkflow,
       approval: persistedApproval ?? undefined,
+      solicitacaoProdutos: chamado.workflow?.requisicao?.solicitacaoProdutos ?? undefined,
+      solicitacaoFinanceiro: chamado.workflow?.requisicao?.solicitacaoFinanceiro ?? undefined,
     },
     messages: listOnly ? [] : messages,
     internalNotes: listOnly ? [] : internalNotes,
@@ -1695,8 +1911,8 @@ export function atribuidoFuncoesFilter(funcaoSlugs: string[]) {
 }
 
 /**
- * Fila do ator de Workflow: tickets com atribuído na função OU workflow ativo
- * cuja definição é `escalonar-{funcao}` / `{funcao}` (ex.: escalonar-produtos).
+ * Fila do ator de Workflow: tickets com atribuído na função, workflow ativo
+ * da definição do time (escalonar-{funcao} ou passo do grupo) ou solicitacaoProdutos.
  */
 export function workflowActorQueueFilter(
   funcaoSlugs: string[],
@@ -1713,27 +1929,61 @@ export function workflowActorQueueFilter(
     })
     .filter((id): id is mongoose.Types.ObjectId => Boolean(id));
 
-  if (!ids.length) return atribuido;
+  const orClauses: Record<string, unknown>[] = [atribuido];
 
-  return {
-    $or: [
-      atribuido,
-      {
-        'workflow.active': true,
-        'workflow.workflowId': { $in: ids },
+  if (ids.length) {
+    orClauses.push({
+      'workflow.active': true,
+      'workflow.workflowId': { $in: ids },
+    });
+  }
+
+  const funcoes = new Set(
+    (funcaoSlugs || [])
+      .map((slug) => String(slug || '').trim().toLowerCase())
+      .filter(Boolean),
+  );
+  if (funcoes.has('produtos')) {
+    orClauses.push({
+      'workflow.active': true,
+      'workflow.requisicao.solicitacaoProdutos.categoria': {
+        $in: ['erros-bugs', 'solicitacoes', 'liberacao-pix', 'documentos'],
       },
-    ],
-  };
+    });
+    orClauses.push({
+      'workflow.active': true,
+      'workflow.requisicao.solicitacaoFinanceiro.categoria': 'documentos',
+    });
+  }
+
+  if (funcoes.has('financeiro')) {
+    orClauses.push({
+      'workflow.active': true,
+      'workflow.requisicao.solicitacaoFinanceiro.categoria': {
+        $in: ['estorno', 'cobranca', 'outros'],
+      },
+    });
+  }
+
+  if (orClauses.length === 1) return orClauses[0];
+  return { $or: orClauses };
 }
 
 export function buildChamadoQueryFilter(status: string, queue?: string, responsavelCandidates?: string[], extraFilter?: Record<string, unknown>) {
   const filters: Record<string, unknown>[] = [lastStatusFilter(status)];
+
+  if (queue === 'procon') {
+    filters.push(proconChannelMongoFilter());
+  } else if (queue === 'consumidor-gov') {
+    filters.push(consumidorGovChannelMongoFilter());
+  }
 
   if (queue === 'meus-chamados' && responsavelCandidates?.length && status !== 'resolvido') {
     const responsavelFilter = status === 'novo'
       ? meusChamadosNovosResponsavelFilter(responsavelCandidates)
       : meusChamadosAgentScopeFilter(responsavelCandidates);
     filters.push(responsavelFilter);
+    filters.push(excludeEspeciaisChannelsMongoFilter());
   }
 
   if (queue === 'funcao-atribuido' && extraFilter) {

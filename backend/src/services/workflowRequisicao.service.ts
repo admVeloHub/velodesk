@@ -3,7 +3,9 @@ import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import type { IWorkflowDefinicao } from '../models/WorkflowDefinicao';
 import {
+  type ComunicacaoWorkflowOrigem,
   type IChamadoWorkflowComunicacao,
+  type IChamadoWorkflowComunicacaoResumo,
   type IChamadoWorkflowRequisicao,
   normalizeRequisicaoConfig,
   validateRequisicaoValores,
@@ -13,7 +15,31 @@ import { appendRegistroEntry } from './chamado.mapper';
 
 export { WorkflowRequisicaoError };
 
-export type ComunicacaoOrigem = 'workflow' | 'responsavel';
+export type ComunicacaoOrigem = ComunicacaoWorkflowOrigem;
+
+function readAutorOrigem(autor: string): ComunicacaoWorkflowOrigem | null {
+  const normalized = String(autor || '').trim().toLowerCase();
+  if (normalized.startsWith('responsavel:')) return 'responsavel';
+  if (normalized.startsWith('wf:')) return 'workflow';
+  return null;
+}
+
+export function buildComunicacaoResumo(
+  thread: IChamadoWorkflowComunicacao[] = [],
+): IChamadoWorkflowComunicacaoResumo {
+  if (!thread.length) {
+    return { ultimaOrigem: null, ultimaData: null, temRespostaAgente: false };
+  }
+  const temRespostaAgente = thread.some(
+    (item) => readAutorOrigem(item.autor) === 'responsavel',
+  );
+  const last = thread[thread.length - 1];
+  return {
+    ultimaOrigem: readAutorOrigem(last.autor),
+    ultimaData: last.data ? new Date(last.data) : null,
+    temRespostaAgente,
+  };
+}
 
 export function getRequisicaoConfig(definicao: IWorkflowDefinicao) {
   return normalizeRequisicaoConfig(definicao.requisicao, definicao.gatilho);
@@ -23,21 +49,91 @@ export function buildRequisicaoSnapshot(
   definicao: IWorkflowDefinicao,
   valores: Record<string, unknown> | undefined,
   authUser?: AuthPayload | null,
+  solicitacaoProdutos?: Record<string, unknown>,
 ): IChamadoWorkflowRequisicao | null {
   const config = getRequisicaoConfig(definicao);
-  if (!config.campos.length) return null;
+  const hasSolicitacao = Boolean(
+    solicitacaoProdutos && Object.keys(solicitacaoProdutos).length,
+  );
 
-  const parsed = validateRequisicaoValores(config, valores || {});
-  if (!parsed.ok) {
-    throw new WorkflowRequisicaoError(parsed.message, 400);
+  if (!config.campos.length && !hasSolicitacao) return null;
+
+  let snapshot: IChamadoWorkflowRequisicao;
+
+  if (config.campos.length) {
+    const parsed = validateRequisicaoValores(config, valores || {});
+    if (!parsed.ok) {
+      throw new WorkflowRequisicaoError(parsed.message, 400);
+    }
+    snapshot = {
+      preenchidaEm: new Date(),
+      preenchidaPor: authUser?.name || authUser?.email || 'Agente',
+      valores: parsed.valores,
+      comunicacaoWorkflow: [],
+    };
+  } else {
+    snapshot = {
+      preenchidaEm: new Date(),
+      preenchidaPor: authUser?.name || authUser?.email || 'Agente',
+      valores: {},
+      comunicacaoWorkflow: [],
+    };
   }
 
-  return {
+  if (hasSolicitacao) {
+    snapshot.solicitacaoProdutos = solicitacaoProdutos;
+  }
+
+  return snapshot;
+}
+
+export function mergeTeamSolicitationIntoChamado(
+  chamado: IChamadoN1,
+  payload: {
+    team: 'produtos' | 'financeiro';
+    solicitacaoProdutos?: Record<string, unknown>;
+    solicitacaoFinanceiro?: Record<string, unknown>;
+  },
+  authUser?: AuthPayload | null,
+): void {
+  if (!chamado.workflow?.active) {
+    throw new WorkflowRequisicaoError('Ticket sem workflow ativo', 400);
+  }
+
+  const team = String(payload.team || '').trim().toLowerCase();
+  if (team !== 'produtos' && team !== 'financeiro') {
+    throw new WorkflowRequisicaoError('Time inválido', 400);
+  }
+
+  const solicitacaoProdutos = payload.solicitacaoProdutos;
+  const solicitacaoFinanceiro = payload.solicitacaoFinanceiro;
+
+  if (team === 'produtos' && (!solicitacaoProdutos || !Object.keys(solicitacaoProdutos).length)) {
+    throw new WorkflowRequisicaoError('solicitacaoProdutos obrigatória para time produtos', 400);
+  }
+  if (team === 'financeiro' && (!solicitacaoFinanceiro || !Object.keys(solicitacaoFinanceiro).length)) {
+    throw new WorkflowRequisicaoError('solicitacaoFinanceiro obrigatória para time financeiro', 400);
+  }
+
+  const prev = chamado.workflow.requisicao;
+  const autor = authUser?.name || authUser?.email || 'Agente';
+
+  chamado.workflow.requisicao = {
     preenchidaEm: new Date(),
-    preenchidaPor: authUser?.name || authUser?.email || 'Agente',
-    valores: parsed.valores,
-    comunicacaoWorkflow: [],
+    preenchidaPor: autor,
+    valores: prev?.valores || {},
+    comunicacaoWorkflow: prev?.comunicacaoWorkflow || [],
+    comunicacaoResumo: prev?.comunicacaoResumo,
+    solicitacaoProdutos: team === 'produtos'
+      ? solicitacaoProdutos
+      : prev?.solicitacaoProdutos,
+    solicitacaoFinanceiro: team === 'financeiro'
+      ? solicitacaoFinanceiro
+      : prev?.solicitacaoFinanceiro,
   };
+
+  chamado.markModified('workflow');
+  chamado.markModified('workflow.requisicao');
 }
 
 export function applyRequisicaoToChamado(
@@ -98,9 +194,11 @@ export function appendComunicacaoWorkflow(
   };
 
   requisicao.comunicacaoWorkflow = [...(requisicao.comunicacaoWorkflow || []), entry];
+  requisicao.comunicacaoResumo = buildComunicacaoResumo(requisicao.comunicacaoWorkflow);
   chamado.markModified('workflow');
   chamado.markModified('workflow.requisicao');
   chamado.markModified('workflow.requisicao.comunicacaoWorkflow');
+  chamado.markModified('workflow.requisicao.comunicacaoResumo');
 
   appendRegistroEntry(chamado, {
     anotacaoInterna: `[Workflow] ${prefix}: ${texto}`,

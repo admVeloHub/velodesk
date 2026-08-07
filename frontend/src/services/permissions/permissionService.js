@@ -4,6 +4,7 @@
  */
 import api from '../../api/client';
 import { normalizeProfileId } from '../../config/profiles';
+import { isWorkflowTeamQueueId } from '../workflow/workflowTeamQueues';
 
 const STORAGE_KEY = 'velodesk_permissions';
 
@@ -439,7 +440,7 @@ export function resolveWorkflowTeamQueueForUser(perm = readCachedPermissions()) 
   if (!hasPermission(perm.permissoes, 'portal', 'workflow')) return null;
   if (!hasPermission(perm.permissoes, 'tickets', 'atuar_atribuido')) return null;
   const slugs = userFuncaoSlugs(perm);
-  return slugs[0] || null;
+  return slugs.find((slug) => isWorkflowTeamQueueId(slug)) || null;
 }
 
 /** Gestão (ver_todos) ou perfil com fila de atribuição no Workflow. */

@@ -3,7 +3,11 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useNotifications } from '../../../context/NotificationContext';
-import { saveCadastralRequest } from '../../../services/cadastral/cadastralRequestStore';
+import {
+  persistSolicitacaoProdutosOnTicket,
+  saveCadastralRequest,
+} from '../../../services/cadastral/cadastralRequestStore';
+import { findTicketEntry } from '../../../services/ticketsStorage';
 import { PIX_KEY_TYPE_OPTIONS } from '../../../services/cadastral/solicitacoesProdutosData';
 import { useProdSolicTicketPrefill, validateCpfTicket } from './useProdSolicTicketPrefill';
 
@@ -19,11 +23,12 @@ const EMPTY_FORM = {
 export default function LiberacaoPixFormTab({
   onSaved,
   onSubmitted,
+  onTeamForward,
   ticketOverride,
   clientOverride,
 }) {
   const { showNotification } = useNotifications();
-  const { prefill, formatCpf } = useProdSolicTicketPrefill({ ticketOverride, clientOverride });
+  const { prefill, activeTabId, formatCpf } = useProdSolicTicketPrefill({ ticketOverride, clientOverride });
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,7 +40,7 @@ export default function LiberacaoPixFormTab({
     }));
   }, [prefill]);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (!validateCpfTicket(form, showNotification)) return;
     if (!String(form.chavePix || '').trim()) {
@@ -45,7 +50,7 @@ export default function LiberacaoPixFormTab({
 
     setSubmitting(true);
     try {
-      saveCadastralRequest({
+      const request = saveCadastralRequest({
         categoria: 'liberacao-pix',
         cpf: form.cpf,
         ticketId: form.ticketId,
@@ -55,10 +60,25 @@ export default function LiberacaoPixFormTab({
         observacoes: form.observacoes.trim(),
         urgente: form.urgente,
       });
-      showNotification('Solicitação de liberação pix enviada ao time de Produtos.', 'success');
+
+      const ticketRef = ticketOverride?.id
+        || findTicketEntry(activeTabId)?.ticket?.id
+        || findTicketEntry(form.ticketId)?.ticket?.id;
+
+      if (onTeamForward) {
+        await onTeamForward(request);
+      } else if (ticketRef) {
+        await persistSolicitacaoProdutosOnTicket(ticketRef, request);
+      }
+
+      if (!onTeamForward) {
+        showNotification('Solicitação de liberação pix enviada ao time de Produtos.', 'success');
+      }
       setForm({ ...EMPTY_FORM, cpf: form.cpf, ticketId: form.ticketId });
       onSaved?.();
       onSubmitted?.();
+    } catch (err) {
+      showNotification(err?.message || 'Não foi possível enviar a solicitação.', 'error');
     } finally {
       setSubmitting(false);
     }

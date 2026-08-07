@@ -3,7 +3,7 @@
  * VERSION: v1.8.0 | DATE: 2026-07-28
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTickets } from '../../../context/TicketsContext';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useWorkflowConfig } from '../../../context/WorkflowConfigContext';
@@ -20,7 +20,11 @@ import {
   computeWorkflowTeamQueue,
   getWorkflowApprovalDetail,
 } from '../../../services/workflow/workflowApprovalData';
-import { getWorkflowTeamQueueMeta } from '../../../services/workflow/workflowTeamQueues';
+import {
+  getWorkflowTeamQueueMeta,
+  ticketMatchesWorkflowTeam,
+  resolveWorkflowTeamForTicket,
+} from '../../../services/workflow/workflowTeamQueues';
 import {
   approveWorkflowDecision,
   rejectWorkflowDecision,
@@ -40,7 +44,8 @@ const EMPTY_SUMMARY = {
 };
 
 export default function WorkflowApprovalShell() {
-  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { refreshKey, refreshTickets } = useTickets();
   const { showNotification } = useNotifications();
   const { workflows: workflowDefinitions, loading: workflowConfigLoading } = useWorkflowConfig();
@@ -51,7 +56,6 @@ export default function WorkflowApprovalShell() {
   const [cancelingWorkflow, setCancelingWorkflow] = useState(false);
   const [demoRevision, setDemoRevision] = useState(0);
   const [detailRevision, setDetailRevision] = useState(0);
-  const [infoPanelOpen, setInfoPanelOpen] = useState(false);
 
   const hasWorkflowAccess = useMemo(
     () => hasWorkflowPortalAccess(permsCtx?.permissions),
@@ -65,16 +69,13 @@ export default function WorkflowApprovalShell() {
     () => (teamQueueId ? getWorkflowTeamQueueMeta(teamQueueId) : null),
     [teamQueueId],
   );
+  const queueView = searchParams.get('view');
 
   useEffect(() => {
     const onDemoChange = () => setDemoRevision((v) => v + 1);
     window.addEventListener('velodesk:workflow-demo-changed', onDemoChange);
     return () => window.removeEventListener('velodesk:workflow-demo-changed', onDemoChange);
   }, []);
-
-  useEffect(() => {
-    setInfoPanelOpen(false);
-  }, [selectedId]);
 
   useEffect(() => {
     if (!selectedId || !hasWorkflowAccess) return undefined;
@@ -125,15 +126,18 @@ export default function WorkflowApprovalShell() {
       return { queueLabel: 'Workflow', queue: [], summary: EMPTY_SUMMARY, teamId: null };
     }
     const data = teamQueueId
-      ? computeWorkflowTeamQueue(teamQueueId)
+      ? computeWorkflowTeamQueue(teamQueueId, {
+        view: queueView === 'respondidos' ? 'respondidos' : null,
+      })
       : computeWorkflowAssigneeQueue();
     deskLog.workflow('fila calculada', {
       teamQueueId,
+      queueView,
       pending: data.summary?.pendingCount,
       fila: data.queue?.length,
     });
     return data;
-  }, [hasWorkflowAccess, teamQueueId, refreshKey, demoRevision, workflowDefinitions, workflowConfigLoading]);
+  }, [hasWorkflowAccess, teamQueueId, queueView, refreshKey, demoRevision, workflowDefinitions, workflowConfigLoading]);
 
   const detail = useMemo(
     () => (selectedId && hasWorkflowAccess ? getWorkflowApprovalDetail(selectedId, teamQueueId) : null),
@@ -181,16 +185,78 @@ export default function WorkflowApprovalShell() {
 
   useEffect(() => {
     const fromUrl = searchParams.get('ticket');
-    if (fromUrl && queueData.queue.some((q) => q.id === String(fromUrl))) {
-      setSelectedId(String(fromUrl));
+    const urlId = fromUrl ? String(fromUrl) : null;
+
+    if (!queueData.queue.length) {
+      if (urlId && teamQueueId) {
+        const entry = findTicketEntry(urlId);
+        if (entry?.ticket && ticketMatchesWorkflowTeam(entry.ticket, teamQueueId)) {
+          setSelectedId(urlId);
+          return;
+        }
+      }
+      setSelectedId(null);
       return;
     }
-    if (!selectedId && queueData.queue.length) {
-      setSelectedId(queueData.queue[0].id);
-    } else if (selectedId && !queueData.queue.some((q) => q.id === selectedId)) {
-      setSelectedId(queueData.queue[0]?.id || null);
+
+    if (urlId && queueData.queue.some((q) => q.id === urlId)) {
+      setSelectedId(urlId);
+      return;
     }
-  }, [queueData.queue, searchParams, selectedId]);
+
+    if (urlId && teamQueueId) {
+      const entry = findTicketEntry(urlId);
+      if (entry?.ticket && ticketMatchesWorkflowTeam(entry.ticket, teamQueueId)) {
+        setSelectedId(urlId);
+        return;
+      }
+      if (entry?.ticket && !ticketMatchesWorkflowTeam(entry.ticket, teamQueueId)) {
+        const otherTeamId = resolveWorkflowTeamForTicket(entry.ticket);
+        const otherTeamMeta = otherTeamId ? getWorkflowTeamQueueMeta(otherTeamId) : null;
+        const myTeamMeta = getWorkflowTeamQueueMeta(teamQueueId);
+        showNotification(
+          otherTeamMeta
+            ? `Este ticket pertence à fila ${otherTeamMeta.name}, não à fila ${myTeamMeta?.name || teamQueueId}.`
+            : `Este ticket não pertence à fila ${myTeamMeta?.name || teamQueueId}.`,
+          'warning',
+        );
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('ticket');
+          return next;
+        }, { replace: true });
+      }
+    }
+
+    const fallbackId = queueData.queue[0].id;
+    setSelectedId(fallbackId);
+    if (urlId !== fallbackId) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('ticket', fallbackId);
+        return next;
+      }, { replace: true });
+    }
+  }, [queueData.queue, searchParams, setSearchParams, teamQueueId, showNotification]);
+
+  const handleSelectTicket = useCallback((ticketId) => {
+    const id = String(ticketId);
+    setSelectedId(id);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('ticket', id);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleSearchOpenDesk = useCallback((ticketId) => {
+    const id = String(ticketId);
+    if (typeof window.openTicket === 'function') {
+      window.openTicket(id);
+      return;
+    }
+    navigate(`/tickets?desk=v2&ticket=${id}`);
+  }, [navigate]);
 
   const runAction = useCallback(async (actionFn, successMsg, args = []) => {
     if (!selectedId || busy) return false;
@@ -222,20 +288,15 @@ export default function WorkflowApprovalShell() {
     [runAction],
   );
 
+  const handleFeito = useCallback(
+    () => runAction(approveWorkflowDecision, 'Alteração concluída e workflow avançado.'),
+    [runAction],
+  );
+
   const handleReject = useCallback(
     () => runAction(rejectWorkflowDecision, 'Solicitação reprovada.'),
     [runAction],
   );
-
-  const handleRequestInfoOpen = useCallback(() => {
-    if (busy) return;
-    setInfoPanelOpen(true);
-  }, [busy]);
-
-  const handleRequestInfoCancel = useCallback(() => {
-    if (busy) return;
-    setInfoPanelOpen(false);
-  }, [busy]);
 
   const handleRequestInfoSubmit = useCallback(async (message) => {
     if (!selectedId || busy) return null;
@@ -244,7 +305,6 @@ export default function WorkflowApprovalShell() {
       const updated = await requestWorkflowInfo(selectedId, message, 'workflow');
       setDetailRevision((v) => v + 1);
       showNotification('Mensagem enviada ao responsável.', 'success');
-      // Lista/boxes em background — não bloqueia nem apaga a thread do modal
       void refreshTickets();
       return updated;
     } catch (err) {
@@ -315,19 +375,19 @@ export default function WorkflowApprovalShell() {
         queueLabel={queueLabel}
         items={queueData.queue}
         selectedId={selectedId}
-        onSelect={setSelectedId}
+        onSelect={handleSelectTicket}
+        teamQueueId={teamQueueId}
+        onSearchOpenWorkflow={handleSelectTicket}
+        onSearchOpenDesk={handleSearchOpenDesk}
       />
       <WorkflowApprovalDetail
         detail={detail}
-        summary={queueData.summary}
         teamId={teamQueueId}
         busy={busy}
-        infoPanelOpen={infoPanelOpen}
         onApprove={handleApprove}
+        onFeito={handleFeito}
         onReject={handleReject}
-        onRequestInfoOpen={handleRequestInfoOpen}
         onRequestInfoSubmit={handleRequestInfoSubmit}
-        onRequestInfoCancel={handleRequestInfoCancel}
         canManageWorkflow={canManageWorkflow}
         canAdvanceWorkflow={canAdvanceWorkflow}
         onAdvanceWorkflow={handleAdvanceWorkflow}

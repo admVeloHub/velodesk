@@ -7,7 +7,7 @@ import { listOnlineEligiblePresenceKeys } from './agentPresence.service';
 import { listAgentesDesk } from './agenteDesk.service';
 import { listColaboradoresDesk } from './colaboradoresCadastro.service';
 import { extractFuncoes } from '../utils/normalizeFuncao';
-import { currentStatus } from './chamado.mapper';
+import { currentStatus, isConsumidorGovChamado, isProconChamado } from './chamado.mapper';
 import { isRealResponsavel } from './responsavel.util';
 
 type RoletaPoolAgent = {
@@ -131,6 +131,8 @@ export function isChamadoAtribuicaoRoleta(chamado: IChamadoN1): boolean {
 
 export function shouldAutoAssign(partial: Partial<IChamadoN1>): boolean {
   if (!env.assignmentRouterEnabled) return false;
+  const chamado = partial as IChamadoN1;
+  if (isProconChamado(chamado) || isConsumidorGovChamado(chamado)) return false;
   return !isRealResponsavel(partial.tabulacao?.[0]?.responsavel);
 }
 

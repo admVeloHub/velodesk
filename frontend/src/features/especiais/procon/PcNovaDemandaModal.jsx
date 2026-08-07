@@ -65,7 +65,7 @@ export default function PcNovaDemandaModal({ open, onClose, onManual }) {
             </span>
             <span className="ra-nova-modal__option-text">
               <strong>Cadastro manual</strong>
-              <small>Preencher formulário de uma demanda por vez</small>
+              <small>Informe o CPF do consumidor para abrir a demanda</small>
             </span>
             <i className="ti ti-chevron-right ra-nova-modal__option-arrow" aria-hidden="true" />
           </button>

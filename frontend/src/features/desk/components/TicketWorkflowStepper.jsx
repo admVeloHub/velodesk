@@ -1,6 +1,6 @@
 /**
- * TicketWorkflowStepper v1.4.0 — etapas reais + label da etapa ativa no header
- * VERSION: v1.4.0 | DATE: 2026-08-04
+ * TicketWorkflowStepper v1.6.0 — headerStack track-only polido
+ * VERSION: v1.6.0 | DATE: 2026-08-06
  */
 import React, { useMemo } from 'react';
 import { getWorkflowProgress, isTicketInWorkflow } from '../../../services/desk/utils';
@@ -37,6 +37,7 @@ export default function TicketWorkflowStepper({ ticket, onClick, clickable = fal
     () => getWorkflowProgress(ticket),
     [ticket, workflows],
   );
+  const isHeaderStack = layout === 'headerStack';
 
   if (!isTicketInWorkflow(ticket)) return null;
 
@@ -64,10 +65,6 @@ export default function TicketWorkflowStepper({ ticket, onClick, clickable = fal
           aria-label={`Carregando workflow: ${label}`}
           {...interactiveProps}
         >
-          <p className="desk-workflow-stepper__eyebrow">
-            <i className="ti ti-arrows-exchange" aria-hidden="true" />
-            <span className="desk-workflow-stepper__eyebrow-text">{label}</span>
-          </p>
           <ol className="desk-workflow-stepper__track">
             <li className="desk-workflow-stepper__step desk-workflow-stepper__step--active">
               <span className="desk-workflow-stepper__circle">
@@ -86,10 +83,6 @@ export default function TicketWorkflowStepper({ ticket, onClick, clickable = fal
         aria-label={`Workflow ativo: ${label}`}
         {...interactiveProps}
       >
-        <p className="desk-workflow-stepper__eyebrow">
-          <i className="ti ti-arrows-exchange" aria-hidden="true" />
-          <span className="desk-workflow-stepper__eyebrow-text">{label}</span>
-        </p>
         <ol className="desk-workflow-stepper__track">
           <li
             className="desk-workflow-stepper__step desk-workflow-stepper__step--active"
@@ -104,13 +97,45 @@ export default function TicketWorkflowStepper({ ticket, onClick, clickable = fal
     );
   }
 
-  const { template, stepsWithState, activeStep } = progress;
-  const showLabels = layout === 'headerStack';
-  const stepCount = stepsWithState.length;
-  const activeIndex = stepsWithState.findIndex((s) => s.state === 'active' || s.state === 'signaled');
-  const progressHint = activeIndex >= 0
-    ? `${activeIndex + 1}/${stepCount}`
-    : `${stepCount} etapas`;
+  const { template, stepsWithState } = progress;
+
+  const track = (
+    <ol className="desk-workflow-stepper__track">
+      {stepsWithState.map((step, index) => {
+        const subtitle = getWorkflowStepSubtitle(step, progress);
+        return (
+          <React.Fragment key={step.id}>
+            {index > 0 && (
+              <li
+                className={connectorClass(stepsWithState[index - 1], step)}
+                aria-hidden="true"
+              />
+            )}
+            <li
+              className={'desk-workflow-stepper__step desk-workflow-stepper__step--' + step.state}
+              title={subtitle ? `${step.label} — ${subtitle}` : step.label}
+            >
+              <span className="desk-workflow-stepper__circle">
+                <StepIcon step={step} />
+              </span>
+            </li>
+          </React.Fragment>
+        );
+      })}
+    </ol>
+  );
+
+  if (isHeaderStack) {
+    return (
+      <section
+        className={buildStepperClassName({ layout, clickable })}
+        aria-label={`Workflow ativo: ${template.title}`}
+        {...interactiveProps}
+      >
+        {track}
+      </section>
+    );
+  }
 
   return (
     <section
@@ -118,45 +143,11 @@ export default function TicketWorkflowStepper({ ticket, onClick, clickable = fal
       aria-label={`Workflow ativo: ${template.title}`}
       {...interactiveProps}
     >
-      <div className="desk-workflow-stepper__head">
-        <p className="desk-workflow-stepper__eyebrow" title={`Workflow ativo: ${template.title}`}>
-          <i className="ti ti-arrows-exchange" aria-hidden="true" />
-          <span className="desk-workflow-stepper__eyebrow-text">{template.title}</span>
-        </p>
-        {showLabels ? (
-          <span className="desk-workflow-stepper__progress-hint" title="Progresso do workflow">
-            {progressHint}
-          </span>
-        ) : null}
-      </div>
-      <ol className="desk-workflow-stepper__track">
-        {stepsWithState.map((step, index) => {
-          const subtitle = getWorkflowStepSubtitle(step, progress);
-          return (
-            <React.Fragment key={step.id}>
-              {index > 0 && (
-                <li
-                  className={connectorClass(stepsWithState[index - 1], step)}
-                  aria-hidden="true"
-                />
-              )}
-              <li
-                className={'desk-workflow-stepper__step desk-workflow-stepper__step--' + step.state}
-                title={subtitle ? `${step.label} — ${subtitle}` : step.label}
-              >
-                <span className="desk-workflow-stepper__circle">
-                  <StepIcon step={step} />
-                </span>
-              </li>
-            </React.Fragment>
-          );
-        })}
-      </ol>
-      {showLabels && activeStep?.label ? (
-        <p className="desk-workflow-stepper__active-caption" title={activeStep.label}>
-          {activeStep.label}
-        </p>
-      ) : null}
+      <p className="desk-workflow-stepper__eyebrow" title={`Workflow ativo: ${template.title}`}>
+        <i className="ti ti-arrows-exchange" aria-hidden="true" />
+        <span className="desk-workflow-stepper__eyebrow-text">{template.title}</span>
+      </p>
+      {track}
     </section>
   );
 }

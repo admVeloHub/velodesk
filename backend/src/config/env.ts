@@ -132,6 +132,22 @@ export const env = {
     .split(',')
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean),
+  inboundEmailProconRecipients: (process.env.INBOUND_EMAIL_PROCON_RECIPIENTS || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean),
+  inboundEmailProconSenderPatterns: (process.env.INBOUND_EMAIL_PROCON_SENDER_PATTERNS || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean),
+  inboundEmailConsumidorGovRecipients: (process.env.INBOUND_EMAIL_CONSUMIDOR_GOV_RECIPIENTS || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean),
+  inboundEmailConsumidorGovSenderPatterns: (process.env.INBOUND_EMAIL_CONSUMIDOR_GOV_SENDER_PATTERNS || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean),
   emailEnabled: process.env.EMAIL_ENABLED === 'true',
   deskEmailTransportCollection: process.env.DESK_EMAIL_TRANSPORT_COLLECTION || 'email_transport',
   deskEmailTransportDocumentId: process.env.DESK_EMAIL_TRANSPORT_DOCUMENT_ID || 'desk_email_transport',

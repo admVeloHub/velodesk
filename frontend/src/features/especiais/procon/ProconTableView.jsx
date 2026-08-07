@@ -5,11 +5,16 @@ import React from 'react';
 import { getStatusLabel } from '../../../services/especiais/proconData';
 import { formatPrazoLegal } from '../../../services/especiais/proconStore';
 
-function RespostaButton({ action, item, onAction }) {
+function RespostaButton({ action, item, onAction, disabled = false }) {
   if (action === 'responder') {
     return (
-      <button type="button" className="ra-table__btn ra-table__btn--primary" onClick={() => onAction?.('responder', item)}>
-        Responder
+      <button
+        type="button"
+        className="ra-table__btn ra-table__btn--primary"
+        disabled={disabled}
+        onClick={() => onAction?.('responder', item)}
+      >
+        {disabled ? 'Abrindo…' : 'Responder'}
       </button>
     );
   }
@@ -44,6 +49,7 @@ function SlaBar({ pct, tone }) {
 export default function ProconTableView({
   groups,
   selectedIds,
+  respondingId = null,
   onToggleSelect,
   onToggleSelectAll,
   onRowAction,
@@ -117,7 +123,12 @@ export default function ProconTableView({
                   <td>{item.tabulacao || '—'}</td>
                   <td>{item.atendente || '—'}</td>
                   <td>
-                    <RespostaButton action={item.respostaAction} item={item} onAction={onRowAction} />
+                    <RespostaButton
+                      action={item.respostaAction}
+                      item={item}
+                      onAction={onRowAction}
+                      disabled={respondingId === item.id}
+                    />
                   </td>
                 </tr>
               ))}

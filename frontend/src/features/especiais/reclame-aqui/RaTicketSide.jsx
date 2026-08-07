@@ -3,10 +3,10 @@
  */
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useNotifications } from '../../../context/NotificationContext';
 import { getStatusLabel } from '../../../services/especiais/reclameAquiData';
 import { formatRaDeadlineLabel } from '../../../services/especiais/reclameAquiTicketService';
 import { formatComplaintDate } from './raTicketFormatters';
+import EspeciaisWorkflowSolicitacoesSection from '../shared/EspeciaisWorkflowSolicitacoesSection';
 
 export default function RaTicketSide({
   raItem,
@@ -14,20 +14,14 @@ export default function RaTicketSide({
   waChatOpen = false,
   onOpenChat,
   onCloseChat,
+  onTicketUpdated,
 }) {
   const navigate = useNavigate();
-  const { showNotification } = useNotifications();
-
-  const handleModeracao = () => {
-    showNotification('Módulo de moderação em breve.', 'info');
-  };
 
   if (!raItem) return null;
 
   const protocoloDisplay = raItem.protocoloRa ? `#${raItem.protocoloRa}` : '—';
   const deadlineLabel = formatRaDeadlineLabel(raItem.prazoRa);
-  const emails = ticket?.lateralForm?.clienteEmail || (raItem.email ? [raItem.email] : []);
-  const phones = ticket?.lateralForm?.clienteTelefone || (raItem.telefoneWhatsapp ? [raItem.telefoneWhatsapp] : []);
 
   return (
     <aside className="ra-crm-side">
@@ -63,39 +57,10 @@ export default function RaTicketSide({
           </dl>
         </section>
 
-        <section className="ra-ticket__side-card">
-          <h2>CONTATO DO CONSUMIDOR</h2>
-          <dl>
-            <div>
-              <dt>CPF</dt>
-              <dd>{raItem.cpf || '—'}</dd>
-            </div>
-            <div>
-              <dt>E-mail</dt>
-              <dd>{emails[0] || '—'}</dd>
-            </div>
-            <div>
-              <dt>Telefone principal</dt>
-              <dd>{phones[0] || '—'}</dd>
-            </div>
-            <div>
-              <dt>Telefone secundário</dt>
-              <dd>{phones[1] || '—'}</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section className="ra-registro__moderacao ra-ticket__moderacao">
-          <div className="ra-registro__moderacao-icon">
-            <i className="ti ti-shield" aria-hidden="true" />
-          </div>
-          <div className="ra-registro__moderacao-content">
-            <h3>Solicitar moderação</h3>
-            <button type="button" className="ra-registro__moderacao-btn" onClick={handleModeracao}>
-              Abrir módulo de moderação
-            </button>
-          </div>
-        </section>
+        <EspeciaisWorkflowSolicitacoesSection
+          ticket={ticket}
+          onTicketUpdated={onTicketUpdated}
+        />
 
         <div className="ra-ticket__side-footer">
           <button

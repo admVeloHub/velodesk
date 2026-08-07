@@ -13,6 +13,7 @@ import {
   buildResponsavelCandidates,
   currentStatus,
   isProconChamado,
+  isConsumidorGovChamado,
   normalizeStatusValue,
   readTabulacaoSnapshot,
 } from './chamado.mapper';
@@ -27,7 +28,7 @@ import {
   normalizeFuncao,
   resolvePrimaryFuncao,
 } from '../utils/normalizeFuncao';
-import { getWorkflowById } from './workflowDefinicao.service';
+import { getWorkflowById, workflowDefinitionMatchesFuncao } from './workflowDefinicao.service';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
 
@@ -171,6 +172,7 @@ function readTicketTabulacao(chamado: IChamadoN1) {
 
 function ticketCanalMatches(chamado: IChamadoN1, canalSlug: string): boolean {
   if (canalSlug === 'procon' && isProconChamado(chamado)) return true;
+  if (canalSlug === 'consumidor-gov' && isConsumidorGovChamado(chamado)) return true;
   const tab = readTicketTabulacao(chamado);
   const text = [
     tab.tipoChamado,
@@ -235,6 +237,29 @@ function teamSlugFromWorkflowDefinicaoSlug(definicaoSlug: string): string {
   return slug;
 }
 
+const PRODUTOS_SOLICITACAO_CATEGORIAS = new Set([
+  'erros-bugs',
+  'solicitacoes',
+  'liberacao-pix',
+  'documentos',
+]);
+
+const FINANCEIRO_SOLICITACAO_CATEGORIAS = new Set([
+  'estorno',
+  'cobranca',
+  'outros',
+]);
+
+function readSolicitacaoProdutosCategoria(chamado: IChamadoN1): string {
+  const categoria = chamado.workflow?.requisicao?.solicitacaoProdutos?.categoria;
+  return String(categoria ?? '').trim().toLowerCase();
+}
+
+function readSolicitacaoFinanceiroCategoria(chamado: IChamadoN1): string {
+  const categoria = chamado.workflow?.requisicao?.solicitacaoFinanceiro?.categoria;
+  return String(categoria ?? '').trim().toLowerCase();
+}
+
 /** Workflow ativo cuja definição pertence a uma das funções do usuário. */
 export async function matchesWorkflowDefinitionTeam(
   resolved: ResolvedUserPermissions,
@@ -249,7 +274,9 @@ export async function matchesWorkflowDefinitionTeam(
   }
   try {
     const def = await getWorkflowById(String(chamado.workflow.workflowId));
-    if (!def?.slug) return false;
+    if (!def) return false;
+    if (workflowDefinitionMatchesFuncao(def, userFuncaoSlugs(resolved))) return true;
+    if (!def.slug) return false;
     const team = teamSlugFromWorkflowDefinicaoSlug(def.slug);
     return Boolean(team) && userFuncaoSlugs(resolved).includes(team);
   } catch {
@@ -392,6 +419,10 @@ async function canActOnTicketAsync(
   resolved: ResolvedUserPermissions,
   chamado: IChamadoN1,
 ): Promise<boolean> {
+  const teamQueue = resolveWorkflowTeamQueueForUser(resolved);
+  if (teamQueue && !(await ticketMatchesWorkflowTeamAsync(chamado, teamQueue))) {
+    return false;
+  }
   if (canActOnTicket(resolved, chamado)) return true;
   return matchesWorkflowDefinitionTeam(resolved, chamado);
 }
@@ -480,6 +511,60 @@ export function shouldUseMeusChamadosFilter(resolved: ResolvedUserPermissions): 
 
 export function canApproveWorkflow(resolved: ResolvedUserPermissions): boolean {
   return hasPermission(resolved.permissoes, 'workflow', 'aprovar');
+}
+
+const WORKFLOW_TEAM_QUEUE_IDS = new Set(['financeiro', 'produtos']);
+
+/** Fila de time do usuário no Workflow (financeiro | produtos). Gestão retorna null. */
+export function resolveWorkflowTeamQueueForUser(
+  resolved: ResolvedUserPermissions,
+): string | null {
+  if (
+    hasPermission(resolved.permissoes, 'tickets', 'ver_todos')
+    && canApproveWorkflow(resolved)
+  ) {
+    return null;
+  }
+  if (!hasPermission(resolved.permissoes, 'portal', 'workflow')) return null;
+  if (!hasPermission(resolved.permissoes, 'tickets', 'atuar_atribuido')) return null;
+  const slugs = userFuncaoSlugs(resolved);
+  return slugs.find((s) => WORKFLOW_TEAM_QUEUE_IDS.has(s)) || null;
+}
+
+export async function ticketMatchesWorkflowTeamAsync(
+  chamado: IChamadoN1,
+  teamId: string,
+): Promise<boolean> {
+  const team = normalizeFuncao(teamId);
+  if (!team || !WORKFLOW_TEAM_QUEUE_IDS.has(team)) return false;
+  if (!chamado.workflow?.active) return false;
+
+  const tab = readTicketTabulacao(chamado);
+  const atribuido = normalizeAtribuidoValue(tab.atribuido).toLowerCase();
+  if (atribuido === `funcao:${team}`) return true;
+
+  if (team === 'produtos') {
+    const categoria = readSolicitacaoProdutosCategoria(chamado);
+    if (PRODUTOS_SOLICITACAO_CATEGORIAS.has(categoria)) return true;
+    if (readSolicitacaoFinanceiroCategoria(chamado) === 'documentos') return true;
+  }
+
+  if (team === 'financeiro') {
+    const categoria = readSolicitacaoFinanceiroCategoria(chamado);
+    if (FINANCEIRO_SOLICITACAO_CATEGORIAS.has(categoria)) return true;
+  }
+
+  if (!chamado.workflow.workflowId) return false;
+
+  try {
+    const def = await getWorkflowById(String(chamado.workflow.workflowId));
+    if (!def) return false;
+    if (workflowDefinitionMatchesFuncao(def, [team])) return true;
+    if (!def.slug) return false;
+    return teamSlugFromWorkflowDefinicaoSlug(def.slug) === team;
+  } catch {
+    return false;
+  }
 }
 
 function isSuporteOrSupervisaoFuncao(resolved: ResolvedUserPermissions): boolean {

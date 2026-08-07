@@ -29,6 +29,7 @@ const EMPTY_FORM = {
 export default function SolicitacoesFormTab({
   onSaved,
   onSubmitted,
+  onTeamForward,
   ticketOverride,
   clientOverride,
 }) {
@@ -72,11 +73,15 @@ export default function SolicitacoesFormTab({
         || findTicketEntry(activeTabId)?.ticket?.id
         || findTicketEntry(form.ticketId)?.ticket?.id;
 
-      if (ticketRef) {
+      if (onTeamForward) {
+        await onTeamForward(request);
+      } else if (ticketRef) {
         await persistSolicitacaoProdutosOnTicket(ticketRef, request);
       }
 
-      showNotification('Solicitação enviada ao time de Produtos.', 'success');
+      if (!onTeamForward) {
+        showNotification('Solicitação enviada ao time de Produtos.', 'success');
+      }
       setForm({
         ...EMPTY_FORM,
         cpf: form.cpf,
@@ -84,6 +89,8 @@ export default function SolicitacoesFormTab({
       });
       onSaved?.();
       onSubmitted?.();
+    } catch (err) {
+      showNotification(err?.message || 'Não foi possível enviar a solicitação.', 'error');
     } finally {
       setSubmitting(false);
     }

@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { computeWorkflow360ViewForUser } from '../../services/workspace/deskData';
 import { usePermissionsOptional } from '../../context/PermissionContext';
 import { hasWorkflowPortalAccess, resolveWorkflowTeamQueueForUser } from '../../services/permissions/permissionService';
-import { getWorkflowTeamQueueMeta } from '../../services/workflow/workflowTeamQueues';
+import { getWorkflowTeamQueueMeta, buildWorkflowNavigationUrl } from '../../services/workflow/workflowTeamQueues';
 import { workflowNotificacoesApi } from '../../api/client';
 import Workspace360Kpis from './components/ws360/Workspace360Kpis';
 import Workspace360TicketSection from './components/ws360/Workspace360TicketSection';
@@ -40,13 +40,21 @@ export default function WorkflowPanel() {
       .catch(() => setCtaPending([]));
   }, []);
 
-  const handleOpenTicket = useCallback((ticketId) => {
+  const handleOpenTicket = useCallback((ticketId, sectionId) => {
+    if (sectionId === 'workflow-respondidos' || teamQueueId) {
+      navigate(buildWorkflowNavigationUrl({ teamId: teamQueueId, ticketId }));
+      return;
+    }
     navigate(`/workflow?ticket=${ticketId}`);
-  }, [navigate]);
+  }, [navigate, teamQueueId]);
 
-  const handleSeeAll = useCallback(() => {
-    navigate('/workflow');
-  }, [navigate]);
+  const handleSeeAll = useCallback((sectionId) => {
+    if (sectionId === 'workflow-respondidos' && teamQueueId) {
+      navigate(buildWorkflowNavigationUrl({ teamId: teamQueueId, view: 'respondidos' }));
+      return;
+    }
+    navigate(teamQueueId ? buildWorkflowNavigationUrl({ teamId: teamQueueId }) : '/workflow');
+  }, [navigate, teamQueueId]);
 
   const handleOpenDeskTicket = useCallback((ticketId) => {
     if (typeof window.openTicket === 'function') {
@@ -57,6 +65,12 @@ export default function WorkflowPanel() {
   }, [navigate]);
 
   const queueTitle = teamMeta?.name || 'Workflow';
+  const heroClassName = [
+    'ws-hero',
+    'ws-hero--workflow',
+    teamQueueId === 'produtos' ? 'ws-hero--produtos' : '',
+    teamQueueId === 'financeiro' ? 'ws-hero--financeiro' : '',
+  ].filter(Boolean).join(' ');
 
   if (!hasWorkflowAccess) {
     return (
@@ -74,7 +88,7 @@ export default function WorkflowPanel() {
 
   return (
     <div className="ws-workflow-desk ws-agent-desk--operational" id="wsWorkflowDesk">
-      <div className="ws-hero ws-hero--workflow">
+      <div className={heroClassName}>
         <div>
           <span className="ws-eyebrow">{queueTitle}</span>
           <h3>{teamQueueId ? `Fila ${queueTitle}` : 'Fluxos operacionais entre times'}</h3>
@@ -128,7 +142,7 @@ export default function WorkflowPanel() {
         </div>
         <div className="ws360-sections-row__stack ws360-sections-row__stack--trail">
           {view.sections
-            .filter((section) => section.id === 'workflow-external')
+            .filter((section) => section.id === 'workflow-respondidos' || section.id === 'workflow-external')
             .map((section) => (
               <Workspace360TicketSection
                 key={section.id}

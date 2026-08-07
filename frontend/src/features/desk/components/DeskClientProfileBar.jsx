@@ -326,26 +326,28 @@ export default function DeskClientProfileBar({
 
         {inWorkflow ? (
           <div className="ticket-client-profile__header-side ticket-client-profile__cell-side">
-            <div className="ticket-client-profile__header-stepper">
-              <TicketWorkflowStepper
-                ticket={ticket}
-                layout="headerStack"
-                clickable={canManageWorkflow}
-                onClick={() => setWorkflowModalOpen(true)}
-              />
-            </div>
-            <div className="ticket-client-profile__header-side-actions">
-              {showInlineAdvance ? (
-                <button
-                  type="button"
-                  className="btn-primary btn-sm desk-workflow-advance-btn ticket-client-advance-btn"
-                  onClick={onAdvanceWorkflow}
-                  disabled={advancingWorkflow}
-                >
-                  {advancingWorkflow ? 'Avançando…' : 'Avançar'}
-                </button>
-              ) : null}
-              {historyButton}
+            <div className="ticket-client-profile__header-side-stack">
+              <div className="ticket-client-profile__header-stepper">
+                <TicketWorkflowStepper
+                  ticket={ticket}
+                  layout="headerStack"
+                  clickable={canManageWorkflow}
+                  onClick={() => setWorkflowModalOpen(true)}
+                />
+              </div>
+              <div className="ticket-client-profile__header-side-actions">
+                {showInlineAdvance ? (
+                  <button
+                    type="button"
+                    className="btn-primary btn-sm desk-workflow-advance-btn ticket-client-advance-btn"
+                    onClick={onAdvanceWorkflow}
+                    disabled={advancingWorkflow}
+                  >
+                    {advancingWorkflow ? 'Avançando…' : 'Avançar'}
+                  </button>
+                ) : null}
+                {historyButton}
+              </div>
             </div>
             {canManageWorkflow ? (
               <WorkflowProgressModal

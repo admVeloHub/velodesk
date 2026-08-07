@@ -6,7 +6,8 @@
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
 import { getDeskQueueDisplayCount, markTicketResolvedOptimistic } from './queueCounts';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
-import { ticketBelongsInMeusTicketsList, ticketBelongsInAgentNovosQueue, ticketMatchesAgentResponsavel, shouldUseMeusChamadosFila, shouldViewAllDeskTickets } from './responsavelSegmentation';
+import { ticketBelongsInMeusTicketsList, ticketBelongsInAgentNovosQueue, ticketMatchesAgentResponsavel, shouldUseMeusChamadosFila, shouldViewAllDeskTickets, readDeskProfileId } from './responsavelSegmentation';
+import { isEspeciaisDeskExcludedTicket } from '../especiais/especiaisChannelDetection';
 import { normalizeMessageDisplayText } from '../../utils/htmlText.util';
 import { sanitizeResponsavel } from '../tabulationConfig';
 import { ticketsApi, ticketSearchApi } from '../../api/client';
@@ -1041,11 +1042,16 @@ export function filterEntriesByDeskSearch(entries, rawQuery, searchMode) {
   return (entries || []).filter((entry) => matchesTicketSearch(entry, q, searchMode));
 }
 
+function shouldExcludeEspeciaisFromDesk(ticket) {
+  return isEspeciaisDeskExcludedTicket(ticket, readDeskProfileId());
+}
+
 function filterMyTicketsEntries(searchQuery) {
   const q = String(searchQuery || '').trim();
   const trustBackend = shouldUseMeusChamadosFila();
 
   return getAllCockpitTickets().filter((entry) => {
+    if (shouldExcludeEspeciaisFromDesk(entry.ticket)) return false;
     if (!MEUS_TICKETS_ACTIVE_QUEUE_IDS.has(entry.queueId)) return false;
     if (isFusaoAbsorvido(entry.ticket)) return false;
     if (isTicketTerminalStatus(entry.ticket)) return false;
@@ -1110,6 +1116,7 @@ function matchesMyTicketsStatusSection(entry, sectionId) {
 function filterCustomQueueEntries(customBox, searchQuery) {
   const q = String(searchQuery || '').trim();
   return getAllCockpitTickets().filter((entry) => {
+    if (shouldExcludeEspeciaisFromDesk(entry.ticket)) return false;
     if (isFusaoAbsorvido(entry.ticket)) return false;
     if (!shouldViewAllDeskTickets() && !ticketMatchesAgentResponsavel(entry.ticket)) return false;
     if (!ticketMatchesQueueCriterios(entry.ticket, customBox.criterios)) return false;
@@ -1135,6 +1142,7 @@ export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOld
   const trustBackendQueues = shouldUseMeusChamadosFila();
   const filtered = getAllCockpitTickets()
     .filter((entry) => {
+      if (shouldExcludeEspeciaisFromDesk(entry.ticket)) return false;
       if (isFusaoAbsorvido(entry.ticket)) return false;
       if (entry.queueId !== activeQueue) return false;
       if (activeQueue === 'novos' && !ticketBelongsInAgentNovosQueue(entry.ticket)) return false;
@@ -1158,6 +1166,7 @@ export function resolveDeskSearchEntries(
 
   const all = getAllCockpitTickets();
   const filtered = all.filter(({ ticket: t }) => {
+    if (shouldExcludeEspeciaisFromDesk(t)) return false;
     if (isFusaoAbsorvido(t)) return false;
     return matchesTicketSearch({ ticket: t }, trimmed, searchMode);
   });
@@ -1247,6 +1256,7 @@ export function countByQueue(queueId) {
   const filterByResponsavel = shouldFilterByAgentResponsavel(queueId);
   const trustBackendQueues = shouldUseMeusChamadosFila();
   return getAllCockpitTickets().filter((e) => {
+    if (shouldExcludeEspeciaisFromDesk(e.ticket)) return false;
     if (isFusaoAbsorvido(e.ticket)) return false;
     if (e.queueId !== queueId) return false;
     if (queueId === 'novos' && !ticketBelongsInAgentNovosQueue(e.ticket)) return false;

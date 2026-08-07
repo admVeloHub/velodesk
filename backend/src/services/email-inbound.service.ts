@@ -26,6 +26,11 @@ import {
 } from './attachmentFilter.util';
 import type { InboundEmailPayload, InboundEmailProcessResult } from './inbound-email/types';
 import type { IChamadoN1 } from '../models/ChamadoN1';
+import {
+  classifyInboundEspeciaisChannel,
+  type InboundEspeciaisChannel,
+} from './inbound-email/inboundChannelClassifier.service';
+import { startWorkflowForChamado } from './workflowTicket.service';
 
 export const LEGACY_PROTOCOL_PATTERN = /VD-\d{8}-\d{4}/i;
 export const NUMERIC_PROTOCOL_PATTERN = /\[(\d{8,10})\]/;
@@ -209,6 +214,88 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
   }
 }
 
+function buildInboundEspeciaisTicketBody(
+  payload: InboundEmailPayload,
+  channel: InboundEspeciaisChannel,
+  bodyText: string,
+  displayName: string,
+  subject: string,
+  attachments: string[],
+  isPriority: boolean,
+): Record<string, unknown> {
+  const lateralBase = {
+    clienteEmail: [payload.from.email],
+    clienteNome: displayName,
+    classificacaoTipo: 'Reclamação',
+    motivo: subject,
+    detalhe: bodyText.slice(0, 500),
+  };
+
+  if (channel === 'procon') {
+    return {
+      title: subject,
+      chamadoTitulo: subject,
+      description: bodyText,
+      text: bodyText,
+      status: 'novo',
+      priority: isPriority ? 'alta' : 'media',
+      clientName: displayName,
+      attachments,
+      messageOrigin: 'cliente',
+      sender: 'them',
+      lateralForm: {
+        ...lateralBase,
+        canal: 'Procon',
+        procon: {
+          assunto: subject,
+          descricao: bodyText,
+          consumidor: displayName,
+          statusPc: 'nao-respondida',
+        },
+      },
+    };
+  }
+
+  return {
+    title: subject,
+    chamadoTitulo: subject,
+    description: bodyText,
+    text: bodyText,
+    status: 'novo',
+    priority: isPriority ? 'alta' : 'media',
+    clientName: displayName,
+    attachments,
+    messageOrigin: 'cliente',
+    sender: 'them',
+    lateralForm: {
+      ...lateralBase,
+      canal: 'Consumidor.Gov',
+      consumidorGov: {
+        assunto: subject,
+        descricao: bodyText,
+        consumidor: displayName,
+        statusGov: 'nao-respondida',
+      },
+    },
+  };
+}
+
+async function activateEspeciaisWorkflow(
+  chamado: IChamadoN1,
+  channel: InboundEspeciaisChannel,
+): Promise<void> {
+  const slug = channel === 'procon' ? 'procon-tratativa' : 'consumidor-gov-tratativa';
+  try {
+    await startWorkflowForChamado(chamado, null, undefined, slug);
+    await chamado.save();
+  } catch (err) {
+    console.warn(
+      '[email-inbound] workflow especiais fail-soft:',
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
 async function runInboundEmailFlow(
   payload: InboundEmailPayload,
   messageId: string,
@@ -255,26 +342,37 @@ async function runInboundEmailFlow(
   const subject = payload.subject.trim() || 'Atendimento por e-mail';
   const displayName = payload.from.name || payload.from.email.split('@')[0];
   const inboundRootId = normalizeMessageId(payload.messageId);
+  const especiaisChannel = classifyInboundEspeciaisChannel(payload);
 
-  const ticketBody: Record<string, unknown> = {
-    title: subject,
-    chamadoTitulo: subject,
-    description: bodyText,
-    text: bodyText,
-    status: 'novo',
-    priority: isPriority ? 'alta' : 'media',
-    clientName: displayName,
-    attachments,
-    lateralForm: {
-      clienteEmail: [payload.from.email],
-      clienteEmailResposta: payload.from.email,
-      clienteNome: displayName,
-      canal: 'E-mail',
-      classificacaoTipo: 'Solicitação',
-      motivo: subject,
-      detalhe: bodyText.slice(0, 500),
-    },
-  };
+  const ticketBody: Record<string, unknown> = especiaisChannel
+    ? buildInboundEspeciaisTicketBody(
+      payload,
+      especiaisChannel,
+      bodyText,
+      displayName,
+      subject,
+      attachments,
+      isPriority,
+    )
+    : {
+      title: subject,
+      chamadoTitulo: subject,
+      description: bodyText,
+      text: bodyText,
+      status: 'novo',
+      priority: isPriority ? 'alta' : 'media',
+      clientName: displayName,
+      attachments,
+      lateralForm: {
+        clienteEmail: [payload.from.email],
+        clienteEmailResposta: payload.from.email,
+        clienteNome: displayName,
+        canal: 'E-mail',
+        classificacaoTipo: 'Solicitação',
+        motivo: subject,
+        detalhe: bodyText.slice(0, 500),
+      },
+    };
 
   if (clienteRef?.clienteId) ticketBody.clienteId = clienteRef.clienteId.toString();
   if (clienteRef?.clienteCpf) ticketBody.clientCPF = clienteRef.clienteCpf;
@@ -283,9 +381,12 @@ async function runInboundEmailFlow(
   if (partial.registro?.[0]) {
     partial.registro[0].origin = 'cliente';
     partial.registro[0].autor = displayName;
+    const channelSource = especiaisChannel ?? 'email-inbound';
     partial.registro[0].metadados = {
       ...(partial.registro[0].metadados ?? {}),
       ...emailMeta,
+      source: channelSource,
+      emailInbound: true,
       emailThreadRootId: inboundRootId,
       ...(isPriority ? { mailPriority: 'alta' } : {}),
     };
@@ -296,14 +397,26 @@ async function runInboundEmailFlow(
     partial.cliente = [clienteRef];
   }
 
-  await applyAssignmentIfNeeded(partial, { source: 'email-inbound', canal: 'E-mail' });
+  await applyAssignmentIfNeeded(partial, {
+    source: 'email-inbound',
+    canal: especiaisChannel === 'procon'
+      ? 'Procon'
+      : especiaisChannel === 'consumidor-gov'
+        ? 'Consumidor.Gov'
+        : 'E-mail',
+  });
 
   const chamado = await ChamadoN1.create(partial);
+  if (especiaisChannel) {
+    await activateEspeciaisWorkflow(chamado, especiaisChannel);
+  }
   await notifyTicketOpenedAsync(chamado, payload.from.email);
 
-  void runInboundPostCreateHooks(chamado, { source: 'email-inbound' }).catch((err: Error) => {
-    console.warn('[email-inbound] hooks inbound fail-soft:', err.message);
-  });
+  if (!especiaisChannel) {
+    void runInboundPostCreateHooks(chamado, { source: 'email-inbound' }).catch((err: Error) => {
+      console.warn('[email-inbound] hooks inbound fail-soft:', err.message);
+    });
+  }
 
   return {
     action: 'created',

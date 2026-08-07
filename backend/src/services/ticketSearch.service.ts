@@ -27,7 +27,7 @@ import {
   shouldUseMeusChamadosFilter,
   type ResolvedUserPermissions,
 } from './permission.service';
-import { listWorkflows } from './workflowDefinicao.service';
+import { resolveWorkflowDefinitionIdsForFuncoes } from './workflowDefinicao.service';
 import { excludeFusaoAbsorvidosFilter } from './ticketFusao.helpers';
 
 export interface SearchCriterio {
@@ -446,31 +446,6 @@ function ticketSlaTone(chamado: IChamadoN1): string {
   const remainingMin = remainingMs / 60000;
   if (remainingMin <= 30) return 'warning';
   return 'ok';
-}
-
-async function resolveWorkflowDefinitionIdsForFuncoes(funcaoSlugs: string[]) {
-  const slugs = [
-    ...new Set(
-      (funcaoSlugs || [])
-        .map((s) => String(s || '').trim().toLowerCase())
-        .filter(Boolean)
-        .flatMap((s) => [`escalonar-${s}`, s]),
-    ),
-  ];
-  if (!slugs.length) return [] as string[];
-
-  try {
-    const all = await listWorkflows(true);
-    return all
-      .filter((w) => slugs.includes(String(w.slug || '').trim().toLowerCase()))
-      .map((w) => String(w._id));
-  } catch (err) {
-    console.warn(
-      '[ticket-search] não foi possível carregar definições de workflow:',
-      err instanceof Error ? err.message : err,
-    );
-    return [];
-  }
 }
 
 async function buildVisibilityFilter(

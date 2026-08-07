@@ -6,13 +6,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { gestaoInsightsApi } from '../../../../api/client';
+import { getGestaoOrgaoTheme } from '../../../../config/especiaisTheme';
 import './gestaoInsights.css';
 
-const ORGAO_ACCENTS = {
-  bacen: { color: '#000058', icon: 'ti-building-bank' },
-  procon: { color: '#1634FF', icon: 'ti-scale' },
-  consumidorGov: { color: '#006AB9', icon: 'ti-gavel' },
-  reclameAqui: { color: '#FCC200', icon: 'ti-message-report' },
+const ORGAO_ICONS = {
+  bacen: 'ti-building-bank',
+  procon: 'ti-scale',
+  consumidorGov: 'ti-gavel',
+  reclameAqui: 'ti-message-report',
 };
 
 export default function GestaoCasosEspeciaisCard() {
@@ -55,7 +56,9 @@ export default function GestaoCasosEspeciaisCard() {
       <div className="gestao-casos-especiais-card__grid gestao-casos-especiais-card__grid--compact">
         {(loading ? Array.from({ length: 4 }) : items).map((item, idx) => {
           const key = item?.id ?? `placeholder-${idx}`;
-          const accent = ORGAO_ACCENTS[item?.id] ?? { color: '#1634FF', icon: 'ti-flag' };
+          const accent = item?.id
+            ? { color: getGestaoOrgaoTheme(item.id).accent, icon: ORGAO_ICONS[item.id] ?? 'ti-flag' }
+            : { color: '#1634FF', icon: 'ti-flag' };
           return (
             <button
               key={key}
