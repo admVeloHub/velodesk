@@ -46,6 +46,7 @@ import telephonyRoutes from './routes/telephony.routes';
 import consultasRoutes from './routes/consultas.routes';
 import ticketSearchRoutes from './routes/ticketSearch.routes';
 import ticketFusaoRoutes from './routes/ticketFusao.routes';
+import realtimeRoutes from './routes/realtime.routes';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
@@ -180,6 +181,7 @@ app.use('/api/telephony', telephonyRoutes);
 app.use('/api/consultas', consultasRoutes);
 app.use('/api/ticket-search', ticketSearchRoutes);
 app.use('/api/ticket-fusao', ticketFusaoRoutes);
+app.use('/api/realtime', realtimeRoutes);
 
 if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);
@@ -311,8 +313,9 @@ async function start() {
           autonomy: env.agentsAutonomyEnabled,
         });
         startGestaoChamadosJob();
-        startChamadoIaAnaliseJob();
       }
+      // Independente do programa de agentes autônomos — controlado só por CHAMADO_IA_ANALISE_ENABLED.
+      startChamadoIaAnaliseJob();
       startCloseResolvedTicketsJob();
       if (env.enableWhatsapp) {
         console.log('Inicializando WhatsApp Web...');

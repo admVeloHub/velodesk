@@ -263,7 +263,7 @@ export async function getAiUsageDailyReport(
     if (log.userId && userNameById.has(log.userId)) {
       key = log.userId;
       label = userNameById.get(log.userId)!;
-    } else if (!log.userId && (log.feature === 'gestao_chamados' || log.feature === 'chamado_ia_analise')) {
+    } else if (!log.userId && (log.feature === 'gestao_chamados' || log.feature === 'chamado_ia_analise' || log.feature === 'telephony_ia_analise')) {
       key = 'automatico';
       label = 'Automático';
     } else if (!log.userId) {

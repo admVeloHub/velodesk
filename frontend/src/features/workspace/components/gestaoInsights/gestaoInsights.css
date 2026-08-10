@@ -91,7 +91,7 @@
 
 .gestao-customer-voice__grid {
     display: grid;
-    grid-template-columns: 1.25fr 1fr 0.85fr;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     gap: 1rem;
 }
 
@@ -726,6 +726,17 @@
     font-size: 0.76rem;
     font-weight: 600;
     color: #64748b;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.gestao-casos-especiais-card__tile-real {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #15803d;
 }
 
 /* ── Variante compacta — tiles clicáveis, gateway para a página de detalhe ── */
@@ -863,8 +874,199 @@
     cursor: pointer;
 }
 
+/* ── Resumo recolhível do card de risco (economia de tela) ── */
+.gestao-risco-card__summary {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    border: 1px dashed rgba(0, 0, 88, 0.18);
+    background: var(--eco-surface, #F3F7FC);
+    border-radius: var(--eco-radius-sm, 12px);
+    padding: 0.65rem 0.85rem;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.gestao-risco-card__summary:hover {
+    border-color: rgba(0, 0, 88, 0.32);
+    background: #eef3fb;
+}
+
+.gestao-risco-card__summary-count {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.9rem;
+    height: 1.9rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 88, 0.08);
+    color: var(--eco-navy, #000058);
+    font-family: var(--gz-mono, ui-monospace, 'SFMono-Regular', Menlo, monospace);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.gestao-risco-card__summary--alert .gestao-risco-card__summary-count {
+    background: #C4291F;
+    color: #fff;
+}
+
+.gestao-risco-card__summary--empty {
+    cursor: default;
+    opacity: 0.75;
+}
+
+.gestao-risco-card__summary--empty:hover {
+    border-color: rgba(0, 0, 88, 0.18);
+    background: var(--eco-surface, #F3F7FC);
+}
+
+.gestao-risco-card__summary-text {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.8rem;
+    color: var(--eco-carbon, #272A30);
+}
+
+.gestao-risco-card__summary-toggle {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--eco-blue, #1634FF);
+    white-space: nowrap;
+}
+
 @media (max-width: 640px) {
     .gestao-insight-card__head { flex-direction: column; align-items: stretch; }
     .gestao-period-filter { align-items: stretch; }
     .gestao-period-filter__pills { justify-content: space-between; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Visão executiva minimalista — Painel 360 da Gestão
+   Escopado em #wsGestaoDesk (mesma linguagem visual do Realtime),
+   sem alterar telas que reaproveitam .ws-panel fora deste painel.
+   ══════════════════════════════════════════════════════════════ */
+#wsGestaoDesk {
+    --gz-mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+}
+
+#wsGestaoDesk .ws-panel {
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 88, 0.1);
+    box-shadow: 0 1px 2px rgba(0, 0, 88, 0.05);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+#wsGestaoDesk .ws-panel:hover {
+    border-color: rgba(0, 0, 88, 0.18);
+    box-shadow: 0 4px 14px rgba(0, 0, 88, 0.08);
+}
+
+#wsGestaoDesk .gestao-insight-card__head h4,
+#wsGestaoDesk .ws360-leaderboard__title,
+#wsGestaoDesk .ws360-reports__title,
+#wsGestaoDesk .ws360-escalated__title {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.74rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--eco-navy, #000058);
+}
+
+#wsGestaoDesk .gestao-insight-card__head h4 > span:first-child,
+#wsGestaoDesk .gestao-insight-card__head h4 > i:first-child,
+#wsGestaoDesk .ws360-leaderboard__title-icon,
+#wsGestaoDesk .ws360-reports__title-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.55rem;
+    height: 1.55rem;
+    border-radius: 7px;
+    background: var(--eco-navy, #000058);
+    color: #fff;
+    font-size: 0.82rem;
+    flex-shrink: 0;
+}
+
+#wsGestaoDesk .ws360-leaderboard__title-tag {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: none;
+    color: var(--eco-blue, #1634FF);
+    background: rgba(22, 52, 255, 0.1);
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+}
+
+#wsGestaoDesk .gestao-customer-voice__head p {
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 500;
+}
+
+/* Números-chave em monoespaçada, no espírito do Realtime */
+#wsGestaoDesk .gestao-volume-stats__value,
+#wsGestaoDesk .gestao-casos-especiais-card__tile-value,
+#wsGestaoDesk .ai-usage-card__tile-value,
+#wsGestaoDesk .gestao-motivos-card__stats strong,
+#wsGestaoDesk .ws360-leaderboard__rank {
+    font-family: var(--gz-mono);
+    letter-spacing: -0.01em;
+}
+
+#wsGestaoDesk .gestao-volume-stats__label,
+#wsGestaoDesk .ai-usage-card__tile-label,
+#wsGestaoDesk .gestao-casos-especiais-card__tile-label {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Densidade um pouco mais compacta entre seções */
+#wsGestaoDesk .gestao-insights-stack {
+    gap: 1rem;
+}
+
+#wsGestaoDesk .gestao-insights-row,
+#wsGestaoDesk .gestao-tiles-row {
+    gap: 1rem;
+}
+
+/* ── Leaderboard operacional — variante compacta (top 5) ── */
+.ws360-leaderboard--compact {
+    padding-bottom: 0.5rem;
+}
+
+.ws360-leaderboard--compact .ws360-leaderboard__item {
+    padding: 0.55rem 0.35rem 0.6rem 0;
+    gap: 10px;
+}
+
+.ws360-leaderboard--compact .ws360-leaderboard__item--first {
+    padding: 0.55rem 0.6rem 0.6rem;
+}
+
+.ws360-leaderboard--compact .ws360-leaderboard__rank {
+    font-size: 1.1rem;
+}
+
+.ws360-leaderboard--compact .ws360-leaderboard__metric {
+    padding: 0.25rem 0.45rem;
+}
+
+.ws360-leaderboard--compact .ws360-leaderboard__metric strong {
+    font-size: 0.76rem;
 }

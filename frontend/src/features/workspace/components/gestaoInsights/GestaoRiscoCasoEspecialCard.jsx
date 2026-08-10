@@ -23,6 +23,7 @@ export default function GestaoRiscoCasoEspecialCard({ onOpenTicket }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -46,8 +47,10 @@ export default function GestaoRiscoCasoEspecialCard({ onOpenTicket }) {
     };
   }, []);
 
+  const count = items.length;
+
   return (
-    <section className="ws-panel gestao-insight-card gestao-risco-card">
+    <section className={`ws-panel gestao-insight-card gestao-risco-card${expanded ? ' gestao-risco-card--expanded' : ''}`}>
       <header className="gestao-insight-card__head">
         <h4>
           <span aria-hidden="true">
@@ -61,41 +64,65 @@ export default function GestaoRiscoCasoEspecialCard({ onOpenTicket }) {
         </span>
       </header>
 
-      <p className="gestao-risco-card__hint">
-        Tickets comuns onde a IA identificou menção do cliente a Bacen, Procon, Reclame Aqui ou ação judicial —
-        ainda não escalonados formalmente. Aja antes que o caso avance.
-      </p>
-
       {loading ? (
         <p className="gestao-insight-card__loading">Carregando…</p>
       ) : error ? (
         <p className="gestao-insight-card__error">{error}</p>
-      ) : items.length === 0 ? (
-        <p className="gestao-insight-card__empty">Nenhum risco identificado no momento.</p>
+      ) : count === 0 ? (
+        <div className="gestao-risco-card__summary gestao-risco-card__summary--empty">
+          <span className="gestao-risco-card__summary-count">0</span>
+          <span className="gestao-risco-card__summary-text">Nenhum risco identificado no momento</span>
+        </div>
       ) : (
-        <ul className="gestao-risco-card__list">
-          {items.map((item) => (
-            <li key={item.id} className={`gestao-risco-card__item gestao-risco-card__item--${accentForTipo(item.tipo)}`}>
-              <div className="gestao-risco-card__info">
-                <div className="gestao-risco-card__top">
-                  <span className="gestao-risco-card__tipo">{item.tipo}</span>
-                  <strong>#{item.protocolo}</strong>
-                  <span className="gestao-risco-card__age">{item.ageDays}d aberto</span>
-                </div>
-                <p className="gestao-risco-card__titulo">{item.titulo}</p>
-                {item.trecho ? <p className="gestao-risco-card__trecho">“{item.trecho}”</p> : null}
-              </div>
-              <button
-                type="button"
-                className="gestao-risco-card__open"
-                onClick={() => onOpenTicket?.(item.id)}
-              >
-                Abrir
-              </button>
-            </li>
-          ))}
-        </ul>
+        <button
+          type="button"
+          className="gestao-risco-card__summary gestao-risco-card__summary--alert"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+        >
+          <span className="gestao-risco-card__summary-count">{count}</span>
+          <span className="gestao-risco-card__summary-text">
+            {count === 1
+              ? 'risco identificado — ainda não escalonado formalmente'
+              : 'riscos identificados — ainda não escalonados formalmente'}
+          </span>
+          <span className="gestao-risco-card__summary-toggle">
+            {expanded ? 'Recolher' : 'Analisar'}
+            <i className={`ti ti-chevron-${expanded ? 'up' : 'down'}`} aria-hidden="true" />
+          </span>
+        </button>
       )}
+
+      {expanded && !loading && !error && count > 0 ? (
+        <>
+          <p className="gestao-risco-card__hint">
+            Tickets comuns onde a IA identificou menção do cliente a Bacen, Procon, Reclame Aqui ou ação judicial —
+            ainda não escalonados formalmente. Aja antes que o caso avance.
+          </p>
+          <ul className="gestao-risco-card__list">
+            {items.map((item) => (
+              <li key={item.id} className={`gestao-risco-card__item gestao-risco-card__item--${accentForTipo(item.tipo)}`}>
+                <div className="gestao-risco-card__info">
+                  <div className="gestao-risco-card__top">
+                    <span className="gestao-risco-card__tipo">{item.tipo}</span>
+                    <strong>#{item.protocolo}</strong>
+                    <span className="gestao-risco-card__age">{item.ageDays}d aberto</span>
+                  </div>
+                  <p className="gestao-risco-card__titulo">{item.titulo}</p>
+                  {item.trecho ? <p className="gestao-risco-card__trecho">“{item.trecho}”</p> : null}
+                </div>
+                <button
+                  type="button"
+                  className="gestao-risco-card__open"
+                  onClick={() => onOpenTicket?.(item.id)}
+                >
+                  Abrir
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
     </section>
   );
 }

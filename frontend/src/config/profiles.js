@@ -1,6 +1,6 @@
 /**
  * Perfis operacionais — Agente / Gestão / Workflow / Especiais
- * VERSION: v1.7.0 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.8.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team
  */
 export const ESPECIAIS_NAV_IDS = [
   'especiais-reclame-aqui',
@@ -32,7 +32,7 @@ export const PROFILES = {
     icon: 'fa-user-tie',
     color: '#000058',
     desc: 'SLA, performance da equipe e escalonamentos',
-    nav: ['workspace', 'dashboard', 'tickets', 'busca-tickets', 'preferencias', 'atendimento-ia-telefonico', 'config', ...ESPECIAIS_NAV_IDS],
+    nav: ['workspace', 'tickets', 'busca-tickets', 'realtime', 'preferencias', 'atendimento-ia-telefonico', 'config', ...ESPECIAIS_NAV_IDS],
     defaultPage: 'workspace',
   },
   workflow: {
@@ -41,7 +41,7 @@ export const PROFILES = {
     icon: 'fa-diagram-project',
     color: '#1694FF',
     desc: 'Fluxos operacionais entre times e acompanhamento de etapas',
-    nav: ['workspace', 'workflow-inbox', 'busca-tickets', 'dashboard'],
+    nav: ['workspace', 'workflow-inbox', 'busca-tickets'],
     defaultPage: 'workflow-inbox',
   },
   especiais: {
@@ -62,7 +62,6 @@ export const PROFILES = {
 export const NAV_ITEMS = [
   { id: 'workspace', path: '/workspace', label: 'Painel 360°', icon: 'ti-layout-grid', tooltip: 'Painel 360°' },
   { id: 'workflow-inbox', path: '/workflow', label: 'Aprovações', icon: 'ti-checkbox', tooltip: 'Console de aprovações' },
-  { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: 'ti-dashboard', tooltip: 'Dashboard' },
   { id: 'reports', path: '/reports', label: 'Relatórios', icon: 'ti-chart-bar', tooltip: 'Relatórios' },
   { id: 'tickets', path: '/tickets', label: 'Tickets', icon: 'ti-ticket', tooltip: 'Tickets' },
   {
@@ -78,6 +77,13 @@ export const NAV_ITEMS = [
     label: 'Preferências',
     icon: 'ti-adjustments',
     tooltip: 'Preferências do agente',
+  },
+  {
+    id: 'realtime',
+    path: '/realtime',
+    label: 'Realtime',
+    icon: 'ti-pulse',
+    tooltip: 'Painel operacional ao vivo',
   },
   {
     id: 'atendimento-ia-telefonico',

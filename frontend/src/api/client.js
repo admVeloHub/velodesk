@@ -161,10 +161,6 @@ export const clientsApi = {
   update: (id, payload) => api.put(`/clients/${encodeURIComponent(id)}`, payload).then((r) => r.data),
 };
 
-export const statsApi = {
-  dashboard: () => api.get('/dashboard').then((r) => r.data),
-};
-
 export const workspace360Api = {
   get: (params) => api.get('/workspace360', { params }).then((r) => r.data),
   agents: () => api.get('/workspace360/agents').then((r) => r.data),
@@ -183,6 +179,15 @@ export const gestaoInsightsApi = {
     api.get('/gestao-insights/voz-cliente', { params }).then((r) => r.data),
   vozClienteTickets: (params) =>
     api.get('/gestao-insights/voz-cliente/tickets', { params }).then((r) => r.data),
+};
+
+export const realtimeApi = {
+  health: () => api.get('/realtime/health').then((r) => r.data),
+  dashboard: () => api.get('/realtime/dashboard').then((r) => r.data),
+  liveCalls: () => api.get('/realtime/live-calls').then((r) => r.data),
+  syncCalls: () => api.post('/realtime/sync/calls').then((r) => r.data),
+  syncEvents: () => api.post('/realtime/sync/events').then((r) => r.data),
+  refreshIa: () => api.post('/realtime/ia/refresh').then((r) => r.data),
 };
 
 export const ticketIaAnalysisApi = {
