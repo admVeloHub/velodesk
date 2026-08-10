@@ -1,6 +1,6 @@
 /**
  * Painel 360° — Gestão
- * VERSION: v3.2.2 | DATE: 2026-08-06
+ * VERSION: v3.5.0 | DATE: 2026-08-10
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -20,6 +20,7 @@ import GestaoCasosEspeciaisCard from './components/gestaoInsights/GestaoCasosEsp
 import GestaoRiscoCasoEspecialCard from './components/gestaoInsights/GestaoRiscoCasoEspecialCard';
 import GestaoCustomerVoiceCard from './components/gestaoInsights/GestaoCustomerVoiceCard';
 import GestaoPeriodFilter from './components/gestaoInsights/GestaoPeriodFilter';
+import GestaoAdherenceCard from './components/gestaoInsights/GestaoAdherenceCard';
 import AiUsageCostCard from './components/aiUsage/AiUsageCostCard';
 
 export default function GestaoPanel() {
@@ -139,11 +140,12 @@ export default function GestaoPanel() {
             onOpenTicket={handleOpenEscalatedTicket}
           />
           <GestaoRiscoCasoEspecialCard onOpenTicket={handleOpenEscalatedTicket} />
+          <GestaoAdherenceCard />
         </div>
       </div>
 
       <div className="ws-grid-2">
-        <Workspace360OperationalLeaderboard />
+        <Workspace360OperationalLeaderboard onOpenTicket={handleOpenEscalatedTicket} />
       </div>
       <Workspace360SupervisorReports />
 

@@ -266,5 +266,25 @@ export const env = {
     || 'https://customer-data.velotax.com.br'
   ).trim().replace(/\/+$/, ''),
   customerDataTimeoutMs: parseInt(process.env.VELOTAX_CUSTOMER_DATA_TIMEOUT_MS || '30000', 10),
+  /** Realtime / 55PBX — Supabase WFM (telefonia). Lazy; não bloqueia API core se ausente. */
+  realtimeEnabled: process.env.REALTIME_ENABLED !== 'false',
+  realtimeSupabaseUrl: (
+    process.env.REALTIME_SUPABASE_URL
+    || process.env.NEXT_PUBLIC_SUPABASE_URL
+    || ''
+  ).trim(),
+  realtimeSupabaseServiceRoleKey: (
+    process.env.REALTIME_SUPABASE_SERVICE_ROLE_KEY
+    || process.env.SUPABASE_SERVICE_ROLE_KEY
+    || ''
+  ).trim(),
+  realtimeTelephonyProvider: (process.env.REALTIME_TELEPHONY_PROVIDER || 'supabase').trim().toLowerCase(),
+  telecom55ApiKey: (process.env.TELECOM55_API_KEY || '').trim(),
+  telecom55ApiUrl: (process.env.TELECOM55_API_URL || 'https://reportapi02.55pbx.com:50500').trim().replace(/\/+$/, ''),
+  telecom55WebhookSecret: (
+    process.env.TELECOM55_WEBHOOK_SECRET
+    || process.env.WEBHOOK_SECRET
+    || ''
+  ).trim(),
 };
 

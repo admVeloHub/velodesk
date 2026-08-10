@@ -31,5 +31,13 @@ export async function fetchWorkspace360Leaderboard({ period, from, to } = {}) {
       leaderboardTo: to,
     },
   });
-  return data?.leaderboard ?? { resolvedRanking: [], interactionRanking: [] };
+  return data?.leaderboard ?? { ranking: [] };
+}
+
+/** Tickets "em andamento" de um colaborador (drill-down do leaderboard), do mais antigo pro mais novo. */
+export async function fetchAgentInProgressTickets({ agentKey } = {}) {
+  const { data } = await api.get('/workspace360/agent-tickets', {
+    params: { agentKey },
+  });
+  return data?.tickets ?? [];
 }

@@ -1,8 +1,8 @@
 /**
- * chamadoIaAnaliseAgent.service v1.0.0 — ciclo periódico de análise de IA do texto do cliente
- * VERSION: v1.0.0 | DATE: 2026-07-23
+ * chamadoIaAnaliseAgent.service v1.1.0 — ciclo periódico de análise IA (tickets + Letícia IA)
  */
 import { runChamadoIaAnaliseCycle } from '../chamadoIaAnalise.service';
+import { runTelephonyIaAnaliseCycle } from '../telephonyIaAnalise.service';
 import { mapOpenAiErrorMessage } from './openaiAgent.util';
 
 export async function runChamadoIaAnaliseAgentCycle(): Promise<{
@@ -12,11 +12,23 @@ export async function runChamadoIaAnaliseAgentCycle(): Promise<{
   error?: string;
 }> {
   try {
-    const { candidatos, classificados } = await runChamadoIaAnaliseCycle();
-    if (candidatos > 0) {
-      console.info('[agent-chamado-ia-analise] ciclo concluído', { candidatos, classificados });
+    const [tickets, telephony] = await Promise.all([
+      runChamadoIaAnaliseCycle(),
+      runTelephonyIaAnaliseCycle(),
+    ]);
+    if (tickets.candidatos > 0 || telephony.candidatos > 0) {
+      console.info('[agent-chamado-ia-analise] ciclo concluído', {
+        candidatos: tickets.candidatos,
+        classificados: tickets.classificados,
+        telephonyCandidatos: telephony.candidatos,
+        telephonyClassificados: telephony.classificados,
+      });
     }
-    return { success: true, candidatos, classificados };
+    return {
+      success: true,
+      candidatos: tickets.candidatos + telephony.candidatos,
+      classificados: tickets.classificados + telephony.classificados,
+    };
   } catch (err) {
     console.error('[agent-chamado-ia-analise]', err);
     return { success: false, error: mapOpenAiErrorMessage(err) };

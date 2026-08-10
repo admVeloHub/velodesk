@@ -107,9 +107,6 @@ export default function WorkflowPanel() {
           <button type="button" className="btn-primary" onClick={() => navigate('/workflow')}>
             <i className="fas fa-check-double" /> Abrir fila {queueTitle}
           </button>
-          <button type="button" className="btn-secondary" onClick={() => navigate('/dashboard')}>
-            <i className="fas fa-chart-line" /> Dashboard
-          </button>
         </div>
       </div>
 

@@ -503,28 +503,48 @@ interface LeaderboardEntry {
   id: string;
   rank: number;
   name: string;
+  /** Chave normalizada (lowercase) do responsável — usada para buscar a lista de tickets "em andamento" no drill-down. */
+  agentKey: string;
   medal: boolean;
   trend: 'up' | 'down';
   sla: string;
-  primaryValue: number;
-  primaryLabel: string;
+  /** Tickets resolvidos no período filtrado do leaderboard. */
+  resolved: number;
+  /** Tickets com status "em-andamento" agora — não é filtrado pelo período do leaderboard. */
+  inProgress: number;
+  /** Tempo médio de resolução (createdAt → resolução), sobre os resolvidos no período. */
   tma: string;
+  /** Tempo médio até a 1ª resposta do agente, sobre os resolvidos no período. */
+  tme: string;
+  /** Nota de pesquisa de satisfação — null até existir captura real de avaliação do cliente por agente. */
   csat: number | null;
   vsLastWeek: string;
   shift: null;
   channel: null;
 }
 
-/** Hash determinístico (0–1) — usado só para gerar a "pesquisa média" fictícia por agente, sem Math.random(). */
-function seededRatio(seed: string): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  return (hash % 1000) / 1000;
+/**
+ * Mapa de aliases → nome canônico do usuário (email completo, nome e parte local do e-mail,
+ * todos em lowercase). Usado para agrupar um mesmo colaborador mesmo quando o campo
+ * `tabulacao.responsavel` foi salvo de formas diferentes (ex.: "victor.silva" vs "victor silva").
+ */
+async function buildUserByKeyMap(): Promise<Map<string, string>> {
+  const users = await User.find({ role: { $in: ['agent', 'supervisor'] } }).select('name email').lean();
+  const map = new Map<string, string>();
+  users.forEach((u) => {
+    map.set(u.email.toLowerCase(), u.name);
+    map.set(u.name.toLowerCase(), u.name);
+    const local = u.email.split('@')[0]?.toLowerCase();
+    if (local) map.set(local, u.name);
+  });
+  return map;
 }
 
-/** Nota de pesquisa fictícia (4.0–5.0) — aguardando captura real de avaliação do cliente por agente. */
-function fakeCsatForAgent(key: string): number {
-  return Math.round((4 + seededRatio(key)) * 10) / 10;
+/** Resolve a chave de agrupamento canônica (nome do usuário se conhecido, senão a própria string). */
+function canonicalAgentKey(rawResponsavel: string, userByKey: Map<string, string>): string {
+  const raw = rawResponsavel.trim().toLowerCase();
+  if (!raw) return '';
+  return (userByKey.get(raw) ?? raw).toLowerCase();
 }
 
 function computeDelta(current: number, previous: number): number {
@@ -534,45 +554,68 @@ function computeDelta(current: number, previous: number): number {
 
 function rankEntries(entries: LeaderboardEntry[]): LeaderboardEntry[] {
   return entries
-    .sort((a, b) => b.primaryValue - a.primaryValue)
+    .sort((a, b) => b.resolved - a.resolved)
     .slice(0, 20)
     .map((entry, index) => ({ ...entry, rank: index + 1, medal: index === 0 }));
 }
 
 async function buildLeaderboard(chamados: IChamadoN1[], from: Date, to: Date) {
-  const users = await User.find({ role: { $in: ['agent', 'supervisor'] } }).select('name email').lean();
-  const userByKey = new Map<string, string>();
-  users.forEach((u) => {
-    userByKey.set(u.email.toLowerCase(), u.name);
-    userByKey.set(u.name.toLowerCase(), u.name);
-    const local = u.email.split('@')[0]?.toLowerCase();
-    if (local) userByKey.set(local, u.name);
-  });
+  const userByKey = await buildUserByKeyMap();
 
   /** Comparação sempre com o mesmo período, 7 dias antes (semana anterior). */
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
   const prevFrom = new Date(from.getTime() - WEEK_MS);
   const prevTo = new Date(to.getTime() - WEEK_MS);
 
-  const chamadoById = new Map<string, IChamadoN1>();
-  chamados.forEach((c) => {
-    chamadoById.set(String((c as unknown as { _id: unknown })._id), c);
-  });
+  const byAgent = new Map<string, {
+    resolved: number;
+    resolvedPrevWeek: number;
+    inProgress: number;
+    slaOk: number;
+    slaTotal: number;
+    tmaSum: number;
+    tmaN: number;
+    tmeSum: number;
+    tmeN: number;
+  }>();
 
-  // ── Ranking por tickets resolvidos ──
-  const byResolver = new Map<string, { resolved: number; resolvedPrevWeek: number; slaOk: number; slaTotal: number; tmaSum: number; tmaN: number }>();
+  const ensureAgent = (key: string) => {
+    if (!byAgent.has(key)) {
+      byAgent.set(key, {
+        resolved: 0,
+        resolvedPrevWeek: 0,
+        inProgress: 0,
+        slaOk: 0,
+        slaTotal: 0,
+        tmaSum: 0,
+        tmaN: 0,
+        tmeSum: 0,
+        tmeN: 0,
+      });
+    }
+    return byAgent.get(key)!;
+  };
+
   chamados.forEach((c) => {
-    const resp = (c.tabulacao?.[c.tabulacao.length - 1]?.responsavel ?? '').trim().toLowerCase();
-    if (!resp || currentStatus(c) !== 'resolvido') return;
+    const rawResp = (c.tabulacao?.[c.tabulacao.length - 1]?.responsavel ?? '').trim();
+    if (!rawResp) return;
+    const resp = canonicalAgentKey(rawResp, userByKey);
+    if (!resp) return;
+    const status = currentStatus(c);
+
+    // "Em andamento" é sempre o estado atual do ticket — não é filtrado pelo período do leaderboard.
+    if (status === 'em-andamento') {
+      ensureAgent(resp).inProgress++;
+    }
+
+    if (status !== 'resolvido') return;
     const resolvedAt = getResolvedAt(c);
     if (!resolvedAt) return;
     const inCurrent = resolvedAt >= from && resolvedAt <= to;
     const inPrev = resolvedAt >= prevFrom && resolvedAt <= prevTo;
     if (!inCurrent && !inPrev) return;
-    if (!byResolver.has(resp)) {
-      byResolver.set(resp, { resolved: 0, resolvedPrevWeek: 0, slaOk: 0, slaTotal: 0, tmaSum: 0, tmaN: 0 });
-    }
-    const row = byResolver.get(resp)!;
+
+    const row = ensureAgent(resp);
     if (inCurrent) {
       row.resolved++;
       row.slaTotal++;
@@ -580,27 +623,34 @@ async function buildLeaderboard(chamados: IChamadoN1[], from: Date, to: Date) {
       const start = c.createdAt ? new Date(c.createdAt) : resolvedAt;
       row.tmaSum += resolvedAt.getTime() - start.getTime();
       row.tmaN++;
+      const firstAgent = getFirstAgentResponseAt(c);
+      if (firstAgent) {
+        row.tmeSum += firstAgent.getTime() - start.getTime();
+        row.tmeN++;
+      }
     } else {
       row.resolvedPrevWeek++;
     }
   });
 
-  const resolvedRanking = rankEntries(
-    [...byResolver.entries()]
-      .filter(([, stats]) => stats.resolved > 0)
+  const ranking = rankEntries(
+    [...byAgent.entries()]
+      .filter(([, stats]) => stats.resolved > 0 || stats.inProgress > 0)
       .map(([key, stats]) => {
         const delta = computeDelta(stats.resolved, stats.resolvedPrevWeek);
         return {
-          id: `resolved-${key.replace(/\s+/g, '-')}`,
+          id: `agent-${key.replace(/\s+/g, '-')}`,
           rank: 0,
           name: userByKey.get(key) ?? key,
+          agentKey: key,
           medal: false,
           trend: delta >= 0 ? 'up' as const : 'down' as const,
           sla: stats.slaTotal ? `${Math.round((stats.slaOk / stats.slaTotal) * 100)}%` : '—',
-          primaryValue: stats.resolved,
-          primaryLabel: 'resolvidos',
+          resolved: stats.resolved,
+          inProgress: stats.inProgress,
           tma: stats.tmaN ? formatDurationMs(stats.tmaSum / stats.tmaN) : '—',
-          csat: fakeCsatForAgent(key),
+          tme: stats.tmeN ? formatDurationMs(stats.tmeSum / stats.tmeN) : '—',
+          csat: null,
           vsLastWeek: `${delta >= 0 ? '+' : ''}${delta}%`,
           shift: null,
           channel: null,
@@ -608,71 +658,26 @@ async function buildLeaderboard(chamados: IChamadoN1[], from: Date, to: Date) {
       }),
   );
 
-  // ── Ranking por interações (todo evento registrado pelo agente, não só a resolução) ──
-  const byInteractor = new Map<string, { interactions: number; interactionsPrevWeek: number; touched: Set<string> }>();
-  chamados.forEach((c) => {
-    const chamadoId = String((c as unknown as { _id: unknown })._id);
-    (c.registro ?? []).forEach((reg) => {
-      if (reg.origin !== 'agente') return;
-      const author = (reg.autor ?? '').trim().toLowerCase();
-      if (!author) return;
-      const at = reg.data ? new Date(reg.data) : null;
-      if (!at) return;
-      const inCurrent = at >= from && at <= to;
-      const inPrev = at >= prevFrom && at <= prevTo;
-      if (!inCurrent && !inPrev) return;
-      if (!byInteractor.has(author)) {
-        byInteractor.set(author, { interactions: 0, interactionsPrevWeek: 0, touched: new Set() });
-      }
-      const row = byInteractor.get(author)!;
-      if (inCurrent) {
-        row.interactions++;
-        row.touched.add(chamadoId);
-      } else {
-        row.interactionsPrevWeek++;
-      }
-    });
+  return { ranking };
+}
+
+/**
+ * Tickets "em-andamento" de um colaborador, do mais antigo para o mais novo (drill-down do leaderboard).
+ * Usa a mesma canonicalização de `buildLeaderboard` (via userByKey) para agrupar corretamente
+ * variações do campo `tabulacao.responsavel` (ex.: "victor.silva" e "victor silva" são a mesma pessoa).
+ */
+export async function getAgentInProgressTickets(agentKey: string) {
+  const key = agentKey.trim().toLowerCase();
+  if (!key) return [];
+  const userByKey = await buildUserByKeyMap();
+  const chamados = await ChamadoN1.find().sort({ createdAt: 1 }).lean<IChamadoN1[]>();
+  const inProgress = chamados.filter((c) => {
+    if (currentStatus(c) !== 'em-andamento') return false;
+    const rawResp = (c.tabulacao?.[c.tabulacao.length - 1]?.responsavel ?? '').trim();
+    if (!rawResp) return false;
+    return canonicalAgentKey(rawResp, userByKey) === key;
   });
-
-  const interactionRanking = rankEntries(
-    [...byInteractor.entries()]
-      .filter(([, stats]) => stats.interactions > 0)
-      .map(([key, stats]) => {
-        const delta = computeDelta(stats.interactions, stats.interactionsPrevWeek);
-        let slaOk = 0;
-        let slaTotal = 0;
-        let tmaSum = 0;
-        let tmaN = 0;
-        stats.touched.forEach((id) => {
-          const c = chamadoById.get(id);
-          if (!c || currentStatus(c) !== 'resolvido') return;
-          const resolvedAt = getResolvedAt(c);
-          if (!resolvedAt) return;
-          slaTotal++;
-          if (!wasResolvedWithSlaBreach(c)) slaOk++;
-          const start = c.createdAt ? new Date(c.createdAt) : resolvedAt;
-          tmaSum += resolvedAt.getTime() - start.getTime();
-          tmaN++;
-        });
-        return {
-          id: `interaction-${key.replace(/\s+/g, '-')}`,
-          rank: 0,
-          name: userByKey.get(key) ?? key,
-          medal: false,
-          trend: delta >= 0 ? 'up' as const : 'down' as const,
-          sla: slaTotal ? `${Math.round((slaOk / slaTotal) * 100)}%` : '—',
-          primaryValue: stats.interactions,
-          primaryLabel: 'interações',
-          tma: tmaN ? formatDurationMs(tmaSum / tmaN) : '—',
-          csat: fakeCsatForAgent(key),
-          vsLastWeek: `${delta >= 0 ? '+' : ''}${delta}%`,
-          shift: null,
-          channel: null,
-        };
-      }),
-  );
-
-  return { resolvedRanking, interactionRanking };
+  return Promise.all(inProgress.map((c) => enrichTicketForPanel(c, 'em-andamento')));
 }
 
 function buildReport(reportId: string, chamados: IChamadoN1[], query: Workspace360Query) {

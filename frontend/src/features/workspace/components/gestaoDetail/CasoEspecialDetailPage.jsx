@@ -175,10 +175,14 @@ export default function CasoEspecialDetailPage() {
               <h2 className="gestao-detail-page__title">{meta.label}</h2>
             </div>
           </div>
-          <p className="gestao-insight-card__mock-note">
-            <i className="ti ti-info-circle" aria-hidden="true" />
-            Dados ilustrativos — aguardando integração dos canais de atendimento especiais.
-          </p>
+          {!loading && data ? (
+            <p className="gestao-insight-card__mock-note">
+              <i className="ti ti-info-circle" aria-hidden="true" />
+              {data.mock === false
+                ? 'Dados reais — tickets Reclame Aqui registrados no CRM.'
+                : 'Dados ilustrativos — aguardando integração dos demais canais especiais.'}
+            </p>
+          ) : null}
         </header>
 
         {error ? <p className="gestao-insight-card__error">{error}</p> : null}

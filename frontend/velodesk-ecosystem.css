@@ -100,7 +100,7 @@ body:has(.eco-prototype-banner) {
     top: 0;
 }
 
-/* ?? Painel 360ï¿½ ? ?rea cinza (dimens?es ref. viewport) ?? */
+/* ?? Painel 360º ? ?rea cinza (dimens?es ref. viewport) ?? */
 #workspace.active.workspace-page,
 #workspace360Content.eco-page-inner--workspace360 {
     --ws360-sidebar-w: var(--velo-sidebar-compact, 56px);
@@ -2300,7 +2300,7 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
 
 /* Modo escuro ws360/ws-agent ? velodesk-dark-theme.css */
 
-/* ??? Painel 360ï¿½ ? layout ws360 (tokens --ws360-*) ??? */
+/* ??? Painel 360º ? layout ws360 (tokens --ws360-*) ??? */
 .ws360-shell {
     display: flex;
     flex-direction: column;
@@ -3839,53 +3839,34 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     box-shadow: 0 0 0 3px rgba(22, 52, 255, 0.12);
 }
 
-.ws360-leaderboard__columns {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1.5rem;
-}
-
-.ws360-leaderboard__column + .ws360-leaderboard__column {
-    border-left: 1px dashed rgba(148, 163, 184, 0.45);
-    padding-left: 1.5rem;
-}
-
-.ws360-leaderboard__column-title {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin: 0 0 0.5rem;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.ws360-leaderboard__column-title i {
-    color: var(--eco-blue, #1634FF);
-    font-size: 0.95rem;
-}
-
-@media (max-width: 760px) {
-    .ws360-leaderboard__columns {
-        grid-template-columns: 1fr;
-        gap: 0.5rem;
-    }
-
-    .ws360-leaderboard__column + .ws360-leaderboard__column {
-        border-left: none;
-        padding-left: 0;
-        border-top: 1px dashed rgba(148, 163, 184, 0.45);
-        padding-top: 1rem;
-        margin-top: 0.5rem;
-    }
-}
-
 .ws360-leaderboard__list {
     list-style: none;
     margin: 0;
     padding: 0;
+}
+
+.ws360-leaderboard__toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+    margin-top: 0.6rem;
+    padding: 0.5rem;
+    border: 1px dashed rgba(148, 163, 184, 0.4);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--gestao-muted, #64748b);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.ws360-leaderboard__toggle:hover {
+    background: rgba(99, 102, 241, 0.08);
+    color: var(--gestao-accent, #4f46e5);
+    border-color: rgba(99, 102, 241, 0.35);
 }
 
 .ws360-leaderboard__item {
@@ -3965,27 +3946,55 @@ body.velodesk-focus-mode .eco-prototype-banner { opacity: 0.55; }
     color: #ca8a04;
 }
 
-.ws360-leaderboard__metrics {
-    margin: 4px 0 0;
-    font-size: 0.78rem;
-    font-weight: 500;
+.ws360-leaderboard__metrics-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 6px 0 0;
+}
+
+.ws360-leaderboard__metric {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    padding: 0.3rem 0.55rem;
+    border-radius: 8px;
+    background: var(--eco-surface, #F3F7FC);
+    line-height: 1.15;
+}
+
+.ws360-leaderboard__metric strong {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--eco-navy, #000058);
+    font-family: var(--gz-mono, ui-monospace, 'SF Mono', Menlo, monospace);
+}
+
+.ws360-leaderboard__metric span {
+    font-size: 0.62rem;
+    font-weight: 600;
     color: #64748b;
-    line-height: 1.45;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
 }
 
-.ws360-leaderboard__delta {
-    font-size: inherit;
-    font-weight: inherit;
-    color: inherit;
-    line-height: inherit;
+.ws360-leaderboard__metric--clickable {
+    border: 1px dashed rgba(22, 52, 255, 0.35);
+    background: rgba(22, 52, 255, 0.06);
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.ws360-leaderboard__delta--up {
-    color: #94a3b8;
+.ws360-leaderboard__metric--clickable:hover {
+    background: rgba(22, 52, 255, 0.12);
+    border-color: rgba(22, 52, 255, 0.5);
 }
 
-.ws360-leaderboard__delta--down {
-    color: #94a3b8;
+.ws360-leaderboard__metric--clickable strong {
+    color: var(--eco-blue, #1634FF);
 }
 
 .ws360-leaderboard__empty {
