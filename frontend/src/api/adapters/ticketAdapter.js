@@ -40,6 +40,8 @@ function normalizeMessage(msg) {
     fromClient: isClient,
     type: isInternal ? 'internal' : (isClient ? 'client' : (msg.type === 'system' ? 'system' : 'agent')),
     author: msg.author || (isInternal ? '' : msg.sender) || '',
+    deliveryStatus: msg.deliveryStatus,
+    deliveryErrorMessage: msg.deliveryErrorMessage,
   };
 }
 

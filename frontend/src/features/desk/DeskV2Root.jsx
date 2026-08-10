@@ -67,6 +67,7 @@ import {
   canSendPublicMessageOnTicket,
 } from '../../services/permissions/permissionService';
 import { getAllQueueStatuses, fetchAndHydrateCustomQueues } from '../../services/desk/customQueueBoxes';
+import { refreshQueueCountsFromApi } from '../../services/desk/queueCounts';
 import CreateTicketPanel from './components/CreateTicketPanel';
 import DeskQueuePanel from './components/DeskQueuePanel';
 import DeskTicketList from './components/DeskTicketList';
@@ -296,10 +297,10 @@ export default function DeskV2Root() {
 
   const syncTicketViews = useCallback(async () => {
     await Promise.all([
-      refreshTickets(),
-      refreshQueueCountsFromApi(user?.email),
+      refreshTickets().catch(() => {}),
+      refreshQueueCountsFromApi(user?.email).catch(() => {}),
     ]);
-    await fetchAndHydrateCustomQueues();
+    await fetchAndHydrateCustomQueues().catch(() => {});
     setQueueStatuses(getAllQueueStatuses());
   }, [refreshTickets, user?.email]);
 
@@ -1037,6 +1038,13 @@ export default function DeskV2Root() {
       showNotification('Ticket fechado — não aceita modificações.', 'warning');
       return;
     }
+    if (isDraftTicket(ticket)) {
+      showNotification(
+        'Salve o ticket antes de enviar WhatsApp — rascunho só registra na tela, não envia ao celular.',
+        'warning',
+      );
+      return;
+    }
 
     const messageText = String(composeText || '').trim();
     if (!messageText) return;
@@ -1050,15 +1058,28 @@ export default function DeskV2Root() {
       || '',
     ).replace(/\D/g, '');
 
+    if (!waChatId) {
+      showNotification('Cadastre o telefone WhatsApp do cliente antes de enviar.', 'warning');
+      waSendInProgressRef.current = false;
+      return;
+    }
+
     try {
-      const updated = await sendWhatsAppMessageViaApi(ticket.id, {
+      const result = await sendWhatsAppMessageViaApi(ticket.id, {
         text: messageText,
         waChatId: waChatId || undefined,
         author: getAgentName(),
       });
 
-      if (updated) {
-        patchTicket(ticket.id, updated);
+      if (result?.ticket) {
+        patchTicket(ticket.id, result.ticket);
+      }
+
+      if (result?.twilio && !result.twilio.sent) {
+        showNotification(
+          result.twilio.reason || 'Mensagem salva no ticket, mas o Twilio não enviou ao celular.',
+          'warning',
+        );
       }
 
       setComposeText('');
@@ -1190,8 +1211,7 @@ export default function DeskV2Root() {
     setCreateOpen(false);
     openTicket(id);
     setActiveQueue('novos');
-    syncTicketViews();
-    showNotification('Ticket criado.', 'success');
+    showNotification('Rascunho aberto — salve quando concluir o atendimento.', 'success');
   };
 
   const convMsgs = ticket ? buildRegistroThread(ticket) : [];

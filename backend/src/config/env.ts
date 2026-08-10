@@ -1,4 +1,4 @@
-/** env v1.31.0 — DB chamados_reclamacoes (collections por órgão) */
+/** env v1.32.0 — status callback WhatsApp Twilio (confirmação de entrega) */
 import fs from 'fs';
 import path from 'path';
 
@@ -111,6 +111,8 @@ export const env = {
     process.env.TWILIO_WHATSAPP_AUTO_REPLY
     || 'Message received! Hello again from the Twilio Sandbox for WhatsApp.'
   ).trim(),
+  /** Status callback — confirmação de entrega (sent/delivered/read) */
+  twilioWhatsappStatusCallbackUrl: (process.env.TWILIO_WHATSAPP_STATUS_CALLBACK_URL || '').trim(),
   /** Dev only — pular validação X-Twilio-Signature (ngrok/local) */
   twilioWebhookSkipValidation: process.env.TWILIO_WEBHOOK_SKIP_VALIDATION === 'true',
   gcpStorageBucket: (process.env.GCP_STORAGE_BUCKET || 'velodesk_storage').trim(),

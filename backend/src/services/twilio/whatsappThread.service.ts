@@ -1,8 +1,27 @@
-/** whatsappThread.service v1.0.1 — thread WhatsApp em um único registro (array aninhado) */
+/** whatsappThread.service v1.1.0 — thread WhatsApp + status de entrega Twilio */
 import type { IChamadoN1, IRegistro } from '../../models/ChamadoN1';
 
 export const WHATSAPP_THREAD_SOURCE = 'whatsapp-thread';
 export const WHATSAPP_MENSAGENS_KEY = 'whatsappMensagens';
+
+export type WhatsAppDeliveryStatus =
+  | 'queued'
+  | 'sending'
+  | 'sent'
+  | 'delivered'
+  | 'read'
+  | 'failed'
+  | 'undelivered';
+
+const DELIVERY_STATUS_RANK: Record<WhatsAppDeliveryStatus, number> = {
+  queued: 1,
+  sending: 2,
+  sent: 3,
+  delivered: 4,
+  read: 5,
+  failed: 0,
+  undelivered: 0,
+};
 
 export interface WhatsAppMensagemItem {
   id: string;
@@ -12,6 +31,10 @@ export interface WhatsAppMensagemItem {
   texto: string;
   anexos: string[];
   twilioMessageSid?: string;
+  deliveryStatus?: WhatsAppDeliveryStatus;
+  deliveryStatusAt?: string;
+  deliveryErrorCode?: string;
+  deliveryErrorMessage?: string;
 }
 
 export interface AppendWhatsAppMensagemInput {
@@ -21,6 +44,46 @@ export interface AppendWhatsAppMensagemInput {
   anexos?: string[];
   twilioMessageSid?: string;
   waChatId?: string;
+  deliveryStatus?: WhatsAppDeliveryStatus;
+}
+
+export function normalizeWhatsAppDeliveryStatus(raw: unknown): WhatsAppDeliveryStatus {
+  const value = String(raw ?? '').trim().toLowerCase();
+  switch (value) {
+    case 'accepted':
+    case 'queued':
+      return 'queued';
+    case 'sending':
+      return 'sending';
+    case 'sent':
+      return 'sent';
+    case 'delivered':
+      return 'delivered';
+    case 'read':
+      return 'read';
+    case 'undelivered':
+      return 'undelivered';
+    case 'failed':
+      return 'failed';
+    default:
+      return 'queued';
+  }
+}
+
+function shouldApplyDeliveryStatus(
+  current: WhatsAppDeliveryStatus | undefined,
+  next: WhatsAppDeliveryStatus,
+): boolean {
+  if (next === 'failed' || next === 'undelivered') return true;
+  const currentRank = DELIVERY_STATUS_RANK[current ?? 'queued'] ?? 0;
+  const nextRank = DELIVERY_STATUS_RANK[next] ?? 0;
+  return nextRank >= currentRank;
+}
+
+function writeWhatsAppMensagensToRegistro(reg: IRegistro, list: WhatsAppMensagemItem[]): void {
+  const meta = registroMetadados(reg);
+  meta[WHATSAPP_MENSAGENS_KEY] = list;
+  reg.metadados = meta;
 }
 
 function currentStatus(chamado: IChamadoN1): string {
@@ -133,6 +196,12 @@ export function readWhatsAppMensagens(reg: IRegistro): WhatsAppMensagemItem[] {
           ? row.anexos.map((url) => String(url ?? '').trim()).filter(Boolean)
           : [],
         twilioMessageSid: String(row.twilioMessageSid ?? '').trim() || undefined,
+        deliveryStatus: row.deliveryStatus || row.status
+          ? normalizeWhatsAppDeliveryStatus(row.deliveryStatus ?? row.status)
+          : undefined,
+        deliveryStatusAt: String(row.deliveryStatusAt ?? '').trim() || undefined,
+        deliveryErrorCode: String(row.deliveryErrorCode ?? row.errorCode ?? '').trim() || undefined,
+        deliveryErrorMessage: String(row.deliveryErrorMessage ?? row.errorMessage ?? '').trim() || undefined,
       } satisfies WhatsAppMensagemItem;
     })
     .filter((item) => item.texto || item.anexos.length);
@@ -162,10 +231,14 @@ export function appendWhatsAppMensagemToChamado(
     texto,
     anexos,
     twilioMessageSid: input.twilioMessageSid,
+    deliveryStatus: input.origin === 'agente'
+      ? (input.deliveryStatus ?? (input.twilioMessageSid ? 'sent' : 'queued'))
+      : undefined,
+    deliveryStatusAt: input.origin === 'agente' ? now.toISOString() : undefined,
   };
 
   list.push(mensagem);
-  meta[WHATSAPP_MENSAGENS_KEY] = list;
+  writeWhatsAppMensagensToRegistro(registro, list);
   meta.source = WHATSAPP_THREAD_SOURCE;
   meta.channel = 'whatsapp';
   if (waChatId) meta.waChatId = waChatId;
@@ -190,4 +263,52 @@ export function resolveWhatsAppDestinationPhone(chamado: IChamadoN1): string | n
   }
 
   return null;
+}
+
+export function updateWhatsAppMensagemDeliveryBySid(
+  chamado: IChamadoN1,
+  messageSid: string,
+  input: {
+    status: WhatsAppDeliveryStatus;
+    errorCode?: string;
+    errorMessage?: string;
+  },
+): { updated: boolean; deliveryStatus?: WhatsAppDeliveryStatus; reason?: string } {
+  const sid = String(messageSid ?? '').trim();
+  if (!sid) return { updated: false, reason: 'MessageSid ausente' };
+
+  const registros = chamado.registro ?? [];
+  for (let index = registros.length - 1; index >= 0; index -= 1) {
+    const reg = registros[index];
+    const meta = registroMetadados(reg);
+    if (String(meta.source ?? '') !== WHATSAPP_THREAD_SOURCE) continue;
+
+    const list = readWhatsAppMensagens(reg);
+    const msgIndex = list.findIndex((item) => item.twilioMessageSid === sid);
+    if (msgIndex < 0) continue;
+
+    const current = list[msgIndex];
+    const nextStatus = normalizeWhatsAppDeliveryStatus(input.status);
+    if (!shouldApplyDeliveryStatus(current.deliveryStatus, nextStatus)) {
+      return {
+        updated: false,
+        deliveryStatus: current.deliveryStatus,
+        reason: 'Status ignorado (regressão)',
+      };
+    }
+
+    const now = new Date().toISOString();
+    list[msgIndex] = {
+      ...current,
+      deliveryStatus: nextStatus,
+      deliveryStatusAt: now,
+      deliveryErrorCode: input.errorCode || current.deliveryErrorCode,
+      deliveryErrorMessage: input.errorMessage || current.deliveryErrorMessage,
+    };
+    writeWhatsAppMensagensToRegistro(reg, list);
+    reg.data = new Date(now);
+    return { updated: true, deliveryStatus: nextStatus };
+  }
+
+  return { updated: false, reason: 'Mensagem não encontrada na thread' };
 }

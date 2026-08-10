@@ -1,12 +1,67 @@
 /**
- * DeskWhatsAppChat v1.3.0 — envio contínuo (onSend leve, sem commit de ticket)
- * VERSION: v1.3.0 | DATE: 2026-08-06
+ * DeskWhatsAppChat v1.4.0 — confirmação de entrega (sent/delivered/read)
+ * VERSION: v1.4.0 | DATE: 2026-08-10
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
   formatWaTime,
   formatWaDateSeparator,
 } from '../../../services/desk/utils';
+
+function renderDeliveryChecks(msg) {
+  if (msg.type !== 'agent') return null;
+
+  const status = String(msg.deliveryStatus || 'sent').toLowerCase();
+  const errorMessage = String(msg.deliveryErrorMessage || '').trim();
+
+  if (status === 'failed' || status === 'undelivered') {
+    return (
+      <i
+        className="ti ti-alert-circle wa-msg__checks wa-msg__checks--failed"
+        aria-hidden="true"
+        title={errorMessage || 'Falha na entrega'}
+      />
+    );
+  }
+
+  if (status === 'queued' || status === 'sending') {
+    return (
+      <i
+        className="ti ti-clock wa-msg__checks wa-msg__checks--pending"
+        aria-hidden="true"
+        title="Enviando…"
+      />
+    );
+  }
+
+  if (status === 'sent') {
+    return (
+      <i
+        className="ti ti-check wa-msg__checks wa-msg__checks--sent"
+        aria-hidden="true"
+        title="Enviada"
+      />
+    );
+  }
+
+  if (status === 'delivered') {
+    return (
+      <i
+        className="ti ti-checks wa-msg__checks wa-msg__checks--delivered"
+        aria-hidden="true"
+        title="Entregue"
+      />
+    );
+  }
+
+  return (
+    <i
+      className="ti ti-checks wa-msg__checks wa-msg__checks--read"
+      aria-hidden="true"
+      title="Lida"
+    />
+  );
+}
 
 export default function DeskWhatsAppChat({
   ticket,
@@ -86,16 +141,14 @@ export default function DeskWhatsAppChat({
               : (isOut ? ' wa-msg__bubble--out' : ' wa-msg__bubble--in');
             return (
             <div
-              key={i}
+              key={msg.id || i}
               className={'wa-msg' + (isOut ? ' wa-msg--out' : ' wa-msg--in')}
             >
               <div className={'wa-msg__bubble' + bubbleClass}>
                 <span className="wa-msg__text">{msg.text}</span>
                 <span className="wa-msg__time">
                   {formatWaTime(msg.timestamp)}
-                  {msg.type === 'agent' && (
-                    <i className="ti ti-checks wa-msg__checks" aria-hidden="true" />
-                  )}
+                  {renderDeliveryChecks(msg)}
                 </span>
               </div>
             </div>

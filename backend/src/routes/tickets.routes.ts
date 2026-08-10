@@ -52,6 +52,7 @@ import {
   appendWhatsAppMensagemToChamado,
   readWhatsAppMensagens,
   resolveWhatsAppDestinationPhone,
+  updateWhatsAppMensagemDeliveryBySid,
 } from '../services/twilio/whatsappThread.service';
 import { sendWhatsAppTextMessage, type WhatsAppOutboundResult } from '../services/twilio/whatsappOutbound.service';
 import { applyWhatsAppSendMask } from '../services/clientMessageSendMask.util';
@@ -402,12 +403,23 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
       if (reg) {
         const list = readWhatsAppMensagens(reg);
         const last = list[list.length - 1];
-        if (last) last.twilioMessageSid = sendResult.sid;
+        if (last) {
+          last.twilioMessageSid = sendResult.sid;
+          last.deliveryStatus = 'sent';
+          last.deliveryStatusAt = new Date().toISOString();
+        }
         const meta = (reg.metadados ?? {}) as Record<string, unknown>;
         meta.whatsappMensagens = list;
         reg.metadados = meta;
         appendResult.mensagem.twilioMessageSid = sendResult.sid;
+        appendResult.mensagem.deliveryStatus = 'sent';
+        appendResult.mensagem.deliveryStatusAt = last?.deliveryStatusAt;
       }
+    } else if (sendResult.sid) {
+      updateWhatsAppMensagemDeliveryBySid(chamado, sendResult.sid, {
+        status: 'failed',
+        errorMessage: sendResult.reason,
+      });
     }
   }
 

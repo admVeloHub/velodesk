@@ -1,10 +1,10 @@
 /**
- * TicketsContext v1.8.1 — catch em refreshQueueCounts (evita AxiosError não tratado)
- * VERSION: v1.8.1 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.8.2 — preserva abas de rascunho durante refresh de filas
+ * VERSION: v1.8.2 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi } from '../services/ticketsStorage';
-import { hydrateColumnsFromStorage, patchTicketInCache, fingerprintQueueColumns } from '../services/ticketsCache';
+import { hydrateColumnsFromStorage, patchTicketInCache, fingerprintQueueColumns, isDraftTicket } from '../services/ticketsCache';
 import {
   hydrateQueueCountsFromStorage,
   refreshQueueCountsFromApi,
@@ -182,7 +182,12 @@ export function TicketsProvider({ children }) {
       const next = prev
         .map((tab) => {
           const entry = findTicketEntry(tab.id);
-          if (!entry) return null;
+          if (!entry) {
+            if (isDraftTicket({ id: tab.id }) || String(tab.id).startsWith('draft-')) {
+              return tab;
+            }
+            return null;
+          }
           return { ...tab, ...buildTabMeta(entry) };
         })
         .filter(Boolean);

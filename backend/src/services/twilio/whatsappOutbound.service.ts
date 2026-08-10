@@ -1,5 +1,6 @@
-/** whatsappOutbound.service v1.0.0 — envio Twilio WhatsApp (Sandbox + sessão 24h) */
+/** whatsappOutbound.service v1.1.0 — envio Twilio + status callback de entrega */
 import { getTwilioClient, getTwilioWhatsAppFrom, isTwilioConfigured } from './twilioClient.util';
+import { resolveWhatsAppStatusCallbackUrl } from './whatsappCallbackUrl.util';
 import { env } from '../../config/env';
 
 export interface WhatsAppOutboundResult {
@@ -13,6 +14,15 @@ function normalizeWhatsAppAddress(value: string): string {
   const trimmed = String(value ?? '').trim();
   if (!trimmed) return '';
   return trimmed.startsWith('whatsapp:') ? trimmed : `whatsapp:${trimmed}`;
+}
+
+function buildStatusCallbackParams(): { statusCallback?: string; statusCallbackMethod?: 'POST' } {
+  const statusCallback = resolveWhatsAppStatusCallbackUrl();
+  if (!statusCallback) return {};
+  return {
+    statusCallback,
+    statusCallbackMethod: 'POST',
+  };
 }
 
 /** Mensagem business-initiated via template (Sandbox quickstart). */
@@ -42,9 +52,10 @@ export async function sendWhatsAppSandboxTemplate(options: {
       to,
       contentSid,
       contentVariables: JSON.stringify(options.contentVariables ?? {
-        1: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
-        2: new Date().toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' }),
+        1: new Date().toLocaleDateString('en-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
+        2: new Date().toLocaleTimeString('pt-BR', { hour: 'numeric', minute: '2-digit' }),
       }),
+      ...buildStatusCallbackParams(),
     });
 
     return {
@@ -81,6 +92,7 @@ export async function sendWhatsAppTextMessage(options: {
       from: getTwilioWhatsAppFrom(),
       to,
       body,
+      ...buildStatusCallbackParams(),
     });
 
     return {

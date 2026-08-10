@@ -3998,6 +3998,26 @@
     color: #53bdeb;
 }
 
+#velodeskDeskV2Root .wa-msg__checks--pending {
+    color: #8696a0;
+}
+
+#velodeskDeskV2Root .wa-msg__checks--sent {
+    color: #8696a0;
+}
+
+#velodeskDeskV2Root .wa-msg__checks--delivered {
+    color: #8696a0;
+}
+
+#velodeskDeskV2Root .wa-msg__checks--read {
+    color: #53bdeb;
+}
+
+#velodeskDeskV2Root .wa-msg__checks--failed {
+    color: #e53935;
+}
+
 #velodeskDeskV2Root .wa-ia-card {
     align-self: flex-start;
     max-width: 88%;

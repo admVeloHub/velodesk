@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.11.4 — preserva workflow pendente no merge/reload pós-commit
- * VERSION: v1.11.4 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.12.0 — rascunhos preservados em refresh concorrente
+ * VERSION: v1.12.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -71,6 +71,19 @@ function injectDraftTickets(cols, drafts) {
   });
   return next;
 }
+
+function mergeDraftSnapshots(...lists) {
+  const byId = new Map();
+  lists.flat().forEach((item) => {
+    if (!item?.ticket) return;
+    const id = String(item.ticket.id || item.ticket._id);
+    if (!id) return;
+    byId.set(id, item);
+  });
+  return [...byId.values()];
+}
+
+let loadBoxesFromApiChain = Promise.resolve();
 
 export { isDraftTicket };
 
@@ -446,17 +459,25 @@ export function upsertDeskSearchTicketsInCache(apiTicket) {
 }
 
 export async function loadBoxesFromApi(userEmail = '') {
+  const run = async () => loadBoxesFromApiOnce(userEmail);
+  loadBoxesFromApiChain = loadBoxesFromApiChain.then(run, run);
+  return loadBoxesFromApiChain;
+}
+
+async function loadBoxesFromApiOnce(userEmail = '') {
   const token = localStorage.getItem('velodesk_token');
   if (!useApi || !isBackendJwtUsable(token)) {
     deskLog.tickets('loadBoxesFromApi → skip (sem API/token)', { useApi, hasToken: Boolean(token) });
     return columns;
   }
-  const drafts = collectDraftTickets(columns);
-  deskLog.tickets('loadBoxesFromApi → início', { userEmail });
+  const draftsBeforeFetch = collectDraftTickets(columns);
+  deskLog.tickets('loadBoxesFromApi → início', { userEmail, drafts: draftsBeforeFetch.length });
   try {
     const profileId = readDeskProfileId();
     const params = shouldUseMeusChamadosFila(profileId) ? { fila: 'meus-chamados' } : undefined;
     const data = await boxesApi.list(params);
+    const draftsAfterFetch = collectDraftTickets(columns);
+    const drafts = mergeDraftSnapshots(draftsBeforeFetch, draftsAfterFetch);
     const nextCols = injectDraftTickets(
       adaptColumnsFromApi(data, { fila: params?.fila }),
       drafts,
@@ -630,7 +651,14 @@ export async function sendWhatsAppMessageViaApi(ticketId, payload) {
   const text = String(payload?.text ?? '').trim();
   if (!text) return null;
 
-  if (useApi && !isDraftTicket({ id: apiId })) {
+  if (isDraftTicket({ id: apiId })) {
+    return {
+      ticket: null,
+      twilio: { sent: false, reason: 'Ticket em rascunho — salve antes de enviar WhatsApp' },
+    };
+  }
+
+  if (useApi) {
     assertApiReady('enviar WhatsApp');
     const result = await ticketsApi.sendWhatsAppMessage(apiId, {
       text,
@@ -647,12 +675,12 @@ export async function sendWhatsAppMessageViaApi(ticketId, payload) {
       } catch {
         /* ignore */
       }
-      return full;
+      return { ticket: full, twilio: result.twilio ?? null };
     }
-    return null;
+    return { ticket: null, twilio: result?.twilio ?? null };
   }
 
-  return updateTicketViaApi(ticketId, (t) => {
+  const local = await updateTicketViaApi(ticketId, (t) => {
     const ts = new Date().toISOString();
     const author = payload?.author || getAgentName() || '';
     if (!t.messages) t.messages = [];
@@ -670,6 +698,7 @@ export async function sendWhatsAppMessageViaApi(ticketId, payload) {
     t.updatedAt = ts;
     return t;
   });
+  return { ticket: local, twilio: { sent: false, reason: 'Modo offline — mensagem só no cache local' } };
 }
 
 export function createDraftTicketInCache(form) {

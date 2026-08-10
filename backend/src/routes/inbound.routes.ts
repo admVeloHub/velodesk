@@ -1,4 +1,4 @@
-/** inbound.routes v1.6.0 — WhatsApp Twilio inbound (quickstart webhook + TwiML) */
+/** inbound.routes v1.7.0 — status callback WhatsApp (confirmação de entrega) */
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { env } from '../config/env';
@@ -10,6 +10,10 @@ import {
   parseTwilioWhatsAppWebhook,
   processInboundWhatsAppMessage,
 } from '../services/twilio/whatsappInbound.service';
+import {
+  parseTwilioMessageStatusWebhook,
+  processWhatsAppMessageStatusCallback,
+} from '../services/twilio/whatsappStatusCallback.service';
 import { processAppNotify } from '../services/app-inbound.service';
 import { isAllowedRecipient, processInboundEmail } from '../services/email-inbound.service';
 import { parseInboundEmailPayload } from '../services/inbound-email/adapters';
@@ -174,6 +178,22 @@ router.post('/whatsapp/messages', twilioWebhookAuthMiddleware, async (req, res: 
   } catch (err) {
     console.error('[inbound/whatsapp/messages]', err);
     return res.status(500).type('text/plain').send('Falha ao processar mensagem WhatsApp');
+  }
+});
+
+/** WhatsApp Twilio — status callback (sent / delivered / read / failed) */
+router.post('/whatsapp/message-status', twilioWebhookAuthMiddleware, async (req, res: Response) => {
+  try {
+    const payload = parseTwilioMessageStatusWebhook(req.body as Record<string, unknown>);
+    if (!payload.messageSid) {
+      return res.status(400).type('text/plain').send('MessageSid ausente');
+    }
+
+    await processWhatsAppMessageStatusCallback(payload);
+    return res.status(200).type('text/plain').send('');
+  } catch (err) {
+    console.error('[inbound/whatsapp/message-status]', err);
+    return res.status(500).type('text/plain').send('Falha ao processar status WhatsApp');
   }
 });
 

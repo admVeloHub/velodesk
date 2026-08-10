@@ -1504,6 +1504,8 @@ export function buildRegistroThread(ticket) {
       attachments: Array.isArray(m.attachments) ? m.attachments.filter(Boolean) : [],
       meta: formatMsgMeta(ts, authorName),
       timestamp: ts,
+      deliveryStatus: m.deliveryStatus,
+      deliveryErrorMessage: m.deliveryErrorMessage,
     };
   });
 

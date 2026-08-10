@@ -1,10 +1,35 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.67.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.68.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — WhatsApp contínuo, confirmação de entrega e fix rascunho Desk
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.68.0
+  - **WhatsApp Twilio**: whatsappThread v1.1.0, whatsappOutbound v1.1.0, whatsappStatusCallback v1.0.0, inbound.routes v1.7.0, tickets.routes (POST whatsapp/messages + deliveryStatus)
+  - **Backend**: env v1.32.0, chamado.mapper v2.9.5, whatsappInbound v1.2.0
+  - **Frontend**: DeskV2Root (WA contínuo, fix refreshQueueCounts), DeskWhatsAppChat v1.4.0, ticketsCache v1.12.0, TicketsContext v1.8.2
+- **Arquivos principais**:
+  - `backend/src/routes/tickets.routes.ts` — envio WA sem commit de status; thread única com array aninhado
+  - `backend/src/routes/inbound.routes.ts` — `POST /whatsapp/message-status` (sent/delivered/read)
+  - `backend/src/services/twilio/whatsappThread.service.ts` — `whatsappMensagens[]` + deliveryStatus
+  - `backend/src/services/twilio/whatsappStatusCallback.service.ts` — atualiza entrega por MessageSid
+  - `frontend/src/features/desk/DeskV2Root.jsx` — handleSendWhatsAppMessage; fix import refreshQueueCountsFromApi; rascunho não dispara sync
+  - `frontend/src/services/ticketsCache.js` — preserva drafts em refresh concorrente
+  - `frontend/src/context/TicketsContext.js` — mantém abas draft-* durante reload
+- **Descrição**: Conversa WhatsApp contínua no Desk (envio leve sem salvar ticket). Confirmação de entrega Twilio via status callback persistida na thread. Corrige race que fechava rascunho ao criar ticket e ReferenceError em syncTicketViews.
+- **Cloud Run (manual)**: `TWILIO_*`, `WHATSAPP_INBOUND_ENABLED`, `TWILIO_WHATSAPP_STATUS_CALLBACK_URL`, `ENABLE_WHATSAPP=false`; Twilio Console status callback → Velodesk.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — Reclamações MongoDB, Agente 4 unificado e mensageria envelope
 
