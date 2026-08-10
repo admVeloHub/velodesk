@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.28.2 | DATE: 2026-08-10
- * — WhatsApp: botão Enviar Mensagem Inicial + compose bloqueado até resposta
+ * VERSION: v3.28.3 | DATE: 2026-08-10
+ * — fix isAtendimentoAgent (hasAtendimentoFuncao) no avanço de workflow
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -106,6 +106,7 @@ import WorkflowComunicacaoModal from '../workflow/components/WorkflowComunicacao
 import { replyWorkflowComunicacao } from '../../services/workflow/workflowDecisionHandlers';
 import deskPlatformTrace, { createPlatformTraceCounter } from '../../utils/deskPlatformTrace';
 import { hasPublicThreadChanged } from '../../services/desk/ticketThreadSync';
+import { hasAtendimentoFuncao } from '../../services/desk/atuacaoVision';
 
 /** Respostas de cliente chegam por e-mail a qualquer momento: a thread se atualiza sozinha */
 const AUTO_REFRESH_DETAIL_MS = 15000;
@@ -1524,6 +1525,7 @@ export default function DeskV2Root() {
   }, []);
 
   const workflowProgress = ticket ? getWorkflowProgress(ticket) : null;
+  const isAtendimentoAgent = hasAtendimentoFuncao(colaboradorAtuacao);
   const deskPermissions = permsCtx?.permissions;
   const canPublicCompose = ticket ? canSendPublicMessageOnTicket(ticket, deskPermissions) : false;
   const canInternalCompose = ticket ? canSendInternalNoteOnTicket(ticket, deskPermissions) : false;

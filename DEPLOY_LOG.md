@@ -1,10 +1,26 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.70.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.71.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — fix ReferenceError isAtendimentoAgent no Desk
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.71.0
+  - **Frontend**: DeskV2Root v3.28.3
+- **Arquivos principais**:
+  - `frontend/src/features/desk/DeskV2Root.jsx` — restaura `isAtendimentoAgent = hasAtendimentoFuncao(colaboradorAtuacao)` (referência órfã pós-merge c34d021)
+- **Descrição**: Corrige crash `ReferenceError: isAtendimentoAgent is not defined` ao abrir ticket no Desk (bloco `canAdvanceWorkflow` sem definição da variável).
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — WhatsApp botão Enviar Mensagem Inicial + feed persistente
 
