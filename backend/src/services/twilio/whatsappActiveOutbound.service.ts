@@ -1,4 +1,4 @@
-/** whatsappActiveOutbound.service v1.0.1 — variável 3 sem sufixo duplicado de protocolo */
+/** whatsappActiveOutbound.service v1.1.0 — mensagem inicial automática (template) */
 import type { IChamadoN1 } from '../../models/ChamadoN1';
 import type { IClienteDados } from '../../models/Cliente';
 import { env } from '../../config/env';
@@ -14,6 +14,8 @@ import {
   type WhatsAppOutboundResult,
 } from './whatsappOutbound.service';
 
+export const DEFAULT_DESK_INITIAL_TEMPLATE_TEXT = 'Estamos entrando em contato sobre sua solicitação.';
+
 export type WhatsAppOutboundMode = 'session' | 'template';
 
 export interface WhatsAppChamadoOutboundResult extends WhatsAppOutboundResult {
@@ -22,10 +24,11 @@ export interface WhatsAppChamadoOutboundResult extends WhatsAppOutboundResult {
 }
 
 export interface SendWhatsAppForChamadoOptions {
-  text: string;
+  text?: string;
   waChatId?: string;
   forceTemplate?: boolean;
   forceSession?: boolean;
+  initialTemplate?: boolean;
   contentSid?: string;
   contentVariables?: Record<string, string>;
 }
@@ -89,13 +92,17 @@ export async function sendWhatsAppForChamado(
   }
 
   const sessionOpen = isWhatsAppCustomerSessionOpen(chamado, waChatId);
-  const rawText = String(options.text ?? '').trim();
+  const useTemplate = options.initialTemplate
+    || options.forceTemplate
+    || (!options.forceSession && !sessionOpen);
+
+  let rawText = String(options.text ?? '').trim();
+  if (!rawText && useTemplate) {
+    rawText = DEFAULT_DESK_INITIAL_TEMPLATE_TEXT;
+  }
   if (!rawText) {
     return { sent: false, reason: 'Texto da mensagem é obrigatório', sessionOpen };
   }
-
-  const useTemplate = options.forceTemplate
-    || (!options.forceSession && !sessionOpen);
 
   if (!useTemplate) {
     const maskedText = applyWhatsAppSendMask(rawText, chamado);

@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.28.1 | DATE: 2026-08-10
- * — Botão Iniciar Workflow: gatilho do WF (não tabulação completa); desacoplado de tabulationReadonly
+ * VERSION: v3.28.2 | DATE: 2026-08-10
+ * — WhatsApp: botão Enviar Mensagem Inicial + compose bloqueado até resposta
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -17,7 +17,7 @@ import {
   isMeusTicketsQueue,
   buildRegistroThread,
   buildWhatsAppConvMsgs,
-  isWhatsAppCustomerSessionOpen,
+  getWhatsAppDeskUiState,
   normalizeTicketForDeskV2,
   getAgentName,
   applySendStatus,
@@ -226,6 +226,7 @@ export default function DeskV2Root() {
   const pendingWorkflowTemplateRef = useRef(null);
   const commitInProgressRef = useRef(false);
   const waSendInProgressRef = useRef(false);
+  const [waSendInProgress, setWaSendInProgress] = useState(false);
   const openedTicketFromUrlRef = useRef(null);
 
   const syncUrlTicketParam = useCallback((ticketId) => {
@@ -1035,6 +1036,75 @@ export default function DeskV2Root() {
     }
   };
 
+  const resolveWhatsAppChatId = () => String(
+    client?.whatsappPhone
+    || ticket?.lateralForm?.clienteTelefoneWhatsapp
+    || (Array.isArray(ticket?.lateralForm?.clienteTelefone) ? ticket.lateralForm.clienteTelefone[0] : '')
+    || ticket?.clientPhone
+    || '',
+  ).replace(/\D/g, '');
+
+  const runWhatsAppSend = async ({ text, initialTemplate = false }) => {
+    if (!ticket || !entry || waSendInProgressRef.current || commitInProgressRef.current) return;
+
+    const waChatId = resolveWhatsAppChatId();
+    if (!waChatId) {
+      showNotification('Cadastre o telefone WhatsApp do cliente antes de enviar.', 'warning');
+      return;
+    }
+
+    waSendInProgressRef.current = true;
+    setWaSendInProgress(true);
+    try {
+      const result = await sendWhatsAppMessageViaApi(ticket.id, {
+        text,
+        initialTemplate,
+        waChatId: waChatId || undefined,
+        author: getAgentName(),
+      });
+
+      if (result?.ticket) {
+        patchTicket(ticket.id, result.ticket);
+      }
+
+      if (result?.twilio && !result.twilio.sent) {
+        showNotification(
+          result.twilio.reason || 'Mensagem salva no ticket, mas o Twilio não enviou ao celular.',
+          'warning',
+        );
+      } else if (result?.twilio?.mode === 'template' || initialTemplate) {
+        showNotification(
+          'Mensagem inicial enviada via template. Aguarde a resposta do cliente.',
+          'success',
+        );
+      } else if (result?.twilio?.sent) {
+        showNotification('WhatsApp enviado.', 'success');
+      }
+
+      if (!initialTemplate) {
+        setComposeText('');
+      }
+      setWaChatOpen(true);
+      if (activeTabId) {
+        const sessionKey = String(activeTabId);
+        const session = tabSessionsRef.current[sessionKey];
+        if (session) {
+          tabSessionsRef.current[sessionKey] = {
+            ...session,
+            composeText: initialTemplate ? session.composeText : '',
+            waChatOpen: true,
+          };
+        }
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Erro ao enviar WhatsApp.';
+      showNotification(msg, 'error');
+    } finally {
+      waSendInProgressRef.current = false;
+      setWaSendInProgress(false);
+    }
+  };
+
   const handleSendWhatsAppMessage = async () => {
     if (!ticket || !entry || waSendInProgressRef.current || commitInProgressRef.current) return;
     if (isTicketReadOnly(ticket)) {
@@ -1049,68 +1119,29 @@ export default function DeskV2Root() {
       return;
     }
 
-    const messageText = String(composeText || '').trim();
-    if (!messageText) return;
-
-    waSendInProgressRef.current = true;
-    const waChatId = String(
-      client?.whatsappPhone
-      || ticket.lateralForm?.clienteTelefoneWhatsapp
-      || (Array.isArray(ticket.lateralForm?.clienteTelefone) ? ticket.lateralForm.clienteTelefone[0] : '')
-      || ticket.clientPhone
-      || '',
-    ).replace(/\D/g, '');
-
-    if (!waChatId) {
-      showNotification('Cadastre o telefone WhatsApp do cliente antes de enviar.', 'warning');
-      waSendInProgressRef.current = false;
+    const waUi = getWhatsAppDeskUiState(ticket);
+    if (!waUi.composeEnabled) {
+      showNotification('Envie a mensagem inicial ou aguarde a resposta do cliente.', 'warning');
       return;
     }
 
-    try {
-      const result = await sendWhatsAppMessageViaApi(ticket.id, {
-        text: messageText,
-        waChatId: waChatId || undefined,
-        author: getAgentName(),
-      });
+    const messageText = String(composeText || '').trim();
+    if (!messageText) return;
 
-      if (result?.ticket) {
-        patchTicket(ticket.id, result.ticket);
-      }
+    await runWhatsAppSend({ text: messageText });
+  };
 
-      if (result?.twilio && !result.twilio.sent) {
-        showNotification(
-          result.twilio.reason || 'Mensagem salva no ticket, mas o Twilio não enviou ao celular.',
-          'warning',
-        );
-      } else if (result?.twilio?.mode === 'template') {
-        showNotification(
-          'Mensagem ativa enviada via template aprovado. Aguarde a resposta do cliente para continuar em texto livre.',
-          'success',
-        );
-      } else if (result?.twilio?.sent) {
-        showNotification('WhatsApp enviado.', 'success');
-      }
-
-      setComposeText('');
-      setWaChatOpen(true);
-      if (activeTabId) {
-        const sessionKey = String(activeTabId);
-        const session = tabSessionsRef.current[sessionKey];
-        if (session) {
-          tabSessionsRef.current[sessionKey] = {
-            ...session,
-            composeText: '',
-            waChatOpen: true,
-          };
-        }
-      }
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Erro ao enviar WhatsApp.';
-      showNotification(msg, 'error');
-    } finally {
-      waSendInProgressRef.current = false;
+  const handleSendWhatsAppInitial = async () => {
+    if (!ticket || !entry || waSendInProgressRef.current || commitInProgressRef.current) return;
+    if (isTicketReadOnly(ticket)) {
+      showNotification('Ticket fechado — não aceita modificações.', 'warning');
+      return;
     }
+    if (isDraftTicket(ticket)) {
+      showNotification('Salve o ticket antes de enviar WhatsApp.', 'warning');
+      return;
+    }
+    await runWhatsAppSend({ initialTemplate: true });
   };
 
   const handleFieldChange = (key, value) => {
@@ -1226,7 +1257,7 @@ export default function DeskV2Root() {
 
   const convMsgs = ticket ? buildRegistroThread(ticket) : [];
   const waConvMsgs = ticket ? buildWhatsAppConvMsgs(ticket) : [];
-  const waSessionOpen = ticket ? isWhatsAppCustomerSessionOpen(ticket) : false;
+  const waUiState = ticket ? getWhatsAppDeskUiState(ticket) : null;
   const threadLen = convMsgs.length;
   const activeTicketId = ticket?.id ? String(ticket.id) : '';
 
@@ -1773,7 +1804,10 @@ export default function DeskV2Root() {
                     onComposeTextChange={setComposeText}
                     onUseIaReply={handleUseIaReply}
                     onSend={handleSendWhatsAppMessage}
-                    sessionOpen={waSessionOpen}
+                    onSendInitial={handleSendWhatsAppInitial}
+                    waUiState={waUiState}
+                    initialSendBusy={waSendInProgress}
+                    sendBusy={waSendInProgress}
                     iaReply={ticketAi.respostaSugerida}
                     iaReplyLoading={ticketAi.loading}
                     iaWaitingMessage={ticketAi.waitingMessage}

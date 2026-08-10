@@ -1,6 +1,6 @@
 /**
- * DeskWhatsAppChat v1.5.0 — aviso mensagem ativa (template) vs sessão 24h
- * VERSION: v1.5.0 | DATE: 2026-08-10
+ * DeskWhatsAppChat v1.6.0 — mensagem inicial dedicada + compose só na sessão 24h
+ * VERSION: v1.6.0 | DATE: 2026-08-10
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -71,7 +71,10 @@ export default function DeskWhatsAppChat({
   onComposeTextChange,
   onUseIaReply,
   onSend,
-  sessionOpen = true,
+  onSendInitial,
+  waUiState,
+  initialSendBusy = false,
+  sendBusy = false,
   iaReply = '',
   iaReplyLoading = false,
   iaWaitingMessage = '',
@@ -84,6 +87,10 @@ export default function DeskWhatsAppChat({
   const lastIaReplyRef = useRef('');
   const chatMessages = messages || [];
   const dateIso = chatMessages[0]?.timestamp || ticket.createdAt;
+
+  const composeEnabled = waUiState?.composeEnabled !== false;
+  const needsInitial = Boolean(waUiState?.needsInitial);
+  const awaitingClient = Boolean(waUiState?.awaitingClient);
 
   useEffect(() => {
     setIaVisible(true);
@@ -119,20 +126,54 @@ export default function DeskWhatsAppChat({
   };
 
   const handleSend = () => {
-    if (!composeText.trim()) return;
+    if (!composeEnabled || !composeText.trim() || sendBusy) return;
     onSend();
   };
+
+  const clientLabel = String(
+    client?.name
+    || ticket?.clientName
+    || ticket?.lateralForm?.clienteNome
+    || 'cliente',
+  ).trim();
 
   return (
     <div className="wa-chat" id="waChatView">
       <div className="conversation wa-chat__body" id="conversation">
+        {needsInitial && (
+          <div className="wa-chat__initial-card" role="region" aria-label="Iniciar conversa WhatsApp">
+            <div className="wa-chat__initial-card-icon" aria-hidden="true">
+              <i className="ti ti-brand-whatsapp" />
+            </div>
+            <h3 className="wa-chat__initial-card-title">Iniciar conversa WhatsApp</h3>
+            <p className="wa-chat__initial-card-text">
+              Para falar com <strong>{clientLabel}</strong> pela primeira vez, envie a mensagem inicial
+              aprovada pela Meta (template Velotax com nome e protocolo do chamado).
+            </p>
+            <button
+              type="button"
+              className="wa-chat__initial-card-btn"
+              onClick={onSendInitial}
+              disabled={initialSendBusy || sendBusy}
+            >
+              {initialSendBusy ? 'Enviando…' : 'Enviar Mensagem Inicial'}
+            </button>
+          </div>
+        )}
+
+        {awaitingClient && !needsInitial && (
+          <div className="wa-chat__awaiting-banner" role="status">
+            Mensagem inicial enviada. Aguardando resposta de <strong>{clientLabel}</strong> para liberar o texto livre (janela 24h).
+          </div>
+        )}
+
         {dateIso && chatMessages.length > 0 && (
           <div className="wa-chat__date-sep">{formatWaDateSeparator(dateIso)}</div>
         )}
 
-        {chatMessages.length === 0 ? (
+        {chatMessages.length === 0 && !needsInitial ? (
           <div className="crm-empty-state conversation-empty">
-            <p>Nenhuma mensagem pública neste atendimento.</p>
+            <p>Nenhuma mensagem WhatsApp neste atendimento.</p>
           </div>
         ) : (
           chatMessages.map((msg, i) => {
@@ -157,7 +198,7 @@ export default function DeskWhatsAppChat({
           })
         )}
 
-        {iaVisible && iaShowBar && (
+        {composeEnabled && iaVisible && iaShowBar && (
           <div className={'wa-ia-card' + (iaReplyLoading ? ' wa-ia-card--loading' : '') + (iaError ? ' wa-ia-card--error' : '')} id="iaSuggestionBar">
             <div className="wa-ia-card__head">
               <i className="ti ti-sparkles" aria-hidden="true" />
@@ -193,26 +234,29 @@ export default function DeskWhatsAppChat({
         )}
       </div>
 
-      <footer className="wa-chat__footer">
-        {!sessionOpen && (
+      <footer className={'wa-chat__footer' + (composeEnabled ? '' : ' wa-chat__footer--locked')}>
+        {!composeEnabled && (
           <p className="wa-chat__session-hint" role="status">
-            Sem resposta recente do cliente — o envio usará o template aprovado da Velotax (mensagem ativa).
+            {needsInitial
+              ? 'Use o botão acima para enviar a mensagem inicial. O campo de texto será liberado após a resposta do cliente.'
+              : 'Aguardando resposta do cliente para continuar a conversa.'}
           </p>
         )}
         <div className="wa-chat__input-bar">
-          <button type="button" className="wa-chat__input-icon" aria-label="Emoji">
+          <button type="button" className="wa-chat__input-icon" aria-label="Emoji" disabled={!composeEnabled}>
             <i className="far fa-smile" />
           </button>
           <input
             ref={inputRef}
             type="text"
             className="wa-chat__input"
-            placeholder="Escreva uma mensagem..."
+            placeholder={composeEnabled ? 'Escreva uma mensagem...' : 'Disponível após resposta do cliente'}
             spellCheck
             lang="pt-BR"
             autoCorrect="on"
             autoCapitalize="sentences"
             value={composeText}
+            disabled={!composeEnabled || sendBusy}
             onChange={(e) => onComposeTextChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -221,12 +265,18 @@ export default function DeskWhatsAppChat({
               }
             }}
           />
-          <button type="button" className="wa-chat__input-icon" aria-label="Anexar">
+          <button type="button" className="wa-chat__input-icon" aria-label="Anexar" disabled={!composeEnabled}>
             <i className="fas fa-paperclip" />
           </button>
         </div>
-        <button type="button" className="wa-chat__send" aria-label="Enviar" onClick={handleSend}>
-          <i className="fas fa-paper-plane" />
+        <button
+          type="button"
+          className="wa-chat__send"
+          aria-label="Enviar mensagem"
+          disabled={!composeEnabled || sendBusy || !composeText.trim()}
+          onClick={handleSend}
+        >
+          <i className="fas fa-paper-plane" aria-hidden="true" />
         </button>
       </footer>
     </div>

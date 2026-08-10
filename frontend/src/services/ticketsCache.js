@@ -292,6 +292,15 @@ function mergePreservedDetails(prevCols, nextCols) {
         clienteId: prev.clienteId || ticket.clienteId,
         responsibleAgent: ticket.responsibleAgent ?? prev.responsibleAgent,
         slaBreached: ticket.slaBreached ?? prev.slaBreached,
+        messages: (prev.messages?.length || 0) >= (ticket.messages?.length || 0)
+          ? prev.messages
+          : (ticket.messages?.length ? ticket.messages : prev.messages),
+        internalNotes: (prev.internalNotes?.length || 0) >= (ticket.internalNotes?.length || 0)
+          ? prev.internalNotes
+          : (ticket.internalNotes?.length ? ticket.internalNotes : prev.internalNotes),
+        registroHistorico: (prev.registroHistorico?.length || 0) >= (ticket.registroHistorico?.length || 0)
+          ? prev.registroHistorico
+          : (ticket.registroHistorico?.length ? ticket.registroHistorico : prev.registroHistorico),
         workflow: prev.workflow?.pendingPersist
           ? prev.workflow
           : mergeTicketWorkflow(prev.workflow, ticket.workflow),
@@ -648,8 +657,9 @@ export async function addMessageViaApi(ticketId, payload) {
 
 export async function sendWhatsAppMessageViaApi(ticketId, payload) {
   const apiId = String(ticketId);
+  const initialTemplate = payload?.initialTemplate === true;
   const text = String(payload?.text ?? '').trim();
-  if (!text) return null;
+  if (!initialTemplate && !text) return null;
 
   if (isDraftTicket({ id: apiId })) {
     return {
@@ -661,12 +671,15 @@ export async function sendWhatsAppMessageViaApi(ticketId, payload) {
   if (useApi) {
     assertApiReady('enviar WhatsApp');
     const result = await ticketsApi.sendWhatsAppMessage(apiId, {
-      text,
+      text: text || undefined,
+      initialTemplate: initialTemplate || undefined,
       waChatId: payload?.waChatId,
       attachments: payload?.attachments,
     });
     if (result?.ticket) {
       const full = apiTicketToCockpit(result.ticket);
+      full.listOnly = false;
+      full._detailLoaded = true;
       patchTicketInCache(apiId, full);
       try {
         window.dispatchEvent(new CustomEvent('velodesk:ticket-detail-changed', {

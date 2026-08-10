@@ -1,4 +1,4 @@
-/** tickets.routes v1.15.0 — WhatsApp ativo (template) + receptivo (sessão 24h) */
+/** tickets.routes v1.16.0 — POST whatsapp/messages: initialTemplate + sessão 24h */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -369,23 +369,26 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
   }
 
   const text = String(req.body?.text ?? '').trim();
+  const initialTemplate = req.body?.initialTemplate === true;
   const waChatId = String(req.body?.waChatId ?? '').trim() || undefined;
   const attachmentList = Array.isArray(req.body?.attachments)
     ? req.body.attachments.map((item: unknown) => String(item ?? '').trim()).filter(Boolean)
     : [];
 
-  if (!text && !attachmentList.length) {
+  if (!initialTemplate && !text && !attachmentList.length) {
     return res.status(400).json({ message: 'Texto da mensagem é obrigatório' });
   }
 
   applyManualResponsavelClaim(chamado, req.user);
+
+  const appendText = text || (initialTemplate ? 'Mensagem inicial WhatsApp (template)' : '');
 
   let appendResult;
   try {
     appendResult = appendWhatsAppMensagemToChamado(chamado, {
       origin: 'agente',
       autor: String(req.user?.name ?? req.user?.email ?? '').trim() || undefined,
-      texto: text,
+      texto: appendText,
       anexos: attachmentList,
       waChatId,
     });
@@ -394,7 +397,12 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
   }
 
   let twilio: WhatsAppChamadoOutboundResult = { sent: false, reason: 'Destino WhatsApp não encontrado no ticket' };
-  const sendResult = await sendWhatsAppForChamado(chamado, { text, waChatId });
+  const sendResult = await sendWhatsAppForChamado(chamado, {
+    text: text || undefined,
+    waChatId,
+    initialTemplate,
+    forceTemplate: initialTemplate || undefined,
+  });
   twilio = sendResult;
   if (sendResult.sent && sendResult.sid) {
       const reg = chamado.registro?.[appendResult.registroIndex];

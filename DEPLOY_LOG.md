@@ -1,10 +1,31 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.69.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.70.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — WhatsApp botão Enviar Mensagem Inicial + feed persistente
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.70.0
+  - **Backend**: whatsappActiveOutbound v1.1.0, tickets.routes v1.16.0 (`initialTemplate`)
+  - **Frontend**: DeskV2Root v3.28.2, DeskWhatsAppChat v1.6.0, utils v3.11.12, ticketsCache (preserve messages + `_detailLoaded`)
+- **Arquivos principais**:
+  - `backend/src/routes/tickets.routes.ts` — flag `initialTemplate` envia template sem texto do compose
+  - `backend/src/services/twilio/whatsappActiveOutbound.service.ts` — texto padrão da mensagem inicial
+  - `frontend/src/features/desk/components/DeskWhatsAppChat.jsx` — card no feed + compose bloqueado
+  - `frontend/src/services/desk/utils.js` — `getWhatsAppDeskUiState`
+  - `frontend/src/services/ticketsCache.js` — fix mensagem WA sumindo após reload da fila
+- **Descrição**: UX dedicada para conversa WhatsApp ativa — botão “Enviar Mensagem Inicial” no feed, compose inativo até resposta do cliente; mensagem permanece no histórico.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — WhatsApp mensagem ativa (template UTILITY) e sessão 24h Desk
 

@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.11.11 | DATE: 2026-08-10
- * — isWhatsAppCustomerSessionOpen (janela 24h p/ texto livre)
+ * VERSION: v3.11.12 | DATE: 2026-08-10
+ * — getWhatsAppDeskUiState (mensagem inicial vs sessão 24h)
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
 import { getDeskQueueDisplayCount, markTicketResolvedOptimistic } from './queueCounts';
@@ -1542,6 +1542,44 @@ export function isWhatsAppCustomerSessionOpen(ticket) {
   }
   if (!lastClienteAt) return false;
   return Date.now() - lastClienteAt < WHATSAPP_SESSION_MS;
+}
+
+/** Agente já enviou ao menos uma mensagem na thread WhatsApp. */
+export function hasWhatsAppAgentOutbound(ticket) {
+  return buildWhatsAppConvMsgs(ticket).some((m) => m.type === 'agent');
+}
+
+/**
+ * Estado UX do chat WhatsApp no Desk.
+ * - needsInitial: exibir botão "Enviar Mensagem Inicial" (template)
+ * - awaitingClient: template enviado, aguardando resposta
+ * - composeEnabled: sessão 24h aberta — texto livre
+ */
+export function getWhatsAppDeskUiState(ticket) {
+  const sessionOpen = isWhatsAppCustomerSessionOpen(ticket);
+  const agentOutbound = hasWhatsAppAgentOutbound(ticket);
+  if (sessionOpen) {
+    return {
+      mode: 'session',
+      composeEnabled: true,
+      needsInitial: false,
+      awaitingClient: false,
+    };
+  }
+  if (!agentOutbound) {
+    return {
+      mode: 'needsInitial',
+      composeEnabled: false,
+      needsInitial: true,
+      awaitingClient: false,
+    };
+  }
+  return {
+    mode: 'awaitingClient',
+    composeEnabled: false,
+    needsInitial: false,
+    awaitingClient: true,
+  };
 }
 
 export function getClientAnalise(client) {
