@@ -1,4 +1,4 @@
-/** inbound.routes v1.7.0 — status callback WhatsApp (confirmação de entrega) */
+/** inbound.routes v1.7.1 — webhook auth parent+subconta (Twilio signature) */
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { env } from '../config/env';

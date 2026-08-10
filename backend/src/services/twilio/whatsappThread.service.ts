@@ -1,4 +1,4 @@
-/** whatsappThread.service v1.3.0 — E.164 BR (+55) no destino WhatsApp */
+/** whatsappThread.service v1.3.1 — export normalizeWaChatId + E.164 BR */
 import type { IChamadoN1, IRegistro } from '../../models/ChamadoN1';
 import { normalizePhoneE164 } from '../telephonyRecado.validation';
 
@@ -98,7 +98,7 @@ function registroMetadados(reg: IRegistro): Record<string, unknown> {
   return (reg.metadados ?? {}) as Record<string, unknown>;
 }
 
-function normalizeWaChatId(value: unknown): string {
+export function normalizeWaChatId(value: unknown): string {
   const digits = String(value ?? '')
     .replace(/^whatsapp:/i, '')
     .replace(/\D/g, '')

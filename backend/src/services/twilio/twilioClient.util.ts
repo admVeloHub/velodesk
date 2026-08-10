@@ -1,4 +1,4 @@
-/** twilioClient.util v1.2.0 — API Key ou Auth Token (subconta Velodesk) */
+/** twilioClient.util v1.3.0 — webhook auth tokens parent + subconta */
 import twilio from 'twilio';
 import { env } from '../../config/env';
 
@@ -110,6 +110,16 @@ export function getTwilioActiveAuthToken(): string {
   const parentToken = env.twilioAuthToken.trim();
   if (parentToken && !isPlaceholderToken(parentToken)) return parentToken;
   return '';
+}
+
+/** Tokens candidatos — sender +17406933944 está na conta principal; subconta pode falhar assinatura. */
+export function getTwilioWebhookAuthTokens(): string[] {
+  const tokens: string[] = [];
+  const parent = env.twilioAuthToken.trim();
+  const sub = env.twilioSubaccountAuthToken.trim();
+  if (parent && !isPlaceholderToken(parent)) tokens.push(parent);
+  if (sub && !isPlaceholderToken(sub) && sub !== parent) tokens.push(sub);
+  return [...new Set(tokens)];
 }
 
 export function getTwilioActiveAccountSid(): string {

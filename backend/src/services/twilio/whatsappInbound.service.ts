@@ -1,4 +1,4 @@
-/** whatsappInbound.service v1.2.0 — inbound + health com status callback URL */
+/** whatsappInbound.service v1.3.0 — inbound + match waChatId canônico (E.164) */
 import twilio from 'twilio';
 import { env } from '../../config/env';
 import { ChamadoN1 } from '../../models/ChamadoN1';
@@ -6,7 +6,6 @@ import { ChamadoIaAnalise } from '../../models/ChamadoIaAnalise';
 import { shouldSpawnNewTicketOnInbound } from '../chamado.mapper';
 import {
   getTwilioActiveAccountSid,
-  getTwilioActiveAuthToken,
   getTwilioCredentialMode,
   isTwilioConfigured,
 } from './twilioClient.util';
@@ -14,6 +13,7 @@ import { resolveWhatsAppStatusCallbackUrl } from './whatsappCallbackUrl.util';
 import type { TwilioWhatsAppWebhookPayload } from './whatsappInbound.types';
 import {
   appendWhatsAppMensagemToChamado,
+  normalizeWaChatId,
   readWhatsAppMensagens,
   WHATSAPP_THREAD_SOURCE,
 } from './whatsappThread.service';
@@ -22,13 +22,6 @@ const { MessagingResponse } = twilio.twiml;
 
 function readField(body: Record<string, unknown>, key: string): string {
   return String(body[key] ?? '').trim();
-}
-
-function normalizeWaChatId(value: unknown): string {
-  return String(value ?? '')
-    .replace(/^whatsapp:/i, '')
-    .replace(/\D/g, '')
-    .trim();
 }
 
 export function parseTwilioWhatsAppWebhook(body: Record<string, unknown>): TwilioWhatsAppWebhookPayload {

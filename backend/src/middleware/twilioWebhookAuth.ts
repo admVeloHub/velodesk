@@ -1,8 +1,8 @@
-/** twilioWebhookAuth v1.0.0 — validação X-Twilio-Signature */
+/** twilioWebhookAuth v1.1.0 — valida assinatura com parent + subconta */
 import twilio from 'twilio';
 import { Request, Response, NextFunction } from 'express';
 import { env } from '../config/env';
-import { getTwilioActiveAuthToken } from '../services/twilio/twilioClient.util';
+import { getTwilioWebhookAuthTokens } from '../services/twilio/twilioClient.util';
 
 export function resolveTwilioWebhookUrl(req: Request): string {
   const proto = String(req.headers['x-forwarded-proto'] ?? req.protocol).split(',')[0].trim() || 'https';
@@ -11,14 +11,27 @@ export function resolveTwilioWebhookUrl(req: Request): string {
   return `${proto}://${host}${path}`;
 }
 
+function isTwilioSignatureValid(
+  authToken: string,
+  signature: string,
+  url: string,
+  body: Record<string, unknown>,
+): boolean {
+  try {
+    return twilio.validateRequest(authToken, signature, url, body);
+  } catch {
+    return false;
+  }
+}
+
 export function twilioWebhookAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (!env.whatsappInboundEnabled) {
     res.status(503).json({ message: 'Inbound WhatsApp desabilitado' });
     return;
   }
 
-  const authToken = getTwilioActiveAuthToken().trim() || env.twilioAuthToken.trim();
-  if (!authToken) {
+  const authTokens = getTwilioWebhookAuthTokens();
+  if (!authTokens.length) {
     if (env.nodeEnv !== 'production') {
       next();
       return;
@@ -38,14 +51,16 @@ export function twilioWebhookAuthMiddleware(req: Request, res: Response, next: N
     return;
   }
 
-  const valid = twilio.validateRequest(
-    authToken,
-    signature,
-    resolveTwilioWebhookUrl(req),
-    req.body as Record<string, unknown>,
-  );
+  const body = req.body as Record<string, unknown>;
+  const webhookUrl = resolveTwilioWebhookUrl(req);
+  const valid = authTokens.some((token) => isTwilioSignatureValid(token, signature, webhookUrl, body));
 
   if (!valid) {
+    console.warn('[twilio-webhook] assinatura inválida', {
+      path: req.originalUrl.split('?')[0],
+      webhookUrl,
+      tokensTried: authTokens.length,
+    });
     res.status(403).json({ message: 'Assinatura Twilio inválida' });
     return;
   }

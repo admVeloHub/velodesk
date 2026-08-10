@@ -1,10 +1,29 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.72.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.73.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — fix webhook inbound WhatsApp (assinatura Twilio + match E.164)
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main (exclusivo)
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.73.0
+  - **Backend**: twilioWebhookAuth v1.1.0, twilioClient v1.3.0, whatsappInbound v1.3.0, whatsappThread v1.3.1, inbound.routes v1.7.1
+- **Arquivos principais**:
+  - `backend/src/middleware/twilioWebhookAuth.ts` — valida X-Twilio-Signature com token parent + subconta
+  - `backend/src/services/twilio/twilioClient.util.ts` — `getTwilioWebhookAuthTokens()`
+  - `backend/src/services/twilio/whatsappInbound.service.ts` — `normalizeWaChatId` canônico (E.164)
+  - `backend/scripts/update-desk-whatsapp-sender-webhook.ts` — utilitário sender +17406933944 callback POST
+- **Descrição**: Corrige recebimento de respostas WhatsApp — status callbacks retornavam 403 (token errado); sender Desk atualizado na Twilio com `callback_method: POST` para inbound.
+- **Status**: Push main
+
+---
 
 ### GitHub Push — fix E.164 WhatsApp BR (+55) no envio Desk
 
