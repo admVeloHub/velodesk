@@ -4090,11 +4090,23 @@
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__footer {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     padding: 8px 12px 10px;
     background: #f0f2f5;
     flex-shrink: 0;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__session-hint {
+    flex: 1 1 100%;
+    margin: 0;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #5c4a00;
+    background: rgba(255, 193, 7, 0.18);
+    border-radius: 8px;
 }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__input-bar {

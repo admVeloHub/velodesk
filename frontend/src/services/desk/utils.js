@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.11.9 | DATE: 2026-08-07
- * — Meus Tickets confia filtro meus-chamados do backend (sem double-filter de responsável)
+ * VERSION: v3.11.11 | DATE: 2026-08-10
+ * — isWhatsAppCustomerSessionOpen (janela 24h p/ texto livre)
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
 import { getDeskQueueDisplayCount, markTicketResolvedOptimistic } from './queueCounts';
@@ -1529,6 +1529,21 @@ export function buildWhatsAppConvMsgs(ticket) {
   return buildRegistroThread({ ...ticket, messages: waOnly });
 }
 
+export const WHATSAPP_SESSION_MS = 24 * 60 * 60 * 1000;
+
+/** True se o cliente enviou WhatsApp nas últimas 24h (texto livre permitido). */
+export function isWhatsAppCustomerSessionOpen(ticket) {
+  const msgs = buildWhatsAppConvMsgs(ticket);
+  let lastClienteAt = 0;
+  for (const m of msgs) {
+    if (m.type !== 'client') continue;
+    const ts = new Date(m.timestamp || 0).getTime();
+    if (!Number.isNaN(ts) && ts > lastClienteAt) lastClienteAt = ts;
+  }
+  if (!lastClienteAt) return false;
+  return Date.now() - lastClienteAt < WHATSAPP_SESSION_MS;
+}
+
 export function getClientAnalise(client) {
   if (client?.analise) return client.analise;
   if ((client?.termometro ?? 0) >= 55 || client?.risco === 'Alto') {
@@ -1595,7 +1610,15 @@ export function getTicketStatusBadgeMeta(ticket, queueId) {
 
 export function getTicketCpfDigits(ticket) {
   const lf = ticket?.lateralForm || {};
-  return normalizeCpf(lf.clienteCpf || lf.cpf || ticket?.clientCPF || '');
+  const clienteRef = Array.isArray(ticket?.cliente) ? ticket.cliente[0] : ticket?.cliente;
+  return normalizeCpf(
+    lf.clienteCpf
+    || lf.cpf
+    || ticket?.clientCPF
+    || clienteRef?.clienteCpf
+    || clienteRef?.cpf
+    || '',
+  );
 }
 
 function normalizeClientNameKey(ticket) {

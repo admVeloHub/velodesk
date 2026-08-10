@@ -1,6 +1,6 @@
 /**
- * DeskWhatsAppChat v1.4.0 — confirmação de entrega (sent/delivered/read)
- * VERSION: v1.4.0 | DATE: 2026-08-10
+ * DeskWhatsAppChat v1.5.0 — aviso mensagem ativa (template) vs sessão 24h
+ * VERSION: v1.5.0 | DATE: 2026-08-10
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -71,6 +71,7 @@ export default function DeskWhatsAppChat({
   onComposeTextChange,
   onUseIaReply,
   onSend,
+  sessionOpen = true,
   iaReply = '',
   iaReplyLoading = false,
   iaWaitingMessage = '',
@@ -193,6 +194,11 @@ export default function DeskWhatsAppChat({
       </div>
 
       <footer className="wa-chat__footer">
+        {!sessionOpen && (
+          <p className="wa-chat__session-hint" role="status">
+            Sem resposta recente do cliente — o envio usará o template aprovado da Velotax (mensagem ativa).
+          </p>
+        )}
         <div className="wa-chat__input-bar">
           <button type="button" className="wa-chat__input-icon" aria-label="Emoji">
             <i className="far fa-smile" />

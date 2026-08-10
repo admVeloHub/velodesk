@@ -1,4 +1,4 @@
-/** env v1.32.0 — status callback WhatsApp Twilio (confirmação de entrega) */
+/** env v1.33.0 — template UTILITY Desk (mensagem WhatsApp ativa) */
 import fs from 'fs';
 import path from 'path';
 
@@ -105,6 +105,10 @@ export const env = {
   /** Template Appointment Reminder (Sandbox quickstart) */
   twilioWhatsappContentSid: (
     process.env.TWILIO_WHATSAPP_CONTENT_SID || 'HXb5b62575e6e4ff6129ad7c8efe1f983e'
+  ).trim(),
+  /** Template UTILITY — 1º contato / fora da janela 24h (Desk ativo) */
+  twilioWhatsappDeskActiveContentSid: (
+    process.env.TWILIO_WHATSAPP_DESK_ACTIVE_CONTENT_SID || 'HXcbba12297392a996aeaf60af3e05ccc4'
   ).trim(),
   whatsappInboundEnabled: process.env.WHATSAPP_INBOUND_ENABLED !== 'false',
   twilioWhatsappAutoReply: (

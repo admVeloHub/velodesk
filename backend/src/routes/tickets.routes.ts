@@ -1,4 +1,4 @@
-/** tickets.routes v1.14.0 — commit/messages: interno para observadores; público exige atuação */
+/** tickets.routes v1.15.0 — WhatsApp ativo (template) + receptivo (sessão 24h) */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -51,11 +51,12 @@ import {
 import {
   appendWhatsAppMensagemToChamado,
   readWhatsAppMensagens,
-  resolveWhatsAppDestinationPhone,
   updateWhatsAppMensagemDeliveryBySid,
 } from '../services/twilio/whatsappThread.service';
-import { sendWhatsAppTextMessage, type WhatsAppOutboundResult } from '../services/twilio/whatsappOutbound.service';
-import { applyWhatsAppSendMask } from '../services/clientMessageSendMask.util';
+import {
+  sendWhatsAppForChamado,
+  type WhatsAppChamadoOutboundResult,
+} from '../services/twilio/whatsappActiveOutbound.service';
 
 const router = Router();
 
@@ -392,13 +393,10 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
     return res.status(400).json({ message: (err as Error).message });
   }
 
-  const destination = resolveWhatsAppDestinationPhone(chamado);
-  const twilioBody = text ? applyWhatsAppSendMask(text, chamado) : '';
-  let twilio: WhatsAppOutboundResult = { sent: false, reason: 'Destino WhatsApp não encontrado no ticket' };
-  if (destination && twilioBody) {
-    const sendResult = await sendWhatsAppTextMessage({ to: destination, body: twilioBody });
-    twilio = sendResult;
-    if (sendResult.sent && sendResult.sid) {
+  let twilio: WhatsAppChamadoOutboundResult = { sent: false, reason: 'Destino WhatsApp não encontrado no ticket' };
+  const sendResult = await sendWhatsAppForChamado(chamado, { text, waChatId });
+  twilio = sendResult;
+  if (sendResult.sent && sendResult.sid) {
       const reg = chamado.registro?.[appendResult.registroIndex];
       if (reg) {
         const list = readWhatsAppMensagens(reg);
@@ -414,14 +412,20 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
         appendResult.mensagem.twilioMessageSid = sendResult.sid;
         appendResult.mensagem.deliveryStatus = 'sent';
         appendResult.mensagem.deliveryStatusAt = last?.deliveryStatusAt;
+        if (sendResult.mode === 'template' && sendResult.body) {
+          appendResult.mensagem.texto = sendResult.body;
+          if (last) last.texto = sendResult.body;
+        }
       }
     } else if (sendResult.sid) {
       updateWhatsAppMensagemDeliveryBySid(chamado, sendResult.sid, {
         status: 'failed',
         errorMessage: sendResult.reason,
       });
+    } else if (!sendResult.sent && sendResult.reason) {
+      appendResult.mensagem.deliveryStatus = 'failed';
+      appendResult.mensagem.deliveryErrorMessage = sendResult.reason;
     }
-  }
 
   await chamado.save();
 

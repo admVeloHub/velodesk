@@ -1,10 +1,34 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.68.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.69.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — WhatsApp mensagem ativa (template UTILITY) e sessão 24h Desk
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.69.0
+  - **WhatsApp ativo**: whatsappActiveOutbound v1.0.1, whatsappThread v1.2.0, whatsappOutbound v1.2.0, tickets.routes v1.15.0, env v1.33.0
+  - **Template Twilio**: `desk_atendimento_ativo` (`HXcbba12297392a996aeaf60af3e05ccc4`, UTILITY)
+  - **Frontend**: DeskV2Root v3.28.1, DeskWhatsAppChat v1.5.0, utils v3.11.11, DeskRightPanel v1.12.2
+- **Arquivos principais**:
+  - `backend/src/services/twilio/whatsappActiveOutbound.service.ts` — template fora da janela 24h; texto livre na sessão
+  - `backend/src/routes/tickets.routes.ts` — POST whatsapp/messages usa fluxo ativo/receptivo
+  - `backend/src/config/env.ts` — `TWILIO_WHATSAPP_DESK_ACTIVE_CONTENT_SID`
+  - `frontend/src/features/desk/components/DeskWhatsAppChat.jsx` — aviso de envio ativo
+  - `frontend/src/services/desk/utils.js` — `isWhatsAppCustomerSessionOpen`
+  - `backend/scripts/create-desk-whatsapp-template.ts` — criação/submissão template UTILITY
+- **Descrição**: Desk envia mensagem ativa via template aprovado quando o cliente não respondeu nas últimas 24h; após resposta, texto livre. Inclui scripts de auditoria Twilio e ajuste do botão Iniciar Workflow (desacoplado de tabulação completa).
+- **Cloud Run (manual)**: `TWILIO_WHATSAPP_DESK_ACTIVE_CONTENT_SID=HXcbba12297392a996aeaf60af3e05ccc4` (+ callbacks já configurados).
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — WhatsApp contínuo, confirmação de entrega e fix rascunho Desk
 

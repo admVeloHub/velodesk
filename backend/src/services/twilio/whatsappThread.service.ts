@@ -1,8 +1,10 @@
-/** whatsappThread.service v1.1.0 — thread WhatsApp + status de entrega Twilio */
+/** whatsappThread.service v1.2.0 — sessão 24h + destino com hint waChatId */
 import type { IChamadoN1, IRegistro } from '../../models/ChamadoN1';
 
 export const WHATSAPP_THREAD_SOURCE = 'whatsapp-thread';
 export const WHATSAPP_MENSAGENS_KEY = 'whatsappMensagens';
+/** Janela de atendimento WhatsApp (última msg do cliente). */
+export const WHATSAPP_SESSION_MS = 24 * 60 * 60 * 1000;
 
 export type WhatsAppDeliveryStatus =
   | 'queued'
@@ -252,8 +254,30 @@ export function appendWhatsAppMensagemToChamado(
   };
 }
 
-export function resolveWhatsAppDestinationPhone(chamado: IChamadoN1): string | null {
-  const chatId = resolveWaChatIdFromChamado(chamado);
+export function isWhatsAppCustomerSessionOpen(
+  chamado: IChamadoN1,
+  waChatId?: string,
+): boolean {
+  const chatId = resolveWaChatIdFromChamado(chamado, waChatId);
+  const thread = findWhatsAppThreadRegistro(chamado, chatId || undefined);
+  if (!thread) return false;
+
+  const msgs = readWhatsAppMensagens(thread.registro);
+  let lastClienteAt = 0;
+  for (const msg of msgs) {
+    if (msg.origin !== 'cliente') continue;
+    const ts = new Date(msg.data).getTime();
+    if (!Number.isNaN(ts) && ts > lastClienteAt) lastClienteAt = ts;
+  }
+  if (!lastClienteAt) return false;
+  return Date.now() - lastClienteAt < WHATSAPP_SESSION_MS;
+}
+
+export function resolveWhatsAppDestinationPhone(
+  chamado: IChamadoN1,
+  hint?: string,
+): string | null {
+  const chatId = resolveWaChatIdFromChamado(chamado, hint);
   if (chatId) return chatId.startsWith('+') ? chatId : `+${chatId}`;
 
   for (let i = (chamado.registro?.length ?? 0) - 1; i >= 0; i -= 1) {

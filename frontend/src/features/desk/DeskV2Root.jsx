@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.28.0 | DATE: 2026-08-07
- * — Persistência workflow: flush usa snapshot pré-save; stepper/badge mantidos após commit
+ * VERSION: v3.28.1 | DATE: 2026-08-10
+ * — Botão Iniciar Workflow: gatilho do WF (não tabulação completa); desacoplado de tabulationReadonly
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -17,6 +17,7 @@ import {
   isMeusTicketsQueue,
   buildRegistroThread,
   buildWhatsAppConvMsgs,
+  isWhatsAppCustomerSessionOpen,
   normalizeTicketForDeskV2,
   getAgentName,
   applySendStatus,
@@ -24,6 +25,7 @@ import {
   isValidEmailFormat,
   getTicketProtocolLabel,
   isTicketInWorkflow,
+  isTicketWorkflowActive,
   injectWorkflowSystemMessage,
   getWorkflowProgress,
   syncTicketWorkflowOnCommit,
@@ -95,6 +97,7 @@ import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
 import DeskAiRevisionModal from './components/DeskAiRevisionModal';
 import { resolveAutomaticaConfig } from '../config/workflow/workflowConfigData';
 import { resolveWorkflowForTicket } from '../../services/desk/workflowEngine';
+import { getRuntimeWorkflows } from '../../services/desk/workflowRuntimeStore';
 import { resolveRequisicaoCamposVisiveis } from '../../services/workflow/workflowRequisicao';
 import { getAutoCloseOnSave } from '../../services/desk/agentDeskPreferences';
 import { parseDeskQueueFromUrl, parseDeskMyTicketsSectionFromUrl } from '../../services/desk/constants';
@@ -1080,6 +1083,13 @@ export default function DeskV2Root() {
           result.twilio.reason || 'Mensagem salva no ticket, mas o Twilio não enviou ao celular.',
           'warning',
         );
+      } else if (result?.twilio?.mode === 'template') {
+        showNotification(
+          'Mensagem ativa enviada via template aprovado. Aguarde a resposta do cliente para continuar em texto livre.',
+          'success',
+        );
+      } else if (result?.twilio?.sent) {
+        showNotification('WhatsApp enviado.', 'success');
       }
 
       setComposeText('');
@@ -1216,6 +1226,7 @@ export default function DeskV2Root() {
 
   const convMsgs = ticket ? buildRegistroThread(ticket) : [];
   const waConvMsgs = ticket ? buildWhatsAppConvMsgs(ticket) : [];
+  const waSessionOpen = ticket ? isWhatsAppCustomerSessionOpen(ticket) : false;
   const threadLen = convMsgs.length;
   const activeTicketId = ticket?.id ? String(ticket.id) : '';
 
@@ -1312,13 +1323,17 @@ export default function DeskV2Root() {
     ticketAi.tabulacaoDisplay,
   ]);
 
+  const workflowDefinitions = useMemo(
+    () => (runtimeWorkflows?.length ? runtimeWorkflows : getRuntimeWorkflows()),
+    [runtimeWorkflows],
+  );
+
   const matchedWorkflowTemplate = useMemo(() => {
-    if (!ticket || isDraftTicket(ticket) || isTicketInWorkflow(ticket)) return null;
+    if (!ticket || isDraftTicket(ticket) || isTicketWorkflowActive(ticket)) return null;
     if (!isClientIdentifiedForWorkflow(ticket)) return null;
     const fields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
-    if (!isTabulationComplete(fields, config, ticket, getAgentName)) return null;
-    return resolveWorkflowForTicket(ticket, fields, runtimeWorkflows);
-  }, [ticket, rightFields, config, runtimeWorkflows]);
+    return resolveWorkflowForTicket(ticket, fields, workflowDefinitions);
+  }, [ticket, rightFields, workflowDefinitions]);
 
   const executeWorkflowStart = useCallback(async (payload) => {
     const template = pendingWorkflowTemplateRef.current || workflowStartTemplate;
@@ -1441,13 +1456,7 @@ export default function DeskV2Root() {
     }
 
     const fields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
-    const tabulationCheck = validateTabulationForSendStatus('em-andamento', fields, config);
-    if (!tabulationCheck.ok) {
-      showNotification(tabulationCheck.message, 'warning');
-      return;
-    }
-
-    const template = resolveWorkflowForTicket(ticket, fields, runtimeWorkflows);
+    const template = resolveWorkflowForTicket(ticket, fields, workflowDefinitions);
     if (!template) {
       showNotification('Tabulação não compatível com nenhum workflow ativo.', 'warning');
       return;
@@ -1464,9 +1473,8 @@ export default function DeskV2Root() {
 
     setWorkflowStartModalOpen(true);
   }, [
-    config,
     executeWorkflowStart,
-    runtimeWorkflows,
+    workflowDefinitions,
     rightFields,
     showNotification,
     startingWorkflow,
@@ -1488,6 +1496,7 @@ export default function DeskV2Root() {
   const deskPermissions = permsCtx?.permissions;
   const canPublicCompose = ticket ? canSendPublicMessageOnTicket(ticket, deskPermissions) : false;
   const canInternalCompose = ticket ? canSendInternalNoteOnTicket(ticket, deskPermissions) : false;
+  const canInitiateWorkflow = canPublicCompose;
   const workflowPublicLocked = ticketReadOnly || !canPublicCompose;
   const tabulationReadonly = ticketReadOnly || !canPublicCompose;
 
@@ -1764,6 +1773,7 @@ export default function DeskV2Root() {
                     onComposeTextChange={setComposeText}
                     onUseIaReply={handleUseIaReply}
                     onSend={handleSendWhatsAppMessage}
+                    sessionOpen={waSessionOpen}
                     iaReply={ticketAi.respostaSugerida}
                     iaReplyLoading={ticketAi.loading}
                     iaWaitingMessage={ticketAi.waitingMessage}
@@ -1855,6 +1865,7 @@ export default function DeskV2Root() {
           onStartWorkflow={handleStartWorkflow}
           startingWorkflow={startingWorkflow}
           canStartWorkflow={Boolean(matchedWorkflowTemplate)}
+          canInitiateWorkflow={canInitiateWorkflow}
           onReplyWorkflowRequest={handleOpenComunicacaoModal}
           replyWorkflowBusy={comunicacaoBusy}
           onCommitStatus={handleCommitWithStatus}

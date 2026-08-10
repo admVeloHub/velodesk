@@ -1,4 +1,4 @@
-/** whatsappOutbound.service v1.1.0 — envio Twilio + status callback de entrega */
+/** whatsappOutbound.service v1.2.0 — template UTILITY + texto livre (sessão 24h) */
 import { getTwilioClient, getTwilioWhatsAppFrom, isTwilioConfigured } from './twilioClient.util';
 import { resolveWhatsAppStatusCallbackUrl } from './whatsappCallbackUrl.util';
 import { env } from '../../config/env';
@@ -25,8 +25,8 @@ function buildStatusCallbackParams(): { statusCallback?: string; statusCallbackM
   };
 }
 
-/** Mensagem business-initiated via template (Sandbox quickstart). */
-export async function sendWhatsAppSandboxTemplate(options: {
+/** Mensagem business-initiated via template aprovado (Utility / Authentication). */
+export async function sendWhatsAppTemplateMessage(options: {
   to: string;
   contentSid?: string;
   contentVariables?: Record<string, string>;
@@ -67,6 +67,9 @@ export async function sendWhatsAppSandboxTemplate(options: {
     return { sent: false, reason: (err as Error).message };
   }
 }
+
+/** @deprecated use sendWhatsAppTemplateMessage */
+export const sendWhatsAppSandboxTemplate = sendWhatsAppTemplateMessage;
 
 /** Mensagem free-form (janela de atendimento 24h após msg do cliente). */
 export async function sendWhatsAppTextMessage(options: {
