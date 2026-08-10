@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.28.3 | DATE: 2026-08-10
- * — fix isAtendimentoAgent (hasAtendimentoFuncao) no avanço de workflow
+ * VERSION: v3.28.4 | DATE: 2026-08-10
+ * — waChatId com DDI 55 (toWhatsAppChatIdDigits)
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -35,6 +35,7 @@ import {
   getDeskSearchSuccessMessage,
   isFusaoAbsorvido,
   isClientIdentifiedForWorkflow,
+  toWhatsAppChatIdDigits,
 } from '../../services/desk/utils';
 import { fundirTickets } from '../../services/desk/ticketFusaoService';
 import {
@@ -1037,13 +1038,13 @@ export default function DeskV2Root() {
     }
   };
 
-  const resolveWhatsAppChatId = () => String(
+  const resolveWhatsAppChatId = () => toWhatsAppChatIdDigits(
     client?.whatsappPhone
     || ticket?.lateralForm?.clienteTelefoneWhatsapp
     || (Array.isArray(ticket?.lateralForm?.clienteTelefone) ? ticket.lateralForm.clienteTelefone[0] : '')
     || ticket?.clientPhone
     || '',
-  ).replace(/\D/g, '');
+  );
 
   const runWhatsAppSend = async ({ text, initialTemplate = false }) => {
     if (!ticket || !entry || waSendInProgressRef.current || commitInProgressRef.current) return;

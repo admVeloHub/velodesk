@@ -1,10 +1,31 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.71.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.72.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — fix E.164 WhatsApp BR (+55) no envio Desk
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.72.0
+  - **Backend**: whatsappThread v1.3.0, whatsappOutbound v1.3.0, whatsappActiveOutbound v1.2.0
+  - **Frontend**: DeskV2Root v3.28.4, utils v3.11.13
+- **Arquivos principais**:
+  - `backend/src/services/twilio/whatsappThread.service.ts` — `resolveWhatsAppDestinationPhone` com E.164 BR
+  - `backend/src/services/twilio/whatsappOutbound.service.ts` — normalização antes do `messages.create`
+  - `backend/src/services/twilio/whatsappActiveOutbound.service.ts` — fallback `clienteTelefone.whatsapp` do cadastro
+  - `frontend/src/services/desk/utils.js` — `normalizePhoneE164`, `toWhatsAppChatIdDigits`
+  - `frontend/src/features/desk/DeskV2Root.jsx` — `waChatId` canônico com DDI 55
+- **Descrição**: Corrige envio WhatsApp para números cadastrados sem DDI (ex. `11966153419` → `+5511966153419`). Elimina falha Twilio 21211 por destino inválido.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — fix ReferenceError isAtendimentoAgent no Desk
 

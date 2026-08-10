@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.11.12 | DATE: 2026-08-10
- * — getWhatsAppDeskUiState (mensagem inicial vs sessão 24h)
+ * VERSION: v3.11.13 | DATE: 2026-08-10
+ * — normalizePhoneE164 / toWhatsAppChatIdDigits (DDI 55 BR)
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
 import { getDeskQueueDisplayCount, markTicketResolvedOptimistic } from './queueCounts';
@@ -92,6 +92,22 @@ export function formatCpf(digits) {
 /** Remove não-dígitos do telefone */
 export function normalizePhone(v) {
   return String(v || '').replace(/\D/g, '');
+}
+
+/** E.164 Brasil — adiciona +55 quando o número local tem 10 ou 11 dígitos */
+export function normalizePhoneE164(value) {
+  const digits = normalizePhone(value);
+  if (digits.length < 8) return '';
+  if (digits.startsWith('55') && digits.length >= 12) return `+${digits}`;
+  if (digits.length === 10 || digits.length === 11) return `+55${digits}`;
+  if (digits.length >= 12) return `+${digits}`;
+  return '';
+}
+
+/** Dígitos canônicos para waChatId (5511...) */
+export function toWhatsAppChatIdDigits(value) {
+  const e164 = normalizePhoneE164(value);
+  return e164 ? e164.replace(/^\+/, '') : normalizePhone(value);
 }
 
 /** Máscara telefone BR enquanto digita (máx. 11 dígitos): (11) 99999-9999 ou (11) 9999-9999 */

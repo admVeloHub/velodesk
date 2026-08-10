@@ -1,6 +1,7 @@
-/** whatsappOutbound.service v1.2.0 — template UTILITY + texto livre (sessão 24h) */
+/** whatsappOutbound.service v1.3.0 — normaliza destino E.164 BR antes do envio */
 import { getTwilioClient, getTwilioWhatsAppFrom, isTwilioConfigured } from './twilioClient.util';
 import { resolveWhatsAppStatusCallbackUrl } from './whatsappCallbackUrl.util';
+import { normalizePhoneE164 } from '../telephonyRecado.validation';
 import { env } from '../../config/env';
 
 export interface WhatsAppOutboundResult {
@@ -13,7 +14,10 @@ export interface WhatsAppOutboundResult {
 function normalizeWhatsAppAddress(value: string): string {
   const trimmed = String(value ?? '').trim();
   if (!trimmed) return '';
-  return trimmed.startsWith('whatsapp:') ? trimmed : `whatsapp:${trimmed}`;
+  const withoutPrefix = trimmed.replace(/^whatsapp:/i, '');
+  const e164 = normalizePhoneE164(withoutPrefix) ?? normalizePhoneE164(withoutPrefix.replace(/\D/g, ''));
+  if (!e164) return '';
+  return `whatsapp:${e164}`;
 }
 
 function buildStatusCallbackParams(): { statusCallback?: string; statusCallbackMethod?: 'POST' } {

@@ -1,5 +1,6 @@
-/** whatsappThread.service v1.2.0 — sessão 24h + destino com hint waChatId */
+/** whatsappThread.service v1.3.0 — E.164 BR (+55) no destino WhatsApp */
 import type { IChamadoN1, IRegistro } from '../../models/ChamadoN1';
+import { normalizePhoneE164 } from '../telephonyRecado.validation';
 
 export const WHATSAPP_THREAD_SOURCE = 'whatsapp-thread';
 export const WHATSAPP_MENSAGENS_KEY = 'whatsappMensagens';
@@ -98,10 +99,19 @@ function registroMetadados(reg: IRegistro): Record<string, unknown> {
 }
 
 function normalizeWaChatId(value: unknown): string {
-  return String(value ?? '')
+  const digits = String(value ?? '')
     .replace(/^whatsapp:/i, '')
     .replace(/\D/g, '')
     .trim();
+  if (!digits) return '';
+  const e164 = normalizePhoneE164(digits);
+  return e164 ? e164.replace(/^\+/, '') : digits;
+}
+
+function toWhatsAppDestinationE164(value: unknown): string | null {
+  const raw = String(value ?? '').replace(/^whatsapp:/i, '').trim();
+  if (!raw) return null;
+  return normalizePhoneE164(raw) ?? normalizePhoneE164(raw.replace(/\D/g, ''));
 }
 
 export function resolveWaChatIdFromChamado(chamado: IChamadoN1, hint?: string): string {
@@ -278,12 +288,13 @@ export function resolveWhatsAppDestinationPhone(
   hint?: string,
 ): string | null {
   const chatId = resolveWaChatIdFromChamado(chamado, hint);
-  if (chatId) return chatId.startsWith('+') ? chatId : `+${chatId}`;
+  const fromChatId = toWhatsAppDestinationE164(chatId);
+  if (fromChatId) return fromChatId;
 
   for (let i = (chamado.registro?.length ?? 0) - 1; i >= 0; i -= 1) {
     const meta = registroMetadados(chamado.registro![i]);
-    const waFrom = String(meta.waFrom ?? '').replace(/^whatsapp:/i, '').trim();
-    if (waFrom) return waFrom.startsWith('+') ? waFrom : `+${waFrom.replace(/\D/g, '')}`;
+    const fromWa = toWhatsAppDestinationE164(meta.waFrom);
+    if (fromWa) return fromWa;
   }
 
   return null;

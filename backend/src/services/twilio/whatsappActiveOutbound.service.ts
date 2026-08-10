@@ -1,8 +1,9 @@
-/** whatsappActiveOutbound.service v1.1.0 — mensagem inicial automática (template) */
+/** whatsappActiveOutbound.service v1.2.0 — fallback cadastro WhatsApp + E.164 BR */
 import type { IChamadoN1 } from '../../models/ChamadoN1';
 import type { IClienteDados } from '../../models/Cliente';
 import { env } from '../../config/env';
 import { loadDadosForRef } from '../cliente.service';
+import { normalizePhoneE164 } from '../telephonyRecado.validation';
 import { applyWhatsAppSendMask } from '../clientMessageSendMask.util';
 import {
   isWhatsAppCustomerSessionOpen,
@@ -82,7 +83,13 @@ export async function sendWhatsAppForChamado(
   options: SendWhatsAppForChamadoOptions,
 ): Promise<WhatsAppChamadoOutboundResult> {
   const waChatId = String(options.waChatId ?? '').trim() || undefined;
-  const destination = resolveWhatsAppDestinationPhone(chamado, waChatId);
+  const dados = await loadDadosForRef(chamado.cliente?.[0] ?? null);
+  let destination = resolveWhatsAppDestinationPhone(chamado, waChatId);
+  if (!destination) {
+    const cadastroWa = dados?.clienteTelefone?.whatsapp
+      ?? dados?.clienteTelefone?.lista?.find((item) => normalizePhoneE164(item));
+    destination = normalizePhoneE164(cadastroWa ?? '') ?? null;
+  }
   if (!destination) {
     return {
       sent: false,
@@ -120,7 +127,6 @@ export async function sendWhatsAppForChamado(
     };
   }
 
-  const dados = await loadDadosForRef(chamado.cliente?.[0] ?? null);
   const contentVariables = options.contentVariables
     ?? buildDeskActiveTemplateVariables(chamado, dados, rawText);
 
