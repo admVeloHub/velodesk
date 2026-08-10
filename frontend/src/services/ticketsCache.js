@@ -15,12 +15,12 @@ import {
 import { readDeskProfileId, shouldUseMeusChamadosFila, ticketBelongsInAgentNovosQueue } from './desk/responsavelSegmentation';
 import { isEspeciaisDeskExcludedTicket } from './especiais/especiaisChannelDetection';
 import { getAgentName } from './clientDb';
-import { syncProconDemandasFromTickets } from './especiais/proconTicketService';
+import { loadProconTicketsFromApi } from './especiais/proconTicketService';
 import {
   hasPendingWorkflowPersist,
   mergeApiTicketPreservingPendingWorkflow,
 } from './desk/pendingWorkflowStart';
-import { syncConsumidorGovDemandasFromTickets } from './especiais/consumidorGovTicketService';
+import { loadConsumidorGovTicketsFromApi } from './especiais/consumidorGovTicketService';
 
 const BOXES_CACHE_KEY = 'velodesk_boxes_cache_v2';
 const BOXES_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -480,8 +480,8 @@ export async function loadBoxesFromApi(userEmail = '') {
     const cockpitEntries = columns.flatMap((box) =>
       (box.tickets || []).map((ticket) => ({ ticket, boxId: box.id })),
     );
-    syncProconDemandasFromTickets(cockpitEntries);
-    syncConsumidorGovDemandasFromTickets(cockpitEntries);
+    void loadProconTicketsFromApi();
+    void loadConsumidorGovTicketsFromApi();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('velodesk:procon-sync'));
       window.dispatchEvent(new CustomEvent('velodesk:consumidor-gov-sync'));

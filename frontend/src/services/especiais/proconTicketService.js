@@ -1,7 +1,7 @@
 /**
  * proconTicketService — bridge Procon ↔ API tickets
  */
-import { clientsApi, ticketsApi, boxesApi } from '../../api/client';
+import { clientsApi, ticketsApi, boxesApi, reclamacoesApi } from '../../api/client';
 import { mapClienteDocToContact } from '../../api/adapters/clienteAdapter';
 import { apiTicketToCockpit, adaptColumnsFromApi } from '../../api/adapters/ticketAdapter';
 import { getAgentName } from '../clientDb';
@@ -14,6 +14,7 @@ import {
   getDemandaById,
   getDemandaByTicketId,
   mirrorDemandaFromTicket,
+  refreshDemandasFromApi,
 } from './proconStore';
 
 const PC_WORKFLOW_SLUG = 'procon-tratativa';
@@ -115,6 +116,12 @@ export async function registerDemandaAndCreateTicket(form) {
   const created = await ticketsApi.create(payload);
   const ticket = apiTicketToCockpit(created);
   const ticketId = String(ticket.id || ticket._id);
+
+  try {
+    await reclamacoesApi.create('procon', { chamadoId: ticketId });
+  } catch (err) {
+    console.warn('proconTicketService: triagem reclamação fail-soft', err?.message || err);
+  }
 
   const publicText = String(form.respostaPublica || '').trim();
   if (publicText) {
@@ -379,18 +386,13 @@ export function syncProconDemandasFromTickets(tickets = []) {
 
 export async function loadProconTicketsFromApi() {
   try {
-    const data = await boxesApi.list({ fila: 'procon' });
-    const columns = adaptColumnsFromApi(data, { fila: 'procon' });
-    const entries = columns.flatMap((box) =>
-      (box.tickets || []).map((ticket) => ({ ticket, boxId: box.id })),
-    );
-    const synced = syncProconDemandasFromTickets(entries);
+    const items = await refreshDemandasFromApi();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('velodesk:procon-sync'));
     }
-    return synced;
+    return items.length;
   } catch (err) {
-    console.warn('proconTicketService: falha ao carregar fila procon', err?.message || err);
+    console.warn('proconTicketService: falha ao carregar reclamacoes procon', err?.message || err);
     return 0;
   }
 }

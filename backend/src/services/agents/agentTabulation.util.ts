@@ -1,9 +1,10 @@
 /**
- * agentTabulation.util v1.2.2 — user block reforça resposta direta sem eco do cliente
- * VERSION: v1.2.2 | DATE: 2026-08-07
+ * agentTabulation.util v1.3.0 — tarefa núcleo only
+ * VERSION: v1.3.0 | DATE: 2026-08-10
  */
 import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from '../tabulation.service';
 import type { TicketAiMessageInput, TicketAiTabulationResult, AuditoriaInput } from './agentTypes';
+import { getAgentNomeOficial } from './agentRegistry';
 import { resolveClientFirstName, trimStr } from './openaiAgent.util';
 
 const VALID_TIPOS = new Set(['Reclamação', 'Solicitação', 'Dúvida', 'Informação']);
@@ -51,6 +52,16 @@ export function formatMessagesBlock(messages: TicketAiMessageInput[]): string {
     .join('\n');
 }
 
+/** Sem mensagem pública do agente no histórico — a próxima resposta é a 1ª ao cliente. */
+export function isPrimeiroContatoAgente(messages?: TicketAiMessageInput[]): boolean {
+  if (!messages?.length) return true;
+  return !messages.some((m) => m.role === 'agente');
+}
+
+export interface AtendimentoUserBlockOptions {
+  modoRevisao?: boolean;
+}
+
 export function buildAtendimentoUserBlock(
   params: {
     protocolo?: string;
@@ -65,6 +76,7 @@ export function buildAtendimentoUserBlock(
     feedbackExamples?: string;
   },
   tabulationCatalog: string,
+  options?: AtendimentoUserBlockOptions,
 ): string {
   const clientFullName = trimStr(params.clientName, 200);
   const clientFirstName = resolveClientFirstName(clientFullName);
@@ -81,7 +93,7 @@ export function buildAtendimentoUserBlock(
   ];
 
   if (clientFirstName) {
-    parts.push(`Primeiro nome do cliente (saudação breve só no 1º contato): ${clientFirstName}`);
+    parts.push(`Primeiro nome do cliente (referência — abertura mecânica no composer, não no núcleo IA): ${clientFirstName}`);
   }
 
   if (params.produtoHint) {
@@ -108,12 +120,30 @@ export function buildAtendimentoUserBlock(
     parts.push('', '## Exemplos de correções anteriores (aprendizado)', '', params.feedbackExamples.trim());
   }
 
-  parts.push(
-    '',
-    '## Tarefa',
-    '',
-    'Em UMA única resposta JSON, retorne respostaSugerida (texto ao cliente, direto e sem eco da pergunta) e tabulacao (tipo, produto, motivo, detalhe) juntos — mesma consulta, mesmo objeto. Inclua também confidence e fontesConsultadas.',
-  );
+  if (options?.modoRevisao) {
+    parts.push(
+      '',
+      '## Contexto de envio',
+      '',
+      'A resposta revisada é SOMENTE o núcleo operacional. Abertura mecânica (1º contato) e fechamento visual são montados fora da IA.',
+    );
+  }
+
+  if (options?.modoRevisao) {
+    parts.push(
+      '',
+      '## Tarefa',
+      '',
+      'Revise o núcleo anterior corrigindo violações/recomendações da auditoria ou input do operador. Retorne SOMENTE núcleo — sem saudação, apresentação, protocolo, CTA ou assinatura. JSON com respostaSugerida, tabulacao, confidence e fontesConsultadas.',
+    );
+  } else {
+    parts.push(
+      '',
+      '## Tarefa',
+      '',
+      'Em UMA única resposta JSON, retorne respostaSugerida (NÚCLEO ONLY — conteúdo operacional direto, sem eco da pergunta, sem saudação/apresentação/fechamento) e tabulacao (tipo, produto, motivo, detalhe) juntos. Inclua confidence e fontesConsultadas.',
+    );
+  }
   return parts.join('\n');
 }
 
@@ -140,15 +170,17 @@ export function buildAuditoriaUserBlock(
     parts.push('', '## Última mensagem do cliente', '', params.ultimaMensagemCliente);
   }
 
+  const agenteResposta = getAgentNomeOficial(1);
+
   parts.push(
     '',
-    '## Resposta proposta pelo Agente de Atendimento',
+    `## Resposta proposta pelo ${agenteResposta}`,
     params.respostaSugerida,
     '',
-    '## Tabulação proposta pelo Agente de Atendimento',
+    `## Tabulação proposta pelo ${agenteResposta}`,
     `tipo: ${params.tabulacao.tipo} | produto: ${params.tabulacao.produto} | motivo: ${params.tabulacao.motivo} | detalhe: ${params.tabulacao.detalhe}`,
     '',
-    `## Confiança do Atendimento: ${params.confidence || 'não informada'}`,
+    `## Confiança do ${agenteResposta}: ${params.confidence || 'não informada'}`,
   );
 
   if (params.mensagemOperador) {
@@ -175,7 +207,7 @@ export function buildAuditoriaUserBlock(
     '',
     '## Tarefa',
     '',
-    'Audite a resposta e sugira a tabulação correta em tabulacaoSugerida (tipo, produto, motivo, detalhe) com base no contexto, na resposta e no catálogo. Confirme ou corrija a tabulação do Agente de Atendimento.',
+    `Audite a resposta e sugira a tabulação correta em tabulacaoSugerida (tipo, produto, motivo, detalhe) com base no contexto, na resposta e no catálogo. Confirme ou corrija a tabulação do ${agenteResposta}.`,
   );
 
   return parts.join('\n');

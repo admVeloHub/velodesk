@@ -43,7 +43,7 @@ import {
   mergeApiTicketPreservingPendingWorkflow,
   resolveTicketSnapshotForWorkflowFlush,
 } from '../../services/desk/pendingWorkflowStart';
-import { refreshQueueCountsFromApi } from '../../services/desk/queueCounts';
+import { wrapComposerOpeningForTicket } from '../../services/desk/clientMessageEnvelope';
 import {
   findTicketEntry,
   commitTicketViaApi,
@@ -1588,6 +1588,15 @@ export default function DeskV2Root() {
     }
   }, [ticketAi, showNotification]);
 
+  const handleUseIaReply = useCallback((nucleo) => {
+    const wrapped = wrapComposerOpeningForTicket({
+      nucleo,
+      ticket,
+      agentName: getAgentName(),
+    });
+    setComposeText(wrapped);
+  }, [ticket]);
+
   const showTableQueueMain = isTableQueueView && tableQueueBrowsing && !createOpen;
   const showTicketMain = Boolean(ticket) && !showTableQueueMain;
   const showOpenTabsBar = openTabs.length > 0 && !createOpen && !showTableQueueMain;
@@ -1733,7 +1742,7 @@ export default function DeskV2Root() {
                     messages={waConvMsgs}
                     composeText={composeText}
                     onComposeTextChange={setComposeText}
-                    onUseIaReply={setComposeText}
+                    onUseIaReply={handleUseIaReply}
                     onSend={handleSendWhatsAppMessage}
                     iaReply={ticketAi.respostaSugerida}
                     iaReplyLoading={ticketAi.loading}
@@ -1758,7 +1767,7 @@ export default function DeskV2Root() {
                       <DeskConversation
                         ticket={ticket}
                         messages={convMsgs}
-                        onUseIaReply={setComposeText}
+                        onUseIaReply={handleUseIaReply}
                         iaReply={ticketAi.respostaSugerida}
                         iaReplyLoading={ticketAi.loading}
                         iaWaitingMessage={ticketAi.waitingMessage}

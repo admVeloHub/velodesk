@@ -1,7 +1,7 @@
 /**
  * reclameAquiTicketService — bridge Reclame Aqui ↔ API tickets
  */
-import { ticketsApi } from '../../api/client';
+import { ticketsApi, reclamacoesApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
 import { getAgentName } from '../clientDb';
 import { createWorkflowState, getWorkflowTemplateById } from '../desk/workflowEngine';
@@ -130,6 +130,12 @@ export async function registerReclamacaoAndCreateTicket(form) {
   const created = await ticketsApi.create(payload);
   const ticket = apiTicketToCockpit(created);
   const ticketId = String(ticket.id || ticket._id);
+
+  try {
+    await reclamacoesApi.create('reclame-aqui', { chamadoId: ticketId });
+  } catch (err) {
+    console.warn('reclameAquiTicketService: triagem reclamação fail-soft', err?.message || err);
+  }
 
   const publicText = String(form.respostaPublica || '').trim();
   if (publicText) {

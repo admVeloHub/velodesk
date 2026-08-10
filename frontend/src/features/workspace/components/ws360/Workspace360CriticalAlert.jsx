@@ -1,5 +1,5 @@
 /**
- * Workspace360CriticalAlert v1.0.0 — alertas críticos do Agente de Gestão
+ * Workspace360CriticalAlert v1.0.1 — alertas críticos do Agente Gestor de Tickets
  * VERSION: v1.0.0 | DATE: 2026-07-13
  */
 import React, { useCallback, useEffect, useState } from 'react';

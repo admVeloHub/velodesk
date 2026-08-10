@@ -79,13 +79,24 @@ function testMongoHelpersShape() {
   assert(typeof excludeEspeciaisChannelsMongoFilter().$nor !== 'undefined', 'exclude filter deve ter $nor');
 }
 
+function testEmailInboundNoDirectWorkflow() {
+  const fs = require('fs') as typeof import('fs');
+  const path = require('path') as typeof import('path');
+  const inboundPath = path.join(__dirname, '../src/services/email-inbound.service.ts');
+  const src = fs.readFileSync(inboundPath, 'utf8');
+  assert(!src.includes('activateEspeciaisWorkflow'), 'sem workflow direto no inbound');
+  assert(src.includes('runInboundPostCreateHooks(chamado'), 'hooks sempre após create');
+  assert(src.includes('canalProvavel'), 'classificador vira hint canalProvavel no create');
+}
+
 async function main() {
   testClassifierMatch();
   testMeusChamadosExcludesEspeciais();
   testProconQueueFilter();
   testShouldAutoAssignSkipsEspeciais();
   testMongoHelpersShape();
-  console.log('test-inbound-especiais-channel: OK (5 checks)');
+  testEmailInboundNoDirectWorkflow();
+  console.log('test-inbound-especiais-channel: OK (6 checks)');
 }
 
 main().catch((err) => {

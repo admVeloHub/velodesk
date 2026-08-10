@@ -1,4 +1,4 @@
-/** email-inbound.service v1.12.0 — triagem Agente 4 na entrada e em replies */
+/** email-inbound.service v1.13.0 — classificador como hint; Agente 4 sempre no create */
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
@@ -30,7 +30,6 @@ import {
   classifyInboundEspeciaisChannel,
   type InboundEspeciaisChannel,
 } from './inbound-email/inboundChannelClassifier.service';
-import { startWorkflowForChamado } from './workflowTicket.service';
 
 export const LEGACY_PROTOCOL_PATTERN = /VD-\d{8}-\d{4}/i;
 export const NUMERIC_PROTOCOL_PATTERN = /\[(\d{8,10})\]/;
@@ -280,22 +279,6 @@ function buildInboundEspeciaisTicketBody(
   };
 }
 
-async function activateEspeciaisWorkflow(
-  chamado: IChamadoN1,
-  channel: InboundEspeciaisChannel,
-): Promise<void> {
-  const slug = channel === 'procon' ? 'procon-tratativa' : 'consumidor-gov-tratativa';
-  try {
-    await startWorkflowForChamado(chamado, null, undefined, slug);
-    await chamado.save();
-  } catch (err) {
-    console.warn(
-      '[email-inbound] workflow especiais fail-soft:',
-      err instanceof Error ? err.message : err,
-    );
-  }
-}
-
 async function runInboundEmailFlow(
   payload: InboundEmailPayload,
   messageId: string,
@@ -342,12 +325,12 @@ async function runInboundEmailFlow(
   const subject = payload.subject.trim() || 'Atendimento por e-mail';
   const displayName = payload.from.name || payload.from.email.split('@')[0];
   const inboundRootId = normalizeMessageId(payload.messageId);
-  const especiaisChannel = classifyInboundEspeciaisChannel(payload);
+  const canalProvavel = classifyInboundEspeciaisChannel(payload);
 
-  const ticketBody: Record<string, unknown> = especiaisChannel
+  const ticketBody: Record<string, unknown> = canalProvavel
     ? buildInboundEspeciaisTicketBody(
       payload,
-      especiaisChannel,
+      canalProvavel,
       bodyText,
       displayName,
       subject,
@@ -381,13 +364,13 @@ async function runInboundEmailFlow(
   if (partial.registro?.[0]) {
     partial.registro[0].origin = 'cliente';
     partial.registro[0].autor = displayName;
-    const channelSource = especiaisChannel ?? 'email-inbound';
     partial.registro[0].metadados = {
       ...(partial.registro[0].metadados ?? {}),
       ...emailMeta,
-      source: channelSource,
+      source: 'email-inbound',
       emailInbound: true,
       emailThreadRootId: inboundRootId,
+      ...(canalProvavel ? { canalProvavel, inboxDedicada: true } : {}),
       ...(isPriority ? { mailPriority: 'alta' } : {}),
     };
     partial.registro[0].alteracoes = partial.registro[0].alteracoes ?? [];
@@ -399,24 +382,19 @@ async function runInboundEmailFlow(
 
   await applyAssignmentIfNeeded(partial, {
     source: 'email-inbound',
-    canal: especiaisChannel === 'procon'
+    canal: canalProvavel === 'procon'
       ? 'Procon'
-      : especiaisChannel === 'consumidor-gov'
+      : canalProvavel === 'consumidor-gov'
         ? 'Consumidor.Gov'
         : 'E-mail',
   });
 
   const chamado = await ChamadoN1.create(partial);
-  if (especiaisChannel) {
-    await activateEspeciaisWorkflow(chamado, especiaisChannel);
-  }
   await notifyTicketOpenedAsync(chamado, payload.from.email);
 
-  if (!especiaisChannel) {
-    void runInboundPostCreateHooks(chamado, { source: 'email-inbound' }).catch((err: Error) => {
-      console.warn('[email-inbound] hooks inbound fail-soft:', err.message);
-    });
-  }
+  void runInboundPostCreateHooks(chamado, { source: 'email-inbound' }).catch((err: Error) => {
+    console.warn('[email-inbound] hooks inbound fail-soft:', err.message);
+  });
 
   return {
     action: 'created',
@@ -430,4 +408,3 @@ export function isAllowedRecipient(payload: InboundEmailPayload, allowed: string
   const allowedSet = new Set(allowed.map((item) => normalizeEmail(item)));
   return payload.to.some((item) => allowedSet.has(normalizeEmail(item)));
 }
-

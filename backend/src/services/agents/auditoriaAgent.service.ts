@@ -1,5 +1,5 @@
 /**
- * auditoriaAgent.service v1.1.0 — tabulação sugerida pelo Agente de Auditoria
+ * auditoriaAgent.service v1.1.1 — tabulação sugerida pelo Agente Auditor
  * VERSION: v1.1.0 | DATE: 2026-07-15
  */
 import { env } from '../../config/env';

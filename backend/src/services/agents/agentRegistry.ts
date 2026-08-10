@@ -1,6 +1,6 @@
 /**
- * agentRegistry v1.0.0 — mapa numerado dos agentes IA do Desk
- * VERSION: v1.0.0 | DATE: 2026-08-07
+ * agentRegistry v1.1.0 — mapa numerado e nomes oficiais dos agentes IA
+ * VERSION: v1.1.0 | DATE: 2026-08-07
  */
 
 export type AgentNumber = 1 | 2 | 3 | 4;
@@ -22,28 +22,32 @@ export const AGENT_REGISTRY: Record<AgentNumber, AgentRegistryEntry> = {
   1: {
     numero: 1,
     codigo: 'agente_atendimento',
-    nomeOficial: 'Agente de Atendimento N1',
+    nomeOficial: 'Agente de Resposta',
     serviceFile: 'atendimentoAgent.service.ts',
   },
   2: {
     numero: 2,
     codigo: 'agente_auditoria',
-    nomeOficial: 'Agente de Auditoria e Compliance',
+    nomeOficial: 'Agente Auditor',
     serviceFile: 'auditoriaAgent.service.ts',
   },
   3: {
     numero: 3,
     codigo: 'agente_gestao',
-    nomeOficial: 'Agente de Gestão de Chamados',
+    nomeOficial: 'Agente Gestor de Tickets',
     serviceFile: 'gestaoChamadosAgent.service.ts',
   },
   4: {
     numero: 4,
     codigo: 'agente_casos_especiais',
-    nomeOficial: 'Agente de Triagem de Casos Especiais',
+    nomeOficial: 'Agente de Casos especiais',
     serviceFile: 'casosEspeciaisAgent.service.ts',
   },
 };
+
+export function getAgentNomeOficial(numero: AgentNumber): string {
+  return AGENT_REGISTRY[numero].nomeOficial;
+}
 
 export function getAgentLabel(numero: AgentNumber): string {
   const entry = AGENT_REGISTRY[numero];

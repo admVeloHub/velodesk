@@ -1,6 +1,6 @@
 /**
- * casosEspeciaisRouting.service v1.0.0 — roteamento para times de casos especiais
- * VERSION: v1.0.0 | DATE: 2026-08-07
+ * casosEspeciaisRouting.service v1.1.0 — roteamento + persistência chamados_reclamacoes
+ * VERSION: v1.1.0 | DATE: 2026-08-07
  */
 import { Types } from 'mongoose';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -23,6 +23,11 @@ import type {
   CasoEspecialOrgaoConfig,
   CasoEspecialTriagemPersisted,
 } from './casosEspeciais.types';
+import { getAgentNomeOficial } from './agentRegistry';
+import {
+  readInboxDedicadaHint,
+  upsertFromChamado,
+} from '../reclamacoes/reclamacao.service';
 
 export const CASO_ESPECIAL_ORGAO_CONFIG: Record<
   Exclude<CasoEspecialOrgao, 'indefinido'>,
@@ -54,7 +59,7 @@ export const CASO_ESPECIAL_ORGAO_CONFIG: Record<
     funcaoSlug: 'consumidor-gov',
     source: 'consumidor-gov',
     canalLabel: 'Consumidor.gov',
-    workflowSlug: null,
+    workflowSlug: 'consumidor-gov-tratativa',
   },
 };
 
@@ -185,9 +190,14 @@ export interface RouteCasoEspecialResult {
   error?: string;
 }
 
+export interface RouteCasoEspecialContext {
+  origemEntrada?: string;
+}
+
 export async function routeCasoEspecialFormal(
   chamado: IChamadoN1,
   triagem: CasoEspecialTriagemPersisted,
+  routeCtx: RouteCasoEspecialContext = {},
 ): Promise<RouteCasoEspecialResult> {
   try {
     assertChamadoModifiable(chamado);
@@ -211,7 +221,7 @@ export async function routeCasoEspecialFormal(
     if (config.workflowSlug) {
       const definicao = await getWorkflowBySlug(config.workflowSlug);
       if (definicao && definicao.ativo !== false) {
-        workflowActivated = await activateWorkflowForChamado(chamado, definicao, 'Agente 4');
+        workflowActivated = await activateWorkflowForChamado(chamado, definicao, getAgentNomeOficial(4));
         if (workflowActivated) {
           workflowId = definicao._id as Types.ObjectId;
           workflowSlug = definicao.slug;
@@ -245,7 +255,7 @@ export async function routeCasoEspecialFormal(
     });
 
     appendRegistroEntry(chamado, {
-      autor: 'Agente 4',
+      autor: getAgentNomeOficial(4),
       anotacaoInterna: `Roteamento automático — ${config.canalLabel}: ${triagem.evidencia || triagem.justificativa}`,
       metadados: {
         skipAgentPipeline: true,
@@ -264,6 +274,12 @@ export async function routeCasoEspecialFormal(
     });
 
     await chamado.save();
+
+    await upsertFromChamado(chamado, { ...triagem, signals: triagem.signals ?? [] }, {
+      origemEntrada: routeCtx.origemEntrada || 'casos-especiais',
+      inboxDedicada: readInboxDedicadaHint(chamado),
+      workflowSlug: workflowSlug || config.workflowSlug || undefined,
+    });
 
     console.info('[casos-especiais-routing]', {
       protocolo: chamado.chamadoProtocolo,
@@ -291,7 +307,7 @@ export function persistCasosEspeciaisTriagemOnly(
   options: { skipAgentPipeline?: boolean } = {},
 ): void {
   appendRegistroEntry(chamado, {
-    autor: 'Agente 4',
+    autor: getAgentNomeOficial(4),
     anotacaoInterna: `Triagem casos especiais (${triagem.classificacao}): ${triagem.justificativa}`,
     metadados: {
       skipAgentPipeline: options.skipAgentPipeline === true,

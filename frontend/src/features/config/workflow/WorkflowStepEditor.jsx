@@ -276,7 +276,7 @@ export default function WorkflowStepEditor({
                   rows={3}
                   value={automatica.promptContexto || ''}
                   onChange={(e) => patchAutomatica({ promptContexto: e.target.value })}
-                  placeholder="Instruções adicionais para o Agente de Atendimento nesta etapa…"
+                  placeholder="Instruções adicionais para o Agente de Resposta nesta etapa…"
                 />
               </label>
             ) : null}

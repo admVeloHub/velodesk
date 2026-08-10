@@ -1,10 +1,37 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.66.0 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.67.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Reclamações MongoDB, Agente 4 unificado e mensageria envelope
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.67.0
+  - **Reclamações**: database v1.9.0, env v1.31.0, reclamacao.service v1.0.0, reclamacoes.routes v1.0.0, ReclamacaoBase.schema v1.0.0
+  - **Inbound/Agente 4**: email-inbound v1.13.0, casosEspeciaisRouting v1.1.0, casosEspeciaisTrigger v1.1.0, casosEspeciaisPrecheck v1.1.0
+  - **Mensageria**: clientMessageEnvelope v1.0.0, clientMessageSendMask v1.0.0, emailBrand.util, emailNotification.service
+  - **Frontend**: reclamacoesApi, procon/consumidorGov/reclameAqui stores via API, ticketsCache sync API
+- **Arquivos principais**:
+  - `backend/src/config/database.ts`, `env.ts` — conexão `chamados_reclamacoes`
+  - `backend/src/models/reclamacoes/`, `services/reclamacoes/reclamacao.service.ts` — upsert/list/sync pós Agente 4
+  - `backend/src/routes/reclamacoes.routes.ts` — GET/POST/PATCH `/api/reclamacoes/:orgao`
+  - `backend/src/services/email-inbound.service.ts` — classificador como hint; hooks Agente 4 sempre no create
+  - `backend/src/services/agents/casosEspeciais*.ts` — persistência em `reclamacoes_*`, guards duplicidade
+  - `backend/src/services/clientMessageEnvelope.service.ts`, `clientMessageSendMask.util.ts` — envelope/máscara envio cliente
+  - `frontend/src/api/client.js`, `services/especiais/*Store.js`, `*TicketService.js` — leitura/refresh via API reclamações
+  - `backend/scripts/test-reclamacoes-smoke.ts`, `test-inbound-especiais-channel.ts` — smoke Agente 4 + persistência
+- **Descrição**: Persistência de casos formais em MongoDB (`chamados_reclamacoes` / collections por órgão) somente após validação do Agente 4. Inbound sempre cria ticket em `chamados_n1` e passa pelo Agente 4; classificador vira hint de canal. Frontend Especiais consome API em vez de sync local. Inclui evoluções de mensageria (envelope/máscara) e ajustes de personas/prompts.
+- **Validação**: `npm run build` backend OK; `npm run test:reclamacoes-smoke` OK; `test-inbound-especiais-channel` OK.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — Desk: permissões workflow/compose, Meus Tickets e persistência de workflow
 

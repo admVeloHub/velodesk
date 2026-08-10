@@ -54,6 +54,7 @@ import {
   resolveWhatsAppDestinationPhone,
 } from '../services/twilio/whatsappThread.service';
 import { sendWhatsAppTextMessage, type WhatsAppOutboundResult } from '../services/twilio/whatsappOutbound.service';
+import { applyWhatsAppSendMask } from '../services/clientMessageSendMask.util';
 
 const router = Router();
 
@@ -391,9 +392,10 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
   }
 
   const destination = resolveWhatsAppDestinationPhone(chamado);
+  const twilioBody = text ? applyWhatsAppSendMask(text, chamado) : '';
   let twilio: WhatsAppOutboundResult = { sent: false, reason: 'Destino WhatsApp não encontrado no ticket' };
-  if (destination && text) {
-    const sendResult = await sendWhatsAppTextMessage({ to: destination, body: text });
+  if (destination && twilioBody) {
+    const sendResult = await sendWhatsAppTextMessage({ to: destination, body: twilioBody });
     twilio = sendResult;
     if (sendResult.sent && sendResult.sid) {
       const reg = chamado.registro?.[appendResult.registroIndex];

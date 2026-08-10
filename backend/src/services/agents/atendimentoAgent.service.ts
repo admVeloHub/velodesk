@@ -1,6 +1,6 @@
 /**
- * atendimentoAgent.service v1.0.0 — Agente de Atendimento (compose + revise)
- * VERSION: v1.0.0 | DATE: 2026-07-13
+ * atendimentoAgent.service v1.0.2 — revisão preserva primeira resposta
+ * VERSION: v1.0.2 | DATE: 2026-08-07
  */
 import { env } from '../../config/env';
 import type { AtendimentoInput, AtendimentoResult, RevisaoInput, ConfidenceLevel } from './agentTypes';
@@ -13,6 +13,7 @@ import {
   loadTabulationConfig,
   buildTabulationCatalog,
   validateTabulationResult,
+  isPrimeiroContatoAgente,
 } from './agentTabulation.util';
 import {
   createOpenAiClient,
@@ -21,6 +22,8 @@ import {
   isAgentsConfigured,
   mapOpenAiErrorMessage,
   parseAiJson,
+  resolveClientFirstName,
+  trimStr,
 } from './openaiAgent.util';
 import { getFeedbackExamplesForPrompt } from './agentFeedback.service';
 import { logAiUsage } from '../aiUsage.service';
@@ -136,17 +139,24 @@ export async function reviseAtendimento(params: RevisaoInput): Promise<Atendimen
       params.tabulacaoAnterior.motivo,
     );
 
+    const isPrimeiroContato = isPrimeiroContatoAgente(params.messages);
+    const clientFirstName = resolveClientFirstName(trimStr(params.clientName, 200));
+
     const systemPrompt = getAtendimentoRevisaoPersona({
       origemRevisao: params.origemRevisao,
       inputOperador: params.inputOperador,
       violacoes: params.violacoes,
       recomendacoes: params.recomendacoes,
       respostaAnterior: params.respostaAnterior,
+      isPrimeiroContato,
+      canal: params.canal,
+      clientFirstName: clientFirstName || undefined,
     });
 
     const userBlock = buildAtendimentoUserBlock(
       { ...params, feedbackExamples },
       catalog,
+      { modoRevisao: true },
     );
 
     const vectorIds = getAtendimentoVectorStoreIds();

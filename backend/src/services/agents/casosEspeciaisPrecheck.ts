@@ -1,6 +1,6 @@
 /**
- * casosEspeciaisPrecheck v1.0.0 — detecção rápida de sinais regulatórios (sem LLM)
- * VERSION: v1.0.0 | DATE: 2026-08-07
+ * casosEspeciaisPrecheck v1.1.0 — hint inbox dedicada (canalProvavel)
+ * VERSION: v1.1.0 | DATE: 2026-08-07
  */
 import type { IChamadoN1 } from '../../models/ChamadoN1';
 import { resolveFormalCaseSource } from '../ticketIaAdapter.service';
@@ -78,9 +78,24 @@ function detectInstitutionalSender(email: string): { matched: boolean; orgao: Ca
   return { matched: false, orgao: null };
 }
 
+function readCanalProvavelHint(chamado: IChamadoN1): string | null {
+  for (const reg of chamado.registro ?? []) {
+    const meta = reg.metadados && typeof reg.metadados === 'object' ? reg.metadados : {};
+    const hint = String((meta as Record<string, unknown>).canalProvavel ?? '').trim();
+    if (hint) return hint;
+  }
+  return null;
+}
+
 export function detectCasoEspecialSignal(chamado: IChamadoN1): CasoEspecialSignalResult {
   const signals: string[] = [];
   let origemProvavel: CasoEspecialOrgao | null = null;
+
+  const canalProvavel = readCanalProvavelHint(chamado);
+  if (canalProvavel) {
+    signals.push(`inbox_dedicada:${canalProvavel}`);
+    origemProvavel = origemProvavel || orgaoFromFormalSource(canalProvavel);
+  }
 
   const formalSource = resolveFormalCaseSource(chamado);
   if (formalSource) {

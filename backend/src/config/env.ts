@@ -1,4 +1,4 @@
-/** env v1.30.0 — Agente 4 casos especiais */
+/** env v1.31.0 — DB chamados_reclamacoes (collections por órgão) */
 import fs from 'fs';
 import path from 'path';
 
@@ -83,6 +83,7 @@ export const env = {
   mongoCadastrosDbName: process.env.MONGODB_CADASTROS_DB_NAME || 'b2c_cadastros',
   mongoDeskConfigDbName: process.env.MONGODB_DESK_CONFIG_DB_NAME || 'desk_config',
   mongoDeskPreferencesDbName: process.env.MONGODB_DESK_PREFERENCES_DB_NAME || 'desk_preferences',
+  mongoReclamacoesDbName: process.env.MONGODB_RECLAMACOES_DB_NAME || 'chamados_reclamacoes',
   /** VeloHubCentral — console_funcionarios.funcionarios_cadastroColaboradores (leitura via MONGO_ENV) */
   mongoFuncionariosUri: resolveMongoFuncionariosUri(),
   mongoFuncionariosDbName: process.env.MONGODB_FUNCIONARIOS_DB_NAME || 'console_funcionarios',
