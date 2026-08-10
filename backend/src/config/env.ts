@@ -1,4 +1,4 @@
-/** env v1.33.0 — template UTILITY Desk (mensagem WhatsApp ativa) */
+/** env v1.34.0 — TWILIO_WEBHOOK_PUBLIC_BASE_URL para assinatura webhook */
 import fs from 'fs';
 import path from 'path';
 
@@ -119,6 +119,11 @@ export const env = {
   twilioWhatsappStatusCallbackUrl: (process.env.TWILIO_WHATSAPP_STATUS_CALLBACK_URL || '').trim(),
   /** Dev only — pular validação X-Twilio-Signature (ngrok/local) */
   twilioWebhookSkipValidation: process.env.TWILIO_WEBHOOK_SKIP_VALIDATION === 'true',
+  /** Base pública usada na assinatura Twilio (deve bater com callback_url do sender) */
+  twilioWebhookPublicBaseUrl: (
+    process.env.TWILIO_WEBHOOK_PUBLIC_BASE_URL
+    || 'https://velodesk-278491073220.us-east1.run.app'
+  ).trim().replace(/\/+$/, ''),
   gcpStorageBucket: (process.env.GCP_STORAGE_BUCKET || 'velodesk_storage').trim(),
   /** E-mail recebido (inbound Gmail) */
   gcpStorageInboundAttachmentsPrefix: (

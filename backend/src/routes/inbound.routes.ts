@@ -1,4 +1,4 @@
-/** inbound.routes v1.7.1 — webhook auth parent+subconta (Twilio signature) */
+/** inbound.routes v1.7.2 — webhook auth URL pública Twilio */
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { env } from '../config/env';

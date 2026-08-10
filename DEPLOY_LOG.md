@@ -1,10 +1,27 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.73.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.74.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — fix assinatura Twilio com URL pública 278491073220
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main (exclusivo)
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.74.0
+  - **Backend**: twilioWebhookAuth v1.2.0, env v1.34.0, inbound.routes v1.7.2
+- **Arquivos principais**:
+  - `backend/src/middleware/twilioWebhookAuth.ts` — `resolveTwilioWebhookUrlCandidates` (URL pública + host request)
+  - `backend/src/config/env.ts` — `TWILIO_WEBHOOK_PUBLIC_BASE_URL` default `https://velodesk-278491073220.us-east1.run.app`
+- **Descrição**: Corrige 403 na validação X-Twilio-Signature quando Cloud Run usa host interno diferente da URL configurada na Twilio.
+- **Status**: Push main
+
+---
 
 ### GitHub Push — fix webhook inbound WhatsApp (assinatura Twilio + match E.164)
 

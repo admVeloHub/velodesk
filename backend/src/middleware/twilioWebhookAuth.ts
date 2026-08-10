@@ -1,4 +1,4 @@
-/** twilioWebhookAuth v1.1.0 — valida assinatura com parent + subconta */
+/** twilioWebhookAuth v1.2.0 — URL pública fixa + parent/subconta na assinatura */
 import twilio from 'twilio';
 import { Request, Response, NextFunction } from 'express';
 import { env } from '../config/env';
@@ -9,6 +9,20 @@ export function resolveTwilioWebhookUrl(req: Request): string {
   const host = String(req.headers['x-forwarded-host'] ?? req.get('host') ?? '').split(',')[0].trim();
   const path = req.originalUrl.split('?')[0];
   return `${proto}://${host}${path}`;
+}
+
+/** Twilio assina a URL exata do webhook — tentamos pública (278491073220) e host do request. */
+export function resolveTwilioWebhookUrlCandidates(req: Request): string[] {
+  const path = req.originalUrl.split('?')[0];
+  const urls: string[] = [];
+
+  const publicBase = env.twilioWebhookPublicBaseUrl.trim().replace(/\/+$/, '');
+  if (publicBase) urls.push(`${publicBase}${path}`);
+
+  const fromRequest = resolveTwilioWebhookUrl(req);
+  if (fromRequest) urls.push(fromRequest);
+
+  return [...new Set(urls)];
 }
 
 function isTwilioSignatureValid(
@@ -52,13 +66,15 @@ export function twilioWebhookAuthMiddleware(req: Request, res: Response, next: N
   }
 
   const body = req.body as Record<string, unknown>;
-  const webhookUrl = resolveTwilioWebhookUrl(req);
-  const valid = authTokens.some((token) => isTwilioSignatureValid(token, signature, webhookUrl, body));
+  const urlCandidates = resolveTwilioWebhookUrlCandidates(req);
+  const valid = urlCandidates.some((url) => authTokens.some(
+    (token) => isTwilioSignatureValid(token, signature, url, body),
+  ));
 
   if (!valid) {
     console.warn('[twilio-webhook] assinatura inválida', {
       path: req.originalUrl.split('?')[0],
-      webhookUrl,
+      urlCandidates,
       tokensTried: authTokens.length,
     });
     res.status(403).json({ message: 'Assinatura Twilio inválida' });
