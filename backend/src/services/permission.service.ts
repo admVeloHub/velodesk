@@ -1,4 +1,4 @@
-/** permission.service v1.6.1 — função gestão vê todas as categorias de tickets */
+/** permission.service v1.7.0 — WF: avanço só atribuído; compose interno para observadores */
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { findColaboradorByEmail } from './colaboradoresCadastro.service';
@@ -9,7 +9,14 @@ import {
   listFuncoesPermissoes,
   resolveEffectivePermissoes,
 } from './funcaoPermissao.service';
-import { buildResponsavelCandidates, isProconChamado, isConsumidorGovChamado, readTabulacaoSnapshot } from './chamado.mapper';
+import {
+  buildResponsavelCandidates,
+  currentStatus,
+  isProconChamado,
+  isConsumidorGovChamado,
+  normalizeStatusValue,
+  readTabulacaoSnapshot,
+} from './chamado.mapper';
 import {
   CANAL_ORIGEM_BY_FUNCAO,
   derivePortalVisivelFromPermissoes,
@@ -304,6 +311,110 @@ function matchesWorkflowScope(
   return matchesAtribuidoAnyUserFuncao(resolved, chamado);
 }
 
+function matchesAtribuidoColaborador(
+  resolved: ResolvedUserPermissions,
+  chamado: IChamadoN1,
+): boolean {
+  const tab = readTicketTabulacao(chamado);
+  const raw = normalizeAtribuidoValue(tab.atribuido);
+  if (!raw || raw.startsWith('funcao:') || raw.startsWith('grupo:')) return false;
+  const atribuido = raw.toLowerCase();
+  return resolved.responsavelCandidates.some((candidate) => {
+    const normalized = candidate.toLowerCase();
+    return normalized === atribuido
+      || atribuido.includes(normalized)
+      || normalized.includes(atribuido);
+  });
+}
+
+/** Atribuído do passo ativo do workflow — não confundir com responsável N1. */
+export function matchesWorkflowStepAssignee(
+  resolved: ResolvedUserPermissions,
+  chamado: IChamadoN1,
+): boolean {
+  const tab = readTicketTabulacao(chamado);
+  const atribuido = normalizeAtribuidoValue(tab.atribuido).toLowerCase();
+
+  if (!atribuido) {
+    return matchesResponsavel(chamado, resolved.responsavelCandidates)
+      && hasPermission(resolved.permissoes, 'tickets', 'atuar_responsavel');
+  }
+
+  if (atribuido.startsWith('funcao:')) {
+    if (!hasPermission(resolved.permissoes, 'tickets', 'atuar_atribuido')) return false;
+    return matchesAtribuidoAnyUserFuncao(resolved, chamado);
+  }
+
+  if (atribuido.startsWith('grupo:')) {
+    return false;
+  }
+
+  return matchesAtribuidoColaborador(resolved, chamado);
+}
+
+function bodyHasPublicPayload(body: Record<string, unknown>): boolean {
+  if (String(body.text ?? '').trim()) return true;
+  const attachments = Array.isArray(body.attachments)
+    ? body.attachments.map((item) => String(item ?? '').trim()).filter(Boolean)
+    : [];
+  return attachments.length > 0;
+}
+
+function bodyHasInternalPayload(body: Record<string, unknown>): boolean {
+  const internalText = String(body.internalText ?? body.anotacaoInterna ?? '').trim();
+  if (internalText) return true;
+  const internalAttachments = Array.isArray(body.internalAttachments)
+    ? body.internalAttachments.map((item) => String(item ?? '').trim()).filter(Boolean)
+    : [];
+  return internalAttachments.length > 0;
+}
+
+function bodyHasTabulationOrStatusChange(
+  body: Record<string, unknown>,
+  chamado: IChamadoN1,
+): boolean {
+  const targetStatus = body.status != null && String(body.status).trim()
+    ? normalizeStatusValue(body.status)
+    : currentStatus(chamado);
+  if (targetStatus !== normalizeStatusValue(currentStatus(chamado))) return true;
+
+  const currentTab = readTicketTabulacao(chamado);
+  const bodyLf = body.lateralForm;
+  if (bodyLf && typeof bodyLf === 'object' && !Array.isArray(bodyLf)) {
+    const tabFields = [
+      'tipoChamado',
+      'classificacaoTipo',
+      'produto',
+      'motivo',
+      'detalhe',
+      'responsavel',
+      'atribuido',
+    ] as const;
+    for (const key of tabFields) {
+      const next = String((bodyLf as Record<string, unknown>)[key] ?? '').trim();
+      const prev = String((currentTab as unknown as Record<string, unknown>)[key] ?? '').trim();
+      if (next !== prev) return true;
+    }
+  }
+
+  const bodyLfRecord = bodyLf && typeof bodyLf === 'object' && !Array.isArray(bodyLf)
+    ? (bodyLf as Record<string, unknown>)
+    : {};
+  const nextResp = String(body.responsibleAgent ?? bodyLfRecord.responsavel ?? '').trim();
+  const prevResp = String(currentTab.responsavel ?? '').trim();
+  if (nextResp && nextResp !== prevResp) return true;
+
+  return false;
+}
+
+/** Comentário interno — qualquer agente com visão do ticket. */
+export function canCommentInternallyOnTicket(
+  resolved: ResolvedUserPermissions,
+  chamado: IChamadoN1,
+): boolean {
+  return canViewTicket(resolved, chamado);
+}
+
 async function canActOnTicketAsync(
   resolved: ResolvedUserPermissions,
   chamado: IChamadoN1,
@@ -520,6 +631,57 @@ export async function assertCanActOnTicket(
   return resolved;
 }
 
+/** POST /messages — público exige atuação plena; interno exige visão. */
+export async function assertCanPostTicketMessage(
+  authUser: AuthPayload,
+  chamado: IChamadoN1,
+  internalOnly: boolean,
+): Promise<ResolvedUserPermissions> {
+  const resolved = await resolveUserPermissions(authUser);
+  if (internalOnly) {
+    if (!canCommentInternallyOnTicket(resolved, chamado)) {
+      throw new PermissionDeniedError('Sem permissão para comentar neste ticket');
+    }
+    return resolved;
+  }
+  if (!(await canActOnTicketAsync(resolved, chamado))) {
+    throw new PermissionDeniedError('Sem permissão para enviar mensagem pública neste ticket');
+  }
+  return resolved;
+}
+
+/** Commit Desk — observadores só anotação interna (sem status/tabulacao/mensagem pública). */
+export async function assertCanCommitTicket(
+  authUser: AuthPayload,
+  chamado: IChamadoN1,
+  body: Record<string, unknown>,
+): Promise<ResolvedUserPermissions> {
+  const resolved = await resolveUserPermissions(authUser);
+  const canFullAct = await canActOnTicketAsync(resolved, chamado);
+  const hasPublic = bodyHasPublicPayload(body);
+  const hasInternal = bodyHasInternalPayload(body);
+  const hasStructuralChange = bodyHasTabulationOrStatusChange(body, chamado);
+
+  if (hasPublic || hasStructuralChange) {
+    if (!canFullAct) {
+      throw new PermissionDeniedError('Sem permissão para atuar neste ticket');
+    }
+    return resolved;
+  }
+
+  if (hasInternal) {
+    if (!canCommentInternallyOnTicket(resolved, chamado)) {
+      throw new PermissionDeniedError('Sem permissão para comentar neste ticket');
+    }
+    return resolved;
+  }
+
+  if (!canFullAct) {
+    throw new PermissionDeniedError('Sem permissão para atuar neste ticket');
+  }
+  return resolved;
+}
+
 export async function assertCanWorkflowComunicacao(
   authUser: AuthPayload,
   chamado: IChamadoN1,
@@ -555,5 +717,9 @@ export async function canUserActOnWorkflowStep(
     return false;
   }
 
-  return canActOnTicketAsync(resolved, chamado);
+  if (!hasPermission(resolved.permissoes, 'workflow', 'avancar')) {
+    return false;
+  }
+
+  return matchesWorkflowStepAssignee(resolved, chamado);
 }

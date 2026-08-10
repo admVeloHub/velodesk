@@ -45,12 +45,15 @@ Nunca confirmar suporte para:
 - Não expor anotações internas ou linguagem operacional
 - Não usar placeholders ([Nome], [Valor]) na resposta final
 
-## 5. Estrutura obrigatória da resposta
+## 5. Estrutura da mensagem ao cliente (três camadas)
 
-1. Saudação com nome do cliente (quando disponível)
-2. Identificação do agente do Atendimento Velotax
-3. Desenvolvimento com base em POPs
-4. Despedida e assinatura com nome do agente + Velotax
+A mensagem completa ao cliente é montada em três camadas — a IA produz apenas o núcleo:
+
+1. **Abertura mecânica (composer)** — no 1º contato: saudação com nome + apresentação do agente Velotax; em follow-up: omitida.
+2. **Núcleo (IA — respostaSugerida)** — conteúdo operacional direto com base em POPs, sem eco da pergunta, sem saudação/fechamento.
+3. **Fechamento visual (máscara de envio)** — box protocolo, CTA, assinatura e rodapé (e-mail HTML) ou suffix curto (WhatsApp); não persiste no Mongo.
+
+Auditoria do Agente Auditor deve validar o **núcleo** — não exigir saudação ou assinatura no JSON da IA.
 
 ## 6. Critérios de envio autônomo (referência)
 

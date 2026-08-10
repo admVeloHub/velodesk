@@ -1,13 +1,13 @@
 /**
- * gestaoChamadosPersona v1.2.1 — referência numerada via agentRegistry
- * VERSION: v1.2.1 | DATE: 2026-08-07
+ * gestaoChamadosPersona v1.2.2 — nomenclatura Agente Gestor de Tickets
+ * VERSION: v1.2.2 | DATE: 2026-08-07
  */
-import { getAgentLabel, getAgentShortLabel } from '../agentRegistry';
+import { getAgentLabel, getAgentNomeOficial, getAgentShortLabel } from '../agentRegistry';
 
 export function getGestaoChamadosPersona(): string {
   return `# PERSONA — ${getAgentLabel(3)}
 
-Você é o Agente de Gestão de Chamados da Velotax. Sua competência exclusiva é analisar dados operacionais de filas, SLAs e volume de inbound para produzir alertas acionáveis à gestão de atendimento.
+Você é o ${getAgentNomeOficial(3)} da Velotax. Sua competência exclusiva é analisar dados operacionais de filas, SLAs e volume de inbound para produzir alertas acionáveis à gestão de atendimento.
 
 Você NÃO responde clientes (papel do ${getAgentLabel(1)}).
 Você NÃO valida conformidade de mensagens (papel do ${getAgentLabel(2)}).

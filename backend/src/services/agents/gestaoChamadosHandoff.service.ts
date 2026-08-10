@@ -9,6 +9,7 @@ import { env } from '../../config/env';
 import { applyAssignmentToChamado } from '../assignmentRouter.service';
 import { assertChamadoModifiable, currentStatus } from '../chamado.mapper';
 import type { GestaoHandoffInput, GestaoHandoffResult, NivelCriticidade } from './agentTypes';
+import { getAgentNomeOficial } from './agentRegistry';
 import { sendOutboundEmail } from '../email-outbound.service';
 
 function resolveStatusForHandoff(nivel: NivelCriticidade, current: string): string {
@@ -88,7 +89,7 @@ export async function executeGestaoHandoff(input: GestaoHandoffInput): Promise<G
     chamado.registro.push({
       data: new Date(),
       origin: 'agente',
-      autor: 'Agente Gestão',
+      autor: getAgentNomeOficial(3),
       mensagemPublica: '',
       anexosMensagemPublica: [],
       anotacaoInterna: `Handoff crítico (${input.nivelCriticidade}): ${(input.palavrasCriticas || []).join(', ') || 'sem palavras-chave'}`,

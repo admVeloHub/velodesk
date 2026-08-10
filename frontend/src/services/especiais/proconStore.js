@@ -1,5 +1,5 @@
 /**
- * proconStore — demandas Procon (localStorage v1)
+ * proconStore v1.1.0 — demandas Procon via API chamados_reclamacoes
  */
 import {
   PC_GROUPS,
@@ -7,8 +7,11 @@ import {
   PC_WHATSAPP_DEFAULT_MSG,
   computeIniciais,
 } from './proconData';
+import { reclamacoesApi } from '../../api/client';
 
 const STORAGE_KEY = 'velodesk_procon_items';
+
+let memoryCache = null;
 
 function todayAt(hour, minute = 0) {
   const d = new Date();
@@ -138,11 +141,49 @@ function writeAll(items) {
 export function ensureProconSeed() {
   const existing = readAll();
   if (existing?.length) return existing;
-  writeAll(SEED_ITEMS);
-  return SEED_ITEMS;
+  if (process.env.NODE_ENV === 'development') {
+    writeAll(SEED_ITEMS);
+    memoryCache = SEED_ITEMS;
+    return SEED_ITEMS;
+  }
+  return [];
+}
+
+function normalizeApiItem(row) {
+  const statusPc = row.statusPc || row.statusCanal || PC_STATUS.NAO_RESPONDIDA;
+  return {
+    ...row,
+    id: row.id || row._id,
+    ticketId: row.ticketId || row.chamadoId,
+    statusPc,
+    groupKey: row.groupKey || (statusPc === PC_STATUS.NAO_RESPONDIDA ? 'nao-respondidas' : 'respondidas'),
+    respostaAction: row.respostaAction || 'responder',
+    workflow: row.workflow || (row.workflowAtivo ? 'Ativo' : '—'),
+    tabulacao: row.tabulacao || row.produto || '—',
+    atendente: row.atendente || row.responsavel || '—',
+  };
+}
+
+export async function refreshDemandasFromApi() {
+  try {
+    const data = await reclamacoesApi.list('procon');
+    const items = (data?.items ?? []).map(normalizeApiItem);
+    memoryCache = items;
+    writeAll(items);
+    return items;
+  } catch (err) {
+    console.warn('proconStore: falha ao carregar reclamacoes_procon', err?.message || err);
+    return memoryCache ?? readAll() ?? [];
+  }
 }
 
 export function loadAllDemandas() {
+  if (memoryCache?.length) return memoryCache;
+  const stored = readAll();
+  if (stored?.length) {
+    memoryCache = stored;
+    return stored;
+  }
   return ensureProconSeed();
 }
 

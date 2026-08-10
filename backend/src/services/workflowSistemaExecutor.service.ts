@@ -1,10 +1,12 @@
-/** workflowSistemaExecutor.service v1.1.0 — executa acao.tipo automatica (+ legado) */
+/** workflowSistemaExecutor.service v1.2.0 — wrapComposerOpening antes de persistir */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import type { IWorkflowDefinicao, IWorkflowPassoEnvelope, IWorkflowAutomaticaConfig } from '../models/WorkflowDefinicao';
 import { appendRegistroEntry } from './chamado.mapper';
 import { composeAtendimento } from './agents/atendimentoAgent.service';
 import type { TicketAiMessageInput } from './agents/agentTypes';
 import { invokeInternalHook } from './workflowInternalHooks';
+import { getAgentNomeOficial } from './agents/agentRegistry';
+import { wrapComposerOpening } from './clientMessageEnvelope.service';
 import { createWorkflowNotificacao } from './workflowNotificacao.service';
 import { getActiveGrupos } from './grupoResponsabilidade.service';
 import { buildTabulationFieldsFromTicket } from './workflowMatcher.service';
@@ -170,10 +172,16 @@ async function executeRespostaCliente(
     };
   }
 
+  const composerText = wrapComposerOpening({
+    nucleo: result.respostaSugerida.trim(),
+    messages,
+    agentName: getAgentNomeOficial(1),
+  });
+
   appendRegistroEntry(chamado, {
-    mensagemPublica: result.respostaSugerida.trim(),
+    mensagemPublica: composerText,
     sender: 'me',
-    autor: 'Agente de Atendimento',
+    autor: getAgentNomeOficial(1),
     metadados: {
       sistemaExec: {
         modo: 'resposta_cliente',

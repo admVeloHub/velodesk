@@ -1,5 +1,7 @@
-/** whatsappOutbound.service v1.0.0 — envio Twilio WhatsApp (Sandbox + sessão 24h) */
+/** whatsappOutbound.service v1.3.0 — normaliza destino E.164 BR antes do envio */
 import { getTwilioClient, getTwilioWhatsAppFrom, isTwilioConfigured } from './twilioClient.util';
+import { resolveWhatsAppStatusCallbackUrl } from './whatsappCallbackUrl.util';
+import { normalizePhoneE164 } from '../telephonyRecado.validation';
 import { env } from '../../config/env';
 
 export interface WhatsAppOutboundResult {
@@ -12,11 +14,23 @@ export interface WhatsAppOutboundResult {
 function normalizeWhatsAppAddress(value: string): string {
   const trimmed = String(value ?? '').trim();
   if (!trimmed) return '';
-  return trimmed.startsWith('whatsapp:') ? trimmed : `whatsapp:${trimmed}`;
+  const withoutPrefix = trimmed.replace(/^whatsapp:/i, '');
+  const e164 = normalizePhoneE164(withoutPrefix) ?? normalizePhoneE164(withoutPrefix.replace(/\D/g, ''));
+  if (!e164) return '';
+  return `whatsapp:${e164}`;
 }
 
-/** Mensagem business-initiated via template (Sandbox quickstart). */
-export async function sendWhatsAppSandboxTemplate(options: {
+function buildStatusCallbackParams(): { statusCallback?: string; statusCallbackMethod?: 'POST' } {
+  const statusCallback = resolveWhatsAppStatusCallbackUrl();
+  if (!statusCallback) return {};
+  return {
+    statusCallback,
+    statusCallbackMethod: 'POST',
+  };
+}
+
+/** Mensagem business-initiated via template aprovado (Utility / Authentication). */
+export async function sendWhatsAppTemplateMessage(options: {
   to: string;
   contentSid?: string;
   contentVariables?: Record<string, string>;
@@ -42,9 +56,10 @@ export async function sendWhatsAppSandboxTemplate(options: {
       to,
       contentSid,
       contentVariables: JSON.stringify(options.contentVariables ?? {
-        1: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
-        2: new Date().toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' }),
+        1: new Date().toLocaleDateString('en-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
+        2: new Date().toLocaleTimeString('pt-BR', { hour: 'numeric', minute: '2-digit' }),
       }),
+      ...buildStatusCallbackParams(),
     });
 
     return {
@@ -56,6 +71,9 @@ export async function sendWhatsAppSandboxTemplate(options: {
     return { sent: false, reason: (err as Error).message };
   }
 }
+
+/** @deprecated use sendWhatsAppTemplateMessage */
+export const sendWhatsAppSandboxTemplate = sendWhatsAppTemplateMessage;
 
 /** Mensagem free-form (janela de atendimento 24h após msg do cliente). */
 export async function sendWhatsAppTextMessage(options: {
@@ -81,6 +99,7 @@ export async function sendWhatsAppTextMessage(options: {
       from: getTwilioWhatsAppFrom(),
       to,
       body,
+      ...buildStatusCallbackParams(),
     });
 
     return {

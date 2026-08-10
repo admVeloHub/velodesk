@@ -1,10 +1,167 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.65.0 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.72.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — fix E.164 WhatsApp BR (+55) no envio Desk
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.72.0
+  - **Backend**: whatsappThread v1.3.0, whatsappOutbound v1.3.0, whatsappActiveOutbound v1.2.0
+  - **Frontend**: DeskV2Root v3.28.4, utils v3.11.13
+- **Arquivos principais**:
+  - `backend/src/services/twilio/whatsappThread.service.ts` — `resolveWhatsAppDestinationPhone` com E.164 BR
+  - `backend/src/services/twilio/whatsappOutbound.service.ts` — normalização antes do `messages.create`
+  - `backend/src/services/twilio/whatsappActiveOutbound.service.ts` — fallback `clienteTelefone.whatsapp` do cadastro
+  - `frontend/src/services/desk/utils.js` — `normalizePhoneE164`, `toWhatsAppChatIdDigits`
+  - `frontend/src/features/desk/DeskV2Root.jsx` — `waChatId` canônico com DDI 55
+- **Descrição**: Corrige envio WhatsApp para números cadastrados sem DDI (ex. `11966153419` → `+5511966153419`). Elimina falha Twilio 21211 por destino inválido.
+- **Status**: Push dev + main
+
+---
+
+### GitHub Push — fix ReferenceError isAtendimentoAgent no Desk
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.71.0
+  - **Frontend**: DeskV2Root v3.28.3
+- **Arquivos principais**:
+  - `frontend/src/features/desk/DeskV2Root.jsx` — restaura `isAtendimentoAgent = hasAtendimentoFuncao(colaboradorAtuacao)` (referência órfã pós-merge c34d021)
+- **Descrição**: Corrige crash `ReferenceError: isAtendimentoAgent is not defined` ao abrir ticket no Desk (bloco `canAdvanceWorkflow` sem definição da variável).
+- **Status**: Push dev + main
+
+---
+
+### GitHub Push — WhatsApp botão Enviar Mensagem Inicial + feed persistente
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.70.0
+  - **Backend**: whatsappActiveOutbound v1.1.0, tickets.routes v1.16.0 (`initialTemplate`)
+  - **Frontend**: DeskV2Root v3.28.2, DeskWhatsAppChat v1.6.0, utils v3.11.12, ticketsCache (preserve messages + `_detailLoaded`)
+- **Arquivos principais**:
+  - `backend/src/routes/tickets.routes.ts` — flag `initialTemplate` envia template sem texto do compose
+  - `backend/src/services/twilio/whatsappActiveOutbound.service.ts` — texto padrão da mensagem inicial
+  - `frontend/src/features/desk/components/DeskWhatsAppChat.jsx` — card no feed + compose bloqueado
+  - `frontend/src/services/desk/utils.js` — `getWhatsAppDeskUiState`
+  - `frontend/src/services/ticketsCache.js` — fix mensagem WA sumindo após reload da fila
+- **Descrição**: UX dedicada para conversa WhatsApp ativa — botão “Enviar Mensagem Inicial” no feed, compose inativo até resposta do cliente; mensagem permanece no histórico.
+- **Status**: Push dev + main
+
+---
+
+### GitHub Push — WhatsApp mensagem ativa (template UTILITY) e sessão 24h Desk
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.69.0
+  - **WhatsApp ativo**: whatsappActiveOutbound v1.0.1, whatsappThread v1.2.0, whatsappOutbound v1.2.0, tickets.routes v1.15.0, env v1.33.0
+  - **Template Twilio**: `desk_atendimento_ativo` (`HXcbba12297392a996aeaf60af3e05ccc4`, UTILITY)
+  - **Frontend**: DeskV2Root v3.28.1, DeskWhatsAppChat v1.5.0, utils v3.11.11, DeskRightPanel v1.12.2
+- **Arquivos principais**:
+  - `backend/src/services/twilio/whatsappActiveOutbound.service.ts` — template fora da janela 24h; texto livre na sessão
+  - `backend/src/routes/tickets.routes.ts` — POST whatsapp/messages usa fluxo ativo/receptivo
+  - `backend/src/config/env.ts` — `TWILIO_WHATSAPP_DESK_ACTIVE_CONTENT_SID`
+  - `frontend/src/features/desk/components/DeskWhatsAppChat.jsx` — aviso de envio ativo
+  - `frontend/src/services/desk/utils.js` — `isWhatsAppCustomerSessionOpen`
+  - `backend/scripts/create-desk-whatsapp-template.ts` — criação/submissão template UTILITY
+- **Descrição**: Desk envia mensagem ativa via template aprovado quando o cliente não respondeu nas últimas 24h; após resposta, texto livre. Inclui scripts de auditoria Twilio e ajuste do botão Iniciar Workflow (desacoplado de tabulação completa).
+- **Cloud Run (manual)**: `TWILIO_WHATSAPP_DESK_ACTIVE_CONTENT_SID=HXcbba12297392a996aeaf60af3e05ccc4` (+ callbacks já configurados).
+- **Status**: Push dev + main
+
+---
+
+### GitHub Push — WhatsApp contínuo, confirmação de entrega e fix rascunho Desk
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.68.0
+  - **WhatsApp Twilio**: whatsappThread v1.1.0, whatsappOutbound v1.1.0, whatsappStatusCallback v1.0.0, inbound.routes v1.7.0, tickets.routes (POST whatsapp/messages + deliveryStatus)
+  - **Backend**: env v1.32.0, chamado.mapper v2.9.5, whatsappInbound v1.2.0
+  - **Frontend**: DeskV2Root (WA contínuo, fix refreshQueueCounts), DeskWhatsAppChat v1.4.0, ticketsCache v1.12.0, TicketsContext v1.8.2
+- **Arquivos principais**:
+  - `backend/src/routes/tickets.routes.ts` — envio WA sem commit de status; thread única com array aninhado
+  - `backend/src/routes/inbound.routes.ts` — `POST /whatsapp/message-status` (sent/delivered/read)
+  - `backend/src/services/twilio/whatsappThread.service.ts` — `whatsappMensagens[]` + deliveryStatus
+  - `backend/src/services/twilio/whatsappStatusCallback.service.ts` — atualiza entrega por MessageSid
+  - `frontend/src/features/desk/DeskV2Root.jsx` — handleSendWhatsAppMessage; fix import refreshQueueCountsFromApi; rascunho não dispara sync
+  - `frontend/src/services/ticketsCache.js` — preserva drafts em refresh concorrente
+  - `frontend/src/context/TicketsContext.js` — mantém abas draft-* durante reload
+- **Descrição**: Conversa WhatsApp contínua no Desk (envio leve sem salvar ticket). Confirmação de entrega Twilio via status callback persistida na thread. Corrige race que fechava rascunho ao criar ticket e ReferenceError em syncTicketViews.
+- **Cloud Run (manual)**: `TWILIO_*`, `WHATSAPP_INBOUND_ENABLED`, `TWILIO_WHATSAPP_STATUS_CALLBACK_URL`, `ENABLE_WHATSAPP=false`; Twilio Console status callback → Velodesk.
+- **Status**: Push dev + main
+
+---
+
+### GitHub Push — Reclamações MongoDB, Agente 4 unificado e mensageria envelope
+
+- **Data/Hora**: 2026-08-10
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.67.0
+  - **Reclamações**: database v1.9.0, env v1.31.0, reclamacao.service v1.0.0, reclamacoes.routes v1.0.0, ReclamacaoBase.schema v1.0.0
+  - **Inbound/Agente 4**: email-inbound v1.13.0, casosEspeciaisRouting v1.1.0, casosEspeciaisTrigger v1.1.0, casosEspeciaisPrecheck v1.1.0
+  - **Mensageria**: clientMessageEnvelope v1.0.0, clientMessageSendMask v1.0.0, emailBrand.util, emailNotification.service
+  - **Frontend**: reclamacoesApi, procon/consumidorGov/reclameAqui stores via API, ticketsCache sync API
+- **Arquivos principais**:
+  - `backend/src/config/database.ts`, `env.ts` — conexão `chamados_reclamacoes`
+  - `backend/src/models/reclamacoes/`, `services/reclamacoes/reclamacao.service.ts` — upsert/list/sync pós Agente 4
+  - `backend/src/routes/reclamacoes.routes.ts` — GET/POST/PATCH `/api/reclamacoes/:orgao`
+  - `backend/src/services/email-inbound.service.ts` — classificador como hint; hooks Agente 4 sempre no create
+  - `backend/src/services/agents/casosEspeciais*.ts` — persistência em `reclamacoes_*`, guards duplicidade
+  - `backend/src/services/clientMessageEnvelope.service.ts`, `clientMessageSendMask.util.ts` — envelope/máscara envio cliente
+  - `frontend/src/api/client.js`, `services/especiais/*Store.js`, `*TicketService.js` — leitura/refresh via API reclamações
+  - `backend/scripts/test-reclamacoes-smoke.ts`, `test-inbound-especiais-channel.ts` — smoke Agente 4 + persistência
+- **Descrição**: Persistência de casos formais em MongoDB (`chamados_reclamacoes` / collections por órgão) somente após validação do Agente 4. Inbound sempre cria ticket em `chamados_n1` e passa pelo Agente 4; classificador vira hint de canal. Frontend Especiais consome API em vez de sync local. Inclui evoluções de mensageria (envelope/máscara) e ajustes de personas/prompts.
+- **Validação**: `npm run build` backend OK; `npm run test:reclamacoes-smoke` OK; `test-inbound-especiais-channel` OK.
+- **Status**: Push dev + main
+
+---
+
+### GitHub Push — Desk: permissões workflow/compose, Meus Tickets e persistência de workflow
+
+- **Data/Hora**: 2026-08-07
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.66.0
+  - **Backend**: permission.service v1.7.0, tickets.routes v1.14.0
+  - **Frontend**: permissionService v1.7.0, DeskComposePanel v1.12.0, DeskV2Root v3.28.0, utils v3.11.9, ticketsCache v1.11.4, DeskMyTicketsTable v1.5.4, pendingWorkflowStart
+- **Arquivos principais**:
+  - `backend/src/services/permission.service.ts` — avanço de workflow só para atribuído do passo; commit/messages com anotação interna para observadores
+  - `backend/src/routes/tickets.routes.ts` — `assertCanCommitTicket` e `assertCanPostTicketMessage`
+  - `frontend/src/services/permissions/permissionService.js` — compose público vs comentário interno; `canAdvanceWorkflowStep`
+  - `frontend/src/features/desk/components/DeskComposePanel.jsx` — lock separado para resposta pública e anotação interna
+  - `frontend/src/services/desk/utils.js`, `DeskMyTicketsTable.jsx` — Meus Tickets confia filtro backend; seções Cliente respondeu/Pendentes
+  - `frontend/src/services/ticketsCache.js`, `pendingWorkflowStart.js`, `DeskV2Root.jsx` — preserva workflow pendente pós-commit/reload
+- **Descrição**: Observadores de ticket em workflow podem registrar anotação interna sem alterar status/tabulacao ou enviar resposta pública. Avanço de workflow restringido ao atribuído do passo ativo. Corrige listagem Meus Tickets e mantém stepper/badge de workflow após salvar.
+- **Validação**: alterações de permissão alinhadas backend/frontend; filtros Meus Tickets sem double-filter de responsável.
+- **Status**: Push main
+
+---
 
 ### GitHub Push — Backend: Agente 4 casos especiais, telefonia/Twilio e prompts anti-eco
 

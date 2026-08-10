@@ -1,6 +1,6 @@
 /**
- * pendingWorkflowStart v1.2.0 — stripPendingWorkflowForApiPayload evita persistir antes do save
- * VERSION: v1.2.0 | DATE: 2026-08-07
+ * pendingWorkflowStart v1.3.0 — flush pós-save com ticket snapshot; _detailLoaded no merge
+ * VERSION: v1.3.0 | DATE: 2026-08-07
  */
 import { getAgentName } from '../clientDb';
 import { createWorkflowState } from './workflowEngine';
@@ -123,6 +123,12 @@ export async function persistPendingWorkflowStart(ticketId, ticket, ticketsApi) 
   return updated;
 }
 
+export function resolveTicketSnapshotForWorkflowFlush(beforeSave, afterSave) {
+  if (hasPendingWorkflowPersist(beforeSave)) return beforeSave;
+  if (hasPendingWorkflowPersist(afterSave)) return afterSave;
+  return afterSave || beforeSave;
+}
+
 export async function flushPendingWorkflowOnSave(ticketId, ticket, deps) {
   if (!hasPendingWorkflowPersist(ticket)) return { flushed: false };
 
@@ -133,6 +139,8 @@ export async function flushPendingWorkflowOnSave(ticketId, ticket, deps) {
     const updated = await persistPendingWorkflowStart(ticketId, ticket, ticketsApi);
     const merged = apiTicketToCockpit(updated);
     clearPendingWorkflowStart(merged);
+    merged.listOnly = false;
+    merged._detailLoaded = true;
     injectWorkflowSystemMessage(merged, { title: pending?.templateTitle || 'Workflow' });
     patchTicket(ticketId, merged);
     return { flushed: true, ticket: merged };

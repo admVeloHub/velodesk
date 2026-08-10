@@ -1,4 +1,4 @@
-/** env v1.30.0 — Agente 4 casos especiais */
+/** env v1.33.0 — template UTILITY Desk (mensagem WhatsApp ativa) */
 import fs from 'fs';
 import path from 'path';
 
@@ -83,6 +83,7 @@ export const env = {
   mongoCadastrosDbName: process.env.MONGODB_CADASTROS_DB_NAME || 'b2c_cadastros',
   mongoDeskConfigDbName: process.env.MONGODB_DESK_CONFIG_DB_NAME || 'desk_config',
   mongoDeskPreferencesDbName: process.env.MONGODB_DESK_PREFERENCES_DB_NAME || 'desk_preferences',
+  mongoReclamacoesDbName: process.env.MONGODB_RECLAMACOES_DB_NAME || 'chamados_reclamacoes',
   /** VeloHubCentral — console_funcionarios.funcionarios_cadastroColaboradores (leitura via MONGO_ENV) */
   mongoFuncionariosUri: resolveMongoFuncionariosUri(),
   mongoFuncionariosDbName: process.env.MONGODB_FUNCIONARIOS_DB_NAME || 'console_funcionarios',
@@ -105,11 +106,17 @@ export const env = {
   twilioWhatsappContentSid: (
     process.env.TWILIO_WHATSAPP_CONTENT_SID || 'HXb5b62575e6e4ff6129ad7c8efe1f983e'
   ).trim(),
+  /** Template UTILITY — 1º contato / fora da janela 24h (Desk ativo) */
+  twilioWhatsappDeskActiveContentSid: (
+    process.env.TWILIO_WHATSAPP_DESK_ACTIVE_CONTENT_SID || 'HXcbba12297392a996aeaf60af3e05ccc4'
+  ).trim(),
   whatsappInboundEnabled: process.env.WHATSAPP_INBOUND_ENABLED !== 'false',
   twilioWhatsappAutoReply: (
     process.env.TWILIO_WHATSAPP_AUTO_REPLY
     || 'Message received! Hello again from the Twilio Sandbox for WhatsApp.'
   ).trim(),
+  /** Status callback — confirmação de entrega (sent/delivered/read) */
+  twilioWhatsappStatusCallbackUrl: (process.env.TWILIO_WHATSAPP_STATUS_CALLBACK_URL || '').trim(),
   /** Dev only — pular validação X-Twilio-Signature (ngrok/local) */
   twilioWebhookSkipValidation: process.env.TWILIO_WEBHOOK_SKIP_VALIDATION === 'true',
   gcpStorageBucket: (process.env.GCP_STORAGE_BUCKET || 'velodesk_storage').trim(),

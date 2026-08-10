@@ -329,3 +329,17 @@ export const ticketFusaoApi = {
   fundir: (payload) =>
     api.post('/ticket-fusao', payload).then((r) => r.data),
 };
+
+/** reclamacoes — chamados_reclamacoes por órgão (pós-validação Agente 4) */
+export const reclamacoesApi = {
+  list: (orgao, params = {}) =>
+    api.get(`/reclamacoes/${encodeURIComponent(orgao)}`, { params }).then((r) => r.data),
+  get: (orgao, id) =>
+    api.get(`/reclamacoes/${encodeURIComponent(orgao)}/${encodeURIComponent(id)}`).then((r) => r.data),
+  byTicket: (orgao, chamadoId) =>
+    api.get(`/reclamacoes/${encodeURIComponent(orgao)}/by-ticket/${encodeURIComponent(chamadoId)}`).then((r) => r.data),
+  create: (orgao, body) =>
+    api.post(`/reclamacoes/${encodeURIComponent(orgao)}`, body).then((r) => r.data),
+  patch: (orgao, id, body) =>
+    api.patch(`/reclamacoes/${encodeURIComponent(orgao)}/${encodeURIComponent(id)}`, body).then((r) => r.data),
+};

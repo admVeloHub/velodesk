@@ -1,6 +1,6 @@
 /**
- * casosEspeciaisTrigger.service v1.0.0 — gatilho na entrada + orquestração Agente 4
- * VERSION: v1.0.0 | DATE: 2026-08-07
+ * casosEspeciaisTrigger.service v1.1.0 — guard reclamação persistida + contexto roteamento
+ * VERSION: v1.1.0 | DATE: 2026-08-07
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -18,6 +18,10 @@ import {
 } from './casosEspeciaisRouting.service';
 import type { CasoEspecialTriagemPersisted } from './casosEspeciais.types';
 import { hasCasosEspeciaisTriagem } from './casosEspeciais.util';
+import {
+  findReclamacaoByChamadoIdAnyOrgao,
+  syncFromChamado,
+} from '../reclamacoes/reclamacao.service';
 
 export interface CasosEspeciaisTriggerContext {
   source: string;
@@ -44,9 +48,14 @@ async function applyTriagemOutcome(
   chamado: IChamadoN1,
   triagem: CasoEspecialTriagemPersisted,
   signals: string[],
+  context: CasosEspeciaisTriggerContext,
 ): Promise<CasosEspeciaisTriggerResult> {
   if (triagem.classificacao === 'caso_formal_real') {
-    const routed = await routeCasoEspecialFormal(chamado, { ...triagem, signals });
+    const routed = await routeCasoEspecialFormal(
+      chamado,
+      { ...triagem, signals },
+      { origemEntrada: context.source },
+    );
     if (!routed.success) {
       return { ran: true, action: 'none', error: routed.error };
     }
@@ -100,6 +109,12 @@ export async function runCasosEspeciaisTriagem(
       return { ran: false, action: 'skipped' };
     }
 
+    const existingReclamacao = await findReclamacaoByChamadoIdAnyOrgao(chamado._id);
+    if (existingReclamacao) {
+      await syncFromChamado(chamado);
+      return { ran: true, action: 'skipped' };
+    }
+
     const signal = detectCasoEspecialSignal(chamado);
     if (!signal.triggered) {
       return { ran: false, action: 'none' };
@@ -129,7 +144,7 @@ export async function runCasosEspeciaisTriagem(
       triagemPersisted = buildPersistedTriagem(classified.result, signal.signals);
     }
 
-    const result = await applyTriagemOutcome(chamado, triagemPersisted, signal.signals);
+    const result = await applyTriagemOutcome(chamado, triagemPersisted, signal.signals, context);
 
     console.info('[casos-especiais-trigger]', {
       protocolo: chamado.chamadoProtocolo,

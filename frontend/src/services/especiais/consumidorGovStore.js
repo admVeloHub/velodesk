@@ -1,5 +1,5 @@
 /**
- * consumidorGovStore — demandas ConsumidorGov (localStorage v1)
+ * consumidorGovStore v1.1.0 — demandas Consumidor.Gov via API chamados_reclamacoes
  */
 import {
   CG_GROUPS,
@@ -7,8 +7,11 @@ import {
   CG_WHATSAPP_DEFAULT_MSG,
   computeIniciais,
 } from './consumidorGovData';
+import { reclamacoesApi } from '../../api/client';
 
 const STORAGE_KEY = 'velodesk_consumidor_gov_items';
+
+let memoryCache = null;
 
 function todayAt(hour, minute = 0) {
   const d = new Date();
@@ -138,11 +141,49 @@ function writeAll(items) {
 export function ensureConsumidorGovSeed() {
   const existing = readAll();
   if (existing?.length) return existing;
-  writeAll(SEED_ITEMS);
-  return SEED_ITEMS;
+  if (process.env.NODE_ENV === 'development') {
+    writeAll(SEED_ITEMS);
+    memoryCache = SEED_ITEMS;
+    return SEED_ITEMS;
+  }
+  return [];
+}
+
+function normalizeApiItem(row) {
+  const statusGov = row.statusGov || row.statusCanal || CG_STATUS.NAO_RESPONDIDA;
+  return {
+    ...row,
+    id: row.id || row._id,
+    ticketId: row.ticketId || row.chamadoId,
+    statusGov,
+    groupKey: row.groupKey || (statusGov === CG_STATUS.NAO_RESPONDIDA ? 'nao-respondidas' : 'respondidas'),
+    respostaAction: row.respostaAction || 'responder',
+    workflow: row.workflow || (row.workflowAtivo ? 'Ativo' : '—'),
+    tabulacao: row.tabulacao || row.produto || '—',
+    atendente: row.atendente || row.responsavel || '—',
+  };
+}
+
+export async function refreshDemandasFromApi() {
+  try {
+    const data = await reclamacoesApi.list('consumidor-gov');
+    const items = (data?.items ?? []).map(normalizeApiItem);
+    memoryCache = items;
+    writeAll(items);
+    return items;
+  } catch (err) {
+    console.warn('consumidorGovStore: falha ao carregar reclamacoes_consumidorGov', err?.message || err);
+    return memoryCache ?? readAll() ?? [];
+  }
 }
 
 export function loadAllDemandas() {
+  if (memoryCache?.length) return memoryCache;
+  const stored = readAll();
+  if (stored?.length) {
+    memoryCache = stored;
+    return stored;
+  }
   return ensureConsumidorGovSeed();
 }
 

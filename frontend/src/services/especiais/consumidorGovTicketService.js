@@ -1,7 +1,7 @@
 /**
  * consumidorGovTicketService — bridge ConsumidorGov ↔ API tickets
  */
-import { clientsApi, ticketsApi, boxesApi } from '../../api/client';
+import { clientsApi, ticketsApi, boxesApi, reclamacoesApi } from '../../api/client';
 import { mapClienteDocToContact } from '../../api/adapters/clienteAdapter';
 import { apiTicketToCockpit, adaptColumnsFromApi } from '../../api/adapters/ticketAdapter';
 import { getAgentName } from '../clientDb';
@@ -14,6 +14,7 @@ import {
   getDemandaById,
   getDemandaByTicketId,
   mirrorDemandaFromTicket,
+  refreshDemandasFromApi,
 } from './consumidorGovStore';
 
 const CG_WORKFLOW_SLUG = 'consumidor-gov-tratativa';
@@ -115,6 +116,12 @@ export async function registerDemandaAndCreateTicket(form) {
   const created = await ticketsApi.create(payload);
   const ticket = apiTicketToCockpit(created);
   const ticketId = String(ticket.id || ticket._id);
+
+  try {
+    await reclamacoesApi.create('consumidor-gov', { chamadoId: ticketId });
+  } catch (err) {
+    console.warn('consumidorGovTicketService: triagem reclamação fail-soft', err?.message || err);
+  }
 
   const publicText = String(form.respostaPublica || '').trim();
   if (publicText) {
@@ -380,18 +387,13 @@ export function syncConsumidorGovDemandasFromTickets(tickets = []) {
 
 export async function loadConsumidorGovTicketsFromApi() {
   try {
-    const data = await boxesApi.list({ fila: 'consumidor-gov' });
-    const columns = adaptColumnsFromApi(data, { fila: 'consumidor-gov' });
-    const entries = columns.flatMap((box) =>
-      (box.tickets || []).map((ticket) => ({ ticket, boxId: box.id })),
-    );
-    const synced = syncConsumidorGovDemandasFromTickets(entries);
+    const items = await refreshDemandasFromApi();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('velodesk:consumidor-gov-sync'));
     }
-    return synced;
+    return items.length;
   } catch (err) {
-    console.warn('consumidorGovTicketService: falha ao carregar fila consumidor-gov', err?.message || err);
+    console.warn('consumidorGovTicketService: falha ao carregar reclamacoes consumidor-gov', err?.message || err);
     return 0;
   }
 }

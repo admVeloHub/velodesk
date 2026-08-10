@@ -1,9 +1,18 @@
-/** emailNotification.service v1.6.0 — usa clienteEmail.resposta quando definido */
+/** emailNotification.service v1.7.0 — máscara envio: logo + composer + fechamento visual */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { loadDadosForRef, normalizeEmail } from './cliente.service';
 import { sendOutboundEmail } from './email-outbound.service';
-import { buildEmailHeaderHtml, loadVelotaxLogoInline } from './emailBrand.util';
+import {
+  buildEmailHeaderHtml,
+  buildEmailLogoHeaderHtml,
+  loadVelotaxLogoCompletoInline,
+  loadVelotaxLogoInline,
+} from './emailBrand.util';
 import { composeHtmlToEmailHtml, escapeHtmlAttribute, htmlToPlainTextForEmail } from './emailHtml.util';
+import {
+  buildSendMaskClosingHtml,
+  buildSendMaskClosingPlain,
+} from './clientMessageSendMask.util';
 import {
   buildOutboundMessageId,
   buildOutboundThreadHeaders,
@@ -26,9 +35,25 @@ function buildBrandEmailHtml(title: string, bodyHtml: string): string {
 </body></html>`;
 }
 
-function buildOutboundEmailExtras() {
-  const logo = loadVelotaxLogoInline();
+function buildOutboundEmailExtras(useLogoCompleto = false) {
+  const logo = useLogoCompleto ? loadVelotaxLogoCompletoInline() : loadVelotaxLogoInline();
   return logo ? { inlineImages: [logo] } : {};
+}
+
+function buildAgentReplyEmailHtml(composerText: string, chamado: IChamadoN1): string {
+  const logo = loadVelotaxLogoCompletoInline();
+  const header = buildEmailLogoHeaderHtml(Boolean(logo));
+  const composerHtml = composeHtmlToEmailHtml(composerText);
+  const closingHtml = buildSendMaskClosingHtml(chamado);
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;margin:0;padding:16px 24px">
+  ${header}
+  <div style="padding:0;margin:0">
+    ${composerHtml}
+    ${closingHtml}
+  </div>
+</body></html>`;
 }
 
 export async function resolveClienteEmailFromChamado(chamado: IChamadoN1): Promise<string | null> {
@@ -110,31 +135,27 @@ export async function sendAgentReplyEmail(
   const protocolo = chamado.chamadoProtocolo;
   const subject = buildThreadSubject(protocolo);
   const plainMessage = publicText
-    ? htmlToPlainTextForEmail(publicText)
+    ? htmlToPlainTextForEmail(publicText) + buildSendMaskClosingPlain(chamado)
     : `Anexo(s) referente(s) ao chamado ${protocolo}.`;
   const messageHtml = publicText
     ? composeHtmlToEmailHtml(publicText)
     : '<p>Segue(m) anexo(s) referente(s) ao seu chamado.</p>';
-  const safeProtocolo = escapeHtmlAttribute(protocolo);
   const messageId = buildOutboundMessageId(protocolo);
   const headers = buildOutboundThreadHeaders(chamado, messageId);
   const emailAttachments = await loadSentAttachmentsForEmail(safeAttachmentUrls);
 
-  const body = `
-    <p>Olá,</p>
-    <p>Há uma nova mensagem sobre seu chamado <strong>${safeProtocolo}</strong>:</p>
-    <div style="margin:16px 0">${messageHtml}</div>
-    <p>Responda este e-mail para continuar o atendimento.</p>
-  `;
+  const htmlBody = publicText
+    ? buildAgentReplyEmailHtml(publicText, chamado)
+    : buildBrandEmailHtml('Nova mensagem no seu chamado', messageHtml);
 
   const result = await sendOutboundEmail({
     to,
     subject,
     text: plainMessage,
-    html: buildBrandEmailHtml('Nova mensagem no seu chamado', body),
+    html: htmlBody,
     headers,
     attachments: emailAttachments,
-    ...buildOutboundEmailExtras(),
+    ...buildOutboundEmailExtras(Boolean(publicText)),
   });
 
   if (!result.sent) {

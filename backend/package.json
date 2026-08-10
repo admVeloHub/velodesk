@@ -33,6 +33,7 @@
     "test:twilio-auth": "tsx scripts/test-twilio-auth.ts",
     "test:casos-especiais-precheck": "tsx scripts/test-casos-especiais-precheck.ts",
     "test:inbound-especiais-channel": "tsx scripts/test-inbound-especiais-channel.ts",
+    "test:reclamacoes-smoke": "tsx scripts/test-reclamacoes-smoke.ts",
     "backfill:ticket-ia": "tsx scripts/backfill-ticket-ia.ts"
   },
   "dependencies": {

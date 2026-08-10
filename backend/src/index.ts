@@ -1,4 +1,4 @@
-/** index v1.13.0 — rotas /api/ticket-fusao */
+/** index v1.14.0 — rotas /api/reclamacoes (chamados_reclamacoes) */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -47,6 +47,7 @@ import consultasRoutes from './routes/consultas.routes';
 import ticketSearchRoutes from './routes/ticketSearch.routes';
 import ticketFusaoRoutes from './routes/ticketFusao.routes';
 import realtimeRoutes from './routes/realtime.routes';
+import reclamacoesRoutes from './routes/reclamacoes.routes';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
@@ -182,6 +183,7 @@ app.use('/api/consultas', consultasRoutes);
 app.use('/api/ticket-search', ticketSearchRoutes);
 app.use('/api/ticket-fusao', ticketFusaoRoutes);
 app.use('/api/realtime', realtimeRoutes);
+app.use('/api/reclamacoes', reclamacoesRoutes);
 
 if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);

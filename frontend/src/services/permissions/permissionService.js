@@ -1,6 +1,6 @@
 /**
- * permissionService v1.6.2 — ver_meus inclui atribuído colaborador
- * VERSION: v1.6.2 | DATE: 2026-08-06
+ * permissionService v1.7.0 — compose público vs comentário interno em workflow
+ * VERSION: v1.7.0 | DATE: 2026-08-07
  */
 import api from '../../api/client';
 import { normalizeProfileId } from '../../config/profiles';
@@ -335,6 +335,22 @@ export function canActOnTicket(ticket, perm = readCachedPermissions()) {
   return false;
 }
 
+/** Mensagem pública, status e tabulação — override Tickets > Atuar como responsável. */
+export function canSendPublicMessageOnTicket(ticket, perm = readCachedPermissions()) {
+  return canActOnTicket(ticket, perm);
+}
+
+/** Comentário interno — responsável/atribuído ou quem enxerga o ticket. */
+export function canSendInternalNoteOnTicket(ticket, perm = readCachedPermissions()) {
+  if (canSendPublicMessageOnTicket(ticket, perm)) return true;
+  return filterTicketForUser(ticket, perm);
+}
+
+function ticketWorkflowActive(ticket) {
+  const wf = ticket?.workflow || ticket?.lateralForm?.workflow;
+  return Boolean(wf?.active);
+}
+
 export function canApproveWorkflow(perm = readCachedPermissions()) {
   return can('workflow', 'aprovar', perm?.permissoes);
 }
@@ -350,19 +366,32 @@ export function canInterruptWorkflow(perm = readCachedPermissions()) {
 }
 
 export function agentCanDecideTicket(ticket, perm = readCachedPermissions()) {
-  if (!canApproveWorkflow(perm) && ticket?.workflow?.pendingDecision) {
-    /* aprovação exige permissão explícita */
-  }
+  if (!can('workflow', 'avancar', perm?.permissoes)) return false;
+
   const atribuido = normalizeAtribuido(ticket?.lateralForm?.atribuido);
-  if (!atribuido) return canActOnTicket(ticket, perm);
+  if (!atribuido) {
+    if (ticketWorkflowActive(ticket)) {
+      return ticketMatchesAgentResponsavel(ticket, perm)
+        && hasPermission(perm?.permissoes, 'tickets', 'atuar_responsavel');
+    }
+    return canActOnTicket(ticket, perm);
+  }
 
   if (atribuido.startsWith('funcao:')) {
     const slug = atribuido.slice(7);
-    return (perm?.funcoes || []).includes(slug) || perm?.funcaoSlug === slug;
+    return userFuncaoSlugs(perm).includes(slug)
+      && hasPermission(perm?.permissoes, 'tickets', 'atuar_atribuido');
   }
 
-  const agent = normalizeText(perm?.colaboradorNome);
-  return agent && (normalizeText(atribuido) === agent || atribuido.toLowerCase().includes(agent));
+  if (atribuido.startsWith('grupo:')) {
+    return false;
+  }
+
+  return ticketAtribuidoMatchesSession(ticket, perm);
+}
+
+export function canAdvanceWorkflowStep(ticket, perm = readCachedPermissions()) {
+  return agentCanDecideTicket(ticket, perm);
 }
 
 function ticketAtribuidoMatchesSession(ticket, perm) {

@@ -1,4 +1,4 @@
-/** chamado.mapper v2.9.4 — workflow não ativa em PUT/commit; só POST /workflow/start */
+/** chamado.mapper v2.9.5 — deliveryStatus WhatsApp na API de mensagens */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -43,6 +43,8 @@ export interface TicketMessageDto {
   registroIndex?: number;
   type?: string;
   channel?: string;
+  deliveryStatus?: string;
+  deliveryErrorMessage?: string;
   time: Date;
   attachments?: string[];
 }
@@ -1549,6 +1551,8 @@ function buildTicketDtoCore(
             author: wa.autor || regAutor || undefined,
             type: 'public',
             channel: 'whatsapp',
+            deliveryStatus: wa.deliveryStatus,
+            deliveryErrorMessage: wa.deliveryErrorMessage,
             time: wa.data ? new Date(wa.data) : reg.data,
             registroIndex: index,
             attachments: filterRealAttachmentUrls(wa.anexos),

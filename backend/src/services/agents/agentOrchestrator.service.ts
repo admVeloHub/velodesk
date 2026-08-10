@@ -1,12 +1,13 @@
 /**
- * agentOrchestrator.service v1.0.5 — evita handoff duplicado pós triagem Agente 4
- * VERSION: v1.0.5 | DATE: 2026-08-07
+ * agentOrchestrator.service v1.1.0 — wrapComposerOpening no envio autônomo
+ * VERSION: v1.1.0 | DATE: 2026-08-10
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
 import { env } from '../../config/env';
 import { appendMessage, assertChamadoModifiable, currentStatus } from '../chamado.mapper';
 import { notifyAgentReplyAsync } from '../emailNotification.service';
+import { wrapComposerOpening } from '../clientMessageEnvelope.service';
 import type {
   AtendimentoInput,
   AtendimentoResult,
@@ -25,6 +26,7 @@ import { saveAgentFeedback } from './agentFeedback.service';
 import { evaluateAutonomy } from './autonomyRules.service';
 import { executeGestaoHandoff } from './gestaoChamadosHandoff.service';
 import { hasCasosEspeciaisTriagem } from './casosEspeciais.util';
+import { getAgentNomeOficial } from './agentRegistry';
 
 function resolveDeskTabulacao(
   audit: AuditoriaResult,
@@ -125,7 +127,7 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
   if (!atendimento.success || !atendimento.respostaSugerida || !atendimento.tabulacao) {
     return {
       success: false,
-      error: atendimento.error || 'Falha no Agente de Atendimento',
+      error: atendimento.error || `Falha no ${getAgentNomeOficial(1)}`,
       source: 'agent_pipeline',
     };
   }
@@ -260,7 +262,13 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
     });
 
     if (autonomy.allowed) {
-      await sendAutonomousReply(chamado, respostaAtual);
+      const composerText = wrapComposerOpening({
+        nucleo: respostaAtual,
+        clientName: input.clientName,
+        agentName: input.nomeOperador || getAgentNomeOficial(1),
+        messages: input.messages,
+      });
+      await sendAutonomousReply(chamado, composerText);
       await saveAgentFeedback({
         ticketId: input.ticketId,
         protocolo: input.protocolo,

@@ -1,4 +1,4 @@
-/** whatsappInbound.service v1.1.0 — inbound Twilio → thread única (array aninhado) */
+/** whatsappInbound.service v1.2.0 — inbound + health com status callback URL */
 import twilio from 'twilio';
 import { env } from '../../config/env';
 import { ChamadoN1 } from '../../models/ChamadoN1';
@@ -10,6 +10,7 @@ import {
   getTwilioCredentialMode,
   isTwilioConfigured,
 } from './twilioClient.util';
+import { resolveWhatsAppStatusCallbackUrl } from './whatsappCallbackUrl.util';
 import type { TwilioWhatsAppWebhookPayload } from './whatsappInbound.types';
 import {
   appendWhatsAppMensagemToChamado,
@@ -142,6 +143,7 @@ export async function processInboundWhatsAppMessage(payload: TwilioWhatsAppWebho
 }
 
 export function getWhatsAppInboundHealth(baseUrl: string) {
+  const normalizedBase = baseUrl.replace(/\/+$/, '');
   return {
     status: 'ok' as const,
     enabled: env.whatsappInboundEnabled,
@@ -149,7 +151,8 @@ export function getWhatsAppInboundHealth(baseUrl: string) {
     twilioConfigured: isTwilioConfigured(),
     twilioCredentialMode: getTwilioCredentialMode(),
     twilioAccountSid: getTwilioActiveAccountSid() || null,
-    webhookUrl: `${baseUrl.replace(/\/+$/, '')}/api/inbound/whatsapp/messages`,
+    webhookUrl: `${normalizedBase}/api/inbound/whatsapp/messages`,
+    statusCallbackUrl: resolveWhatsAppStatusCallbackUrl(normalizedBase) || null,
     sandboxFromDefault: env.twilioWhatsappFrom || 'whatsapp:+14155238886',
   };
 }

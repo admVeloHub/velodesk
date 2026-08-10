@@ -1,5 +1,5 @@
 /**
- * casosEspeciais.types v1.0.0 — tipos do Agente 4 (Triagem de Casos Especiais)
+ * casosEspeciais.types v1.0.1 — tipos do Agente de Casos especiais
  * VERSION: v1.0.0 | DATE: 2026-08-07
  */
 

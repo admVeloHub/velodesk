@@ -3998,6 +3998,26 @@
     color: #53bdeb;
 }
 
+#velodeskDeskV2Root .wa-msg__checks--pending {
+    color: #8696a0;
+}
+
+#velodeskDeskV2Root .wa-msg__checks--sent {
+    color: #8696a0;
+}
+
+#velodeskDeskV2Root .wa-msg__checks--delivered {
+    color: #8696a0;
+}
+
+#velodeskDeskV2Root .wa-msg__checks--read {
+    color: #53bdeb;
+}
+
+#velodeskDeskV2Root .wa-msg__checks--failed {
+    color: #e53935;
+}
+
 #velodeskDeskV2Root .wa-ia-card {
     align-self: flex-start;
     max-width: 88%;
@@ -4070,11 +4090,99 @@
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__footer {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     padding: 8px 12px 10px;
     background: #f0f2f5;
     flex-shrink: 0;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__session-hint {
+    flex: 1 1 100%;
+    margin: 0;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #5c4a00;
+    background: rgba(255, 193, 7, 0.18);
+    border-radius: 8px;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__footer--locked {
+    opacity: 0.92;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__footer--locked .wa-chat__input-bar {
+    background: #eef0f2;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__initial-card {
+    margin: 16px auto 12px;
+    max-width: 420px;
+    padding: 20px 18px;
+    text-align: center;
+    background: #fff;
+    border: 1px solid rgba(21, 162, 55, 0.25);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__initial-card-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 10px;
+    border-radius: 50%;
+    background: rgba(37, 211, 102, 0.15);
+    color: #15A237;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__initial-card-title {
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #111b21;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__initial-card-text {
+    margin: 0 0 14px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #54656f;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__initial-card-btn {
+    border: none;
+    border-radius: 24px;
+    padding: 10px 18px;
+    background: #25D366;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__initial-card-btn:hover:not(:disabled) {
+    background: #1da851;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__initial-card-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__awaiting-banner {
+    margin: 12px 12px 4px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #0d47a1;
+    background: rgba(33, 150, 243, 0.12);
+    border-radius: 8px;
 }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__input-bar {
@@ -4115,10 +4223,10 @@
 }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__send {
-    width: 44px;
+    min-width: 44px;
     height: 44px;
     border: none;
-    border-radius: 50%;
+    border-radius: 22px;
     background: #25D366;
     color: #fff;
     font-size: var(--desk-fs-base);
@@ -4126,8 +4234,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
+    padding: 0 14px;
     flex-shrink: 0;
     transition: background 0.15s;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__send-label {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
 }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__send:hover {

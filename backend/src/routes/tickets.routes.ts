@@ -1,4 +1,4 @@
-/** tickets.routes v1.13.0 — envio WhatsApp contínuo (thread, sem mudar status) */
+/** tickets.routes v1.16.0 — POST whatsapp/messages: initialTemplate + sessão 24h */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -38,7 +38,9 @@ import {
 } from '../services/workflowRequisicao.service';
 import {
   assertCanActOnTicket,
+  assertCanCommitTicket,
   assertCanInterruptWorkflow,
+  assertCanPostTicketMessage,
   assertCanWorkflowComunicacao,
   PermissionDeniedError,
 } from '../services/permission.service';
@@ -49,9 +51,12 @@ import {
 import {
   appendWhatsAppMensagemToChamado,
   readWhatsAppMensagens,
-  resolveWhatsAppDestinationPhone,
+  updateWhatsAppMensagemDeliveryBySid,
 } from '../services/twilio/whatsappThread.service';
-import { sendWhatsAppTextMessage, type WhatsAppOutboundResult } from '../services/twilio/whatsappOutbound.service';
+import {
+  sendWhatsAppForChamado,
+  type WhatsAppChamadoOutboundResult,
+} from '../services/twilio/whatsappActiveOutbound.service';
 
 const router = Router();
 
@@ -238,7 +243,7 @@ router.post('/:id/commit', authMiddleware, async (req, res: Response) => {
 
   try {
     assertChamadoModifiable(chamado);
-    await assertCanActOnTicket(req.user!, chamado);
+    await assertCanCommitTicket(req.user!, chamado, req.body);
   } catch (err) {
     if (handleTicketMutationError(err, res)) return;
     throw err;
@@ -293,7 +298,7 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
 
   try {
     assertChamadoModifiable(chamado);
-    await assertCanActOnTicket(req.user!, chamado);
+    await assertCanPostTicketMessage(req.user!, chamado, Boolean(internal));
   } catch (err) {
     if (handleTicketMutationError(err, res)) return;
     throw err;
@@ -364,23 +369,26 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
   }
 
   const text = String(req.body?.text ?? '').trim();
+  const initialTemplate = req.body?.initialTemplate === true;
   const waChatId = String(req.body?.waChatId ?? '').trim() || undefined;
   const attachmentList = Array.isArray(req.body?.attachments)
     ? req.body.attachments.map((item: unknown) => String(item ?? '').trim()).filter(Boolean)
     : [];
 
-  if (!text && !attachmentList.length) {
+  if (!initialTemplate && !text && !attachmentList.length) {
     return res.status(400).json({ message: 'Texto da mensagem é obrigatório' });
   }
 
   applyManualResponsavelClaim(chamado, req.user);
+
+  const appendText = text || (initialTemplate ? 'Mensagem inicial WhatsApp (template)' : '');
 
   let appendResult;
   try {
     appendResult = appendWhatsAppMensagemToChamado(chamado, {
       origin: 'agente',
       autor: String(req.user?.name ?? req.user?.email ?? '').trim() || undefined,
-      texto: text,
+      texto: appendText,
       anexos: attachmentList,
       waChatId,
     });
@@ -388,24 +396,44 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
     return res.status(400).json({ message: (err as Error).message });
   }
 
-  const destination = resolveWhatsAppDestinationPhone(chamado);
-  let twilio: WhatsAppOutboundResult = { sent: false, reason: 'Destino WhatsApp não encontrado no ticket' };
-  if (destination && text) {
-    const sendResult = await sendWhatsAppTextMessage({ to: destination, body: text });
-    twilio = sendResult;
-    if (sendResult.sent && sendResult.sid) {
+  let twilio: WhatsAppChamadoOutboundResult = { sent: false, reason: 'Destino WhatsApp não encontrado no ticket' };
+  const sendResult = await sendWhatsAppForChamado(chamado, {
+    text: text || undefined,
+    waChatId,
+    initialTemplate,
+    forceTemplate: initialTemplate || undefined,
+  });
+  twilio = sendResult;
+  if (sendResult.sent && sendResult.sid) {
       const reg = chamado.registro?.[appendResult.registroIndex];
       if (reg) {
         const list = readWhatsAppMensagens(reg);
         const last = list[list.length - 1];
-        if (last) last.twilioMessageSid = sendResult.sid;
+        if (last) {
+          last.twilioMessageSid = sendResult.sid;
+          last.deliveryStatus = 'sent';
+          last.deliveryStatusAt = new Date().toISOString();
+        }
         const meta = (reg.metadados ?? {}) as Record<string, unknown>;
         meta.whatsappMensagens = list;
         reg.metadados = meta;
         appendResult.mensagem.twilioMessageSid = sendResult.sid;
+        appendResult.mensagem.deliveryStatus = 'sent';
+        appendResult.mensagem.deliveryStatusAt = last?.deliveryStatusAt;
+        if (sendResult.mode === 'template' && sendResult.body) {
+          appendResult.mensagem.texto = sendResult.body;
+          if (last) last.texto = sendResult.body;
+        }
       }
+    } else if (sendResult.sid) {
+      updateWhatsAppMensagemDeliveryBySid(chamado, sendResult.sid, {
+        status: 'failed',
+        errorMessage: sendResult.reason,
+      });
+    } else if (!sendResult.sent && sendResult.reason) {
+      appendResult.mensagem.deliveryStatus = 'failed';
+      appendResult.mensagem.deliveryErrorMessage = sendResult.reason;
     }
-  }
 
   await chamado.save();
 

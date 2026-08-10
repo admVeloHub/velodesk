@@ -1,6 +1,6 @@
 /**
- * casosEspeciaisPersona v1.0.1 — import agentRegistry corrigido
- * VERSION: v1.0.1 | DATE: 2026-08-07
+ * casosEspeciaisPersona v1.0.2 — nomenclatura Agente de Casos especiais
+ * VERSION: v1.0.2 | DATE: 2026-08-07
  */
 import { getAgentLabel } from '../agentRegistry';
 

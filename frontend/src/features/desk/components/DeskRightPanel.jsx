@@ -1,6 +1,6 @@
 /**
- * DeskRightPanel v1.12.1 — tabulação completa considera ticket + campos locais
- * VERSION: v1.12.1 | DATE: 2026-08-07
+ * DeskRightPanel v1.12.2 — botão Iniciar Workflow desacoplado de tabulationReadonly
+ * VERSION: v1.12.2 | DATE: 2026-08-10
  */
 import React, { useMemo, useState } from 'react';
 import { DEFAULT_TIPO, hasApplyableTabulation, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
@@ -8,7 +8,7 @@ import { useTabulation } from '../../../context/TabulationContext';
 import { DeskStatusCommitButton } from './DeskComposePanel';
 import ProcessosPopover from './ProcessosPopover';
 import { DESK_THERMOMETER_UI_ENABLED } from '../../../services/desk/constants';
-import { isTicketInWorkflow } from '../../../services/desk/utils';
+import { isTicketWorkflowActive } from '../../../services/desk/utils';
 import { ticketHasComunicacaoWorkflow } from '../../../services/workflow/workflowDecisionHandlers';
 
 const CANAL_OPTIONS_FALLBACK = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
@@ -45,6 +45,7 @@ export default function DeskRightPanel({
   onStartWorkflow,
   startingWorkflow = false,
   canStartWorkflow = false,
+  canInitiateWorkflow = false,
   onReplyWorkflowRequest,
   replyWorkflowBusy = false,
   onCommitStatus,
@@ -101,9 +102,12 @@ export default function DeskRightPanel({
     || hasApplyableTabulation(iaTabulation)
     || hasApplyableTabulation(parsedTabulation)
   );
-  const inWorkflow = isTicketInWorkflow(ticket);
+  const inWorkflow = isTicketWorkflowActive(ticket);
   const showThermoUi = DESK_THERMOMETER_UI_ENABLED;
-  const showStartWorkflow = canStartWorkflow && tabulationComplete && !inWorkflow && !tabulationReadonly && !ticketReadOnly;
+  const showStartWorkflow = canStartWorkflow
+    && canInitiateWorkflow
+    && !inWorkflow
+    && !ticketReadOnly;
   const showReplyWorkflow = inWorkflow && ticketHasComunicacaoWorkflow(ticket) && typeof onReplyWorkflowRequest === 'function';
 
   return (
