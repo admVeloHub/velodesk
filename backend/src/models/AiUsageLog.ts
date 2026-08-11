@@ -13,7 +13,8 @@ export type AiUsageFeature =
   | 'casos_especiais'
   | 'ticket_suggest_legacy'
   | 'refinar_rascunho'
-  | 'chamado_ia_analise';
+  | 'chamado_ia_analise'
+  | 'telephony_ia_analise';
 
 export interface IAiUsageLog extends Document {
   provider: AiUsageProvider;

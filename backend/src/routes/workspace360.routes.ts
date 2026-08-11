@@ -6,6 +6,7 @@ import {
   buildAgent360Payload,
   buildReportPayload,
   buildSupervisor360Payload,
+  getAgentInProgressTickets,
   Workspace360Query,
 } from '../services/workspace360.service';
 import { hasPermission, resolveUserPermissions } from '../services/permission.service';
@@ -95,6 +96,31 @@ router.get('/agents', authMiddleware, async (req, res: Response) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[workspace360] GET /agents falhou:', message);
     res.status(500).json({ message: 'Erro ao listar agentes' });
+  }
+});
+
+router.get('/agent-tickets', authMiddleware, async (req, res: Response) => {
+  if (!isMongoConnected()) {
+    return res.status(503).json({ message: 'Banco de chamados indisponível' });
+  }
+  try {
+    const resolved = await resolveUserPermissions(req.user!);
+    const canViewTeam =
+      hasPermission(resolved.permissoes, 'workspace', 'painel_360_equipe') ||
+      hasPermission(resolved.permissoes, 'tickets', 'ver_todos');
+    if (!canViewTeam) {
+      return res.status(403).json({ message: 'Sem permissão para ver tickets da equipe' });
+    }
+    const agentKey = typeof req.query.agentKey === 'string' ? req.query.agentKey : '';
+    if (!agentKey.trim()) {
+      return res.status(400).json({ message: 'Parâmetro agentKey é obrigatório' });
+    }
+    const tickets = await getAgentInProgressTickets(agentKey);
+    return res.json({ agentKey, tickets });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[workspace360] GET /agent-tickets falhou:', message);
+    return res.status(500).json({ message: 'Erro ao carregar tickets do colaborador' });
   }
 });
 

@@ -25,6 +25,12 @@ import {
   processInboundTelephonyCall,
 } from '../services/telephony-inbound/telephonyInbound.service';
 import { countActiveRecados, getRecadosEnvelopeUpdatedAt, migrateLegacyRecadosIfNeeded } from '../services/telephonyRecado.service';
+import {
+  getTelecom55WebhookHealth,
+  isTelecom55WebhookAuthorized,
+  processTelecom55Webhook,
+} from '../services/realtime/telecom55/webhook.service';
+import { isRealtimeSupabaseConfigured } from '../config/supabaseRealtime';
 
 const router = Router();
 const upload = multer({
@@ -178,6 +184,49 @@ router.post('/whatsapp/messages', twilioWebhookAuthMiddleware, async (req, res: 
   } catch (err) {
     console.error('[inbound/whatsapp/messages]', err);
     return res.status(500).type('text/plain').send('Falha ao processar mensagem WhatsApp');
+  }
+});
+
+/** 55PBX — webhook de eventos em tempo real (telecom_webhook_events + telecom_live_calls) */
+router.post('/telecom55', async (req: Request, res: Response) => {
+  if (!env.realtimeEnabled) {
+    return res.status(503).json({ message: 'Módulo Realtime desabilitado' });
+  }
+  if (!isRealtimeSupabaseConfigured()) {
+    return res.status(503).json({ message: 'Supabase Realtime não configurado' });
+  }
+
+  const payload = (req.body ?? {}) as Record<string, unknown>;
+  if (!isTelecom55WebhookAuthorized(req, payload)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const result = await processTelecom55Webhook(payload);
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('[inbound/telecom55]', err);
+    return res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.get('/telecom55', async (req: Request, res: Response) => {
+  if (!env.realtimeEnabled) {
+    return res.status(503).json({ message: 'Módulo Realtime desabilitado' });
+  }
+  if (!isRealtimeSupabaseConfigured()) {
+    return res.status(503).json({ message: 'Supabase Realtime não configurado' });
+  }
+  if (!isTelecom55WebhookAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const health = await getTelecom55WebhookHealth();
+    return res.json(health);
+  } catch (err) {
+    console.error('[inbound/telecom55] GET health falhou:', err);
+    return res.status(500).json({ error: (err as Error).message });
   }
 });
 

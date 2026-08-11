@@ -499,12 +499,13 @@ export interface CasoEspecialEntry {
   id: 'bacen' | 'procon' | 'consumidorGov' | 'reclameAqui';
   label: string;
   total: number;
+  mock?: boolean;
 }
 
 export interface CasosEspeciaisResult {
   range: { start: string; end: string };
   items: CasoEspecialEntry[];
-  mock: true;
+  mock: boolean;
 }
 
 export const CASOS_ESPECIAIS_ORGAOS: { id: CasoEspecialEntry['id']; label: string }[] = [
@@ -513,6 +514,124 @@ export const CASOS_ESPECIAIS_ORGAOS: { id: CasoEspecialEntry['id']; label: strin
   { id: 'consumidorGov', label: 'Consumidor.gov' },
   { id: 'reclameAqui', label: 'Reclame Aqui' },
 ];
+
+const REAL_CASOS_ESPECIAIS_ORGAOS = new Set<CasoEspecialEntry['id']>(['reclameAqui']);
+
+function isRealCasoEspecialOrgao(orgaoId: string): orgaoId is 'reclameAqui' {
+  return REAL_CASOS_ESPECIAIS_ORGAOS.has(orgaoId as CasoEspecialEntry['id']);
+}
+
+function buildReclameAquiTicketMatch(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    'registro.metadados.source': 'reclame-aqui',
+    ...extra,
+  };
+}
+
+async function countReclameAquiInRange(range: DateRange): Promise<number> {
+  return ChamadoN1.countDocuments({
+    ...buildReclameAquiTicketMatch(),
+    createdAt: { $gte: range.start, $lte: range.end },
+  });
+}
+
+async function getReclameAquiDailyCounts(range: DateRange): Promise<Map<string, number>> {
+  const rows = await ChamadoN1.aggregate<{ _id: string; total: number }>([
+    {
+      $match: {
+        ...buildReclameAquiTicketMatch(),
+        createdAt: { $gte: range.start, $lte: range.end },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: TZ },
+        },
+        total: { $sum: 1 },
+      },
+    },
+  ]);
+  const map = new Map<string, number>();
+  rows.forEach((row) => map.set(String(row._id), row.total));
+  return map;
+}
+
+async function buildReclameAquiDailySeries(
+  range: DateRange,
+  comparisonRange?: DateRange,
+): Promise<CasoEspecialSeriesDay[]> {
+  const [currentCounts, previousCounts] = await Promise.all([
+    getReclameAquiDailyCounts(range),
+    comparisonRange ? getReclameAquiDailyCounts(comparisonRange) : Promise.resolve(new Map<string, number>()),
+  ]);
+  const keys = dayKeysBetween(range);
+  const comparisonKeys = comparisonRange ? dayKeysBetween(comparisonRange) : [];
+  return keys.map((key, idx) => {
+    const prevKey = comparisonKeys[idx];
+    return {
+      date: key,
+      label: labelForDay(key),
+      total: currentCounts.get(key) ?? 0,
+      ...(prevKey ? { totalAnterior: previousCounts.get(prevKey) ?? 0 } : {}),
+    };
+  });
+}
+
+async function getReclameAquiMotivosPorProduto(range: DateRange): Promise<CasoEspecialMotivoProduto[]> {
+  const rows = await ChamadoN1.aggregate<{
+    _id: { produto: string; motivo: string };
+    count: number;
+  }>([
+    {
+      $match: {
+        ...buildReclameAquiTicketMatch(),
+        createdAt: { $gte: range.start, $lte: range.end },
+      },
+    },
+    { $unwind: '$tabulacao' },
+    {
+      $match: {
+        'tabulacao.produto': { $nin: [null, ''] },
+        'tabulacao.motivo': { $nin: [null, ''] },
+      },
+    },
+    {
+      $group: {
+        _id: { produto: '$tabulacao.produto', motivo: '$tabulacao.motivo' },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const byProduto = new Map<string, Map<string, number>>();
+  rows.forEach((row) => {
+    const produto = String(row._id.produto ?? '').trim();
+    const motivo = String(row._id.motivo ?? '').trim();
+    if (!produto || !motivo) return;
+    if (!byProduto.has(produto)) byProduto.set(produto, new Map());
+    byProduto.get(produto)!.set(motivo, row.count);
+  });
+
+  return Array.from(byProduto.entries())
+    .map(([produto, motivosMap]) => {
+      const motivos = Array.from(motivosMap.entries())
+        .map(([motivo, count]) => ({ motivo, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+      const total = motivos.reduce((sum, item) => sum + item.count, 0);
+      return {
+        produto,
+        total,
+        motivos: motivos.map((item) => ({
+          ...item,
+          pct: total > 0 ? Math.round((item.count / total) * 1000) / 10 : 0,
+        })),
+      };
+    })
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
+}
 
 /** Base diária fictícia (determinística) de casos por órgão — usada tanto no total do card quanto na série do detalhe. */
 function casoEspecialDailyTotal(orgaoId: string, key: string): number {
@@ -525,22 +644,32 @@ function casoEspecialTotalForRange(orgaoId: string, range: DateRange): number {
 }
 
 /**
- * Totais de casos especiais por órgão/canal — fictício por ora.
- * TODO: substituir quando os canais de atendimento especiais (Bacen/Procon/Consumidor.gov/Reclame Aqui) existirem.
+ * Totais de casos especiais por órgão/canal.
+ * Reclame Aqui usa tickets reais (`registro.metadados.source = reclame-aqui`).
+ * Demais canais permanecem ilustrativos até integração.
  */
 export async function getCasosEspeciais(query: GestaoInsightsQuery = {}): Promise<CasosEspeciaisResult> {
   const range = resolvePeriodRange(query);
 
-  const items = CASOS_ESPECIAIS_ORGAOS.map((org) => ({
-    id: org.id,
-    label: org.label,
-    total: casoEspecialTotalForRange(org.id, range),
-  }));
+  const items = await Promise.all(
+    CASOS_ESPECIAIS_ORGAOS.map(async (org) => {
+      if (isRealCasoEspecialOrgao(org.id)) {
+        const total = await countReclameAquiInRange(range);
+        return { id: org.id, label: org.label, total, mock: false };
+      }
+      return {
+        id: org.id,
+        label: org.label,
+        total: casoEspecialTotalForRange(org.id, range),
+        mock: true,
+      };
+    }),
+  );
 
   return {
     range: { start: range.start.toISOString(), end: range.end.toISOString() },
     items,
-    mock: true,
+    mock: items.some((item) => item.mock),
   };
 }
 
@@ -595,7 +724,7 @@ export interface CasoEspecialDetailResult {
   granularity: ChartGranularity;
   comparison?: { mode: ComparisonMode; range: { start: string; end: string } };
   motivosPorProduto: CasoEspecialMotivoProduto[];
-  mock: true;
+  mock: boolean;
 }
 
 /** Agrega a série diária de um caso especial em buckets de mês fechado (soma de casos). */
@@ -641,14 +770,44 @@ export async function getCasoEspecialDetail(
   const compareMode: ComparisonMode | undefined =
     query.compare === 'mom' || query.compare === 'yoy' ? query.compare : undefined;
 
+  let comparisonRange: DateRange | undefined;
+  if (compareMode) {
+    comparisonRange = resolveComparisonRange(range, compareMode);
+  }
+
+  if (isRealCasoEspecialOrgao(org.id)) {
+    const [currentMonth, currentYear, dailySeries, motivosPorProduto] = await Promise.all([
+      countReclameAquiInRange(getCurrentMonthRange()),
+      countReclameAquiInRange(getCurrentYearRange()),
+      buildReclameAquiDailySeries(range, comparisonRange),
+      getReclameAquiMotivosPorProduto(range),
+    ]);
+    const series = granularity === 'mes' ? aggregateCasoEspecialByMonth(dailySeries) : dailySeries;
+
+    return {
+      orgao: { id: org.id, label: org.label },
+      range: { start: range.start.toISOString(), end: range.end.toISOString() },
+      totals: { currentMonth, currentYear },
+      series,
+      granularity,
+      comparison:
+        compareMode && comparisonRange
+          ? {
+              mode: compareMode,
+              range: { start: comparisonRange.start.toISOString(), end: comparisonRange.end.toISOString() },
+            }
+          : undefined,
+      motivosPorProduto,
+      mock: false,
+    };
+  }
+
   const currentMonth = casoEspecialTotalForRange(org.id, getCurrentMonthRange());
   const currentYear = casoEspecialTotalForRange(org.id, getCurrentYearRange());
 
   const keys = dayKeysBetween(range);
-  let comparisonRange: DateRange | undefined;
   let comparisonKeys: string[] = [];
-  if (compareMode) {
-    comparisonRange = resolveComparisonRange(range, compareMode);
+  if (compareMode && comparisonRange) {
     comparisonKeys = dayKeysBetween(comparisonRange);
   }
 

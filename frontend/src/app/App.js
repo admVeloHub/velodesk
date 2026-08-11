@@ -31,8 +31,6 @@ import AppShell from '../layout/AppShell';
 
 import WorkspacePage from '../pages/WorkspacePage';
 
-import DashboardPage from '../pages/DashboardPage';
-
 import TicketsPage from '../pages/TicketsPage';
 
 import ChatPage from '../pages/ChatPage';
@@ -56,6 +54,7 @@ import ConsumidorGovChannelPage from '../features/especiais/ConsumidorGovChannel
 import CasoEspecialDetailPage from '../features/workspace/components/gestaoDetail/CasoEspecialDetailPage';
 import AiUsageDetailPage from '../features/workspace/components/gestaoDetail/AiUsageDetailPage';
 import AtendimentoIaTelefonicoPage from '../pages/AtendimentoIaTelefonicoPage';
+import RealtimePage from '../pages/RealtimePage';
 import { PermissionProvider } from '../context/PermissionContext';
 
 import { initCockpitGlobals } from '../config/cockpitConfig';
@@ -92,8 +91,6 @@ function AppRoutes() {
 
             { path: 'workflow', element: React.createElement(WorkflowPage) },
 
-            { path: 'dashboard', element: React.createElement(DashboardPage) },
-
             { path: 'reports', element: React.createElement(ReportsPage) },
 
             { path: 'tickets', element: React.createElement(TicketsPage) },
@@ -119,6 +116,8 @@ function AppRoutes() {
             { path: 'busca-tickets', element: React.createElement(TicketSearchPage) },
 
             { path: 'atendimento-ia-telefonico/*', element: React.createElement(AtendimentoIaTelefonicoPage) },
+
+            { path: 'realtime', element: React.createElement(RealtimePage) },
 
             { path: 'client-portal', element: React.createElement(ClientPortalPage) },
 

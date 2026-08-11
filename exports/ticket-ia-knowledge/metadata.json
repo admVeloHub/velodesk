@@ -1,12 +1,12 @@
 {
-  "exportedAt": "2026-07-28T18:57:25.877Z",
+  "exportedAt": "2026-08-06T18:17:19.463Z",
   "sourceProject": "wfm_atendimento",
   "sourceSupabaseUrl": "https://pxnfdqkyboreqdrckczp.supabase.co",
-  "contextoVersao": 56,
+  "contextoVersao": 80,
   "counts": {
-    "taxonomiaMotivos": 27,
-    "motivoAliases": 8,
-    "exemplosContexto": 0,
+    "taxonomiaMotivos": 28,
+    "motivoAliases": 7,
+    "exemplosContexto": 169,
     "instrucoesOutrosChars": 3752,
     "contextoEmpresaChars": 5647
   },

@@ -457,36 +457,39 @@ export function computeSupervisor360View() {
       resolvedStats.set(agent, (resolvedStats.get(agent) || 0) + 1);
     });
 
-  const interactionStats = new Map();
-  allEntries.forEach(({ ticket }) => {
-    const agent = agentOf(ticket);
-    interactionStats.set(agent, (interactionStats.get(agent) || 0) + 1);
-  });
+  const inProgressStats = new Map();
+  allEntries
+    .filter((entry) => entry.queueId === 'em-andamento')
+    .forEach(({ ticket }) => {
+      const agent = agentOf(ticket);
+      inProgressStats.set(agent, (inProgressStats.get(agent) || 0) + 1);
+    });
 
-  const buildMockRanking = (statsMap, primaryLabel) => [...statsMap.entries()]
-    .filter(([, count]) => count > 0)
-    .sort((a, b) => b[1] - a[1])
+  const agentNames = new Set([...resolvedStats.keys(), ...inProgressStats.keys()]);
+  const ranking = [...agentNames]
+    .map((agent) => ({ agent, resolved: resolvedStats.get(agent) || 0, inProgress: inProgressStats.get(agent) || 0 }))
+    .filter((row) => row.resolved > 0 || row.inProgress > 0)
+    .sort((a, b) => b.resolved - a.resolved)
     .slice(0, 8)
-    .map(([agent, count], index) => ({
-      id: `${primaryLabel}-${agent.replace(/\s+/g, '-')}`,
+    .map((row, index) => ({
+      id: `agent-${row.agent.replace(/\s+/g, '-')}`,
       rank: index + 1,
-      name: agent,
+      name: row.agent,
+      agentKey: row.agent.toLowerCase(),
       medal: index === 0,
       trend: 'up',
       sla: '90%',
-      primaryValue: count,
-      primaryLabel,
+      resolved: row.resolved,
+      inProgress: row.inProgress,
       tma: '—',
+      tme: '—',
       csat: null,
       vsLastWeek: '—',
       shift: 'all',
       channel: 'all',
     }));
 
-  const leaderboard = {
-    resolvedRanking: buildMockRanking(resolvedStats, 'resolvidos'),
-    interactionRanking: buildMockRanking(interactionStats, 'interações'),
-  };
+  const leaderboard = { ranking };
 
   return buildSupervisor360View({
     kpis: {
@@ -827,7 +830,7 @@ export function buildSupervisor360View(apiPayload) {
     kpis: buildSupervisorKpis(apiPayload?.kpis),
     escalated: apiPayload?.escalated ?? { categories: [], slaCriticalCount: 0, groups: [] },
     channelVision: apiPayload?.channelVision ?? [],
-    leaderboard: apiPayload?.leaderboard ?? { resolvedRanking: [], interactionRanking: [] },
+    leaderboard: apiPayload?.leaderboard ?? { ranking: [] },
   };
 }
 

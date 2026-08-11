@@ -1,5 +1,6 @@
-/** telephonyInbound.service v2.0.0 — recebe ligações Contact Tel / parceira */
+/** telephonyInbound.service v2.1.0 — recebe ligações Contact Tel / parceira + dispara análise IA */
 import { TelephonyCall } from '../../models/TelephonyCall';
+import { env } from '../../config/env';
 import { findClienteByCpf, findClienteByPhone } from '../cliente.service';
 import { parsePartnerTelephonyPayload } from './adapters/partner.adapter';
 import { CONTACT_TEL_COMPLETED_FIXTURE } from './fixtures/contact-tel.fixture';
@@ -80,6 +81,12 @@ export async function processInboundTelephonyCall(
     ...buildCreatePayload(input, rawPayload),
     clienteId,
   });
+
+  if (env.chamadoIaAnaliseEnabled && (input.summary || input.transcript)) {
+    void import('../telephonyIaAnalise.service')
+      .then(({ classificarTelephonyCallPorId }) => classificarTelephonyCallPorId(String(doc._id)))
+      .catch((err) => console.warn('[telephony-inbound] classificação IA falhou:', (err as Error).message));
+  }
 
   console.info('[telephony-inbound] created externalCallId=%s callId=%s provider=%s status=%s',
     input.externalCallId, doc._id, input.provider ?? 'contact-tel', input.status ?? 'unknown');

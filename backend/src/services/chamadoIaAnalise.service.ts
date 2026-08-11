@@ -12,21 +12,14 @@
  * Cache por hash de conteúdo (textoHash): evita reclassificar um ticket cujo texto do
  * cliente não mudou, mesmo que status/tags tenham sido atualizados depois.
  */
-import { createHash } from 'crypto';
+import { hashTextoClassificacao } from './iaTextoHash.util';
 import mongoose from 'mongoose';
 import { ChamadoN1, IChamadoN1 } from '../models/ChamadoN1';
-import { ChamadoIaAnalise, ICasoGraveIA, SentimentoClasseIA } from '../models/ChamadoIaAnalise';
+import { ChamadoIaAnalise, SentimentoClasseIA } from '../models/ChamadoIaAnalise';
 import { TicketIaExemplo } from '../models/TicketIaExemplo';
 import type { ITicketIaSettings } from '../models/TicketIaSettings';
 import { currentStatus, GESTAO_TERMINAL_STATUSES } from './chamado.mapper';
 import { env } from '../config/env';
-import {
-  createOpenAiClient,
-  extractOutputText,
-  mapOpenAiErrorMessage,
-  parseAiJson,
-} from './agents/openaiAgent.util';
-import { logAiUsage } from './aiUsage.service';
 import {
   adaptChamadoToTicketIa,
   buildTicketIaText,
@@ -34,19 +27,16 @@ import {
   TicketIaPayload,
 } from './ticketIaAdapter.service';
 import {
-  canonicalizeTicketIaReason,
   ensureTicketIaSettings,
   getTicketIaExamplesForPrompt,
   normalizeForComparison,
-  resolveTicketIaAlias,
   TicketIaExamplePrompt,
   updateTicketIaSettings,
 } from './ticketIaSettings.service';
 import { resolvePeriodRange, GestaoInsightsQuery } from './gestaoInsights.service';
+import { executarClassificacaoIaLote, type IaClassificacaoCandidato } from './iaClassificacaoBatch.service';
 
-const LOTE_SIZE = 40;
 const MAX_TEXTO_CLIENTE = 4000;
-const SENTIMENTOS_VALIDOS: SentimentoClasseIA[] = ['positivo', 'neutro', 'irritado', 'confuso', 'critico'];
 
 export interface CandidatoIaAnalise {
   chamado: IChamadoN1;
@@ -55,130 +45,12 @@ export interface CandidatoIaAnalise {
   textoHash: string;
 }
 
-interface ClassificacaoItem {
-  chamadoId: string;
-  motivo: string;
-  motivoNovo: boolean;
-  sentimentoClasse: string;
-  casoGrave: { tipo: string; trecho: string } | null;
-}
+export { hashTextoClassificacao } from './iaTextoHash.util';
 
 /** Elegível quando há relato analisável e o ticket ainda não pertence a um canal especial formal. */
 export function isElegivelParaAnaliseIa(chamado: IChamadoN1): boolean {
   const payload = adaptChamadoToTicketIa(chamado);
   return Boolean(payload && !payload.formalCaseSource && buildTicketIaText(payload).length > 0);
-}
-
-export function hashTextoClassificacao(texto: string): string {
-  return createHash('sha256').update(texto, 'utf8').digest('hex');
-}
-
-const CLASSIFICACAO_JSON_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    classificacoes: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          chamadoId: { type: 'string' },
-          motivo: { type: 'string' },
-          motivoNovo: { type: 'boolean' },
-          sentimentoClasse: { type: 'string', enum: SENTIMENTOS_VALIDOS },
-          casoGrave: {
-            type: ['object', 'null'],
-            properties: {
-              tipo: { type: 'string' },
-              trecho: { type: 'string' },
-            },
-            required: ['tipo', 'trecho'],
-            additionalProperties: false,
-          },
-        },
-        required: ['chamadoId', 'motivo', 'motivoNovo', 'sentimentoClasse', 'casoGrave'],
-      },
-    },
-  },
-  required: ['classificacoes'],
-} as const;
-
-function buildSystemPrompt(
-  settings: ITicketIaSettings,
-  examples: TicketIaExamplePrompt[],
-  recentNewReasons: string[],
-): string {
-  const blocks = ['Você é um analista sênior de atendimento de uma fintech de crédito.'];
-  if (settings.contextoEmpresa) blocks.push(`Contexto da empresa:\n${settings.contextoEmpresa}`);
-  if (settings.instrucoesOutros) {
-    blocks.push(`Regras de desambiguação antes de usar "Outros":\n${settings.instrucoesOutros}`);
-  }
-  if (settings.taxonomiaMotivos.length) {
-    blocks.push(
-      `Taxonomia oficial. Prefira SEMPRE um destes rótulos e copie o texto exatamente:\n${
-        settings.taxonomiaMotivos.map((item) => `- ${item}`).join('\n')
-      }`,
-    );
-  }
-  if (settings.motivoAliases.length) {
-    blocks.push(
-      `Sinônimos já confirmados. Quando identificar o rótulo à esquerda, use o da direita:\n${
-        settings.motivoAliases.map((alias) => `- "${alias.de}" → "${alias.para}"`).join('\n')
-      }`,
-    );
-  }
-  if (examples.length) {
-    blocks.push(
-      `Exemplos reais corrigidos por gestores (aprenda o contexto, não copie dados pessoais):\n${
-        examples.map((example) =>
-          `- Título: ${example.titulo || '(sem título)'} | Trecho: ${example.trecho} | Motivo confirmado: ${example.motivo}`
-        ).join('\n')
-      }`,
-    );
-  }
-  if (recentNewReasons.length) {
-    blocks.push(
-      `Motivos novos usados nos últimos 30 dias. Reutilize o mesmo texto quando o assunto for equivalente:\n${
-        recentNewReasons.map((item) => `- ${item}`).join('\n')
-      }`,
-    );
-  }
-  blocks.push(`Tarefa: leia o TÍTULO e o RELATO DO CLIENTE de cada ticket. Não use a tabulação manual como resposta. Quando a fonte estiver marcada como "resumo transcrito", trate-a como descrição do atendente, não como citação literal.
-
-Responda SOMENTE com JSON válido, com uma "classificacoes" (array), um item por ticket:
-{ "chamadoId": "<id>", "motivo": "<rótulo curto>", "motivoNovo": true|false, "sentimentoClasse": "positivo|neutro|irritado|confuso|critico", "casoGrave": { "tipo": "Bacen|Procon|Reclame Aqui|Ação judicial|Órgão regulador|Outro", "trecho": "<trecho real>" } | null }
-
-Regras:
-- Use motivoNovo=false quando o motivo pertence à taxonomia ou à lista de motivos recentes.
-- Só crie motivo novo quando nenhum rótulo conhecido servir e existir um padrão específico.
-- "Outros" é apenas para conteúdo realmente ambíguo.
-- casoGrave exige menção real e explícita do cliente; resumos transcritos sem citação literal não devem produzir trecho entre aspas.
-- Devolva exatamente um item por ticket recebido. Não invente dados. Escreva em português do Brasil.`);
-  return blocks.join('\n\n');
-}
-
-function buildUserPrompt(candidatos: CandidatoIaAnalise[]): string {
-  const payload = candidatos.map((c) => ({
-    chamadoId: c.payload.chamadoId,
-    protocolo: c.payload.protocolo,
-    canal: c.payload.canal,
-    abertoEm: c.payload.abertoEm,
-    qualidadeFonte: c.payload.qualidadeFonte,
-    texto: c.textoCliente,
-  }));
-  return `Total de tickets a classificar nesta chamada: ${candidatos.length}.
-
-Tickets (JSON):
-${JSON.stringify(payload, null, 2)}
-
-Responda apenas com o objeto JSON no formato pedido, com um item por ticket.`;
-}
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
 }
 
 /** Busca candidatos elegíveis e ainda sem cache válido (hash do texto do cliente mudou ou nunca foi analisado). */
@@ -242,85 +114,53 @@ async function classificarLote(
   recentNewReasons: string[],
 ): Promise<number> {
   if (candidatos.length === 0) return 0;
-  const openai = createOpenAiClient();
+
+  const batchInput: IaClassificacaoCandidato[] = candidatos.map((c) => ({
+    itemId: c.payload.chamadoId,
+    protocolo: c.payload.protocolo,
+    canal: c.payload.canal,
+    abertoEm: c.payload.abertoEm,
+    qualidadeFonte: c.payload.qualidadeFonte,
+    textoCliente: c.textoCliente,
+    textoHash: c.textoHash,
+  }));
+
+  const resultados = await executarClassificacaoIaLote(
+    batchInput,
+    settings,
+    examples,
+    recentNewReasons,
+    'chamado_ia_analise',
+  );
+
+  const porId = new Map(candidatos.map((c) => [c.payload.chamadoId, c]));
   let classificadosTotal = 0;
 
-  for (const lote of chunk(candidatos, LOTE_SIZE)) {
-    try {
-      const response = await openai.responses.create({
-        model: env.chamadoIaAnaliseModel,
-        input: [
-          { role: 'system', content: buildSystemPrompt(settings, examples, recentNewReasons) },
-          { role: 'user', content: buildUserPrompt(lote) },
-        ],
-        reasoning: { effort: 'low' },
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'classificacao_chamados_ia',
-            schema: CLASSIFICACAO_JSON_SCHEMA,
-            strict: true,
-          },
-        },
-      });
-
-      if (response.usage) {
-        void logAiUsage({
-          provider: 'openai',
-          model: response.model || env.chamadoIaAnaliseModel,
-          feature: 'chamado_ia_analise',
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens,
-        });
-      }
-
-      const raw = extractOutputText(response);
-      const parsed = parseAiJson<{ classificacoes?: ClassificacaoItem[] }>(raw);
-      const classificacoes = parsed?.classificacoes ?? [];
-      const porId = new Map(lote.map((c) => [String(c.chamado._id), c]));
-
-      const upserts = classificacoes
-        .map((item) => {
-          const candidato = porId.get(String(item.chamadoId));
-          if (!candidato) return null;
-          const sentimentoClasse = SENTIMENTOS_VALIDOS.includes(item.sentimentoClasse as SentimentoClasseIA)
-            ? item.sentimentoClasse
-            : 'neutro';
-          const casoGrave: ICasoGraveIA | null =
-            item.casoGrave && String(item.casoGrave.tipo ?? '').trim()
-              ? { tipo: String(item.casoGrave.tipo).trim(), trecho: String(item.casoGrave.trecho ?? '').trim() }
-              : null;
-          const motivoBruto = String(item.motivo ?? '').trim() || 'Outros';
-          const motivoAliasado = resolveTicketIaAlias(motivoBruto, settings.motivoAliases) ?? motivoBruto;
-          const motivo = canonicalizeTicketIaReason(motivoAliasado, settings.taxonomiaMotivos);
-          const conhecido = settings.taxonomiaMotivos.includes(motivo);
-          return {
-            chamadoId: candidato.chamado._id,
-            chamadoProtocolo: candidato.chamado.chamadoProtocolo || '',
-            ticketCreatedAt: candidato.chamado.createdAt ?? new Date(),
-            motivo,
-            motivoNovo: Boolean(item.motivoNovo) && !conhecido,
-            sentimentoClasse,
-            casoGrave,
-            textoHash: candidato.textoHash,
-            qualidadeFonte: candidato.payload.qualidadeFonte,
-            canal: candidato.payload.canal,
-            contextoVersao: settings.contextoVersao,
-            modelo: response.model || env.chamadoIaAnaliseModel,
-            origem: 'auto' as const,
-            needsReanalysis: false,
-            analisadoEm: new Date(),
-          };
-        })
-        .filter((v): v is NonNullable<typeof v> => v != null);
-
-      for (const doc of upserts) {
-        await ChamadoIaAnalise.findOneAndUpdate({ chamadoId: doc.chamadoId }, doc, { upsert: true, new: true });
-      }
-      classificadosTotal += upserts.length;
-    } catch (err) {
-      console.warn('[chamado-ia-analise] lote falhou:', mapOpenAiErrorMessage(err));
-    }
+  for (const item of resultados) {
+    const candidato = porId.get(item.itemId);
+    if (!candidato) continue;
+    await ChamadoIaAnalise.findOneAndUpdate(
+      { chamadoId: candidato.chamado._id },
+      {
+        chamadoId: candidato.chamado._id,
+        chamadoProtocolo: candidato.chamado.chamadoProtocolo || '',
+        ticketCreatedAt: candidato.chamado.createdAt ?? new Date(),
+        motivo: item.motivo,
+        motivoNovo: item.motivoNovo,
+        sentimentoClasse: item.sentimentoClasse,
+        casoGrave: item.casoGrave,
+        textoHash: item.textoHash,
+        qualidadeFonte: item.qualidadeFonte,
+        canal: item.canal,
+        contextoVersao: settings.contextoVersao,
+        modelo: item.modelo,
+        origem: 'auto' as const,
+        needsReanalysis: false,
+        analisadoEm: new Date(),
+      },
+      { upsert: true, new: true },
+    );
+    classificadosTotal += 1;
   }
 
   return classificadosTotal;

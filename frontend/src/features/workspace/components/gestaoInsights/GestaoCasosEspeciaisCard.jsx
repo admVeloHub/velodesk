@@ -72,7 +72,12 @@ export default function GestaoCasosEspeciaisCard() {
                 <i className={`ti ${accent.icon}`} />
               </span>
               <span className="gestao-casos-especiais-card__tile-value">{loading ? '—' : item.total}</span>
-              <span className="gestao-casos-especiais-card__tile-label">{item?.label ?? ''}</span>
+              <span className="gestao-casos-especiais-card__tile-label">
+                {item?.label ?? ''}
+                {!loading && item?.mock === false ? (
+                  <small className="gestao-casos-especiais-card__tile-real">dados reais</small>
+                ) : null}
+              </span>
               <i className="ti ti-chevron-right gestao-casos-especiais-card__tile-chevron" aria-hidden="true" />
             </button>
           );
