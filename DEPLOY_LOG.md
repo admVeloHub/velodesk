@@ -1,10 +1,31 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.76.0 | DATE: 2026-08-11 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.77.0 | DATE: 2026-08-11 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — fix persistência thread WhatsApp + balão de presença e polling rápido
+
+- **Data/Hora**: 2026-08-11
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.77.0
+  - **Backend**: whatsappThread v1.4.0
+  - **Frontend**: DeskV2Root v3.30.0, DeskConversation v1.6.0, utils v3.12.0, velodesk-crm.css v1.13.0, velodesk-dark-theme.css v1.2.0
+- **Arquivos principais**:
+  - `backend/src/services/twilio/whatsappThread.service.ts` — `chamado.markModified('registro.N.metadados')` em `appendWhatsAppMensagemToChamado` e `updateWhatsAppMensagemDeliveryBySid`
+  - `frontend/src/services/desk/utils.js` — `collapseWhatsAppThreadToBalloon` + `channel` preservado na thread
+  - `frontend/src/features/desk/components/DeskConversation.jsx` — balão de presença da conversa WhatsApp (abre o chat ao clicar)
+  - `frontend/src/features/desk/DeskV2Root.jsx` — timeline usa `displayMsgs`; poll 3s com chat WA aberto, 5s com sessão 24h ativa
+  - `frontend/velodesk-crm.css` / `velodesk-dark-theme.css` — estilos `.wa-presence-balloon` (claro + escuro)
+- **Descrição**: (1) Corrige mensagens WhatsApp (inbound do cliente, 2ª+ do agente e status de entrega) descartadas no `save()` — `registro.metadados` é `Schema.Types.Mixed` e o Mongoose não rastreia mutação interna sem `markModified`. (2) Timeline do ticket deixa de listar mensagens WhatsApp individuais e exibe balão único de presença da conversa. (3) Mensagens chegam em tempo quase real: polling 3s com a conversa em tela e 5s com sessão do cliente aberta.
+- **Status**: Push main
+
+---
 
 ### GitHub Push — fix auto-reply Sandbox no inbound WhatsApp e polling thread WA no Desk
 

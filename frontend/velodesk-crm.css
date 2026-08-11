@@ -1,4 +1,4 @@
-﻿/* Velodesk CRM v1.12.3 â€” AvanÃ§ar: clip-path contÃ­nuo + mesma largura do HistÃ³rico */
+﻿/* Velodesk CRM v1.13.0 - balao de presenca da conversa WhatsApp na timeline */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -3827,6 +3827,92 @@
     background: rgba(252, 194, 0, 0.12);
 }
 
+/* === WhatsApp: balão de presença da conversa na timeline === */
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .msg-row--wa-presence {
+    display: flex;
+    justify-content: center;
+    padding: 4px 0;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-presence-balloon {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 480px;
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid rgba(7, 94, 84, 0.28);
+    border-radius: 12px;
+    background: rgba(37, 211, 102, 0.08);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-presence-balloon:hover {
+    background: rgba(37, 211, 102, 0.16);
+    border-color: rgba(7, 94, 84, 0.5);
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-presence-balloon__icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #25D366;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--desk-fs-lg, 20px);
+    flex-shrink: 0;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-presence-balloon__body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-presence-balloon__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--desk-fs-sm);
+    font-weight: 600;
+    color: #075E54;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-presence-balloon__count {
+    font-size: var(--desk-fs-caption);
+    font-weight: 600;
+    color: #075E54;
+    background: rgba(37, 211, 102, 0.2);
+    border-radius: 999px;
+    padding: 1px 8px;
+    white-space: nowrap;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-presence-balloon__preview {
+    font-size: var(--desk-fs-caption);
+    color: #3b4a54;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-presence-balloon__hint {
+    font-size: var(--desk-fs-caption);
+    color: #667781;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-presence-balloon__chevron {
+    color: #075E54;
+    font-size: var(--desk-fs-base);
+    flex-shrink: 0;
+}
+
 /* === WhatsApp chat view (Abrir conversa) === */
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-conversation-wrap--wa .tab-panel {
     background: #E5DDD5;
@@ -5491,6 +5577,30 @@
     background: #F3F4F8;
     color: #6b7280;
     cursor: default;
+}
+
+#velodeskDeskV2Root .rp-assume-ticket-link {
+    display: inline-block;
+    margin: -2px 0 10px;
+    padding: 0;
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-size: var(--desk-fs-sm);
+    font-weight: 600;
+    color: #1634FF;
+    cursor: pointer;
+    text-align: left;
+}
+
+#velodeskDeskV2Root .rp-assume-ticket-link:hover:not(:disabled) {
+    color: #1694FF;
+    text-decoration: underline;
+}
+
+#velodeskDeskV2Root .rp-assume-ticket-link:disabled {
+    opacity: 0.6;
+    cursor: wait;
 }
 
 #velodeskDeskV2Root .rp-field select:focus,

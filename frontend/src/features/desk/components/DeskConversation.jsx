@@ -1,6 +1,6 @@
 /**
- * DeskConversation v1.5.8 — listas numeradas e quebras após lista na thread
- * VERSION: v1.5.8 | DATE: 2026-07-31
+ * DeskConversation v1.6.0 — balão de presença da conversa WhatsApp na timeline
+ * VERSION: v1.6.0 | DATE: 2026-08-11
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
@@ -137,6 +137,54 @@ function MessageBubbleText({ text, attachments }) {
   );
 }
 
+function formatWaBalloonTime(timestamp) {
+  const ts = new Date(timestamp || 0);
+  if (Number.isNaN(ts.getTime()) || !timestamp) return '';
+  return ts.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function WhatsAppPresenceBalloon({ msg, onOpen }) {
+  const preview = String(msg.lastText || '').trim();
+  const time = formatWaBalloonTime(msg.timestamp);
+  return (
+    <div className="msg-row msg-row--wa-presence">
+      <button
+        type="button"
+        className="wa-presence-balloon"
+        onClick={onOpen}
+        title="Abrir a conversa de WhatsApp"
+      >
+        <span className="wa-presence-balloon__icon">
+          <i className="ti ti-brand-whatsapp" aria-hidden="true" />
+        </span>
+        <span className="wa-presence-balloon__body">
+          <span className="wa-presence-balloon__title">
+            Conversa de WhatsApp
+            <span className="wa-presence-balloon__count">
+              {msg.count} {msg.count === 1 ? 'mensagem' : 'mensagens'}
+            </span>
+          </span>
+          {preview ? (
+            <span className="wa-presence-balloon__preview">
+              {msg.lastType === 'client' ? 'Cliente: ' : 'Agente: '}
+              {preview.length > 80 ? `${preview.slice(0, 80)}…` : preview}
+            </span>
+          ) : null}
+          <span className="wa-presence-balloon__hint">
+            {time ? `Última mensagem ${time} · ` : ''}Clique para abrir a conversa
+          </span>
+        </span>
+        <i className="ti ti-chevron-right wa-presence-balloon__chevron" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 export default function DeskConversation({
   ticket,
   messages,
@@ -149,6 +197,7 @@ export default function DeskConversation({
   iaError = '',
   iaAuditScore = null,
   onRequestRevision,
+  onOpenWhatsAppChat,
 }) {
   const [iaVisible, setIaVisible] = useState(true);
   const lastIaReplyRef = useRef('');
@@ -193,6 +242,11 @@ export default function DeskConversation({
         </div>
       ) : (
         thread.map((msg, i) => {
+          if (msg.type === 'whatsapp-thread') {
+            return (
+              <WhatsAppPresenceBalloon key={i} msg={msg} onOpen={onOpenWhatsAppChat} />
+            );
+          }
           if (msg.type === 'system') {
             if (shouldHideWorkflowSystemThreadMessage(msg.text)) {
               return null;

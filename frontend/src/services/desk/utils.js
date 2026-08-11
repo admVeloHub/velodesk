@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.11.13 | DATE: 2026-08-10
- * — normalizePhoneE164 / toWhatsAppChatIdDigits (DDI 55 BR)
+ * VERSION: v3.12.0 | DATE: 2026-08-11
+ * — collapseWhatsAppThreadToBalloon: balão único de presença da conversa WhatsApp na timeline
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
 import { getDeskQueueDisplayCount, markTicketResolvedOptimistic } from './queueCounts';
@@ -1064,13 +1064,15 @@ function shouldExcludeEspeciaisFromDesk(ticket) {
 
 function filterMyTicketsEntries(searchQuery) {
   const q = String(searchQuery || '').trim();
-  const trustBackend = shouldUseMeusChamadosFila();
 
   return getAllCockpitTickets().filter((entry) => {
     if (shouldExcludeEspeciaisFromDesk(entry.ticket)) return false;
     if (!MEUS_TICKETS_ACTIVE_QUEUE_IDS.has(entry.queueId)) return false;
     if (isFusaoAbsorvido(entry.ticket)) return false;
     if (isTicketTerminalStatus(entry.ticket)) return false;
+
+    // Regra Meus Tickets: SOMENTE responsável OU atribuído = usuário logado (nunca confiar só no backend).
+    if (!ticketBelongsInMeusTicketsList(entry.ticket)) return false;
 
     const status = normalizeTicketStatusKey(entry.ticket?.status);
 
@@ -1083,9 +1085,6 @@ function filterMyTicketsEntries(searchQuery) {
     } else if (!MEUS_TICKETS_ACTIVE_STATUSES.has(status)) {
       return false;
     }
-
-    // /boxes?fila=meus-chamados já filtra responsável/atribuído — não re-filtrar no cliente
-    if (!trustBackend && !ticketBelongsInMeusTicketsList(entry.ticket)) return false;
 
     return matchesTicketSearch(entry, q);
   });
@@ -1129,13 +1128,24 @@ function matchesMyTicketsStatusSection(entry, sectionId) {
   return entry.queueId === sectionId;
 }
 
+function ticketVisibleForCustomQueue(entry) {
+  if (shouldViewAllDeskTickets()) return true;
+  // /boxes?fila=meus-chamados já segmenta — não re-filtrar como nas filas fixas (trustBackendQueues).
+  if (shouldUseMeusChamadosFila()) return true;
+  const status = normalizeTicketStatusKey(entry.ticket?.status);
+  if (TERMINAL_TICKET_STATUSES.has(status)) return true;
+  return ticketMatchesAgentResponsavel(entry.ticket);
+}
+
 function filterCustomQueueEntries(customBox, searchQuery) {
   const q = String(searchQuery || '').trim();
   return getAllCockpitTickets().filter((entry) => {
     if (shouldExcludeEspeciaisFromDesk(entry.ticket)) return false;
     if (isFusaoAbsorvido(entry.ticket)) return false;
-    if (!shouldViewAllDeskTickets() && !ticketMatchesAgentResponsavel(entry.ticket)) return false;
-    if (!ticketMatchesQueueCriterios(entry.ticket, customBox.criterios)) return false;
+    if (!ticketVisibleForCustomQueue(entry)) return false;
+    if (!ticketMatchesQueueCriterios(entry.ticket, customBox.criterios, { queueId: entry.queueId })) {
+      return false;
+    }
     return matchesTicketSearch(entry, q);
   });
 }
@@ -1520,6 +1530,7 @@ export function buildRegistroThread(ticket) {
       attachments: Array.isArray(m.attachments) ? m.attachments.filter(Boolean) : [],
       meta: formatMsgMeta(ts, authorName),
       timestamp: ts,
+      channel: m.channel,
       deliveryStatus: m.deliveryStatus,
       deliveryErrorMessage: m.deliveryErrorMessage,
     };
@@ -1530,6 +1541,38 @@ export function buildRegistroThread(ticket) {
   );
 
   return combined;
+}
+
+/**
+ * Timeline do ticket: substitui as mensagens individuais de WhatsApp por um balão
+ * único de presença da conversa (abre o chat ao clicar). Sem WhatsApp, retorna a lista original.
+ */
+export function collapseWhatsAppThreadToBalloon(msgs) {
+  const list = msgs || [];
+  const waMsgs = list.filter((m) => m?.channel === 'whatsapp');
+  if (!waMsgs.length) return list;
+
+  const rest = list.filter((m) => m?.channel !== 'whatsapp');
+  const last = waMsgs[waMsgs.length - 1];
+  const clienteCount = waMsgs.filter((m) => m.type === 'client').length;
+
+  const balloon = {
+    type: 'whatsapp-thread',
+    count: waMsgs.length,
+    clienteCount,
+    lastText: String(last?.text || '').trim(),
+    lastType: last?.type,
+    timestamp: last?.timestamp,
+  };
+
+  const lastTs = new Date(last?.timestamp || 0).getTime();
+  const insertAt = rest.findIndex((m) => {
+    const ts = new Date(m?.timestamp || 0).getTime();
+    return Number.isFinite(ts) && ts > lastTs;
+  });
+
+  if (insertAt < 0) return [...rest, balloon];
+  return [...rest.slice(0, insertAt), balloon, ...rest.slice(insertAt)];
 }
 
 /** Mensagens exclusivas da conversa WhatsApp (thread contínua, sem e-mail/outros canais). */

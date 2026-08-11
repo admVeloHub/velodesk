@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.29.0 | DATE: 2026-08-11
- * — Polling WhatsApp: refresh imediato + 5s enquanto aguarda resposta do cliente
+ * VERSION: v3.30.0 | DATE: 2026-08-11
+ * — Balão de presença WhatsApp na timeline + polling 3s com chat aberto / 5s sessão ativa
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -17,6 +17,7 @@ import {
   isMeusTicketsQueue,
   buildRegistroThread,
   buildWhatsAppConvMsgs,
+  collapseWhatsAppThreadToBalloon,
   getWhatsAppDeskUiState,
   normalizeTicketForDeskV2,
   getAgentName,
@@ -68,7 +69,9 @@ import {
   canInterruptWorkflow,
   canSendInternalNoteOnTicket,
   canSendPublicMessageOnTicket,
+  hasPermission,
 } from '../../services/permissions/permissionService';
+import { ticketAssignedToCurrentAgent } from '../../services/desk/responsavelSegmentation';
 import { getAllQueueStatuses, fetchAndHydrateCustomQueues } from '../../services/desk/customQueueBoxes';
 import { refreshQueueCountsFromApi } from '../../services/desk/queueCounts';
 import CreateTicketPanel from './components/CreateTicketPanel';
@@ -112,6 +115,7 @@ import { hasAtendimentoFuncao } from '../../services/desk/atuacaoVision';
 /** Respostas de cliente chegam por e-mail a qualquer momento: a thread se atualiza sozinha */
 const AUTO_REFRESH_DETAIL_MS = 15000;
 const AUTO_REFRESH_WA_WAIT_MS = 5000;
+const AUTO_REFRESH_WA_CHAT_MS = 3000;
 const AUTO_REFRESH_QUEUES_MS = 60000;
 
 const WORKFLOW_REQUIRES_CLIENT_MESSAGE = 'Identifique o cliente (CPF válido) antes de iniciar o workflow.';
@@ -206,6 +210,9 @@ export default function DeskV2Root() {
   const [sendStatus, setSendStatus] = useState('em-andamento');
   const [rightFields, setRightFields] = useState({});
   const [waChatOpen, setWaChatOpen] = useState(false);
+  // Ref para o ciclo de polling ler o estado atual sem reiniciar o efeito
+  const waChatOpenRef = useRef(false);
+  waChatOpenRef.current = waChatOpen;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [mergeInProgress, setMergeInProgress] = useState(false);
   const [aiRevisionOpen, setAiRevisionOpen] = useState(false);
@@ -222,6 +229,7 @@ export default function DeskV2Root() {
   const [advancingWorkflow, setAdvancingWorkflow] = useState(false);
   const [cancelingWorkflow, setCancelingWorkflow] = useState(false);
   const [startingWorkflow, setStartingWorkflow] = useState(false);
+  const [assumingTicket, setAssumingTicket] = useState(false);
   const [workflowStartModalOpen, setWorkflowStartModalOpen] = useState(false);
   const [comunicacaoModalOpen, setComunicacaoModalOpen] = useState(false);
   const [comunicacaoBusy, setComunicacaoBusy] = useState(false);
@@ -503,8 +511,12 @@ export default function DeskV2Root() {
     const resolvePollIntervalMs = () => {
       const current = findTicketEntry(ticketId)?.ticket;
       if (!current) return AUTO_REFRESH_DETAIL_MS;
+      // Conversa WhatsApp em tela: ciclo mais curto para diálogo em tempo quase real
+      if (waChatOpenRef.current) return AUTO_REFRESH_WA_CHAT_MS;
       const waState = getWhatsAppDeskUiState(current);
       if (waState?.awaitingClient || waState?.needsInitial) return AUTO_REFRESH_WA_WAIT_MS;
+      // Sessão 24h aberta: cliente pode responder a qualquer momento
+      if (waState?.mode === 'session') return AUTO_REFRESH_WA_WAIT_MS;
       return AUTO_REFRESH_DETAIL_MS;
     };
 
@@ -1179,6 +1191,84 @@ export default function DeskV2Root() {
     setRightFields((f) => applyCascadeFieldChange(f, key, value));
   };
 
+  const handleAssumeTicket = useCallback(async () => {
+    if (!ticket || assumingTicket || isTicketReadOnly(ticket)) return;
+
+    const perm = permsCtx?.permissions;
+    if (
+      !hasPermission(perm?.permissoes, 'tickets', 'ver_todos')
+      && !hasPermission(perm?.permissoes, 'tickets', 'atuar_responsavel')
+    ) {
+      showNotification('Sem permissão para assumir tickets.', 'warning');
+      return;
+    }
+
+    const agentName = getAgentName();
+    if (!agentName) {
+      showNotification('Não foi possível identificar o agente logado.', 'warning');
+      return;
+    }
+
+    const merged = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
+    const previewTicket = applyRightFieldsToTicket({ ...ticket }, merged);
+    if (ticketAssignedToCurrentAgent(previewTicket)) {
+      showNotification('Você já é o responsável deste ticket.', 'info');
+      return;
+    }
+
+    setAssumingTicket(true);
+    try {
+      const next = { ...merged, responsavel: agentName };
+      setRightFields(next);
+
+      if (activeTabId) {
+        const sessionKey = String(activeTabId);
+        tabSessionsRef.current[sessionKey] = {
+          ...(tabSessionsRef.current[sessionKey] || {}),
+          rightFields: next,
+        };
+      }
+
+      if (isDraftTicket(ticket)) {
+        showNotification('Responsável definido. Salve o ticket para confirmar.', 'success');
+        return;
+      }
+
+      await updateTicketInCache(ticket.id, (t) => applyRightFieldsToTicket(t, next));
+      await syncTicketViews();
+      showNotification('Ticket assumido com sucesso.', 'success');
+    } catch (err) {
+      showNotification(
+        err?.response?.data?.message || err?.message || 'Não foi possível assumir o ticket.',
+        'error',
+      );
+    } finally {
+      setAssumingTicket(false);
+    }
+  }, [
+    activeTabId,
+    assumingTicket,
+    permsCtx?.permissions,
+    rightFields,
+    showNotification,
+    syncTicketViews,
+    ticket,
+  ]);
+
+  const showAssumeTicket = useMemo(() => {
+    if (!ticket || ticketReadOnly || assumingTicket) return false;
+    const perm = permsCtx?.permissions;
+    if (
+      !hasPermission(perm?.permissoes, 'tickets', 'ver_todos')
+      && !hasPermission(perm?.permissoes, 'tickets', 'atuar_responsavel')
+    ) {
+      return false;
+    }
+    const merged = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
+    const preview = applyRightFieldsToTicket({ ...ticket }, merged);
+    return !ticketAssignedToCurrentAgent(preview);
+  }, [assumingTicket, permsCtx?.permissions, rightFields, ticket, ticketReadOnly]);
+
   const handleSaveContact = async (draft) => {
     if (!ticket) return;
     if (isTicketReadOnly(ticket)) {
@@ -1286,6 +1376,8 @@ export default function DeskV2Root() {
   };
 
   const convMsgs = ticket ? buildRegistroThread(ticket) : [];
+  // Timeline exibe um balão único da conversa WhatsApp; IA continua lendo convMsgs completo
+  const displayMsgs = collapseWhatsAppThreadToBalloon(convMsgs);
   const waConvMsgs = ticket ? buildWhatsAppConvMsgs(ticket) : [];
   const waUiState = ticket ? getWhatsAppDeskUiState(ticket) : null;
   const threadLen = convMsgs.length;
@@ -1511,6 +1603,11 @@ export default function DeskV2Root() {
       return;
     }
 
+    if (!canSendPublicMessageOnTicket(ticket, permsCtx?.permissions)) {
+      showNotification('Sem permissão para iniciar workflow neste ticket.', 'warning');
+      return;
+    }
+
     if (!isClientIdentifiedForWorkflow(ticket)) {
       showNotification(WORKFLOW_REQUIRES_CLIENT_MESSAGE, 'warning');
       return;
@@ -1535,6 +1632,7 @@ export default function DeskV2Root() {
     setWorkflowStartModalOpen(true);
   }, [
     executeWorkflowStart,
+    permsCtx?.permissions,
     workflowDefinitions,
     rightFields,
     showNotification,
@@ -1861,7 +1959,7 @@ export default function DeskV2Root() {
                       <TicketWorkflowInfoRequestCallout ticket={ticket} />
                       <DeskConversation
                         ticket={ticket}
-                        messages={convMsgs}
+                        messages={displayMsgs}
                         onUseIaReply={handleUseIaReply}
                         iaReply={ticketAi.respostaSugerida}
                         iaReplyLoading={ticketAi.loading}
@@ -1871,6 +1969,7 @@ export default function DeskV2Root() {
                         iaError={ticketAi.error}
                         iaAuditScore={ticketAi.auditScore}
                         onRequestRevision={handleOpenAiRevision}
+                        onOpenWhatsAppChat={() => setWaChatOpen(true)}
                       />
                       <DeskComposePanel
                         ticketId={ticket.id}
@@ -1926,6 +2025,9 @@ export default function DeskV2Root() {
           rightFields={rightFields}
           sendStatus={sendStatus}
           onFieldChange={handleFieldChange}
+          onAssumeTicket={handleAssumeTicket}
+          assumingTicket={assumingTicket}
+          showAssumeTicket={showAssumeTicket}
           onApplyTabulation={handleApplyTabulation}
           onStartWorkflow={handleStartWorkflow}
           startingWorkflow={startingWorkflow}
