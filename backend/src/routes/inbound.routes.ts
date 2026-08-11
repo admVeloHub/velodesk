@@ -1,4 +1,4 @@
-/** inbound.routes v1.7.2 — webhook auth URL pública Twilio */
+/** inbound.routes v1.7.3 — WhatsApp inbound sem auto-reply sandbox */
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { env } from '../config/env';
@@ -167,7 +167,7 @@ router.get('/whatsapp/health', (req: Request, res: Response) => {
   res.json(getWhatsAppInboundHealth(baseUrl));
 });
 
-/** WhatsApp Twilio — webhook inbound (quickstart: log + resposta TwiML) */
+/** WhatsApp Twilio — webhook inbound (registra mensagem; auto-reply só se TWILIO_WHATSAPP_AUTO_REPLY definido) */
 router.post('/whatsapp/messages', twilioWebhookAuthMiddleware, async (req, res: Response) => {
   try {
     const payload = parseTwilioWhatsAppWebhook(req.body as Record<string, unknown>);

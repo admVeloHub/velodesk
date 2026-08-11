@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.28.4 | DATE: 2026-08-10
- * — waChatId com DDI 55 (toWhatsAppChatIdDigits)
+ * VERSION: v3.29.0 | DATE: 2026-08-11
+ * — Polling WhatsApp: refresh imediato + 5s enquanto aguarda resposta do cliente
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -106,11 +106,12 @@ import ProdutosForwardPopover from './components/ProdutosForwardPopover';
 import WorkflowComunicacaoModal from '../workflow/components/WorkflowComunicacaoModal';
 import { replyWorkflowComunicacao } from '../../services/workflow/workflowDecisionHandlers';
 import deskPlatformTrace, { createPlatformTraceCounter } from '../../utils/deskPlatformTrace';
-import { hasPublicThreadChanged } from '../../services/desk/ticketThreadSync';
+import { hasPublicThreadChanged, hasWhatsAppThreadChanged } from '../../services/desk/ticketThreadSync';
 import { hasAtendimentoFuncao } from '../../services/desk/atuacaoVision';
 
 /** Respostas de cliente chegam por e-mail a qualquer momento: a thread se atualiza sozinha */
 const AUTO_REFRESH_DETAIL_MS = 15000;
+const AUTO_REFRESH_WA_WAIT_MS = 5000;
 const AUTO_REFRESH_QUEUES_MS = 60000;
 
 const WORKFLOW_REQUIRES_CLIENT_MESSAGE = 'Identifique o cliente (CPF válido) antes de iniciar o workflow.';
@@ -470,9 +471,10 @@ export default function DeskV2Root() {
           ? mergeApiTicketPreservingPendingWorkflow(prevTicket, full)
           : full;
         const threadChanged = hasPublicThreadChanged(prevTicket, merged);
+        const waThreadChanged = hasWhatsAppThreadChanged(prevTicket, merged);
         const detailFilled = ticketNeedsDetailLoad(prevTicket) && !ticketNeedsDetailLoad(merged);
 
-        if (threadChanged || detailFilled) {
+        if (threadChanged || waThreadChanged || detailFilled) {
           const msgs = merged?.messages?.length ?? 0;
           const prevMsgs = prevTicket?.messages?.length;
           const last = merged?.messages?.[msgs - 1];
@@ -481,12 +483,13 @@ export default function DeskV2Root() {
             de: prevMsgs ?? null,
             para: msgs,
             ultimaOrigem: last?.origin || last?.sender || null,
+            waThreadChanged,
             detailFilled,
             patch: !cancelled && !commitInProgressRef.current,
           });
         }
 
-        if (!cancelled && !commitInProgressRef.current && (threadChanged || detailFilled)) {
+        if (!cancelled && !commitInProgressRef.current && (threadChanged || waThreadChanged || detailFilled)) {
           patchTicket(ticketId, merged);
         }
       } catch (err) {
@@ -497,21 +500,41 @@ export default function DeskV2Root() {
       }
     };
 
-    const entry = findTicketEntry(ticketId);
-    if (ticketNeedsDetailLoad(entry?.ticket)) {
-      void syncDetail();
-    }
+    const resolvePollIntervalMs = () => {
+      const current = findTicketEntry(ticketId)?.ticket;
+      if (!current) return AUTO_REFRESH_DETAIL_MS;
+      const waState = getWhatsAppDeskUiState(current);
+      if (waState?.awaitingClient || waState?.needsInitial) return AUTO_REFRESH_WA_WAIT_MS;
+      return AUTO_REFRESH_DETAIL_MS;
+    };
 
-    const timer = window.setInterval(syncDetail, AUTO_REFRESH_DETAIL_MS);
+    void syncDetail();
+
+    let timer = null;
+    const schedulePoll = () => {
+      timer = window.setTimeout(() => {
+        void syncDetail().finally(() => {
+          if (!cancelled) schedulePoll();
+        });
+      }, resolvePollIntervalMs());
+    };
+    schedulePoll();
+
     const onVisibilityChange = () => {
       if (!document.hidden) void syncDetail();
     };
+    const onTicketDetailChanged = (event) => {
+      const changedId = String(event?.detail?.ticketId ?? '');
+      if (changedId && changedId === ticketId) void syncDetail();
+    };
     document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('velodesk:ticket-detail-changed', onTicketDetailChanged);
 
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      if (timer) window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('velodesk:ticket-detail-changed', onTicketDetailChanged);
     };
   }, [activeTabId, patchTicket]);
 
@@ -917,7 +940,12 @@ export default function DeskV2Root() {
             author,
           });
         }
-        const persisted = await persistDraftTicket(prepared, messageText || internalNoteText || attachmentUrls.length);
+        const persisted = await persistDraftTicket(prepared, {
+          publicText: messageText,
+          internalText: internalNoteText,
+          attachments: attachmentUrls,
+          author: getAgentName(),
+        });
         const newId = persisted.id || persisted._id;
         const draftFlushTicket = hasPendingWorkflowPersist(prepared)
           ? { ...prepared, id: newId, _id: newId }

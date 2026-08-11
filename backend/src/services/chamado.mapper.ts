@@ -1,4 +1,4 @@
-/** chamado.mapper v2.9.5 — deliveryStatus WhatsApp na API de mensagens */
+/** chamado.mapper v2.9.6 — create separa mensagem pública de anotação interna */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -1041,6 +1041,10 @@ export async function createChamadoFromBody(
     const initialOrigin: RegistroOrigin = requestedOrigin === 'cliente' || body.sender === 'them'
       ? 'cliente'
       : 'agente';
+    const internalText = String(body.internalText ?? body.anotacaoInterna ?? '').trim();
+    const internalAttachments = Array.isArray(body.internalAttachments)
+      ? body.internalAttachments.map((item) => String(item ?? '').trim()).filter(Boolean)
+      : [];
     registro = [{
       data: new Date(),
       origin: initialOrigin,
@@ -1051,8 +1055,8 @@ export async function createChamadoFromBody(
       }),
       mensagemPublica: internal ? '' : text,
       anexosMensagemPublica: internal ? [] : attachments,
-      anotacaoInterna: internal ? text : '',
-      anexosAnotacaoInterna: internal ? attachments : [],
+      anotacaoInterna: internal ? text : internalText,
+      anexosAnotacaoInterna: internal ? attachments : internalAttachments,
       alteracoes: [],
       metadados: {
         source: String(body.source ?? body.channel ?? '').trim() || 'velodesk',
