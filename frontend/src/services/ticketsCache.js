@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.12.0 — rascunhos preservados em refresh concorrente
- * VERSION: v1.12.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.12.1 — persistDraftTicket separa mensagem pública de anotação interna
+ * VERSION: v1.12.1 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -746,14 +746,36 @@ export function createDraftTicketInCache(form) {
   return ticket;
 }
 
-export async function persistDraftTicket(ticket, messageText) {
+export async function persistDraftTicket(ticket, messageOptions = {}) {
   const draftId = String(ticket._id || ticket.id);
   assertApiReady('registrar o ticket no MongoDB');
+
+  const opts = typeof messageOptions === 'string'
+    ? { publicText: messageOptions }
+    : (messageOptions || {});
+
+  const publicText = String(opts.publicText ?? '').trim();
+  const internalText = String(opts.internalText ?? '').trim();
+  const attachments = Array.isArray(opts.attachments)
+    ? opts.attachments.map((item) => String(item ?? '').trim()).filter(Boolean)
+    : [];
+
   const payload = cockpitTicketToApi(ticket);
-  if (messageText && String(messageText).trim()) {
-    payload.text = String(messageText).trim();
-    payload.description = payload.text;
+  delete payload.text;
+  delete payload.description;
+
+  if (opts.author) payload.author = opts.author;
+
+  if (publicText || attachments.length) {
+    payload.text = publicText;
+    if (publicText) payload.description = publicText;
+    if (attachments.length) payload.attachments = attachments;
+    if (internalText) payload.internalText = internalText;
+  } else if (internalText) {
+    payload.internal = true;
+    payload.text = internalText;
   }
+
   const created = await ticketsApi.create(payload);
   const persisted = apiTicketToCockpit(created);
   removeTicketFromColumns(draftId);

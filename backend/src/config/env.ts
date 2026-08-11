@@ -100,8 +100,8 @@ export const env = {
   /** API Key (SK...) — alternativa ao Auth Token; exige TWILIO_SUBACCOUNT_SID */
   twilioApiKeySid: (process.env.TWILIO_API_KEY_SID || process.env.API_KEY_SID || '').trim(),
   twilioApiKeySecret: (process.env.TWILIO_API_KEY_SECRET || process.env.API_KEY_SECRET || '').trim(),
-  /** Sandbox default: whatsapp:+14155238886 */
-  twilioWhatsappFrom: (process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886').trim(),
+  /** Número WhatsApp Business (produção). Não usar +14155238886 (sandbox Twilio). */
+  twilioWhatsappFrom: (process.env.TWILIO_WHATSAPP_FROM || '').trim(),
   /** Template Appointment Reminder (Sandbox quickstart) */
   twilioWhatsappContentSid: (
     process.env.TWILIO_WHATSAPP_CONTENT_SID || 'HXb5b62575e6e4ff6129ad7c8efe1f983e'
@@ -111,10 +111,8 @@ export const env = {
     process.env.TWILIO_WHATSAPP_DESK_ACTIVE_CONTENT_SID || 'HXcbba12297392a996aeaf60af3e05ccc4'
   ).trim(),
   whatsappInboundEnabled: process.env.WHATSAPP_INBOUND_ENABLED !== 'false',
-  twilioWhatsappAutoReply: (
-    process.env.TWILIO_WHATSAPP_AUTO_REPLY
-    || 'Message received! Hello again from the Twilio Sandbox for WhatsApp.'
-  ).trim(),
+  /** Resposta automática TwiML ao inbound — vazio = só registra no ticket, sem mensagem ao cliente */
+  twilioWhatsappAutoReply: (process.env.TWILIO_WHATSAPP_AUTO_REPLY || '').trim(),
   /** Status callback — confirmação de entrega (sent/delivered/read) */
   twilioWhatsappStatusCallbackUrl: (process.env.TWILIO_WHATSAPP_STATUS_CALLBACK_URL || '').trim(),
   /** Dev only — pular validação X-Twilio-Signature (ngrok/local) */

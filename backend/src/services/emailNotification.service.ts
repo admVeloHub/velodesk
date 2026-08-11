@@ -1,4 +1,4 @@
-/** emailNotification.service v1.7.0 — máscara envio: logo + composer + fechamento visual */
+/** emailNotification.service v1.7.1 — não notifica solicitante em ticket criado só com nota interna */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { loadDadosForRef, normalizeEmail } from './cliente.service';
 import { sendOutboundEmail } from './email-outbound.service';
@@ -177,12 +177,25 @@ function findFirstPublicAgentMessage(chamado: IChamadoN1): { text: string; regis
   return null;
 }
 
+/** Ticket criado só com nota interna do agente — não notificar solicitante. */
+function chamadoCreatedHasPublicClientMessage(chamado: IChamadoN1): boolean {
+  for (const reg of chamado.registro ?? []) {
+    const pub = String(reg.mensagemPublica ?? '').trim();
+    const pubAttachments = (reg.anexosMensagemPublica ?? []).length;
+    if (pub || pubAttachments) return true;
+  }
+  return false;
+}
+
 /** Criação de ticket: envia a 1ª mensagem pública do agente ou confirmação genérica. */
 export async function notifyChamadoCreatedAsync(
   chamado: IChamadoN1,
   clienteEmail?: string,
 ): Promise<void> {
   try {
+    if (!chamadoCreatedHasPublicClientMessage(chamado)) {
+      return;
+    }
     const firstAgentPublic = findFirstPublicAgentMessage(chamado);
     if (firstAgentPublic) {
       const reg = chamado.registro?.[firstAgentPublic.registroIndex];

@@ -1,10 +1,29 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.75.0 | DATE: 2026-08-11 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.76.0 | DATE: 2026-08-11 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — fix auto-reply Sandbox no inbound WhatsApp e polling thread WA no Desk
+
+- **Data/Hora**: 2026-08-11
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.76.0
+  - **Backend**: whatsappInbound v1.3.1, inbound.routes v1.7.3, chamado.mapper, emailNotification
+  - **Frontend**: DeskV2Root v3.29.0, ticketThreadSync v1.3.0, ticketsCache
+- **Arquivos principais**:
+  - `backend/src/services/twilio/whatsappInbound.service.ts` — remove fallback hardcoded "Twilio Sandbox"; TwiML vazio salvo se `TWILIO_WHATSAPP_AUTO_REPLY` ausente
+  - `frontend/src/features/desk/DeskV2Root.jsx` — poll imediato + 5s enquanto aguarda resposta WA; fingerprint thread WhatsApp
+  - `frontend/src/services/desk/ticketThreadSync.js` — `hasWhatsAppThreadChanged`
+- **Descrição**: Corrige produção respondendo "Hello again from the Twilio Sandbox" a cada inbound. Desk passa a exibir respostas do cliente na janela WhatsApp sem depender só do poll de 15s.
+- **Status**: Push dev + main
+
+---
 
 ### GCP Config — sender WhatsApp Desk +17406697857 (conta principal)
 

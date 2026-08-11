@@ -1,6 +1,6 @@
 /**
- * ticketThreadSync v1.2.0 — refresh IA só por thread/notas (não tabulação aplicada)
- * VERSION: v1.2.0 | DATE: 2026-08-07
+ * ticketThreadSync v1.3.0 — fingerprint thread WhatsApp para polling inbound
+ * VERSION: v1.3.0 | DATE: 2026-08-11
  */
 
 function normalizeMsgText(value) {
@@ -66,6 +66,33 @@ export function hasPublicThreadChanged(prevTicket, nextTicket) {
   if (!prevTicket && !nextTicket) return false;
   if (!prevTicket || !nextTicket) return true;
   return buildPublicThreadFingerprint(prevTicket) !== buildPublicThreadFingerprint(nextTicket);
+}
+
+function whatsAppMessagesFromTicket(ticket) {
+  return (ticket?.messages || []).filter((m) => {
+    if (!m || m.type === 'internal') return false;
+    if (m.channel === 'whatsapp') return true;
+    const metaSource = String(m.source || m.metadados?.source || '').toLowerCase();
+    return metaSource === 'whatsapp-thread';
+  });
+}
+
+/** Fingerprint das mensagens WhatsApp persistidas (channel whatsapp / whatsapp-thread). */
+export function buildWhatsAppThreadFingerprint(ticket) {
+  return whatsAppMessagesFromTicket(ticket)
+    .map((m) => {
+      const ts = m.timestamp || m.time || m.createdAt || '';
+      const text = normalizeMsgText(m.text || m.message);
+      const origin = m.origin || (m.sender === 'them' ? 'cliente' : 'agente');
+      return `${m.id || ''}|${origin}|${ts}|${text}`;
+    })
+    .join(';;');
+}
+
+export function hasWhatsAppThreadChanged(prevTicket, nextTicket) {
+  if (!prevTicket && !nextTicket) return false;
+  if (!prevTicket || !nextTicket) return true;
+  return buildWhatsAppThreadFingerprint(prevTicket) !== buildWhatsAppThreadFingerprint(nextTicket);
 }
 
 /** Dispara refresh da sugestão IA (e-mail/chat: nova msg cliente; telefone: notas persistidas). */

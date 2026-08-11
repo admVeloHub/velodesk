@@ -1,4 +1,4 @@
-/** whatsappInbound.service v1.3.0 — inbound + match waChatId canônico (E.164) */
+/** whatsappInbound.service v1.3.1 — inbound sem auto-reply sandbox por padrão */
 import twilio from 'twilio';
 import { env } from '../../config/env';
 import { ChamadoN1 } from '../../models/ChamadoN1';
@@ -49,9 +49,13 @@ export function parseTwilioWhatsAppWebhook(body: Record<string, unknown>): Twili
 
 export function buildInboundTwimlReply(message?: string): string {
   const twiml = new MessagingResponse();
-  const text = String(message ?? env.twilioWhatsappAutoReply).trim()
-    || 'Message received! Hello again from the Twilio Sandbox for WhatsApp.';
-  twiml.message(text);
+  const configured = message !== undefined
+    ? String(message).trim()
+    : String(env.twilioWhatsappAutoReply ?? '').trim();
+  if (!configured) {
+    return twiml.toString();
+  }
+  twiml.message(configured);
   return twiml.toString();
 }
 
