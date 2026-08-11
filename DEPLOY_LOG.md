@@ -1,10 +1,28 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.74.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.75.0 | DATE: 2026-08-11 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GCP Config — sender WhatsApp Desk +17406697857 (conta principal)
+
+- **Data/Hora**: 2026-08-11
+- **Tipo**: GCP Config (Twilio + Cloud Run env)
+- **Serviço**: velodesk (`us-east1`)
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.75.0
+  - **Scripts**: configure-desk-whatsapp-sender v1.0.0, enable-ms-inbound-on-number v1.0.0
+- **Alterações Twilio (API)**:
+  - Sender `+17406697857` (XE6db6bd8cf6b31fdec915093bae2d82eb) — webhooks inbound/status → Velodesk
+  - Messaging Service `Autenticação – Verificação` — `use_inbound_webhook_on_number=true` (desbloqueia inbound)
+- **Cloud Run env**:
+  - `TWILIO_WHATSAPP_FROM=whatsapp:+17406697857`
+- **Descrição**: Desk passa a usar sender +17406697857 na conta principal; corrige bloqueio de inbound causado pelo Messaging Service de Autenticação.
+- **Status**: Twilio configurado; Cloud Run env requer `gcloud run services update`
+
+---
 
 ### GitHub Push — fix assinatura Twilio com URL pública 278491073220
 
