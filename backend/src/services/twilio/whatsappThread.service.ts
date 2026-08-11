@@ -1,4 +1,4 @@
-/** whatsappThread.service v1.3.1 — export normalizeWaChatId + E.164 BR */
+/** whatsappThread.service v1.4.0 — markModified em registro.metadados (Mixed não rastreia mutação) */
 import type { IChamadoN1, IRegistro } from '../../models/ChamadoN1';
 import { normalizePhoneE164 } from '../telephonyRecado.validation';
 
@@ -257,6 +257,9 @@ export function appendWhatsAppMensagemToChamado(
   registro.metadados = meta;
   registro.data = now;
 
+  // metadados é Mixed — sem markModified o save() descarta a mutação silenciosamente
+  chamado.markModified(`registro.${index}.metadados`);
+
   return {
     registroIndex: index,
     mensagem,
@@ -342,6 +345,8 @@ export function updateWhatsAppMensagemDeliveryBySid(
     };
     writeWhatsAppMensagensToRegistro(reg, list);
     reg.data = new Date(now);
+    // metadados é Mixed — sem markModified o save() descarta a mutação silenciosamente
+    chamado.markModified(`registro.${index}.metadados`);
     return { updated: true, deliveryStatus: nextStatus };
   }
 
