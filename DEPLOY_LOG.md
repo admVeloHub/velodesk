@@ -1,10 +1,26 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.78.0 | DATE: 2026-08-12 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.79.0 | DATE: 2026-08-12 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — fix build Cloud Build: service de anexos legado Octadesk fora do versionamento
+
+- **Data/Hora**: 2026-08-12
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.79.0
+  - **Backend**: octadeskLegacyAttachmentStorage v1.0.0
+- **Arquivos principais**:
+  - `backend/src/services/octadeskLegacyAttachmentStorage.service.ts` — arquivo passa a ser versionado
+- **Descrição**: O push anterior (`d994c2c`) levou `uploads.routes.ts` v1.4.0, que importa `openOctadeskLegacyAttachment`, mas o service permaneceu como untracked no repositório. O `tsc` no Cloud Build falhou com `TS2307: Cannot find module '../services/octadeskLegacyAttachmentStorage.service'`. Nenhuma alteração de código: apenas inclusão do arquivo ausente no versionamento. `npx tsc --noEmit` no backend passa sem erros.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — Consolidado Testes CRM (Meus Tickets, anexos, 360, pendente, especiais)
 
