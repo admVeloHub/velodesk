@@ -298,6 +298,7 @@ export const telephonyApi = {
   integrationInfo: () => api.get('/telephony/integration-info').then((r) => r.data),
   listCalls: (params) => api.get('/telephony/calls', { params }).then((r) => r.data),
   getCall: (id) => api.get(`/telephony/calls/${encodeURIComponent(id)}`).then((r) => r.data),
+  exportCalls: (params) => api.get('/telephony/calls/export', { params }).then((r) => r.data),
   stats: (params) => api.get('/telephony/calls/stats', { params }).then((r) => r.data),
   listRecados: () => api.get('/telephony/recados').then((r) => r.data),
   createRecado: (data) => api.post('/telephony/recados', data).then((r) => r.data),

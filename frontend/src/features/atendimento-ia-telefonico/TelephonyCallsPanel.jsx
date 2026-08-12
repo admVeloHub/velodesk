@@ -3,6 +3,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { telephonyApi } from '../../api/client';
 import GestaoPeriodFilter from '../workspace/components/gestaoInsights/GestaoPeriodFilter';
 import TelephonyRecadosPanel from './TelephonyRecadosPanel';
@@ -56,6 +57,8 @@ export default function TelephonyCallsPanel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   const queryParams = useCallback(() => ({
     period: period.period,
@@ -91,6 +94,39 @@ export default function TelephonyCallsPanel() {
   useEffect(() => {
     if (tab === 'calls') void load();
   }, [tab, load]);
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    setExportError('');
+    try {
+      const { items } = await telephonyApi.exportCalls(queryParams());
+      if (!items?.length) {
+        setExportError('Nenhuma ligação encontrada no período selecionado.');
+        return;
+      }
+      const rows = items.map((item) => ({
+        'Data/hora': formatDate(item.endedAt || item.startedAt),
+        Telefone: item.clientPhone || '—',
+        Cliente: item.clientName || '—',
+        Agente: item.agentName || '—',
+        Duração: formatDuration(item.durationSeconds),
+        Resumo: item.summary || '',
+        'Transcrição completa': item.transcript || '',
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      worksheet['!cols'] = [
+        { wch: 18 }, { wch: 16 }, { wch: 24 }, { wch: 20 }, { wch: 10 }, { wch: 60 }, { wch: 90 },
+      ];
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Ligações Letícia IA');
+      const stamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, `leticia-ia-transcricoes-${stamp}.xlsx`);
+    } catch (err) {
+      setExportError(err?.response?.data?.message || 'Não foi possível gerar o arquivo XLSX.');
+    } finally {
+      setExporting(false);
+    }
+  }, [queryParams]);
 
   return (
     <div className="telephony-shell">
@@ -173,7 +209,19 @@ export default function TelephonyCallsPanel() {
             <button type="button" className="btn btn-primary btn-sm" onClick={load}>
               Filtrar
             </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={handleExport}
+              disabled={exporting}
+              title="Baixa horário, resumo e transcrição completa das ligações do período filtrado"
+            >
+              <i className="ti ti-file-spreadsheet" aria-hidden="true" />
+              {exporting ? 'Gerando XLSX…' : 'Baixar XLSX'}
+            </button>
           </div>
+
+          {exportError ? <p className="telephony-error">{exportError}</p> : null}
 
           {stats ? (
             <div className="telephony-kpis">

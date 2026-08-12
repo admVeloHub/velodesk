@@ -3,6 +3,7 @@ import { NextFunction, Request, Response, Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { env } from '../config/env';
 import {
+  exportTelephonyCalls,
   getTelephonyCallDetail,
   getTelephonyCallsStats,
   getTelephonyIntegrationInfo,
@@ -98,6 +99,17 @@ router.get('/calls', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[telephony] GET /calls falhou:', err);
     return res.status(500).json({ message: 'Erro ao carregar ligações' });
+  }
+});
+
+/** Export (XLSX no frontend) — horário, resumo e transcrição completa das ligações do período filtrado. */
+router.get('/calls/export', async (req: Request, res: Response) => {
+  try {
+    const items = await exportTelephonyCalls(queryFromRequest(req));
+    return res.json({ items, total: items.length });
+  } catch (err) {
+    console.error('[telephony] GET /calls/export falhou:', err);
+    return res.status(500).json({ message: 'Erro ao exportar ligações' });
   }
 });
 
