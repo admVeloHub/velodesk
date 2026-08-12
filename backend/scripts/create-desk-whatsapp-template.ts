@@ -1,11 +1,8 @@
-/** create-desk-whatsapp-template.ts v1.0.0 — template UTILITY atendimento Desk */
+/** create-desk-whatsapp-template.ts v1.1.0 — template UTILITY Desk (o Velotax) */
 import { env } from '../src/config/env';
+import { DESK_ACTIVE_WHATSAPP_TEMPLATE_TWILIO_BODY } from '../src/services/twilio/whatsappActiveOutbound.service';
 
-const TEMPLATE_BODY = [
-  'Olá {{1}}, aqui é a Velotax.',
-  'Referente ao seu chamado {{2}}: {{3}}',
-  'Responda esta mensagem para continuarmos o atendimento.',
-].join('\n');
+const TEMPLATE_BODY = DESK_ACTIVE_WHATSAPP_TEMPLATE_TWILIO_BODY;
 
 async function main() {
   const auth = Buffer.from(`${env.twilioAccountSid}:${env.twilioAuthToken}`).toString('base64');

@@ -1,4 +1,4 @@
-﻿/* Velodesk CRM v1.13.0 - balao de presenca da conversa WhatsApp na timeline */
+﻿/* Velodesk CRM v1.15.0 - transcricao de audio WhatsApp sob demanda */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -1603,6 +1603,19 @@
     color: #334155;
     line-height: 1.35;
     position: relative;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .ticket-client-profile__hydrating {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--desk-fs-xs);
+    color: #64748b;
+    font-weight: 500;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .ticket-client-profile__hydrating-spin {
+    animation: crm-consultas-spin 0.85s linear infinite;
 }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-client-profile-bar .ticket-client-profile__row--client {
@@ -4065,6 +4078,126 @@
 #velodeskDeskV2Root .wa-msg__text {
     display: block;
     padding-right: 4px;
+    white-space: pre-wrap;
+}
+
+#velodeskDeskV2Root .wa-msg__media-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: -3px -6px 6px;
+    min-width: 220px;
+}
+
+#velodeskDeskV2Root .wa-msg__media {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#velodeskDeskV2Root .wa-msg__image-button {
+    border: 0;
+    border-radius: 7px;
+    padding: 0;
+    overflow: hidden;
+    background: transparent;
+    cursor: zoom-in;
+    line-height: 0;
+}
+
+#velodeskDeskV2Root .wa-msg__image-button img,
+#velodeskDeskV2Root .wa-msg__video {
+    display: block;
+    width: 100%;
+    max-width: 360px;
+    max-height: 360px;
+    object-fit: contain;
+    border-radius: 7px;
+    background: #111b21;
+}
+
+#velodeskDeskV2Root .wa-msg__audio {
+    width: min(330px, 65vw);
+    max-width: 100%;
+}
+
+#velodeskDeskV2Root .wa-msg__document {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    border: 0;
+    border-radius: 7px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.06);
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+}
+
+#velodeskDeskV2Root .wa-msg__document:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+#velodeskDeskV2Root .wa-msg__document i {
+    font-size: 24px;
+    color: #075e54;
+}
+
+#velodeskDeskV2Root .wa-msg__media-loading,
+#velodeskDeskV2Root .wa-msg__media-error,
+#velodeskDeskV2Root .wa-msg__transcription-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--desk-fs-caption);
+    color: #667781;
+}
+
+#velodeskDeskV2Root .wa-msg__media-error {
+    color: #b42318;
+}
+
+#velodeskDeskV2Root .wa-msg__transcription-status {
+    margin-top: 5px;
+}
+
+#velodeskDeskV2Root .wa-msg__transcription-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    margin-top: 6px;
+    border: 1px solid rgba(7, 94, 84, 0.35);
+    border-radius: 16px;
+    padding: 5px 10px;
+    background: rgba(255, 255, 255, 0.6);
+    color: #075e54;
+    font: inherit;
+    font-size: var(--desk-fs-caption);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+#velodeskDeskV2Root .wa-msg__transcription-button:hover:not(:disabled) {
+    background: rgba(7, 94, 84, 0.1);
+}
+
+#velodeskDeskV2Root .wa-msg__transcription-button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+#velodeskDeskV2Root .wa-msg__transcription-status i {
+    animation: wa-media-spin 1s linear infinite;
+}
+
+@keyframes wa-media-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 #velodeskDeskV2Root .wa-msg__time {

@@ -1,4 +1,4 @@
-/** tickets.routes v1.16.0 — POST whatsapp/messages: initialTemplate + sessão 24h */
+/** tickets.routes v1.17.0 — transcrição WhatsApp sob demanda */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -57,6 +57,7 @@ import {
   sendWhatsAppForChamado,
   type WhatsAppChamadoOutboundResult,
 } from '../services/twilio/whatsappActiveOutbound.service';
+import { requestWhatsAppAudioTranscription } from '../services/twilio/whatsappAudioTranscription.service';
 
 const router = Router();
 
@@ -448,6 +449,39 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
     ticket,
   });
 });
+
+router.post(
+  '/:id/whatsapp/messages/:messageSid/transcription',
+  authMiddleware,
+  async (req, res: Response) => {
+    const chamado = await ChamadoN1.findById(req.params.id);
+    if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+
+    try {
+      await assertCanActOnTicket(req.user!, chamado);
+    } catch (err) {
+      if (handleTicketMutationError(err, res)) return;
+      throw err;
+    }
+
+    try {
+      const transcriptionStatus = await requestWhatsAppAudioTranscription(
+        chamado._id.toString(),
+        String(req.params.messageSid || '').trim(),
+      );
+      const refreshed = await ChamadoN1.findById(chamado._id);
+      if (!refreshed) return res.status(404).json({ message: 'Ticket não encontrado' });
+      const boxes = await loadBoxes();
+      const ticket = await chamadoToTicket(
+        refreshed,
+        await resolveBoxIdForChamado(refreshed, boxes),
+      );
+      return res.status(202).json({ transcriptionStatus, ticket });
+    } catch (err) {
+      return res.status(400).json({ message: (err as Error).message });
+    }
+  },
+);
 
 router.post('/:id/workflow/start', authMiddleware, async (req, res: Response) => {
   const chamado = await ChamadoN1.findById(req.params.id);

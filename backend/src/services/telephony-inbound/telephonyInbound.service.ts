@@ -1,4 +1,4 @@
-/** telephonyInbound.service v2.1.0 — recebe ligações Contact Tel / parceira + dispara análise IA */
+/** telephonyInbound.service v2.2.0 — auto-cria ticket + CTA sininho quando agente determinado */
 import { TelephonyCall } from '../../models/TelephonyCall';
 import { env } from '../../config/env';
 import { findClienteByCpf, findClienteByPhone } from '../cliente.service';
@@ -7,6 +7,10 @@ import { CONTACT_TEL_COMPLETED_FIXTURE } from './fixtures/contact-tel.fixture';
 import { sanitizeTelephonyRawPayload } from './sanitizePayload';
 import type { TelephonyCallInput, TelephonyInboundResult } from './types';
 import { buildPartnerRecadosEnvelope } from '../telephonyRecado.service';
+import {
+  createTicketAndNotifyFromTelephonyCall,
+  telephonyHasAssignedAgent,
+} from '../telephonyTicketNotify.service';
 
 async function resolveClienteId(input: TelephonyCallInput) {
   if (input.clientCpf) {
@@ -86,6 +90,17 @@ export async function processInboundTelephonyCall(
     void import('../telephonyIaAnalise.service')
       .then(({ classificarTelephonyCallPorId }) => classificarTelephonyCallPorId(String(doc._id)))
       .catch((err) => console.warn('[telephony-inbound] classificação IA falhou:', (err as Error).message));
+  }
+
+  if (env.telephonyAutoCreateTicket && telephonyHasAssignedAgent(input)) {
+    try {
+      const created = await createTicketAndNotifyFromTelephonyCall(doc, input);
+      if (created) {
+        console.info('[telephony-inbound] ticket criado e CTA notificado', created);
+      }
+    } catch (err) {
+      console.warn('[telephony-inbound] auto-create ticket falhou:', (err as Error).message);
+    }
   }
 
   console.info('[telephony-inbound] created externalCallId=%s callId=%s provider=%s status=%s',

@@ -1,9 +1,14 @@
-/** clients.routes v1.0.5 — GET por cpf ou e-mail */
+/** clients.routes v1.0.6 — GET por cpf com fallback Customer Data API (hydrateFromApi) */
 import { Router, Response } from 'express';
 import mongoose from 'mongoose';
 import { authMiddleware } from '../middleware/auth';
 import { getClienteModel } from '../models/Cliente';
-import { findClienteByCpf, findClienteByEmail, normalizeCpf } from '../services/cliente.service';
+import {
+  findClienteByCpf,
+  findClienteByEmail,
+  findOrCreateClienteFromCpfLookup,
+  normalizeCpf,
+} from '../services/cliente.service';
 import { env } from '../config/env';
 import { getMongoStorageLabel, isCadastrosConnected } from '../config/database';
 
@@ -22,14 +27,27 @@ router.get('/', authMiddleware, async (req, res: Response) => {
       return res.status(400).json({ message: 'Query cpf ou email é obrigatória' });
     }
 
-    const cliente = cpf ? await findClienteByCpf(cpf) : await findClienteByEmail(email);
+    let cliente = null;
+    let lookupSource: string | undefined;
+
+    if (cpf) {
+      const hydrateFromApi = String(req.query.hydrateFromApi ?? '1').trim() !== '0';
+      const result = await findOrCreateClienteFromCpfLookup(cpf, hydrateFromApi);
+      cliente = result.cliente;
+      lookupSource = result.source;
+    } else {
+      cliente = await findClienteByEmail(email);
+      if (cliente) lookupSource = 'cadastro_local';
+    }
+
     if (!cliente) {
       const lookup = cpf ? `cpf=${cpf}` : `email=${email}`;
       console.log(`[clients] GET ${lookup} → 404 | db=${env.mongoCadastrosDbName} storage=${getMongoStorageLabel()}`);
       return res.status(404).json({ message: 'Cliente não encontrado' });
     }
     const lookup = cpf ? `cpf=${cpf}` : `email=${email}`;
-    console.log(`[clients] GET ${lookup} → 200 _id=${cliente._id} | storage=${getMongoStorageLabel()}`);
+    const sourceTag = lookupSource ? ` source=${lookupSource}` : '';
+    console.log(`[clients] GET ${lookup} → 200 _id=${cliente._id}${sourceTag} | storage=${getMongoStorageLabel()}`);
     res.json(cliente);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

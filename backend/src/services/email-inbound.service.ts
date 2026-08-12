@@ -1,4 +1,4 @@
-/** email-inbound.service v1.13.0 — classificador como hint; Agente 4 sempre no create */
+/** email-inbound.service v1.14.0 — anexos no corpo só com nome; HTML com imgs inline */
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
@@ -47,9 +47,56 @@ export function stripHtml(html: string): string {
   return decodeBasicHtmlEntities(stripped);
 }
 
+function plainLooksLikeImagePlaceholders(text: string): boolean {
+  return /\[image:\s*[^\]]+\]/i.test(text)
+    || /\[cid:[^\]]+\]/i.test(text)
+    || (!text.trim() && false);
+}
+
+/** Mantém tags básicas + img com src http(s) ou /api — para corpo inbound com fotos inline. */
+export function sanitizeInboundHtmlKeepingImages(html: string): string {
+  let result = String(html ?? '');
+  result = result.replace(/<\s*(script|style)[^>]*>[\s\S]*?<\/\s*\1\s*>/gi, '');
+  result = result.replace(/<\s*br\s*\/?>/gi, '<br>');
+  // Preserve img tags with safe src; rewrite others away after collecting.
+  const imgs: string[] = [];
+  result = result.replace(/<\s*img\b[^>]*>/gi, (full) => {
+    const srcMatch = full.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
+    const src = String(srcMatch?.[1] ?? '').trim();
+    if (!src) return '';
+    if (/^cid:/i.test(src)) return ''; // unresolved CID — drop
+    if (!/^(https?:\/\/|\/api\/)/i.test(src)) return '';
+    const altMatch = full.match(/\balt\s*=\s*["']([^"']*)["']/i);
+    const alt = String(altMatch?.[1] ?? 'imagem').replace(/"/g, '');
+    const token = `__IMG_${imgs.length}__`;
+    imgs.push(`<img src="${src}" alt="${alt}" style="max-width:100%;height:auto" />`);
+    return token;
+  });
+  result = result.replace(/<\s*(\/?)\s*([a-z][a-z0-9]*)\b[^>]*>/gi, (_full, slash, name) => {
+    const tag = String(name).toLowerCase();
+    const allowed = new Set(['b', 'strong', 'i', 'em', 'u', 'br', 'p', 'div', 'ul', 'ol', 'li']);
+    if (!allowed.has(tag)) return '';
+    if (tag === 'br' && slash) return '';
+    return `<${slash ? '/' : ''}${tag}>`;
+  });
+  imgs.forEach((img, i) => {
+    result = result.replace(`__IMG_${i}__`, img);
+  });
+  return result.replace(/(<br>){3,}/gi, '<br><br>').trim();
+}
+
 export function resolveEmailBody(payload: InboundEmailPayload): string {
   const text = payload.textBody.trim();
-  const raw = text || (payload.htmlBody ? stripHtml(payload.htmlBody) : '');
+  const htmlRaw = String(payload.htmlBody ?? '').trim();
+
+  if (htmlRaw && (!text || plainLooksLikeImagePlaceholders(text))) {
+    const sanitized = sanitizeInboundHtmlKeepingImages(htmlRaw);
+    if (sanitized) {
+      return extractEmailReplyContent(sanitized);
+    }
+  }
+
+  const raw = text || (htmlRaw ? stripHtml(htmlRaw) : '');
   return extractEmailReplyContent(raw);
 }
 
@@ -151,11 +198,10 @@ function buildAttachmentMetadados(payload: InboundEmailPayload): Record<string, 
 
 function appendAttachmentReferencesToBody(bodyText: string, payload: InboundEmailPayload): string {
   const lines = (payload.attachments ?? [])
-    .filter((item) => item.gcsUri || item.url)
+    .filter((item) => item.filename || item.url)
     .map((item) => {
-      const label = String(item.filename || 'anexo').trim();
-      const ref = String(item.gcsUri || item.url || '').trim();
-      return `[Anexo: ${label}] ${ref}`;
+      const label = String(item.filename || 'anexo').trim() || 'anexo';
+      return `[Anexo: ${label}]`;
     });
   if (!lines.length) return bodyText;
   const block = lines.join('\n');

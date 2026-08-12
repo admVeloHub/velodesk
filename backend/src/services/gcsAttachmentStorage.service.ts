@@ -1,4 +1,4 @@
-/** gcsAttachmentStorage v1.3.1 — prefixos inbound/sent; "No such object" = miss silencioso */
+/** gcsAttachmentStorage v1.4.0 — prefixos inbound/sent/octadesk-legacy; "No such object" = miss silencioso */
 import { Readable } from 'stream';
 import { google } from 'googleapis';
 import { env } from '../config/env';
@@ -16,6 +16,12 @@ export function getInboundAttachmentsPrefix(): string {
 
 export function getSentAttachmentsPrefix(): string {
   return normalizePrefix(env.gcpStorageSentAttachmentsPrefix || 'desk_ticket_sent_attachments');
+}
+
+export function getOctadeskLegacyAttachmentsPrefix(): string {
+  return normalizePrefix(
+    env.gcpStorageOctadeskLegacyAttachmentsPrefix || 'octadesk_legacy_attachments',
+  );
 }
 
 export function isGcsAttachmentStorageConfigured(): boolean {
@@ -137,4 +143,18 @@ export async function readSentAttachmentFromGcs(
   storageKey: string,
 ): Promise<{ stream: Readable; contentType: string } | null> {
   return readAttachmentFromGcs(getSentAttachmentsPrefix(), storageKey);
+}
+
+export async function uploadOctadeskLegacyAttachmentToGcs(
+  storageKey: string,
+  buffer: Buffer,
+  contentType: string,
+): Promise<boolean> {
+  return uploadAttachmentToGcs(getOctadeskLegacyAttachmentsPrefix(), storageKey, buffer, contentType);
+}
+
+export async function readOctadeskLegacyAttachmentFromGcs(
+  storageKey: string,
+): Promise<{ stream: Readable; contentType: string } | null> {
+  return readAttachmentFromGcs(getOctadeskLegacyAttachmentsPrefix(), storageKey);
 }

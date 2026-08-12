@@ -1,7 +1,8 @@
-/** whatsappActiveOutbound.service v1.2.0 — fallback cadastro WhatsApp + E.164 BR */
+/** whatsappActiveOutbound.service v1.4.0 — template inicial: artigo masculino (o Velotax) */
 import type { IChamadoN1 } from '../../models/ChamadoN1';
 import type { IClienteDados } from '../../models/Cliente';
 import { env } from '../../config/env';
+import { resolveClientGreetingName } from '../clientMessageEnvelope.service';
 import { loadDadosForRef } from '../cliente.service';
 import { normalizePhoneE164 } from '../telephonyRecado.validation';
 import { applyWhatsAppSendMask } from '../clientMessageSendMask.util';
@@ -16,6 +17,27 @@ import {
 } from './whatsappOutbound.service';
 
 export const DEFAULT_DESK_INITIAL_TEMPLATE_TEXT = 'Estamos entrando em contato sobre sua solicitação.';
+
+/** Corpo do template UTILITY Desk — placeholders Twilio {{1}} {{2}} {{3}}. */
+export const DESK_ACTIVE_WHATSAPP_TEMPLATE_TWILIO_BODY = [
+  'Olá {{1}}, aqui é o Velotax.',
+  'Referente ao seu chamado {{2}}: {{3}}',
+  'Responda esta mensagem para continuarmos o atendimento.',
+].join('\n');
+
+export function buildDeskActiveTemplateBody(
+  variables: Record<string, string>,
+): string {
+  const name = String(variables['1'] ?? 'Cliente').trim() || 'Cliente';
+  const protocol = String(variables['2'] ?? '—').trim() || '—';
+  const summary = String(variables['3'] ?? DEFAULT_DESK_INITIAL_TEMPLATE_TEXT).trim()
+    || DEFAULT_DESK_INITIAL_TEMPLATE_TEXT;
+  return [
+    `Olá ${name}, aqui é o Velotax.`,
+    `Referente ao seu chamado ${protocol}: ${summary}`,
+    'Responda esta mensagem para continuarmos o atendimento.',
+  ].join('\n');
+}
 
 export type WhatsAppOutboundMode = 'session' | 'template';
 
@@ -40,12 +62,10 @@ function truncate(value: string, max: number): string {
   return `${trimmed.slice(0, max - 1).trim()}…`;
 }
 
-function resolveClientName(chamado: IChamadoN1, dados: IClienteDados | null): string {
-  const fromCadastro = String(dados?.clienteNome ?? '').trim();
-  if (fromCadastro) return fromCadastro;
-  const fromTitle = String(chamado.chamadoTitulo ?? '').trim();
-  if (fromTitle) return fromTitle;
-  return 'Cliente';
+function resolveTemplateClientName(chamado: IChamadoN1, dados: IClienteDados | null): string {
+  const full = String(dados?.clienteNome ?? '').trim()
+    || String(chamado.chamadoTitulo ?? '').trim();
+  return resolveClientGreetingName(full, 'Cliente');
 }
 
 function resolveProtocol(chamado: IChamadoN1): string {
@@ -63,7 +83,7 @@ export function buildDeskActiveTemplateVariables(
     320,
   );
   return {
-    1: resolveClientName(chamado, dados),
+    1: resolveTemplateClientName(chamado, dados),
     2: resolveProtocol(chamado),
     3: summary,
   };
@@ -136,10 +156,12 @@ export async function sendWhatsAppForChamado(
     contentVariables,
   });
 
+  const renderedBody = buildDeskActiveTemplateBody(contentVariables);
+
   return {
     ...result,
     mode: 'template',
     sessionOpen: false,
-    body: result.body ?? rawText,
+    body: renderedBody,
   };
 }

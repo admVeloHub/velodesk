@@ -1,4 +1,4 @@
-/** uploads.routes v1.3.1 — inbound com fallback de chaves legadas */
+/** uploads.routes v1.4.0 — inbound/sent + leitura anexos legado Octadesk */
 import path from 'path';
 import multer from 'multer';
 import { Router, Response, Request } from 'express';
@@ -9,6 +9,7 @@ import {
   openSentAttachment,
   persistSentAttachment,
 } from '../services/sentAttachmentStorage.service';
+import { openOctadeskLegacyAttachment } from '../services/octadeskLegacyAttachmentStorage.service';
 
 const router = Router();
 const upload = multer({
@@ -117,6 +118,19 @@ router.get('/sent/:storageKey', authMiddleware, async (req, res: Response) => {
     const opened = await openSentAttachment(String(req.params.storageKey ?? ''));
     if (!opened) {
       return res.status(404).json({ message: 'Anexo do agente não encontrado no bucket GCP.' });
+    }
+    return sendOpenedAttachment(res, opened);
+  } catch {
+    return res.status(404).json({ message: 'Anexo não encontrado' });
+  }
+});
+
+/** Anexos importados do Octadesk → octadesk_legacy_attachments/ */
+router.get('/octadesk-legacy/:storageKey', authMiddleware, async (req, res: Response) => {
+  try {
+    const opened = await openOctadeskLegacyAttachment(String(req.params.storageKey ?? ''));
+    if (!opened) {
+      return res.status(404).json({ message: 'Anexo legado Octadesk não encontrado no bucket GCP.' });
     }
     return sendOpenedAttachment(res, opened);
   } catch {

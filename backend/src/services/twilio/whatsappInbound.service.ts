@@ -1,4 +1,4 @@
-/** whatsappInbound.service v1.3.1 — inbound sem auto-reply sandbox por padrão */
+/** whatsappInbound.service v1.5.0 — áudio armazenado para transcrição sob demanda */
 import twilio from 'twilio';
 import { env } from '../../config/env';
 import { ChamadoN1 } from '../../models/ChamadoN1';
@@ -11,6 +11,10 @@ import {
 } from './twilioClient.util';
 import { resolveWhatsAppStatusCallbackUrl } from './whatsappCallbackUrl.util';
 import type { TwilioWhatsAppWebhookPayload } from './whatsappInbound.types';
+import {
+  parseTwilioInboundMedia,
+  persistTwilioInboundMedia,
+} from './twilioMediaInbound.service';
 import {
   appendWhatsAppMensagemToChamado,
   normalizeWaChatId,
@@ -33,13 +37,15 @@ export function parseTwilioWhatsAppWebhook(body: Record<string, unknown>): Twili
 
   const numMediaRaw = readField(body, 'NumMedia');
   const numMedia = Number.parseInt(numMediaRaw || '0', 10);
+  const normalizedNumMedia = Number.isFinite(numMedia) ? Math.max(0, numMedia) : 0;
 
   return {
     messageSid: readField(body, 'MessageSid') || readField(body, 'SmsMessageSid'),
     from: readField(body, 'From'),
     to: readField(body, 'To'),
     body: readField(body, 'Body'),
-    numMedia: Number.isFinite(numMedia) ? Math.max(0, numMedia) : 0,
+    numMedia: normalizedNumMedia,
+    media: parseTwilioInboundMedia(raw, normalizedNumMedia),
     profileName: readField(body, 'ProfileName'),
     waId: readField(body, 'WaId'),
     accountSid: readField(body, 'AccountSid'),
@@ -118,13 +124,22 @@ export async function processInboundWhatsAppMessage(payload: TwilioWhatsAppWebho
     return;
   }
 
+  const storedMedia = payload.media.length
+    ? await persistTwilioInboundMedia(payload.messageSid, payload.accountSid, payload.media)
+    : [];
+  const attachmentUrls = storedMedia.map((item) => item.url);
+  const mediaContentTypes = storedMedia.map((item) => item.contentType);
+  const hasAudio = mediaContentTypes.some((value) => value.toLowerCase().startsWith('audio/'));
   const waChatId = normalizeWaChatId(payload.waId || payload.from);
   appendWhatsAppMensagemToChamado(chamado, {
     origin: 'cliente',
     autor: payload.profileName || waChatId,
-    texto: texto || '[mídia recebida]',
+    texto: texto || (hasAudio ? '[Áudio recebido]' : '[Mídia recebida]'),
+    anexos: attachmentUrls,
     waChatId,
     twilioMessageSid: payload.messageSid || undefined,
+    mediaContentTypes,
+    transcriptionStatus: hasAudio ? 'available' : undefined,
   });
 
   await chamado.save();
@@ -136,6 +151,8 @@ export async function processInboundWhatsAppMessage(payload: TwilioWhatsAppWebho
   console.info('[whatsapp-inbound] mensagem anexada ao ticket', {
     chamadoProtocolo: chamado.chamadoProtocolo,
     ticketId: chamado._id.toString(),
+    attachments: attachmentUrls.length,
+    audioTranscription: hasAudio ? 'available-on-demand' : 'not-applicable',
   });
 }
 

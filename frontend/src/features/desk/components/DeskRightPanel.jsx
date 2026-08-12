@@ -1,6 +1,6 @@
 /**
- * DeskRightPanel v1.12.2 — botão Iniciar Workflow desacoplado de tabulationReadonly
- * VERSION: v1.12.2 | DATE: 2026-08-10
+ * DeskRightPanel v1.12.4 — link Assumir Ticket sob responsável
+ * VERSION: v1.12.4 | DATE: 2026-08-11
  */
 import React, { useMemo, useState } from 'react';
 import { DEFAULT_TIPO, hasApplyableTabulation, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
@@ -42,6 +42,9 @@ export default function DeskRightPanel({
   sendStatus,
   onFieldChange,
   onApplyTabulation,
+  onAssumeTicket,
+  assumingTicket = false,
+  showAssumeTicket = false,
   onStartWorkflow,
   startingWorkflow = false,
   canStartWorkflow = false,
@@ -104,10 +107,7 @@ export default function DeskRightPanel({
   );
   const inWorkflow = isTicketWorkflowActive(ticket);
   const showThermoUi = DESK_THERMOMETER_UI_ENABLED;
-  const showStartWorkflow = canStartWorkflow
-    && canInitiateWorkflow
-    && !inWorkflow
-    && !ticketReadOnly;
+  const showStartWorkflow = canStartWorkflow && !inWorkflow && !ticketReadOnly;
   const showReplyWorkflow = inWorkflow && ticketHasComunicacaoWorkflow(ticket) && typeof onReplyWorkflowRequest === 'function';
 
   return (
@@ -193,6 +193,17 @@ export default function DeskRightPanel({
             readonly
             onFieldChange={onFieldChange}
           />
+          {showAssumeTicket ? (
+            <button
+              type="button"
+              className="rp-assume-ticket-link"
+              id="btnAssumeTicket"
+              disabled={assumingTicket}
+              onClick={onAssumeTicket}
+            >
+              {assumingTicket ? 'Assumindo…' : 'Assumir Ticket'}
+            </button>
+          ) : null}
 
           {showIaTabulationPanel ? (
             <div className={'ia-tabulation' + (iaTabulationLoading ? ' ia-tabulation--loading' : '')}>

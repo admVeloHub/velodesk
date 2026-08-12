@@ -1,8 +1,14 @@
 /**
  * Match de critérios de caixas personalizadas (AND entre linhas, OR dentro de valores[])
- * VERSION: v1.1.0 | DATE: 2026-07-31
+ * VERSION: v1.2.1 | DATE: 2026-08-11
  */
-import { getAgentName } from '../clientDb';
+import {
+  buildResponsavelCandidates,
+  ticketAtribuidoToCurrentAgent,
+  ticketAssignedToCurrentAgent,
+  ticketBelongsInMeusTicketsList,
+} from './responsavelSegmentation';
+import { readCachedPermissions } from '../permissions/permissionService';
 
 const TAB_FIELDS = new Set(['tipoChamado', 'tipo', 'produto', 'motivo', 'detalhe']);
 
@@ -53,16 +59,63 @@ function normalizeStatus(ticket) {
   return String(ticket?.status || '').trim().toLowerCase().replace(/\s+/g, '-');
 }
 
+function queueIdStatusHints(queueId) {
+  const q = String(queueId || '').trim().toLowerCase();
+  if (q === 'em-andamento') return ['em-andamento', 'em-aberto'];
+  if (q === 'pendente') return ['pendente', 'em-espera'];
+  if (q === 'novos') return ['novo'];
+  if (q === 'resolvidos') return ['resolvido', 'resolvidos', 'fechado', 'cancelado'];
+  return [];
+}
+
+/** Status efetivo: campo do ticket + caixa física onde ele está no cache. */
+function ticketStatusKeys(ticket, queueId) {
+  const keys = new Set();
+  const fromTicket = normalizeStatus(ticket);
+  if (fromTicket) keys.add(fromTicket);
+  queueIdStatusHints(queueId).forEach((hint) => keys.add(hint));
+  return [...keys];
+}
+
 function statusMatches(ticketStatus, wanted) {
-  const a = String(ticketStatus || '').toLowerCase();
-  const b = String(wanted || '').toLowerCase();
+  const a = String(ticketStatus || '').toLowerCase().replace(/\s+/g, '-');
+  const b = String(wanted || '').toLowerCase().replace(/\s+/g, '-');
   if (!b) return true;
   if (a === b) return true;
-  if (b === 'em-andamento' && (a === 'em-aberto' || a === 'em andamento' || a === 'em-andamento')) return true;
+  if (b === 'em-andamento' && (a === 'em-aberto' || a === 'em-andamento')) return true;
+  if (b === 'em-aberto' && a === 'em-andamento') return true;
   if (b === 'pendente' && (a === 'em-espera' || a === 'pendente')) return true;
+  if (b === 'resolvido' && (a === 'resolvido' || a === 'resolvidos')) return true;
   if (b === 'resolvidos' && (a === 'resolvido' || a === 'resolvidos')) return true;
-  if (b === 'resolvido' && a === 'resolvidos') return true;
+  if (b === 'fechado' && (a === 'fechado' || a === 'cancelado')) return true;
+  if (b === 'cancelado' && (a === 'cancelado' || a === 'fechado')) return true;
   return false;
+}
+
+function matchAtribuidoFuncaoForCurrentAgent(ticket) {
+  const atribuido = String(ticket?.lateralForm?.atribuido || '').trim().toLowerCase();
+  if (!atribuido.startsWith('funcao:')) return false;
+  const slug = atribuido.slice(7);
+  const perm = readCachedPermissions();
+  if (!perm) return false;
+  const slugs = [
+    perm.funcaoSlug,
+    ...(perm.funcoes || []),
+  ].map((item) => String(item || '').trim().toLowerCase()).filter(Boolean);
+  return slugs.includes(slug);
+}
+
+function matchAtribuidoMe(ticket) {
+  if (ticketBelongsInMeusTicketsList(ticket)) return true;
+  if (matchAtribuidoFuncaoForCurrentAgent(ticket)) return true;
+  const actual = String(ticket?.lateralForm?.atribuido || '').trim().toLowerCase();
+  if (!actual || actual.startsWith('funcao:') || actual.startsWith('grupo:')) return false;
+  const candidates = buildResponsavelCandidates();
+  return candidates.some((candidate) => (
+    actual === candidate
+    || actual.includes(candidate)
+    || candidate.includes(actual)
+  ));
 }
 
 function isWorkflowActive(ticket) {
@@ -109,27 +162,32 @@ function matchTabulacao(ticket, criterio) {
 function matchAtribuido(ticket, criterio) {
   const actual = String(ticket?.lateralForm?.atribuido || '').trim();
   const valor = criterioValores(criterio)[0] || '';
-  if (valor === '__empty__') return !actual;
-  if (valor === '__me__') {
-    const me = String(getAgentName() || '').trim().toLowerCase();
-    if (!me || !actual) return false;
-    return actual.toLowerCase() === me || actual.toLowerCase().includes(me);
-  }
+  if (valor === '__empty__') return !actual && !ticketAssignedToCurrentAgent(ticket);
+  if (valor === '__me__') return matchAtribuidoMe(ticket);
   if (!valor) return Boolean(actual);
-  return actual.toLowerCase() === valor.toLowerCase();
+  const expected = valor.toLowerCase();
+  if (actual.toLowerCase() === expected) return true;
+  return buildResponsavelCandidates().some((candidate) => (
+    actual.toLowerCase() === candidate
+    || actual.toLowerCase().includes(candidate)
+    || candidate.includes(actual.toLowerCase())
+  ));
 }
 
-export function ticketMatchesQueueCriterio(ticket, criterio) {
+export function ticketMatchesQueueCriterio(ticket, criterio, context = {}) {
   if (!criterio || !ticket) return false;
   const tipo = String(criterio.tipo || '').trim().toLowerCase();
   const valores = criterioValores(criterio);
+  const queueId = context?.queueId;
 
   switch (tipo) {
     case 'tabulacao':
       return matchTabulacao(ticket, criterio);
     case 'status':
       if (!valores.length) return false;
-      return valores.some((wanted) => statusMatches(normalizeStatus(ticket), wanted));
+      return valores.some((wanted) => (
+        ticketStatusKeys(ticket, queueId).some((actual) => statusMatches(actual, wanted))
+      ));
     case 'workflow': {
       const active = isWorkflowActive(ticket);
       if (!valores.length) return false;
@@ -153,10 +211,10 @@ export function ticketMatchesQueueCriterio(ticket, criterio) {
 }
 
 /** AND — todos os critérios devem bater. Sem critérios = não casa. */
-export function ticketMatchesQueueCriterios(ticket, criterios) {
+export function ticketMatchesQueueCriterios(ticket, criterios, context = {}) {
   const list = Array.isArray(criterios) ? criterios : [];
   if (!list.length) return false;
-  return list.every((criterio) => ticketMatchesQueueCriterio(ticket, criterio));
+  return list.every((criterio) => ticketMatchesQueueCriterio(ticket, criterio, context));
 }
 
 function formatValorList(valores) {

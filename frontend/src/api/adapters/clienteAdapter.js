@@ -1,6 +1,6 @@
 /**
- * clienteAdapter v1.2.0 — e-mail de resposta (clienteEmail.resposta)
- * VERSION: v1.2.0 | DATE: 2026-08-06
+ * clienteAdapter v1.3.0 — merge ticket←clienteDoc + hydrateFromApi no lookup
+ * VERSION: v1.3.0 | DATE: 2026-08-12
  */
 import { formatPhone, normalizeCpf, normalizePhone } from '../../services/desk/utils';
 
@@ -183,4 +183,44 @@ export function buildDraftTicketFromCliente(doc, agentName) {
       responsavel: agent,
     },
   };
+}
+
+/** Aplica dados do doc b2c_cadastros no ticket (mutação in-place). */
+export function applyClienteDocToTicket(ticket, doc) {
+  if (!ticket || !doc) return ticket;
+  const contact = mapClienteDocToContact(doc);
+  if (!contact) return ticket;
+
+  const clienteId = contact.clienteId || ticket.clienteId || ticket.lateralForm?.clienteId;
+  const primaryEmail = contact.replyEmail || contact.emails[0] || '';
+  const primaryPhone = contact.whatsappPhone || contact.phones[0] || '';
+
+  ticket.clientName = contact.clientName || ticket.clientName;
+  ticket.solicitante = contact.clientName || ticket.solicitante;
+  ticket.clientEmail = primaryEmail || ticket.clientEmail;
+  ticket.clientPhone = primaryPhone || ticket.clientPhone;
+  ticket.clientCPF = contact.clientCPF || ticket.clientCPF;
+  if (clienteId) ticket.clienteId = clienteId;
+
+  ticket.lateralForm = {
+    ...ticket.lateralForm,
+    cpf: contact.clientCPF || ticket.lateralForm?.cpf,
+    clienteCpf: contact.clientCPF || ticket.lateralForm?.clienteCpf,
+    clienteNome: contact.clientName || ticket.lateralForm?.clienteNome,
+    clienteEmail: contact.emails.length ? contact.emails : ticket.lateralForm?.clienteEmail,
+    clienteEmailResposta: contact.replyEmail || ticket.lateralForm?.clienteEmailResposta,
+    clienteTelefone: contact.phones.length ? contact.phones : ticket.lateralForm?.clienteTelefone,
+    clienteTelefoneWhatsapp: contact.whatsappPhone || ticket.lateralForm?.clienteTelefoneWhatsapp,
+    clienteId: clienteId || ticket.lateralForm?.clienteId,
+  };
+  ticket.updatedAt = new Date().toISOString();
+  return ticket;
+}
+
+export function ticketNeedsContactHydration(ticket) {
+  if (!ticket) return false;
+  const lf = ticket.lateralForm || {};
+  const hasClienteId = Boolean(ticket.clienteId || lf.clienteId);
+  const nome = String(lf.clienteNome || ticket.clientName || ticket.solicitante || '').trim();
+  return !hasClienteId || !nome;
 }

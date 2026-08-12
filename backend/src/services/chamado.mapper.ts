@@ -1,4 +1,4 @@
-/** chamado.mapper v2.9.6 — create separa mensagem pública de anotação interna */
+/** chamado.mapper v2.10.1 — exclui RA/Procon/CG do Desk agente (meus-chamados) */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -45,6 +45,8 @@ export interface TicketMessageDto {
   channel?: string;
   deliveryStatus?: string;
   deliveryErrorMessage?: string;
+  mediaContentTypes?: string[];
+  transcriptionStatus?: string;
   time: Date;
   attachments?: string[];
 }
@@ -229,11 +231,21 @@ export function consumidorGovChannelMongoFilter(): Record<string, unknown> {
   };
 }
 
+export function reclameAquiChannelMongoFilter(): Record<string, unknown> {
+  return {
+    $or: [
+      { 'registro.metadados.source': 'reclame-aqui' },
+      { 'registro.metadados.reclameAqui': { $exists: true, $ne: null } },
+    ],
+  };
+}
+
 export function excludeEspeciaisChannelsMongoFilter(): Record<string, unknown> {
   return {
     $nor: [
       proconChannelMongoFilter(),
       consumidorGovChannelMongoFilter(),
+      reclameAquiChannelMongoFilter(),
     ],
   };
 }
@@ -1548,7 +1560,7 @@ function buildTicketDtoCore(
         waMsgs.forEach((wa, waIdx) => {
           const waOrigin = wa.origin;
           messages.push({
-            id: `${index}-wa-${waIdx}`,
+            id: wa.twilioMessageSid || wa.id || `${index}-wa-${waIdx}`,
             text: normalizeTicketMessageText(wa.texto),
             sender: senderFromOrigin(waOrigin),
             origin: waOrigin,
@@ -1557,6 +1569,8 @@ function buildTicketDtoCore(
             channel: 'whatsapp',
             deliveryStatus: wa.deliveryStatus,
             deliveryErrorMessage: wa.deliveryErrorMessage,
+            mediaContentTypes: wa.mediaContentTypes,
+            transcriptionStatus: wa.transcriptionStatus,
             time: wa.data ? new Date(wa.data) : reg.data,
             registroIndex: index,
             attachments: filterRealAttachmentUrls(wa.anexos),

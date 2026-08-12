@@ -1,6 +1,6 @@
 /**
- * DeskConversation v1.6.0 — balão de presença da conversa WhatsApp na timeline
- * VERSION: v1.6.0 | DATE: 2026-08-11
+ * DeskConversation v1.6.1 — label de anexo só com nome do arquivo (sem gs:// ou path)
+ * VERSION: v1.6.1 | DATE: 2026-08-12
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
@@ -21,8 +21,12 @@ function normalizeAuditScore(value) {
 }
 
 function attachmentLabelFromUrl(url) {
-  const raw = decodeURIComponent(String(url || '').split('/').pop() || 'Anexo');
-  const withoutUuid = raw.replace(/^[0-9a-f-]{36}-/i, '');
+  const rawUrl = String(url || '').trim();
+  if (!rawUrl) return 'Anexo';
+  // gs://bucket/path/uuid__nome.pdf → nome.pdf
+  const withoutScheme = rawUrl.replace(/^gs:\/\//i, '').replace(/^https?:\/\/[^/]+/i, '');
+  const leaf = decodeURIComponent(withoutScheme.split('/').pop() || rawUrl.split('/').pop() || 'Anexo');
+  const withoutUuid = leaf.replace(/^[0-9a-f-]{36}-/i, '');
   return withoutUuid.replace(/__/g, '/').split('/').pop() || 'Anexo';
 }
 

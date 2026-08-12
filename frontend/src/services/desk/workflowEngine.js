@@ -1,6 +1,6 @@
 /**
- * workflowEngine v1.11.0 — template a partir de passosResumo do ticket
- * VERSION: v1.11.0 | DATE: 2026-08-04
+ * workflowEngine v1.11.1 — readFields lê tabulacao[] (paridade com backend)
+ * VERSION: v1.11.1 | DATE: 2026-08-11
  */
 import { getRuntimeGrupos, getRuntimeWorkflows } from './workflowRuntimeStore';
 
@@ -38,18 +38,26 @@ function normalizeText(value) {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+function readTabulacaoSnapshot(ticket) {
+  const list = ticket?.tabulacao;
+  if (!Array.isArray(list) || !list.length) return {};
+  const tab = list[list.length - 1];
+  return tab && typeof tab === 'object' ? tab : {};
+}
+
 function readFields(ticket, rightFields = {}) {
   const lf = ticket?.lateralForm || {};
-  const integracao = lf.integracao || lf.metadados?.integracao || {};
+  const tab = readTabulacaoSnapshot(ticket);
+  const integracao = lf.integracao || lf.metadados?.integracao || tab.integracao || {};
   return {
-    tipoChamado: rightFields.tipo ?? lf.classificacaoTipo ?? lf.tipoChamado ?? '',
-    tipo: rightFields.tipo ?? lf.classificacaoTipo ?? lf.tipoChamado ?? '',
-    produto: rightFields.produto ?? lf.produto ?? '',
-    motivo: rightFields.motivo ?? lf.motivo ?? '',
-    detalhe: rightFields.detalhe ?? lf.detalhe ?? '',
-    canal: rightFields.canal ?? lf.canal ?? ticket?.channel ?? '',
-    responsavel: rightFields.responsavel ?? lf.responsavel ?? '',
-    atribuido: rightFields.atribuido ?? lf.atribuido ?? '',
+    tipoChamado: rightFields.tipo ?? lf.classificacaoTipo ?? lf.tipoChamado ?? tab.tipoChamado ?? '',
+    tipo: rightFields.tipo ?? lf.classificacaoTipo ?? lf.tipoChamado ?? tab.tipoChamado ?? '',
+    produto: rightFields.produto ?? lf.produto ?? tab.produto ?? '',
+    motivo: rightFields.motivo ?? lf.motivo ?? tab.motivo ?? '',
+    detalhe: rightFields.detalhe ?? lf.detalhe ?? tab.detalhe ?? '',
+    canal: rightFields.canal ?? lf.canal ?? tab.canal ?? ticket?.channel ?? '',
+    responsavel: rightFields.responsavel ?? lf.responsavel ?? tab.responsavel ?? '',
+    atribuido: rightFields.atribuido ?? lf.atribuido ?? tab.atribuido ?? '',
     statusPagamento: rightFields.statusPagamento ?? integracao.statusPagamento ?? lf.statusPagamento ?? '',
     dataContratacao: rightFields.dataContratacao ?? integracao.dataContratacao ?? integracao.dataContratacaoFaixa ?? lf.dataContratacao ?? '',
     statusContrato: rightFields.statusContrato ?? integracao.statusContrato ?? lf.statusContrato ?? '',

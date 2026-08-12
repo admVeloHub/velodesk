@@ -1,11 +1,11 @@
 /**
- * useTicketAiSuggestions v1.8.0 — refresh IA só por thread; tabulação aplicada não refaz Agente 1
- * VERSION: v1.8.0 | DATE: 2026-08-07
+ * useTicketAiSuggestions v1.9.0 — refresh e payload alinhados ao thread WhatsApp
+ * VERSION: v1.9.0 | DATE: 2026-08-12
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ticketAiApi, agentsApi } from '../api/client';
 import { htmlToPlainText } from '../services/desk/composeRichEditor';
-import { getClientContactFields, getAgentName } from '../services/desk/utils';
+import { getClientContactFields, getAgentName, isWhatsAppCustomerSessionOpen, buildWhatsAppConvMsgs } from '../services/desk/utils';
 import {
   buildAiSuggestionRefreshKey,
   isLastPublicInteractionFromAgent,
@@ -142,8 +142,40 @@ function resolveClientName(ticket) {
   ).trim();
 }
 
+function mergePublicMessagesForAi(convMsgs, ticket) {
+  const base = (convMsgs || []).map((m) => ({
+    type: m.type,
+    text: String(m.text || '').trim(),
+    channel: m.channel,
+    timestamp: m.timestamp,
+  })).filter((m) => m.text.length > 0 && (m.type === 'client' || m.type === 'agent'));
+
+  const waMsgs = buildWhatsAppConvMsgs(ticket).map((m) => ({
+    type: m.type,
+    text: String(m.text || '').trim(),
+    channel: 'whatsapp',
+    timestamp: m.timestamp,
+  })).filter((m) => m.text.length > 0);
+
+  if (!waMsgs.length) return base;
+
+  const seen = new Set(
+    base.map((m) => `${m.type}|${m.timestamp || ''}|${m.text}`),
+  );
+  const merged = [...base];
+  for (const msg of waMsgs) {
+    const key = `${msg.type}|${msg.timestamp || ''}|${msg.text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(msg);
+  }
+
+  merged.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+  return merged;
+}
+
 function buildPayload({ ticket, rightFields, convMsgs, internalNotesBlock, contextSource }) {
-  const apiMessages = mapConvMsgsToApi(convMsgs);
+  const apiMessages = mapConvMsgsToApi(mergePublicMessagesForAi(convMsgs, ticket));
   const canal = resolveCanal(ticket, rightFields);
   const nomeOperador = String(getAgentName() || '').trim();
   const contact = getClientContactFields(ticket);
@@ -240,16 +272,19 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
   /** Agente já respondeu — só nova msg do cliente reabre sugestão (rascunho no compose não conta). */
   const awaitingClientAfterAgentReply = useMemo(() => {
     if (isPhone) return false;
-    if (!hasClientMessage(convMsgs)) return false;
-    return isLastPublicInteractionFromAgent(convMsgs);
-  }, [isPhone, convMsgs]);
+    const aiMsgs = mergePublicMessagesForAi(convMsgs, ticket);
+    if (!hasClientMessage(aiMsgs)) return false;
+    if (isWhatsAppCustomerSessionOpen(ticket)) return false;
+    return isLastPublicInteractionFromAgent(aiMsgs);
+  }, [isPhone, convMsgs, ticket]);
 
   const canFetch = useMemo(() => {
     if (!ticket) return false;
     if (isPhone) {
       return internalNotesBlock.length >= TICKET_AI_INTERNAL_NOTE_MIN_CHARS;
     }
-    if (!hasClientMessage(convMsgs)) return false;
+    const aiMsgs = mergePublicMessagesForAi(convMsgs, ticket);
+    if (!hasClientMessage(aiMsgs)) return false;
     if (awaitingClientAfterAgentReply) return false;
     return true;
   }, [ticket, isPhone, internalNotesBlock, convMsgs, awaitingClientAfterAgentReply]);
@@ -513,6 +548,8 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     }
 
     if (!canFetch || !aiRefreshKey) {
+      abortRef.current?.abort();
+      inFlightHashRef.current = '';
       setLoading(false);
       setError(null);
       setRespostaSugerida('');

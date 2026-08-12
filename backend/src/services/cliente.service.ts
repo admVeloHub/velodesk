@@ -1,7 +1,12 @@
-/** cliente.service v1.5.0 — e-mail de resposta em clienteEmail.resposta */
+/** cliente.service v1.6.0 — lookup CPF com fallback Customer Data API (overview) */
 import mongoose from 'mongoose';
 import { getClienteModel, ICliente, IClienteDados } from '../models/Cliente';
 import type { IClienteRef } from '../models/ChamadoN1';
+import {
+  fetchOverview,
+  isCustomerDataApiConfigured,
+  type ConsultaSnapshotResult,
+} from './customerDataApi.service';
 
 export function normalizeCpf(value: unknown): string {
   return String(value ?? '').replace(/\D/g, '');
@@ -99,6 +104,86 @@ export async function findClienteByCpf(cpfRaw: unknown): Promise<ICliente | null
   if (!cpf) return null;
   const Cliente = getClienteModel();
   return Cliente.findOne({ 'clienteDados.clienteCpf': cpf });
+}
+
+export type ClienteLookupSource = 'cadastro_local' | 'api_velotax_created';
+
+function isOverviewCustomerFound(overview: ConsultaSnapshotResult): boolean {
+  return overview.ok === true
+    && overview.data != null
+    && overview.status !== 'customer_not_found';
+}
+
+export function mapOverviewToClienteDados(
+  overviewData: Record<string, unknown>,
+  cpfFallback: string,
+): IClienteDados {
+  const cpf = normalizeCpf(overviewData.cpf) || cpfFallback;
+  const nome = String(overviewData.name ?? '').trim();
+  const emailRaw = normalizeEmail(overviewData.email);
+  const phoneRaw = normalizePhoneDigits(overviewData.phone);
+  const emailList = emailRaw ? [emailRaw] : [];
+  const phoneList = phoneRaw ? [phoneRaw] : [];
+
+  return {
+    clienteCpf: cpf,
+    clienteNome: nome,
+    clienteEmail: {
+      lista: emailList,
+      ...(emailList.length === 1 ? { resposta: emailList[0] } : {}),
+    },
+    clienteTelefone: {
+      lista: phoneList,
+      whatsapp: phoneList.length === 1 ? phoneList[0] : '',
+    },
+  };
+}
+
+export async function findOrCreateClienteFromCpfLookup(
+  cpfRaw: unknown,
+  hydrateFromApi = true,
+): Promise<{ cliente: ICliente | null; source?: ClienteLookupSource }> {
+  const cpf = normalizeCpf(cpfRaw);
+  if (!cpf) return { cliente: null };
+
+  const existing = await findClienteByCpf(cpf);
+  if (existing) return { cliente: existing, source: 'cadastro_local' };
+
+  if (!hydrateFromApi || !isCustomerDataApiConfigured()) {
+    return { cliente: null };
+  }
+
+  try {
+    const overview = await fetchOverview(cpf, 'lookup');
+    if (!isOverviewCustomerFound(overview)) {
+      return { cliente: null };
+    }
+
+    const dados = mapOverviewToClienteDados(
+      (overview.data || {}) as Record<string, unknown>,
+      cpf,
+    );
+
+    const raced = await findClienteByCpf(cpf);
+    if (raced) return { cliente: raced, source: 'cadastro_local' };
+
+    const Cliente = getClienteModel();
+    const created = await Cliente.create({
+      clienteDados: [{
+        clienteCpf: cpf,
+        clienteNome: dados.clienteNome,
+        clienteEmail: dados.clienteEmail,
+        clienteTelefone: dados.clienteTelefone,
+      }],
+      atendimentoHistorico: [],
+    });
+
+    return { cliente: created, source: 'api_velotax_created' };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[cliente] lookup API fallback cpf=***${cpf.slice(-4)} falhou:`, message);
+    return { cliente: null };
+  }
 }
 
 function normalizePhoneDigits(value: unknown): string {

@@ -1,6 +1,7 @@
 /**
  * Workspace — dados operacionais do painel 360°
- * VERSION: v2.4.1 | DATE: 2026-07-31
+ * VERSION: v2.5.0 | DATE: 2026-08-12
+ * — Pendente nas seções; CSAT/TMA sem mock; warRoom alinhado
  */
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { getAgentName } from '../clientDb';
@@ -250,11 +251,13 @@ export function mergeWorkflowInfoRequestsIntoSection(section, existingTickets = 
 
 function classifyEntry(entry) {
   const { queueId, ticket } = entry;
-  const status = String(ticket?.status || '').trim().toLowerCase();
+  const status = String(ticket?.status || '').trim().toLowerCase().replace(/\s+/g, '-');
   const sla = getSlaClass(ticket);
   if (status === 'em-aberto') return 'client-replied';
-  if (queueId === 'em-andamento') return 'workflow';
-  if (queueId === 'novos' || sla === 'critical' || sla === 'warning') return 'action-now';
+  if (status === 'em-andamento' || status === 'pendente' || status === 'em-espera' || queueId === 'em-andamento' || queueId === 'pendente') {
+    return 'workflow';
+  }
+  if (queueId === 'novos' || status === 'novo' || sla === 'critical' || sla === 'warning') return 'action-now';
   return null;
 }
 
@@ -352,8 +355,8 @@ export function computeAgent360View() {
       { id: 'assigned', label: 'Atribuídos a mim', value: String(assigned), hint: 'total', tone: 'neutral', icon: 'ti ti-ticket' },
       { id: 'resolved', label: 'Resolvidos hoje', value: String(resolvedToday), hint: resolvedToday > 0 ? `+${resolvedToday} hoje` : 'hoje', tone: 'success', icon: 'ti ti-circle-check' },
       { id: 'sla', label: 'SLA próximo do limite', value: String(desk.counts.slaCritico), hint: desk.counts.slaCritico > 0 ? 'atenção' : null, tone: desk.counts.slaCritico > 0 ? 'warn' : 'neutral', icon: 'ti ti-clock-exclamation' },
-      { id: 'csat', label: 'CSAT médio', value: desk.personal.csat, hint: 'acima da meta', tone: 'success', icon: 'ti ti-star' },
-      { id: 'tma', label: 'TMA hoje', value: desk.personal.tma, hint: '-8 min', tone: 'success', icon: 'ti ti-clock' },
+      { id: 'csat', label: 'CSAT médio', value: '—', hint: 'Sem dados', tone: 'neutral', icon: 'ti ti-star' },
+      { id: 'tma', label: 'TMA hoje', value: '—', hint: 'Sem dados', tone: 'neutral', icon: 'ti ti-clock' },
     ],
     sections,
     productionWeek: computeProductionWeek(),

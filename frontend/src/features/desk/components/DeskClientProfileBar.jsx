@@ -1,6 +1,6 @@
 /**
- * DeskClientProfileBar v1.14.0 — seleção de e-mail para resposta
- * VERSION: v1.14.0 | DATE: 2026-08-06 | AUTHOR: VeloHub Development Team
+ * DeskClientProfileBar v1.15.0 — loading durante hidratação automática de cadastro
+ * VERSION: v1.15.0 | DATE: 2026-08-12 | AUTHOR: VeloHub Development Team
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clientsApi } from '../../../api/client';
@@ -45,6 +45,7 @@ export default function DeskClientProfileBar({
   cancelingWorkflow = false,
   canAdvanceWorkflow = false,
   canManageWorkflow = false,
+  hydratingContact = false,
 }) {
   const { showNotification } = useNotifications();
   const { refreshKey } = useTickets();
@@ -214,6 +215,12 @@ export default function DeskClientProfileBar({
         aria-label="Perfil do cliente"
       >
         <div className="ticket-client-profile__client-main ticket-client-profile__cell-client" id="headerInfo">
+          {hydratingContact ? (
+            <span className="ticket-client-profile__hydrating" aria-live="polite">
+              <i className="ti ti-loader-2 ticket-client-profile__hydrating-spin" aria-hidden="true" />
+              Consultando cadastro…
+            </span>
+          ) : null}
           <span className="ticket-client-profile__field ticket-client-profile__field--name" id="profileName">
             {contact.name || '—'}
           </span>

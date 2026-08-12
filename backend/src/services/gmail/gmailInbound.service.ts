@@ -1,4 +1,4 @@
-/** gmailInbound.service v1.4.0 — dedupe anexos contra ticket antes do upload GCS */
+/** gmailInbound.service v1.5.0 — resolve imagens CID/inline no corpo do e-mail */
 import { env } from '../../config/env';
 import {
   findChamadoForEmailReply,
@@ -8,7 +8,10 @@ import { collectChamadoAttachmentFingerprints } from '../attachmentFilter.util';
 import type { InboundEmailProcessResult } from '../inbound-email/types';
 import { createGmailClient, GMAIL_SCOPE_READONLY } from './gmailAuth';
 import { gmailMessageToInboundPayload, shouldSkipGmailMessage } from './gmailMessageParser';
-import { downloadGmailAttachments } from './gmailAttachment.service';
+import {
+  downloadAndRewriteGmailInlineImages,
+  downloadGmailAttachments,
+} from './gmailAttachment.service';
 import {
   getStoredHistoryId,
   updateStoredHistoryId,
@@ -118,8 +121,23 @@ export async function processGmailHistory(
             payload.messageId,
             knownFingerprints,
           );
-          if (inboundAttachments.length) {
-            payload.attachments = inboundAttachments;
+          const { htmlBody: rewrittenHtml, inlineAttachments } = await downloadAndRewriteGmailInlineImages(
+            gmail,
+            full.data,
+            payload.messageId,
+            String(payload.htmlBody ?? ''),
+          );
+          if (rewrittenHtml) {
+            payload.htmlBody = rewrittenHtml;
+          }
+          const merged = [...inboundAttachments];
+          for (const inline of inlineAttachments) {
+            if (!merged.some((a) => a.url && a.url === inline.url)) {
+              merged.push(inline);
+            }
+          }
+          if (merged.length) {
+            payload.attachments = merged;
           }
 
           try {
@@ -131,7 +149,7 @@ export async function processGmailHistory(
               messageId: payload.messageId,
               action: result.action,
               protocolo: result.chamadoProtocolo ?? null,
-              anexos: inboundAttachments.length,
+              anexos: merged.length,
             });
           } catch (err) {
             console.error('[gmailInbound] processInboundEmail falhou:', {

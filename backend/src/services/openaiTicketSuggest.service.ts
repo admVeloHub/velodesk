@@ -1,14 +1,16 @@
 /**
- * openaiTicketSuggest.service v1.2.1 — user block reforça resposta direta sem eco do cliente
- * VERSION: v1.2.1 | DATE: 2026-08-07
+ * openaiTicketSuggest.service v1.3.1 — últimas 50 msgs + notas internas do Mongo
+ * VERSION: v1.3.1 | DATE: 2026-08-12
  */
 import OpenAI from 'openai';
 import { env } from '../config/env';
+import { ChamadoN1, type IChamadoN1 } from '../models/ChamadoN1';
 import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from './tabulation.service';
 import { getTicketSuggestPersona } from './ticketSuggestPersona';
 import { runAgentPipeline } from './agents/agentOrchestrator.service';
 import { getAgentsStatus, isAgentsConfigured } from './agents/openaiAgent.util';
 import { logAiUsage } from './aiUsage.service';
+import { buildTicketIaMessagesFromChamado, buildTicketIaInternalNotesFromChamado } from './ticketIaAdapter.service';
 
 const MAX_MESSAGES = 50;
 const MAX_MESSAGE_CHARS = 8_000;
@@ -116,13 +118,63 @@ function trimStr(value: unknown, maxLen: number): string {
 
 function normalizeMessages(raw: unknown): TicketAiMessageInput[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .slice(0, MAX_MESSAGES)
+  const mapped = raw
     .map((m) => ({
       role: m?.role === 'agente' ? 'agente' as const : 'cliente' as const,
       text: trimStr(m?.text, MAX_MESSAGE_CHARS),
     }))
     .filter((m) => m.text.length > 0);
+  // Mantém as mensagens mais recentes (não as mais antigas).
+  return mapped.slice(-MAX_MESSAGES);
+}
+
+async function resolveMessagesForSuggest(
+  params: TicketAiSuggestInput,
+): Promise<TicketAiMessageInput[]> {
+  const fromClient = normalizeMessages(params.messages);
+  if (!params.ticketId) return fromClient;
+
+  try {
+    const chamado = await ChamadoN1.findById(params.ticketId).lean();
+    if (!chamado) return fromClient;
+    const fromDb = buildTicketIaMessagesFromChamado(chamado as unknown as IChamadoN1)
+      .map((item) => ({
+        role: item.role,
+        text: trimStr(item.text, MAX_MESSAGE_CHARS),
+      }))
+      .filter((item) => item.text.length > 0)
+      .slice(-MAX_MESSAGES);
+    if (fromDb.length) return fromDb;
+  } catch (err) {
+    console.warn('[ticket-ai-suggest] falha ao montar histórico do ticket — usando payload do cliente:', (err as Error).message);
+  }
+  return fromClient;
+}
+
+async function resolveInternalNoteForSuggest(
+  params: TicketAiSuggestInput,
+): Promise<string | undefined> {
+  const fromClient = trimStr(params.internalNote, MAX_INTERNAL_NOTE_CHARS);
+  if (!params.ticketId) return fromClient || undefined;
+
+  try {
+    const chamado = await ChamadoN1.findById(params.ticketId).lean();
+    if (!chamado) return fromClient || undefined;
+    const fromDb = trimStr(
+      buildTicketIaInternalNotesFromChamado(chamado as unknown as IChamadoN1),
+      MAX_INTERNAL_NOTE_CHARS,
+    );
+    if (!fromDb) return fromClient || undefined;
+    if (!fromClient) return fromDb;
+    // Une DB + rascunho do cliente sem duplicar o mesmo bloco.
+    if (fromDb.includes(fromClient) || fromClient.includes(fromDb)) {
+      return fromDb.length >= fromClient.length ? fromDb : fromClient;
+    }
+    return trimStr(`${fromDb}\n\n${fromClient}`, MAX_INTERNAL_NOTE_CHARS);
+  } catch (err) {
+    console.warn('[ticket-ai-suggest] falha ao montar notas internas — usando payload:', (err as Error).message);
+    return fromClient || undefined;
+  }
 }
 
 export function validateTicketAiInput(body: unknown):
@@ -349,9 +401,24 @@ export async function generateTicketAiSuggest(
     return { success: false, error: 'Serviço OpenAI não configurado' };
   }
 
+  const resolvedMessages = await resolveMessagesForSuggest(params);
+  const resolvedInternalNote = await resolveInternalNoteForSuggest(params);
+  const enrichedParams: TicketAiSuggestInput = {
+    ...params,
+    messages: resolvedMessages.length ? resolvedMessages : params.messages,
+    internalNote: resolvedInternalNote || params.internalNote,
+  };
+
+  if (enrichedParams.contextSource === 'public') {
+    const hasClientMsg = (enrichedParams.messages || []).some((m) => m.role === 'cliente');
+    if (!hasClientMsg) {
+      return { success: false, error: 'Informe ao menos uma mensagem do cliente para contextSource public' };
+    }
+  }
+
   if (env.agentsEnabled) {
     console.log('[ticket-ai-suggest] delegando ao orquestrador (desk) para', userId || 'anonimo');
-    const pipeline = await runAgentPipeline({ ...params, pipelineModo: 'desk' });
+    const pipeline = await runAgentPipeline({ ...enrichedParams, pipelineModo: 'desk' });
     if (!pipeline.success) {
       return { success: false, error: pipeline.error || 'Falha no pipeline de agentes' };
     }
@@ -384,11 +451,13 @@ export async function generateTicketAiSuggest(
     }
     const tabulationCatalog = buildTabulationCatalog(config);
     const systemPrompt = getTicketSuggestPersona();
-    const userBlock = buildUserBlock(params, tabulationCatalog);
+    const userBlock = buildUserBlock(enrichedParams, tabulationCatalog);
 
     const openai = createOpenAiClient();
 
-    console.log('[ticket-ai-suggest] processando para', userId || 'anonimo', params.contextSource);
+    console.log('[ticket-ai-suggest] processando para', userId || 'anonimo', enrichedParams.contextSource, {
+      messages: enrichedParams.messages?.length || 0,
+    });
 
     const response = await openai.responses.create({
       model: env.openaiModel,
@@ -420,8 +489,8 @@ export async function generateTicketAiSuggest(
         feature: 'ticket_suggest_legacy',
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
-        ticketId: params.ticketId,
-        protocolo: params.protocolo,
+        ticketId: enrichedParams.ticketId,
+        protocolo: enrichedParams.protocolo,
         userId,
       });
     }

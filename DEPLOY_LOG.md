@@ -1,10 +1,33 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.77.0 | DATE: 2026-08-11 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.78.0 | DATE: 2026-08-12 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Consolidado Testes CRM (Meus Tickets, anexos, 360, pendente, especiais)
+
+- **Data/Hora**: 2026-08-12
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.78.0
+  - **Backend**: email-inbound v1.14.0, gmailAttachment v1.5.0, gmailInbound v1.5.0, emailHtml v1.1.0, emailNotification v1.8.0, composeInlineImages v1.0.0, openaiTicketSuggest v1.3.1, ticketIaAdapter v1.1.1, resolvePendenteTickets v1.0.0, telephonyTicketNotify v1.0.0, telephonyInbound v2.2.0, chamado.mapper v2.10.1, workspace360 v1.2.0, env v1.36.1
+  - **Frontend**: DeskV2Root v3.32.1, DeskConversation v1.6.1, especiaisChannelDetection v1.1.0, NotificationPanel v1.0.0, AgentPanel v3.2.0, GestaoPanel v3.6.0, deskData v2.5.0, app.css v1.1.0, App v2.7.1, NotificationContext v1.3.0
+- **Arquivos principais**:
+  - `frontend/src/features/desk/DeskV2Root.jsx` — restaura tabela Meus Tickets/Resolvidos ao fechar última aba
+  - `frontend/src/services/especiais/*` + `backend/.../chamado.mapper.ts` — exclui RA/Procon/CG do Desk agente
+  - `backend/src/services/email-inbound.service.ts`, `gmailAttachment.service.ts`, `composeInlineImages.util.ts`, `emailNotification.service.ts` — imagens CID inbound/outbound + anexos só com filename
+  - `backend/src/services/openaiTicketSuggest.service.ts`, `ticketIaAdapter.service.ts` — últimas 50 msgs + notas internas do Mongo
+  - `backend/src/jobs/resolvePendenteTickets.job.ts` — pendente ≥48h → resolvido (hora cheia)
+  - `frontend/src/features/workspace/*` + `workspace360.service.ts` — alert, channelVision, KPIs supervisor, pendente nas seções
+  - `backend/src/services/telephonyTicketNotify.service.ts` + `NotificationPanel.jsx` — CTA sininho para ticket de telefonia
+- **Descrição**: Entrega do consolidado de testes CRM (sem lote de permissões Responsável/overrides). Corrige navegação Meus Tickets, exclusão de especiais, anexos/imagens de e-mail, contexto IA, automação pendente→resolvido, Painel 360 e notificação de ligação no sininho.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — fix persistência thread WhatsApp + balão de presença e polling rápido
 

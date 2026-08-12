@@ -1,6 +1,7 @@
 /**
  * Painel 360° — Agente
- * VERSION: v3.1.0 | DATE: 2026-07-31
+ * VERSION: v3.2.0 | DATE: 2026-08-12
+ * — Exibe alerta de SLA crítico quando a API/local retorna `alert`
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +15,7 @@ import { useWorkspace360 } from '../../hooks/useWorkspace360';
 import { getAgentName } from '../../services/clientDb';
 import { markWorkflowInfoRequestsReadForTicket } from '../../services/workflow/workflowInfoNotifications';
 import Workspace360Kpis from './components/ws360/Workspace360Kpis';
+import Workspace360Alert from './components/ws360/Workspace360Alert';
 import Workspace360DualTicketSection from './components/ws360/Workspace360DualTicketSection';
 import Workspace360TicketSection from './components/ws360/Workspace360TicketSection';
 import Workspace360ProductionChart from './components/ws360/Workspace360ProductionChart';
@@ -48,6 +50,10 @@ export default function AgentPanel() {
     navigate(buildDeskNavigationForWs360Section(sectionId));
   }, [navigate]);
 
+  const handleOpenAlert = useCallback((ticketId) => {
+    handleOpenTicket(ticketId, 'action-now');
+  }, [handleOpenTicket]);
+
   if (loading && !view) {
     return <div className="ws-agent-desk ws-agent-desk--operational"><p className="ws360-loading">Carregando painel…</p></div>;
   }
@@ -61,6 +67,7 @@ export default function AgentPanel() {
           API indisponível — exibindo dados locais da fila.
         </p>
       ) : null}
+      <Workspace360Alert alert={view.alert} onOpen={handleOpenAlert} />
       <Workspace360Kpis kpis={view.kpis} />
       <Workspace360DualTicketSection
         leftSection={actionNow}

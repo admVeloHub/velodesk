@@ -1,12 +1,151 @@
 /**
- * DeskWhatsAppChat v1.6.0 — mensagem inicial dedicada + compose só na sessão 24h
- * VERSION: v1.6.0 | DATE: 2026-08-10
+ * DeskWhatsAppChat v1.9.0 — botão de transcrição de áudio sob demanda
+ * VERSION: v1.9.0 | DATE: 2026-08-12
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
   formatWaTime,
   formatWaDateSeparator,
 } from '../../../services/desk/utils';
+
+function attachmentHref(url) {
+  return url.startsWith('/api/') ? url : `/api${url.startsWith('/') ? url : `/${url}`}`;
+}
+
+function attachmentLabel(url) {
+  try {
+    const raw = decodeURIComponent(String(url || '').split('/').pop() || 'Anexo');
+    return raw.replace(/^[0-9a-f-]{36}-/i, '').replace(/__/g, '/').split('/').pop() || 'Anexo';
+  } catch {
+    return 'Anexo';
+  }
+}
+
+function mediaKind(contentType, url) {
+  const type = String(contentType || '').toLowerCase();
+  const label = attachmentLabel(url).toLowerCase();
+  if (type.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(label)) return 'image';
+  if (type.startsWith('audio/') || /\.(ogg|opus|mp3|m4a|aac|amr|wav)$/i.test(label)) return 'audio';
+  if (type.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(label)) return 'video';
+  return 'document';
+}
+
+async function fetchAuthenticatedAttachment(url) {
+  const token = localStorage.getItem('velodesk_token');
+  const response = await fetch(attachmentHref(url), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) throw new Error(`Anexo indisponível (HTTP ${response.status})`);
+  return response;
+}
+
+function WhatsAppMediaAttachments({ attachments, contentTypes }) {
+  const items = (attachments || []).map((url, index) => ({
+    url: String(url || '').trim(),
+    contentType: String(contentTypes?.[index] || ''),
+  })).filter((item) => item.url);
+  const fingerprint = items.map((item) => `${item.url}|${item.contentType}`).join(';;');
+  const [inlineUrls, setInlineUrls] = useState({});
+  const [errors, setErrors] = useState({});
+  const [downloading, setDownloading] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const created = [];
+    const inlineItems = items.filter((item) => mediaKind(item.contentType, item.url) !== 'document');
+    Promise.all(inlineItems.map(async (item) => {
+      try {
+        const response = await fetchAuthenticatedAttachment(item.url);
+        const objectUrl = URL.createObjectURL(await response.blob());
+        created.push(objectUrl);
+        if (!cancelled) {
+          setInlineUrls((current) => ({ ...current, [item.url]: objectUrl }));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setErrors((current) => ({ ...current, [item.url]: err?.message || 'Anexo indisponível' }));
+        }
+      }
+    }));
+    return () => {
+      cancelled = true;
+      created.forEach((url) => URL.revokeObjectURL(url));
+      setInlineUrls({});
+      setErrors({});
+    };
+  // fingerprint representa exatamente a lista de anexos da mensagem
+  }, [fingerprint]);
+
+  const downloadDocument = async (item) => {
+    setDownloading(item.url);
+    setErrors((current) => ({ ...current, [item.url]: '' }));
+    try {
+      const response = await fetchAuthenticatedAttachment(item.url);
+      const objectUrl = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = attachmentLabel(item.url);
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (err) {
+      setErrors((current) => ({ ...current, [item.url]: err?.message || 'Anexo indisponível' }));
+    } finally {
+      setDownloading('');
+    }
+  };
+
+  if (!items.length) return null;
+  return (
+    <div className="wa-msg__media-list">
+      {items.map((item) => {
+        const kind = mediaKind(item.contentType, item.url);
+        const src = inlineUrls[item.url];
+        const error = errors[item.url];
+        return (
+          <div className={`wa-msg__media wa-msg__media--${kind}`} key={item.url}>
+            {kind === 'image' && src ? (
+              <button
+                type="button"
+                className="wa-msg__image-button"
+                onClick={() => window.open(src, '_blank', 'noopener,noreferrer')}
+                aria-label={`Abrir imagem ${attachmentLabel(item.url)}`}
+              >
+                <img src={src} alt={attachmentLabel(item.url)} loading="lazy" />
+              </button>
+            ) : null}
+            {kind === 'audio' && src ? (
+              <audio className="wa-msg__audio" controls preload="metadata" src={src}>
+                Seu navegador não conseguiu reproduzir este áudio.
+              </audio>
+            ) : null}
+            {kind === 'video' && src ? (
+              <video className="wa-msg__video" controls preload="metadata" src={src}>
+                Seu navegador não conseguiu reproduzir este vídeo.
+              </video>
+            ) : null}
+            {kind !== 'document' && !src && !error ? (
+              <span className="wa-msg__media-loading">Carregando mídia…</span>
+            ) : null}
+            {kind === 'document' ? (
+              <button
+                type="button"
+                className="wa-msg__document"
+                disabled={downloading === item.url}
+                onClick={() => { void downloadDocument(item); }}
+              >
+                <i className="ti ti-file-download" aria-hidden="true" />
+                <span>{downloading === item.url ? 'Baixando…' : attachmentLabel(item.url)}</span>
+              </button>
+            ) : null}
+            {error ? <span className="wa-msg__media-error" role="alert">{error}</span> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function renderDeliveryChecks(msg) {
   if (msg.type !== 'agent') return null;
@@ -72,6 +211,7 @@ export default function DeskWhatsAppChat({
   onUseIaReply,
   onSend,
   onSendInitial,
+  onRequestAudioTranscription,
   waUiState,
   initialSendBusy = false,
   sendBusy = false,
@@ -83,8 +223,10 @@ export default function DeskWhatsAppChat({
   iaError = '',
 }) {
   const [iaVisible, setIaVisible] = useState(true);
+  const [transcriptionBusyId, setTranscriptionBusyId] = useState('');
   const inputRef = useRef(null);
   const lastIaReplyRef = useRef('');
+  const prevSendBusyRef = useRef(false);
   const chatMessages = messages || [];
   const dateIso = chatMessages[0]?.timestamp || ticket.createdAt;
 
@@ -101,6 +243,24 @@ export default function DeskWhatsAppChat({
     if (!iaHasSuggestion || !iaReply || iaReply === lastIaReplyRef.current) return;
     setIaVisible(true);
   }, [iaReply, iaHasSuggestion]);
+
+  // Mantém o cursor no campo após cada envio (Enter ou botão)
+  useEffect(() => {
+    if (prevSendBusyRef.current && !sendBusy && composeEnabled) {
+      window.requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
+    }
+    prevSendBusyRef.current = sendBusy;
+  }, [sendBusy, composeEnabled]);
+
+  // Foco inicial ao abrir conversa com texto livre liberado
+  useEffect(() => {
+    if (!composeEnabled) return;
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  }, [ticket?.id, composeEnabled]);
 
   const displayText = iaError
     ? iaError
@@ -125,9 +285,25 @@ export default function DeskWhatsAppChat({
     inputRef.current?.focus();
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!composeEnabled || !composeText.trim() || sendBusy) return;
-    onSend();
+    const result = onSend?.();
+    if (result && typeof result.then === 'function') {
+      await result;
+    }
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  };
+
+  const handleRequestTranscription = async (msg) => {
+    if (!msg?.id || !onRequestAudioTranscription || transcriptionBusyId) return;
+    setTranscriptionBusyId(msg.id);
+    try {
+      await onRequestAudioTranscription(msg.id);
+    } finally {
+      setTranscriptionBusyId('');
+    }
   };
 
   const clientLabel = String(
@@ -187,7 +363,30 @@ export default function DeskWhatsAppChat({
               className={'wa-msg' + (isOut ? ' wa-msg--out' : ' wa-msg--in')}
             >
               <div className={'wa-msg__bubble' + bubbleClass}>
+                <WhatsAppMediaAttachments
+                  attachments={msg.attachments}
+                  contentTypes={msg.mediaContentTypes}
+                />
                 <span className="wa-msg__text">{msg.text}</span>
+                {msg.transcriptionStatus === 'processing' || msg.transcriptionStatus === 'pending' ? (
+                  <span className="wa-msg__transcription-status">
+                    <i className="ti ti-loader-2" aria-hidden="true" />
+                    Transcrevendo áudio…
+                  </span>
+                ) : null}
+                {msg.transcriptionStatus === 'available' || msg.transcriptionStatus === 'failed' ? (
+                  <button
+                    type="button"
+                    className="wa-msg__transcription-button"
+                    disabled={Boolean(transcriptionBusyId)}
+                    onClick={() => { void handleRequestTranscription(msg); }}
+                  >
+                    <i className="ti ti-file-text-ai" aria-hidden="true" />
+                    {transcriptionBusyId === msg.id
+                      ? 'Solicitando…'
+                      : (msg.transcriptionStatus === 'failed' ? 'Tentar transcrever novamente' : 'Transcrever áudio')}
+                  </button>
+                ) : null}
                 <span className="wa-msg__time">
                   {formatWaTime(msg.timestamp)}
                   {renderDeliveryChecks(msg)}
@@ -261,7 +460,7 @@ export default function DeskWhatsAppChat({
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                handleSend();
+                void handleSend();
               }
             }}
           />
@@ -274,7 +473,8 @@ export default function DeskWhatsAppChat({
           className="wa-chat__send"
           aria-label="Enviar mensagem"
           disabled={!composeEnabled || sendBusy || !composeText.trim()}
-          onClick={handleSend}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => { void handleSend(); }}
         >
           <i className="fas fa-paper-plane" aria-hidden="true" />
         </button>

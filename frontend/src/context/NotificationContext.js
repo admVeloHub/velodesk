@@ -1,6 +1,6 @@
 /**
- * NotificationContext v1.2.0 — sininho + tratamento 429 no poll
- * VERSION: v1.2.0 | DATE: 2026-07-21
+ * NotificationContext v1.3.0 — sininho com painel + CTA telefonia/workflow
+ * VERSION: v1.3.0 | DATE: 2026-08-12
  */
 import React, {
   createContext,
@@ -21,8 +21,8 @@ function mapPersistedNotification(row) {
     id: `wf-${row._id}`,
     persistId: row._id,
     message: row.titulo ? `${row.titulo}: ${row.mensagem}` : row.mensagem,
-    type: 'workflow-cta',
-    ticketId: row.ticketId,
+    type: row.workflowSlug === 'telephony-inbound' ? 'telephony-cta' : 'workflow-cta',
+    ticketId: row.ticketId ? String(row.ticketId) : '',
     protocolo: row.chamadoProtocolo,
     lida: row.lida,
     createdAt: row.createdAt,
