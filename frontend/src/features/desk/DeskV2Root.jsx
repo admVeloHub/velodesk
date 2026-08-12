@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.30.0 | DATE: 2026-08-11
- * — Balão de presença WhatsApp na timeline + polling 3s com chat aberto / 5s sessão ativa
+ * VERSION: v3.32.1 | DATE: 2026-08-12
+ * — Ao fechar última aba em Meus Tickets/Resolvidos, restaura tabela
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -24,6 +24,7 @@ import {
   applySendStatus,
   normalizeCpf,
   isValidEmailFormat,
+  isValidCpfDigits,
   getTicketProtocolLabel,
   isTicketInWorkflow,
   isTicketWorkflowActive,
@@ -59,7 +60,7 @@ import { isDraftTicket, persistDraftTicket } from '../../services/ticketsCache';
 import { apiTicketToCockpit, cockpitTicketToApi } from '../../api/adapters/ticketAdapter';
 import { lookupClient } from '../../services/clientDb';
 import { clientsApi, colaboradoresApi, ticketsApi } from '../../api/client';
-import { persistClienteContact } from '../../api/adapters/clienteAdapter';
+import { persistClienteContact, applyClienteDocToTicket, ticketNeedsContactHydration } from '../../api/adapters/clienteAdapter';
 import { useTickets } from '../../context/TicketsContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
@@ -214,6 +215,8 @@ export default function DeskV2Root() {
   const waChatOpenRef = useRef(false);
   waChatOpenRef.current = waChatOpen;
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [hydratingContact, setHydratingContact] = useState(false);
+  const contactHydrateRef = useRef(new Set());
   const [mergeInProgress, setMergeInProgress] = useState(false);
   const [aiRevisionOpen, setAiRevisionOpen] = useState(false);
   const [aiRevisionSubmitting, setAiRevisionSubmitting] = useState(false);
@@ -449,6 +452,56 @@ export default function DeskV2Root() {
       cancelled = true;
     };
   }, [activeTabId, refreshKey, patchTicket, showNotification]);
+
+  // Busca inicial: cadastro local ou fallback Customer Data API (overview) → painel superior
+  useEffect(() => {
+    if (!ticket) return undefined;
+
+    const ticketId = String(ticket.id || ticket._id || '');
+    if (!ticketId) return undefined;
+
+    const cpf = normalizeCpf(
+      ticket.lateralForm?.clienteCpf || ticket.lateralForm?.cpf || ticket.clientCPF,
+    );
+    if (!isValidCpfDigits(cpf)) return undefined;
+    if (!ticketNeedsContactHydration(ticket)) return undefined;
+
+    const dedupeKey = `${ticketId}:${cpf}`;
+    if (contactHydrateRef.current.has(dedupeKey)) return undefined;
+
+    let cancelled = false;
+    contactHydrateRef.current.add(dedupeKey);
+    setHydratingContact(true);
+
+    clientsApi.getByCpf(cpf)
+      .then(async (clienteDoc) => {
+        if (cancelled || !clienteDoc) return;
+        const updated = await updateTicketInCache(ticketId, (t) => {
+          applyClienteDocToTicket(t, clienteDoc);
+          return t;
+        });
+        if (updated) patchTicket(ticketId, updated);
+      })
+      .catch(() => {
+        /* 404 ou API indisponível — painel permanece como está */
+      })
+      .finally(() => {
+        if (!cancelled) setHydratingContact(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    ticket?.id,
+    ticket?.clienteId,
+    ticket?.clientCPF,
+    ticket?.lateralForm?.clienteCpf,
+    ticket?.lateralForm?.cpf,
+    ticket?.lateralForm?.clienteNome,
+    ticket?.clientName,
+    patchTicket,
+  ]);
 
   // Ticket aberto: recarrega o detalhe em ciclo curto para trazer resposta do cliente sem ação do agente
   useEffect(() => {
@@ -701,6 +754,9 @@ export default function DeskV2Root() {
       : activeTabId;
     closeTicketTab(id);
     syncUrlTicketParam(nextActive);
+    if (remaining.length === 0 && isDeskTableQueue(activeQueue)) {
+      setTableQueueBrowsing(true);
+    }
   };
 
   const handleFundirTickets = useCallback(async ({ activeId, inactiveIds, cpf }) => {
@@ -1186,6 +1242,29 @@ export default function DeskV2Root() {
     await runWhatsAppSend({ initialTemplate: true });
   };
 
+  const handleRequestWhatsAppAudioTranscription = async (messageSid) => {
+    if (!ticket || !messageSid) return;
+    try {
+      const result = await ticketsApi.requestWhatsAppAudioTranscription(
+        ticket.id || ticket._id,
+        messageSid,
+      );
+      if (result?.ticket) {
+        patchTicket(ticket.id, apiTicketToCockpit(result.ticket));
+      }
+      showNotification(
+        result?.transcriptionStatus === 'completed'
+          ? 'Este áudio já foi transcrito.'
+          : 'Transcrição solicitada.',
+        'success',
+      );
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Não foi possível transcrever o áudio.';
+      showNotification(message, 'error');
+      throw err;
+    }
+  };
+
   const handleFieldChange = (key, value) => {
     if (ticketReadOnly) return;
     setRightFields((f) => applyCascadeFieldChange(f, key, value));
@@ -1321,14 +1400,13 @@ export default function DeskV2Root() {
         clienteId: draft?.clienteId || ticket.clienteId || ticket.lateralForm?.clienteId,
       });
       const clienteId = clienteDoc?._id || clienteDoc?.id || ticket.clienteId || ticket.lateralForm?.clienteId;
-      const primaryEmail = replyEmail || emailList[0] || '';
-      const primaryPhone = whatsappPhone || phoneList[0] || '';
 
       const updated = await updateTicketInCache(ticket.id, (t) => {
+        applyClienteDocToTicket(t, clienteDoc);
         t.clientName = nome;
         t.solicitante = nome;
-        t.clientEmail = primaryEmail;
-        t.clientPhone = primaryPhone;
+        t.clientEmail = replyEmail || emailList[0] || '';
+        t.clientPhone = whatsappPhone || phoneList[0] || '';
         if (clienteId) t.clienteId = clienteId;
         t.lateralForm = {
           ...t.lateralForm,
@@ -1865,6 +1943,7 @@ export default function DeskV2Root() {
                 <DeskClientProfileBar
               ticket={ticket}
               client={client}
+              hydratingContact={hydratingContact}
               onSaveContact={handleSaveContact}
               onOpenHistory={() => setHistoryOpen(true)}
               onAdvanceWorkflow={handleAdvanceWorkflow}
@@ -1934,6 +2013,7 @@ export default function DeskV2Root() {
                     onUseIaReply={handleUseIaReply}
                     onSend={handleSendWhatsAppMessage}
                     onSendInitial={handleSendWhatsAppInitial}
+                    onRequestAudioTranscription={handleRequestWhatsAppAudioTranscription}
                     waUiState={waUiState}
                     initialSendBusy={waSendInProgress}
                     sendBusy={waSendInProgress}

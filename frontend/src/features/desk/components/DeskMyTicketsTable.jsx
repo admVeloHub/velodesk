@@ -1,6 +1,6 @@
 /**
- * DeskMyTicketsTable v1.5.4 — seções Cliente respondeu + Pendentes (filtro backend confiável)
- * VERSION: v1.5.4 | DATE: 2026-08-07
+ * DeskMyTicketsTable v1.5.5 — Meus Tickets: só responsável/atribuído do agente logado
+ * VERSION: v1.5.5 | DATE: 2026-08-11
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {

@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.12.0 | DATE: 2026-08-11
- * — collapseWhatsAppThreadToBalloon: balão único de presença da conversa WhatsApp na timeline
+ * VERSION: v3.13.0 | DATE: 2026-08-12
+ * — IDs estáveis e metadados de mídia/transcrição WhatsApp
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
 import { getDeskQueueDisplayCount, markTicketResolvedOptimistic } from './queueCounts';
@@ -1524,6 +1524,7 @@ export function buildRegistroThread(ticket) {
         : rawText,
     );
     return {
+      id: m.id,
       type: bubbleType,
       initials: getInitials(isClient ? ticket.clientName || m.author : authorName),
       text,
@@ -1533,6 +1534,8 @@ export function buildRegistroThread(ticket) {
       channel: m.channel,
       deliveryStatus: m.deliveryStatus,
       deliveryErrorMessage: m.deliveryErrorMessage,
+      mediaContentTypes: Array.isArray(m.mediaContentTypes) ? m.mediaContentTypes : [],
+      transcriptionStatus: m.transcriptionStatus,
     };
   });
 

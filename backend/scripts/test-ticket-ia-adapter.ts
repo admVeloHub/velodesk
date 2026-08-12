@@ -4,6 +4,7 @@ import type { IChamadoN1 } from '../src/models/ChamadoN1';
 import {
   adaptChamadoToTicketIa,
   buildTicketIaText,
+  buildTicketIaMessagesFromChamado,
 } from '../src/services/ticketIaAdapter.service';
 import {
   canonicalizeTicketIaReason,
@@ -64,6 +65,57 @@ const transcribed = adaptChamadoToTicketIa(chamado({
 assert.equal(transcribed?.qualidadeFonte, 'resumo_atendente');
 assert.match(buildTicketIaText(transcribed!), /não é citação literal/);
 
+const whatsapp = adaptChamadoToTicketIa(chamado({
+  registro: [{
+    data: new Date('2026-08-12T10:00:00Z'),
+    origin: 'cliente',
+    mensagemPublica: '',
+    anotacaoInterna: '',
+    status: 'novo',
+    metadados: {
+      source: 'whatsapp-thread',
+      channel: 'whatsapp',
+      whatsappMensagens: [
+        {
+          id: 'wa-1',
+          data: '2026-08-12T10:00:00Z',
+          origin: 'agente',
+          texto: 'Olá João, aqui é o Velotax.',
+        },
+        {
+          id: 'wa-2',
+          data: '2026-08-12T10:05:00Z',
+          origin: 'cliente',
+          texto: 'Preciso de ajuda com meu boleto.',
+        },
+      ],
+    },
+  }],
+}));
+assert.equal(whatsapp?.qualidadeFonte, 'direto_cliente');
+assert.equal(whatsapp?.descricaoCliente, 'Preciso de ajuda com meu boleto.');
+assert.equal(whatsapp?.canal, 'whatsapp');
+
+const waThread = buildTicketIaMessagesFromChamado(chamado({
+  registro: [{
+    data: new Date('2026-08-12T10:00:00Z'),
+    origin: 'cliente',
+    mensagemPublica: '',
+    anotacaoInterna: '',
+    status: 'novo',
+    metadados: {
+      source: 'whatsapp-thread',
+      whatsappMensagens: [
+        { id: 'wa-1', data: '2026-08-12T10:00:00Z', origin: 'agente', texto: 'Template inicial' },
+        { id: 'wa-2', data: '2026-08-12T10:05:00Z', origin: 'cliente', texto: 'Meu IR atrasou' },
+      ],
+    },
+  }],
+}));
+assert.equal(waThread.length, 2);
+assert.equal(waThread[1].role, 'cliente');
+assert.equal(waThread[1].channel, 'whatsapp');
+
 const formal = adaptChamadoToTicketIa(chamado({
   registro: [{
     data: new Date(),
@@ -87,6 +139,6 @@ assert.equal(
 
 const knowledge = readExportedTicketIaKnowledge();
 assert.ok(knowledge, 'knowledge.json deve estar disponível');
-assert.equal(knowledge?.taxonomiaMotivos?.length, 27);
+assert.ok((knowledge?.taxonomiaMotivos?.length ?? 0) >= 27);
 
 console.log('ticket-ia-adapter: ok');

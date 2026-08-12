@@ -1,6 +1,6 @@
 /**
- * clientMessageEnvelope.service v1.0.0 — abertura mecânica no composer (núcleo IA separado)
- * VERSION: v1.0.0 | DATE: 2026-08-10
+ * clientMessageEnvelope.service v1.1.0 — resolveClientGreetingName exportado (WhatsApp template)
+ * VERSION: v1.1.0 | DATE: 2026-08-11
  */
 import type { TicketAiMessageInput } from './agents/agentTypes';
 import { isPrimeiroContatoAgente } from './agents/agentTabulation.util';
@@ -20,9 +20,10 @@ export function detectEnvelopeModo(messages?: TicketAiMessageInput[]): EnvelopeM
   return isPrimeiroContatoAgente(messages) ? 'primeiro_contato' : 'continuacao';
 }
 
-function resolveClientGreetingName(clientName?: string): string {
+/** Primeiro nome do cliente para saudação (template WhatsApp, envelope composer, etc.). */
+export function resolveClientGreetingName(clientName?: string, fallback = 'cliente'): string {
   const first = resolveClientFirstName(trimStr(clientName, 200));
-  return first || 'cliente';
+  return first || fallback;
 }
 
 function resolveAgentDisplayName(agentName?: string): string {

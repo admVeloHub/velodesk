@@ -1,6 +1,6 @@
 /**
- * ticketThreadSync v1.3.0 — fingerprint thread WhatsApp para polling inbound
- * VERSION: v1.3.0 | DATE: 2026-08-11
+ * ticketThreadSync v1.5.0 — refresh IA considera fingerprint WhatsApp persistido
+ * VERSION: v1.5.0 | DATE: 2026-08-12
  */
 
 function normalizeMsgText(value) {
@@ -84,7 +84,9 @@ export function buildWhatsAppThreadFingerprint(ticket) {
       const ts = m.timestamp || m.time || m.createdAt || '';
       const text = normalizeMsgText(m.text || m.message);
       const origin = m.origin || (m.sender === 'them' ? 'cliente' : 'agente');
-      return `${m.id || ''}|${origin}|${ts}|${text}`;
+      const attachments = Array.isArray(m.attachments) ? m.attachments.join(',') : '';
+      const transcription = String(m.transcriptionStatus || '');
+      return `${m.id || ''}|${origin}|${ts}|${text}|${attachments}|${transcription}`;
     })
     .join(';;');
 }
@@ -117,6 +119,7 @@ export function buildAiSuggestionRefreshKey({
     contextSource,
     'client',
     buildClientThreadFingerprint(convMsgs),
+    buildWhatsAppThreadFingerprint(ticket),
   ].join('::');
 }
 
@@ -130,5 +133,18 @@ export function getLastClientOrAgentConvMsg(convMsgs) {
 }
 
 export function isLastPublicInteractionFromAgent(convMsgs) {
-  return getLastClientOrAgentConvMsg(convMsgs)?.type === 'agent';
+  let lastClient = null;
+  let lastAgent = null;
+  for (const m of convMsgs || []) {
+    if (m?.type === 'client') lastClient = m;
+    if (m?.type === 'agent') lastAgent = m;
+  }
+  if (!lastClient) return false;
+  if (!lastAgent) return false;
+  const tsClient = new Date(lastClient.timestamp || 0).getTime();
+  const tsAgent = new Date(lastAgent.timestamp || 0).getTime();
+  if (Number.isNaN(tsClient) || Number.isNaN(tsAgent)) {
+    return getLastClientOrAgentConvMsg(convMsgs)?.type === 'agent';
+  }
+  return tsAgent > tsClient;
 }

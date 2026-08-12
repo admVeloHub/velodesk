@@ -34,12 +34,16 @@
     "test:casos-especiais-precheck": "tsx scripts/test-casos-especiais-precheck.ts",
     "test:inbound-especiais-channel": "tsx scripts/test-inbound-especiais-channel.ts",
     "test:reclamacoes-smoke": "tsx scripts/test-reclamacoes-smoke.ts",
-    "backfill:ticket-ia": "tsx scripts/backfill-ticket-ia.ts"
+    "backfill:ticket-ia": "tsx scripts/backfill-ticket-ia.ts",
+    "octadesk:dump-tickets": "tsx scripts/octadesk-dump-tickets.ts",
+    "octadesk:dump-interactions": "tsx scripts/octadesk-dump-interactions.ts",
+    "octadesk:dump-attachments": "tsx scripts/octadesk-dump-attachments.ts",
+    "octadesk:dump-report": "tsx scripts/octadesk-dump-report.ts"
   },
   "dependencies": {
     "@google-cloud/pubsub": "^5.0.0",
     "@google/generative-ai": "^0.21.0",
-    "@supabase/supabase-js": "^2.112.1",
+    "@supabase/supabase-js": "^2.112.3",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

@@ -1,4 +1,4 @@
-/** gmailAttachment.service v1.4.1 — Content-ID não bloqueia attachment; percorre message/rfc822 */
+/** gmailAttachment.service v1.5.0 — anexos + imagens inline CID resolvidas para URL API */
 import crypto from 'crypto';
 import type { gmail_v1 } from 'googleapis';
 import type { InboundEmailAttachment } from '../inbound-email/types';
@@ -169,4 +169,182 @@ export async function downloadGmailAttachments(
   }
 
   return stored;
+}
+
+export interface GmailInlineImagePartRef {
+  filename: string;
+  mimeType: string;
+  attachmentId: string;
+  contentId: string;
+}
+
+function normalizeContentId(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .replace(/^<|>$/g, '')
+    .toLowerCase();
+}
+
+function isImageMime(mimeType: string): boolean {
+  return /^image\//i.test(String(mimeType || '').trim());
+}
+
+/** Partes inline/CID (imagens no corpo) — distintas dos anexos disposition=attachment. */
+export function listGmailInlineImageParts(
+  part: gmail_v1.Schema$MessagePart | undefined,
+  acc: GmailInlineImagePartRef[] = [],
+): GmailInlineImagePartRef[] {
+  if (!part) return acc;
+
+  const filename = String(part.filename ?? '').trim() || 'image.png';
+  const attachmentId = String(part.body?.attachmentId ?? '').trim();
+  const contentId = normalizeContentId(getPartHeader(part, 'Content-ID'));
+  const mimeType = String(part.mimeType ?? '').trim();
+  const disposition = getPartHeader(part, 'Content-Disposition').toLowerCase();
+  const isExplicitAttachment = disposition.includes('attachment');
+
+  if (
+    attachmentId
+    && contentId
+    && !isExplicitAttachment
+    && (isImageMime(mimeType) || disposition.includes('inline') || Boolean(contentId))
+  ) {
+    if (isImageMime(mimeType) || disposition.includes('inline')) {
+      acc.push({
+        filename: isBrandInlineAttachmentFilename(filename) ? 'image.png' : filename,
+        mimeType: mimeType || 'image/png',
+        attachmentId,
+        contentId,
+      });
+    }
+  }
+
+  // Alguns clients embutem imagem sem filename mas com body.data direto (sem attachmentId)
+  if (!attachmentId && part.body?.data && contentId && isImageMime(mimeType) && !isExplicitAttachment) {
+    // Tratado em download via body.data no caller — marcar com attachmentId vazio não ajuda;
+    // skip here; downloadGmailInlineImages handles body.data separately if needed.
+  }
+
+  for (const child of part.parts ?? []) {
+    listGmailInlineImageParts(child, acc);
+  }
+  return acc;
+}
+
+function listInlinePartsWithEmbeddedData(
+  part: gmail_v1.Schema$MessagePart | undefined,
+  acc: Array<{ contentId: string; mimeType: string; filename: string; buffer: Buffer }> = [],
+): typeof acc {
+  if (!part) return acc;
+  const contentId = normalizeContentId(getPartHeader(part, 'Content-ID'));
+  const mimeType = String(part.mimeType ?? '').trim();
+  const disposition = getPartHeader(part, 'Content-Disposition').toLowerCase();
+  const isExplicitAttachment = disposition.includes('attachment');
+  const data = String(part.body?.data ?? '').trim();
+  if (contentId && data && isImageMime(mimeType) && !isExplicitAttachment && !part.body?.attachmentId) {
+    acc.push({
+      contentId,
+      mimeType,
+      filename: String(part.filename ?? '').trim() || 'image.png',
+      buffer: decodeBase64Url(data),
+    });
+  }
+  for (const child of part.parts ?? []) {
+    listInlinePartsWithEmbeddedData(child, acc);
+  }
+  return acc;
+}
+
+/**
+ * Baixa imagens CID/inline, persiste no storage inbound e reescreve htmlBody `cid:` → URL da API.
+ * Retorna anexos inline (para opcionalmente listar) e o HTML reescrito.
+ */
+export async function downloadAndRewriteGmailInlineImages(
+  gmail: gmail_v1.Gmail,
+  message: gmail_v1.Schema$Message,
+  messageIdForStorage: string,
+  htmlBody: string,
+): Promise<{ htmlBody: string; inlineAttachments: InboundEmailAttachment[] }> {
+  const gmailId = String(message.id ?? '').trim();
+  const cidToUrl = new Map<string, string>();
+  const inlineAttachments: InboundEmailAttachment[] = [];
+
+  if (!gmailId) {
+    return { htmlBody, inlineAttachments };
+  }
+
+  const persistBuffer = async (
+    contentId: string,
+    filename: string,
+    mimeType: string,
+    buffer: Buffer,
+  ) => {
+    if (buffer.length > MAX_ATTACHMENT_BYTES) return;
+    if (isBrandInlineAttachmentFilename(filename)) return;
+    const contentHash = crypto.createHash('sha256').update(buffer).digest('hex');
+    const saved = await persistInboundAttachment({
+      messageId: messageIdForStorage,
+      filename,
+      contentType: mimeType,
+      buffer,
+    });
+    cidToUrl.set(contentId, saved.url);
+    inlineAttachments.push({
+      filename: saved.filename,
+      contentType: saved.contentType,
+      url: saved.url,
+      gcsUri: saved.gcsUri,
+      storageKey: saved.storageKey,
+      contentHash,
+      bytes: buffer.length,
+    });
+  };
+
+  const parts = listGmailInlineImageParts(message.payload ?? undefined);
+  for (const part of parts) {
+    try {
+      const res = await gmail.users.messages.attachments.get({
+        userId: 'me',
+        messageId: gmailId,
+        id: part.attachmentId,
+      });
+      const raw = String(res.data.data ?? '').trim();
+      if (!raw) continue;
+      await persistBuffer(part.contentId, part.filename, part.mimeType, decodeBase64Url(raw));
+    } catch (err) {
+      console.warn('[gmailAttachment] falha ao baixar imagem inline', {
+        contentId: part.contentId,
+        messageId: messageIdForStorage,
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  for (const embedded of listInlinePartsWithEmbeddedData(message.payload ?? undefined)) {
+    try {
+      if (cidToUrl.has(embedded.contentId)) continue;
+      await persistBuffer(embedded.contentId, embedded.filename, embedded.mimeType, embedded.buffer);
+    } catch (err) {
+      console.warn('[gmailAttachment] falha ao persistir imagem inline embutida', {
+        contentId: embedded.contentId,
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  if (!cidToUrl.size || !htmlBody) {
+    return { htmlBody, inlineAttachments };
+  }
+
+  const rewritten = htmlBody.replace(
+    /(<img\b[^>]*\bsrc\s*=\s*["'])cid:([^"']+)(["'][^>]*>)/gi,
+    (full, pre, cidRaw, post) => {
+      const cid = normalizeContentId(cidRaw);
+      const url = cidToUrl.get(cid);
+      if (!url) return full;
+      return `${pre}${url}${post}`;
+    },
+  );
+
+  return { htmlBody: rewritten, inlineAttachments };
 }

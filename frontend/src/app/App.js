@@ -1,6 +1,7 @@
 /**
  * App raiz — providers + rotas
- * VERSION: v2.7.0 | DATE: 2026-08-04 | AUTHOR: VeloHub Development Team
+ * VERSION: v2.7.1 | DATE: 2026-08-12 | AUTHOR: VeloHub Development Team
+ * — Painel do sininho (NotificationPanel)
  */
 
 import React, { useEffect } from 'react';
@@ -8,6 +9,7 @@ import React, { useEffect } from 'react';
 import { useRoutes } from 'react-router-dom';
 
 import CockpitBridge from '../components/CockpitBridge';
+import NotificationPanel from '../components/NotificationPanel';
 
 import { AuthProvider } from '../context/AuthContext';
 
@@ -199,6 +201,8 @@ export default function App() {
     null,
 
     React.createElement(CockpitBridge),
+
+    React.createElement(NotificationPanel),
 
     React.createElement(AppRoutes)
 

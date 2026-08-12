@@ -1,5 +1,7 @@
 /**
  * reclameAquiTicketService — bridge Reclame Aqui ↔ API tickets
+ * VERSION: v1.1.0 | DATE: 2026-08-12
+ * — isReclameAquiChannelTicket para exclusão do Desk Agente
  */
 import { ticketsApi, reclamacoesApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
@@ -243,4 +245,26 @@ export function formatRaDeadlineLabel(iso) {
     return `${days} dia${days > 1 ? 's' : ''} e ${hours} hora${hours !== 1 ? 's' : ''}`;
   }
   return `${hours} hora${hours !== 1 ? 's' : ''}`;
+}
+
+function normalizeCanal(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+/** Ticket de canal Reclame Aqui — exclusão do Desk Agente. */
+export function isReclameAquiChannelTicket(ticket) {
+  if (!ticket) return false;
+  const channel = normalizeCanal(ticket.channel ?? ticket.source ?? ticket.especialChannel);
+  if (channel === 'reclame-aqui' || channel === 'reclameaqui') return true;
+  const lf = ticket.lateralForm || {};
+  const canal = normalizeCanal(lf.canal);
+  if (canal.includes('reclame') && canal.includes('aqui')) return true;
+  const ra = lf.reclameAqui;
+  if (ra && typeof ra === 'object' && !Array.isArray(ra)) return true;
+  const registro = Array.isArray(ticket.registro) ? ticket.registro : [];
+  return registro.some((reg) => {
+    const src = normalizeCanal(reg?.metadados?.source ?? reg?.source);
+    return src === 'reclame-aqui' || src === 'reclameaqui'
+      || Boolean(reg?.metadados?.reclameAqui && typeof reg.metadados.reclameAqui === 'object');
+  });
 }

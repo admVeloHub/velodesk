@@ -1,6 +1,7 @@
 /**
  * Leaderboard operacional — painel supervisor
- * VERSION: v5.0.0 | DATE: 2026-08-10
+ * VERSION: v5.1.0 | DATE: 2026-08-12
+ * — Oculta filtros turno/canal quando o payload não traz esses campos
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -48,9 +49,13 @@ export default function Workspace360OperationalLeaderboard({ onOpenTicket }) {
     };
   }, [period.period, period.from, period.to]);
 
+  const ranking = entries?.ranking || [];
+  const showShiftFilter = ranking.some((row) => row?.shift != null && String(row.shift).trim() !== '');
+  const showChannelFilter = ranking.some((row) => row?.channel != null && String(row.channel).trim() !== '');
+
   const allRows = useMemo(
-    () => filterOperationalLeaderboard(entries?.ranking, { shift, channel }),
-    [entries, shift, channel],
+    () => filterOperationalLeaderboard(ranking, { shift, channel }),
+    [ranking, shift, channel],
   );
   const rows = expanded ? allRows : allRows.slice(0, TOP_N);
   const hiddenCount = Math.max(0, allRows.length - TOP_N);
@@ -68,26 +73,30 @@ export default function Workspace360OperationalLeaderboard({ onOpenTicket }) {
           </span>
         </h4>
         <div className="ws360-leaderboard__filters">
-          <select
-            className="ws360-leaderboard__select"
-            value={shift}
-            onChange={(e) => setShift(e.target.value)}
-            aria-label="Filtrar por turno"
-          >
-            {LEADERBOARD_SHIFT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <select
-            className="ws360-leaderboard__select"
-            value={channel}
-            onChange={(e) => setChannel(e.target.value)}
-            aria-label="Filtrar por canal"
-          >
-            {LEADERBOARD_CHANNEL_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+          {showShiftFilter ? (
+            <select
+              className="ws360-leaderboard__select"
+              value={shift}
+              onChange={(e) => setShift(e.target.value)}
+              aria-label="Filtrar por turno"
+            >
+              {LEADERBOARD_SHIFT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          ) : null}
+          {showChannelFilter ? (
+            <select
+              className="ws360-leaderboard__select"
+              value={channel}
+              onChange={(e) => setChannel(e.target.value)}
+              aria-label="Filtrar por canal"
+            >
+              {LEADERBOARD_CHANNEL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          ) : null}
           <GestaoPeriodFilter value={period} onChange={setPeriod} idPrefix="gestao-leaderboard" />
         </div>
       </header>

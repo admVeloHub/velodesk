@@ -1,4 +1,4 @@
-/** emailNotification.service v1.7.1 — não notifica solicitante em ticket criado só com nota interna */
+/** emailNotification.service v1.8.0 — imagens coladas no compose vão como CID no e-mail */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { loadDadosForRef, normalizeEmail } from './cliente.service';
 import { sendOutboundEmail } from './email-outbound.service';
@@ -9,6 +9,7 @@ import {
   loadVelotaxLogoInline,
 } from './emailBrand.util';
 import { composeHtmlToEmailHtml, escapeHtmlAttribute, htmlToPlainTextForEmail } from './emailHtml.util';
+import { extractComposeInlineImages } from './composeInlineImages.util';
 import {
   buildSendMaskClosingHtml,
   buildSendMaskClosingPlain,
@@ -20,6 +21,7 @@ import {
   persistOutboundEmailMeta,
 } from './emailThread.service';
 import { loadSentAttachmentsForEmail } from './sentAttachmentStorage.service';
+import type { GmailInlineImage } from './gmail/gmailApiSend';
 
 function buildBrandEmailHtml(title: string, bodyHtml: string): string {
   const logo = loadVelotaxLogoInline();
@@ -35,15 +37,26 @@ function buildBrandEmailHtml(title: string, bodyHtml: string): string {
 </body></html>`;
 }
 
-function buildOutboundEmailExtras(useLogoCompleto = false) {
+function buildOutboundEmailExtras(
+  useLogoCompleto = false,
+  extraInline: GmailInlineImage[] = [],
+) {
   const logo = useLogoCompleto ? loadVelotaxLogoCompletoInline() : loadVelotaxLogoInline();
-  return logo ? { inlineImages: [logo] } : {};
+  const inlineImages = [
+    ...(logo ? [logo] : []),
+    ...extraInline,
+  ];
+  return inlineImages.length ? { inlineImages } : {};
 }
 
-function buildAgentReplyEmailHtml(composerText: string, chamado: IChamadoN1): string {
+function buildAgentReplyEmailHtml(
+  composerText: string,
+  chamado: IChamadoN1,
+  preparedHtml?: string,
+): string {
   const logo = loadVelotaxLogoCompletoInline();
   const header = buildEmailLogoHeaderHtml(Boolean(logo));
-  const composerHtml = composeHtmlToEmailHtml(composerText);
+  const composerHtml = preparedHtml ?? composeHtmlToEmailHtml(composerText);
   const closingHtml = buildSendMaskClosingHtml(chamado);
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head>
@@ -134,18 +147,19 @@ export async function sendAgentReplyEmail(
 
   const protocolo = chamado.chamadoProtocolo;
   const subject = buildThreadSubject(protocolo);
+  const { html: htmlWithCids, inlineImages: composeInline } = extractComposeInlineImages(publicText);
   const plainMessage = publicText
     ? htmlToPlainTextForEmail(publicText) + buildSendMaskClosingPlain(chamado)
     : `Anexo(s) referente(s) ao chamado ${protocolo}.`;
   const messageHtml = publicText
-    ? composeHtmlToEmailHtml(publicText)
+    ? composeHtmlToEmailHtml(htmlWithCids)
     : '<p>Segue(m) anexo(s) referente(s) ao seu chamado.</p>';
   const messageId = buildOutboundMessageId(protocolo);
   const headers = buildOutboundThreadHeaders(chamado, messageId);
   const emailAttachments = await loadSentAttachmentsForEmail(safeAttachmentUrls);
 
   const htmlBody = publicText
-    ? buildAgentReplyEmailHtml(publicText, chamado)
+    ? buildAgentReplyEmailHtml(publicText, chamado, messageHtml)
     : buildBrandEmailHtml('Nova mensagem no seu chamado', messageHtml);
 
   const result = await sendOutboundEmail({
@@ -155,7 +169,7 @@ export async function sendAgentReplyEmail(
     html: htmlBody,
     headers,
     attachments: emailAttachments,
-    ...buildOutboundEmailExtras(Boolean(publicText)),
+    ...buildOutboundEmailExtras(Boolean(publicText), composeInline),
   });
 
   if (!result.sent) {

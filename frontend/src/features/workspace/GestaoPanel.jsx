@@ -1,6 +1,7 @@
 /**
  * Painel 360° — Gestão
- * VERSION: v3.5.0 | DATE: 2026-08-10
+ * VERSION: v3.6.0 | DATE: 2026-08-12
+ * — KPIs supervisor + visão por canal montados a partir do payload 360
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +14,8 @@ import Workspace360EscalatedCasesList from './components/ws360/Workspace360Escal
 import Workspace360OperationalLeaderboard from './components/ws360/Workspace360OperationalLeaderboard';
 import Workspace360SupervisorReports from './components/ws360/Workspace360SupervisorReports';
 import Workspace360RedistributeModal from './components/ws360/Workspace360RedistributeModal';
+import Workspace360SupervisorKpis from './components/ws360/Workspace360SupervisorKpis';
+import Workspace360ChannelVision from './components/ws360/Workspace360ChannelVision';
 import GestaoVolumeCard from './components/gestaoInsights/GestaoVolumeCard';
 import GestaoVolumeStatsCard from './components/gestaoInsights/GestaoVolumeStatsCard';
 import GestaoMotivosCard from './components/gestaoInsights/GestaoMotivosCard';
@@ -95,6 +98,11 @@ export default function GestaoPanel() {
           Abrir fila
         </button>
       </div>
+
+      <Workspace360SupervisorKpis kpis={d} />
+      {Array.isArray(view.channelVision) && view.channelVision.length > 0 ? (
+        <Workspace360ChannelVision channels={view.channelVision} />
+      ) : null}
 
       <div className="gestao-period-row">
         <span className="gestao-period-row__label">

@@ -1,4 +1,4 @@
-/** whatsappThread.service v1.4.0 — markModified em registro.metadados (Mixed não rastreia mutação) */
+/** whatsappThread.service v1.6.0 — áudio disponível para transcrição sob demanda */
 import type { IChamadoN1, IRegistro } from '../../models/ChamadoN1';
 import { normalizePhoneE164 } from '../telephonyRecado.validation';
 
@@ -38,6 +38,10 @@ export interface WhatsAppMensagemItem {
   deliveryStatusAt?: string;
   deliveryErrorCode?: string;
   deliveryErrorMessage?: string;
+  mediaContentTypes?: string[];
+  transcriptionStatus?: 'available' | 'pending' | 'processing' | 'completed' | 'failed';
+  transcriptionText?: string;
+  transcriptionError?: string;
 }
 
 export interface AppendWhatsAppMensagemInput {
@@ -48,6 +52,8 @@ export interface AppendWhatsAppMensagemInput {
   twilioMessageSid?: string;
   waChatId?: string;
   deliveryStatus?: WhatsAppDeliveryStatus;
+  mediaContentTypes?: string[];
+  transcriptionStatus?: WhatsAppMensagemItem['transcriptionStatus'];
 }
 
 export function normalizeWhatsAppDeliveryStatus(raw: unknown): WhatsAppDeliveryStatus {
@@ -214,6 +220,16 @@ export function readWhatsAppMensagens(reg: IRegistro): WhatsAppMensagemItem[] {
         deliveryStatusAt: String(row.deliveryStatusAt ?? '').trim() || undefined,
         deliveryErrorCode: String(row.deliveryErrorCode ?? row.errorCode ?? '').trim() || undefined,
         deliveryErrorMessage: String(row.deliveryErrorMessage ?? row.errorMessage ?? '').trim() || undefined,
+        mediaContentTypes: Array.isArray(row.mediaContentTypes)
+          ? row.mediaContentTypes.map((value) => String(value ?? '').trim()).filter(Boolean)
+          : undefined,
+        transcriptionStatus: ['available', 'pending', 'processing', 'completed', 'failed'].includes(
+          String(row.transcriptionStatus ?? ''),
+        )
+          ? row.transcriptionStatus as WhatsAppMensagemItem['transcriptionStatus']
+          : undefined,
+        transcriptionText: String(row.transcriptionText ?? '').trim() || undefined,
+        transcriptionError: String(row.transcriptionError ?? '').trim() || undefined,
       } satisfies WhatsAppMensagemItem;
     })
     .filter((item) => item.texto || item.anexos.length);
@@ -247,6 +263,8 @@ export function appendWhatsAppMensagemToChamado(
       ? (input.deliveryStatus ?? (input.twilioMessageSid ? 'sent' : 'queued'))
       : undefined,
     deliveryStatusAt: input.origin === 'agente' ? now.toISOString() : undefined,
+    mediaContentTypes: input.mediaContentTypes,
+    transcriptionStatus: input.transcriptionStatus,
   };
 
   list.push(mensagem);

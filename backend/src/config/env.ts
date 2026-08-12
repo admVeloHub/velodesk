@@ -1,4 +1,4 @@
-/** env v1.34.0 — TWILIO_WEBHOOK_PUBLIC_BASE_URL para assinatura webhook */
+/** env v1.36.1 — PENDENTE_RESOLVE_AFTER_MS (job pendente→resolvido) */
 import fs from 'fs';
 import path from 'path';
 
@@ -133,6 +133,17 @@ export const env = {
   gcpStorageSentAttachmentsPrefix: (
     process.env.GCP_STORAGE_SENT_ATTACHMENTS_PREFIX || 'desk_ticket_sent_attachments'
   ).trim().replace(/^\/+|\/+$/g, ''),
+  /** Anexos importados do Octadesk (dump legado) */
+  gcpStorageOctadeskLegacyAttachmentsPrefix: (
+    process.env.GCP_STORAGE_OCTADESK_LEGACY_PREFIX || 'octadesk_legacy_attachments'
+  ).trim().replace(/^\/+|\/+$/g, ''),
+  /** Dump Octadesk → legado_tickets.importados_octadesk (scripts offline) */
+  octadeskApiBase: (
+    process.env.OCTADESK_API_BASE || 'https://o199103-bfa.api001.octadesk.services'
+  ).trim().replace(/\/+$/, ''),
+  octadeskApiKey: (process.env.OCTADESK_API_KEY || '').trim(),
+  octadeskAgentEmail: (process.env.OCTADESK_AGENT_EMAIL || '').trim(),
+  mongoLegadoTicketsDbName: (process.env.MONGODB_LEGADO_TICKETS_DB_NAME || 'legado_tickets').trim(),
   inboundAttachmentsDir: (process.env.INBOUND_ATTACHMENTS_DIR || '').trim(),
   sentAttachmentsDir: (process.env.SENT_ATTACHMENTS_DIR || '').trim(),
   inboundEmailEnabled: process.env.INBOUND_EMAIL_ENABLED === 'true',
@@ -188,6 +199,11 @@ export const env = {
   /** Revisor de Texto — flash-lite por padrão (menor latência). */
   geminiRefinarModel: (process.env.GEMINI_REFINAR_MODEL || 'gemini-2.5-flash-lite').trim(),
   openaiApiKey: (process.env.OPENAI_API_KEY || '').trim(),
+  whatsappAudioTranscriptionEnabled:
+    process.env.WHATSAPP_AUDIO_TRANSCRIPTION_ENABLED !== 'false',
+  whatsappAudioTranscriptionModel: (
+    process.env.WHATSAPP_AUDIO_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe'
+  ).trim(),
   openaiVectorStoreId: (
     process.env.OPENAI_VECTOR_STORE_ID
     || process.env.VECTOR_STORE_PATH
@@ -249,6 +265,8 @@ export const env = {
   resolvedCloseIntervalMs: parseInt(process.env.RESOLVED_CLOSE_INTERVAL_MS || '3600000', 10),
   /** Idade mínima em Resolvido antes de virar Fechado (default 48h) */
   resolvedCloseAfterMs: parseInt(process.env.RESOLVED_CLOSE_AFTER_MS || '172800000', 10),
+  /** Idade mínima em Pendente antes de virar Resolvido (default 48h) */
+  pendenteResolveAfterMs: parseInt(process.env.PENDENTE_RESOLVE_AFTER_MS || '172800000', 10),
   inboundTelephonyEnabled: process.env.INBOUND_TELEPHONY_ENABLED !== 'false',
   inboundTelephonyWebhookSecret: (process.env.INBOUND_TELEPHONY_WEBHOOK_SECRET || '').trim(),
   telephonyAutoCreateTicket: process.env.TELEPHONY_AUTO_CREATE_TICKET === 'true',

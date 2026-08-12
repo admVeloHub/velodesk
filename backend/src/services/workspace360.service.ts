@@ -1,4 +1,4 @@
-/** workspace360.service v1.1.0 — Cliente respondeu = em-aberto; em-andamento = workflow */
+/** workspace360.service v1.2.0 — pendente na seção workflow; warRoom por SLA crítico */
 import mongoose from 'mongoose';
 import { ChamadoN1, IChamadoN1 } from '../models/ChamadoN1';
 import { User } from '../models/User';
@@ -227,7 +227,7 @@ async function enrichTicketForPanel(chamado: IChamadoN1, queueId: string) {
 function classifyAgentSection(chamado: IChamadoN1): 'action-now' | 'client-replied' | 'workflow' | null {
   const status = currentStatus(chamado);
   if (status === 'em-aberto') return 'client-replied';
-  if (status === 'em-andamento') return 'workflow';
+  if (status === 'em-andamento' || status === 'pendente' || status === 'em-espera') return 'workflow';
   if (status === 'novo' || isSlaAtRisk(chamado)) return 'action-now';
   return null;
 }
@@ -475,7 +475,7 @@ export async function buildSupervisor360Payload(authUser: AuthPayload, query: Wo
       tme: tmeN ? formatDurationMs(tmeSum / tmeN) : '—',
       nps: null,
       volume: String(createdInPeriod),
-      warRoom: false,
+      warRoom: slaCriticalCount >= 3,
     },
     escalated: {
       categories,

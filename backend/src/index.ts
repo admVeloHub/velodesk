@@ -1,4 +1,4 @@
-/** index v1.14.0 — rotas /api/reclamacoes (chamados_reclamacoes) */
+/** index v1.15.0 — worker de transcrição de áudio WhatsApp */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -59,9 +59,11 @@ import { seedDevelopmentData, purgeAllMockTickets, runDeskConfigMigrations } fro
 import { getAgentsStatus } from './services/agents/openaiAgent.util';
 import { startGestaoChamadosJob } from './jobs/gestaoChamados.job';
 import { startCloseResolvedTicketsJob } from './jobs/closeResolvedTickets.job';
+import { startResolvePendenteTicketsJob } from './jobs/resolvePendenteTickets.job';
 import { startChamadoIaAnaliseJob } from './jobs/chamadoIaAnalise.job';
 import { bootstrapEmailServices } from './services/emailBootstrap.service';
 import { startChamadoProtocoloWatcher } from './services/chamadoProtocoloWatcher.service';
+import { startWhatsAppAudioTranscriptionWorker } from './services/twilio/whatsappAudioTranscription.service';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const whatsapp = require('./whatsapp/whatsappModule.js');
@@ -319,6 +321,8 @@ async function start() {
       // Independente do programa de agentes autônomos — controlado só por CHAMADO_IA_ANALISE_ENABLED.
       startChamadoIaAnaliseJob();
       startCloseResolvedTicketsJob();
+      startResolvePendenteTicketsJob();
+      startWhatsAppAudioTranscriptionWorker();
       if (env.enableWhatsapp) {
         console.log('Inicializando WhatsApp Web...');
         whatsapp.initializeWhatsApp();

@@ -1,8 +1,9 @@
-/** inboundAttachmentStorage v1.4.1 — lookup legado (subpasta) + flat no GCS, sem double-decode */
+/** inboundAttachmentStorage v1.5.0 — leitura em buffer para transcrição de mídia WhatsApp */
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { Readable } from 'stream';
 import { env } from '../config/env';
 import {
   buildGcsObjectUri,
@@ -78,6 +79,17 @@ export interface StoredInboundAttachment {
 export function buildInboundAttachmentApiUrl(storageKey: string): string {
   const encodedKey = storageKey.replace(/\//g, STORAGE_KEY_SEP);
   return `/api/uploads/inbound/${encodeURIComponent(encodedKey)}`;
+}
+
+export function parseInboundAttachmentStorageKeyFromApiUrl(apiUrl: string): string | null {
+  const raw = String(apiUrl || '').trim();
+  const match = raw.match(/\/(?:api\/)?uploads\/inbound\/([^?#]+)/i);
+  if (!match?.[1]) return null;
+  try {
+    return decodeStorageKey(decodeURIComponent(match[1]));
+  } catch {
+    return null;
+  }
 }
 
 export async function persistInboundAttachment(
@@ -195,6 +207,36 @@ export async function openInboundAttachment(storageKey: string): Promise<{
   }
 
   console.warn('[inboundAttachment] não encontrado', { storageKey: relative, tried: candidates });
+  return null;
+}
+
+async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream as Readable) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+export async function readInboundAttachmentBuffer(
+  storageKey: string,
+): Promise<{ buffer: Buffer; filename: string; contentType: string } | null> {
+  const opened = await openInboundAttachment(storageKey);
+  if (!opened) return null;
+  if (opened.source === 'disk' && opened.filePath) {
+    return {
+      buffer: await fs.readFile(opened.filePath),
+      filename: opened.filename,
+      contentType: opened.contentType || 'application/octet-stream',
+    };
+  }
+  if (opened.stream) {
+    return {
+      buffer: await streamToBuffer(opened.stream),
+      filename: opened.filename,
+      contentType: opened.contentType || 'application/octet-stream',
+    };
+  }
   return null;
 }
 

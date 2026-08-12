@@ -1,6 +1,6 @@
 /**
- * API client v1.22.2 — GET /boxes/queue-counts (contadores reais das filas)
- * VERSION: v1.22.2 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team
+ * API client v1.24.0 — clientsApi.getByCpf hydrateFromApi
+ * VERSION: v1.24.0 | DATE: 2026-08-12 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -109,6 +109,10 @@ export const ticketsApi = {
   commit: (id, data) => api.post(`/tickets/${id}/commit`, data).then((r) => r.data),
   sendWhatsAppMessage: (id, data) =>
     api.post(`/tickets/${id}/whatsapp/messages`, data).then((r) => r.data),
+  requestWhatsAppAudioTranscription: (id, messageSid) =>
+    api.post(
+      `/tickets/${id}/whatsapp/messages/${encodeURIComponent(messageSid)}/transcription`,
+    ).then((r) => r.data),
   delete: (id) => api.delete(`/tickets/${id}`).then((r) => r.data),
   addMessage: (id, data) =>
     api.post(`/tickets/${id}/messages`, data).then((r) => r.data),
@@ -154,7 +158,9 @@ export const agentQueueBoxesApi = {
 };
 
 export const clientsApi = {
-  getByCpf: (cpf) => api.get('/clients', { params: { cpf } }).then((r) => r.data),
+  getByCpf: (cpf, options = {}) => api.get('/clients', {
+    params: { cpf, hydrateFromApi: options.hydrateFromApi ?? 1 },
+  }).then((r) => r.data),
   getByEmail: (email) => api.get('/clients', { params: { email } }).then((r) => r.data),
   getById: (id) => api.get(`/clients/${encodeURIComponent(id)}`).then((r) => r.data),
   create: (payload) => api.post('/clients', payload).then((r) => r.data),

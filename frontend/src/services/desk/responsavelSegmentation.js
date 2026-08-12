@@ -1,6 +1,6 @@
 /**
- * responsavelSegmentation v1.6.2 — meus tickets inclui atribuído colaborador
- * VERSION: v1.6.2 | DATE: 2026-08-06
+ * responsavelSegmentation v1.6.3 — Meus Tickets: match exato responsável/atribuído
+ * VERSION: v1.6.3 | DATE: 2026-08-11
  */
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 import { normalizeProfileId } from '../../config/profiles';
@@ -110,7 +110,7 @@ export function readTicketResponsavel(ticket) {
 }
 
 function normalizeAtribuidoColaborador(value) {
-  const raw = String(value ?? '').trim();
+  const raw = String(value ?? '').trim().replace(/\s*\(eu\)\s*$/i, '');
   if (!raw || raw.startsWith('funcao:') || raw.startsWith('grupo:')) return '';
   return normalize(raw);
 }
@@ -120,8 +120,7 @@ export function ticketAtribuidoToCurrentAgent(ticket) {
   const atribuido = normalizeAtribuidoColaborador(ticket?.lateralForm?.atribuido);
   if (!atribuido) return false;
   const candidates = buildResponsavelCandidates();
-  if (candidates.includes(atribuido)) return true;
-  return candidates.some((c) => atribuido.includes(c) || c.includes(atribuido));
+  return candidates.includes(atribuido);
 }
 
 /**
@@ -174,7 +173,8 @@ export function ticketAssignedToCurrentAgent(ticket) {
 }
 
 /**
- * Fila virtual Meus Tickets — sempre exclusiva do usuário logado.
+ * Fila virtual Meus Tickets — SOMENTE tickets do usuário logado.
+ * Responsável explícito OU atribuído colaborador individual (nunca funcao:/grupo:).
  * Não herda ver_todos/gestão: perfil de gestão vê totais nas outras filas, não aqui.
  */
 export function ticketBelongsInMeusTicketsList(ticket) {
