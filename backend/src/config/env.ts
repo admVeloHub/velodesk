@@ -1,4 +1,4 @@
-/** env v1.37.0 — prefixo quarentena de anexos + secret do callback ClamAV */
+/** env v1.38.0 — secrets inbound tickets por origem ([a-z0-9]{35}) */
 import fs from 'fs';
 import path from 'path';
 
@@ -266,6 +266,11 @@ export const env = {
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean),
   inboundAppWebhookSecret: (process.env.INBOUND_APP_WEBHOOK_SECRET || '').trim(),
+  /** Abertura de ticket inbound — App / Telefone / Agente IA */
+  inboundTicketsEnabled: process.env.INBOUND_TICKETS_ENABLED !== 'false',
+  inboundTicketAppSecret: (process.env.INBOUND_TICKET_APP_SECRET || '').trim(),
+  inboundTicketTelefoneSecret: (process.env.INBOUND_TICKET_TELEFONE_SECRET || '').trim(),
+  inboundTicketAgenteIaSecret: (process.env.INBOUND_TICKET_AGENTE_IA_SECRET || '').trim(),
   /** Intervalo do job que fecha tickets resolvidos (default 1h) */
   resolvedCloseIntervalMs: parseInt(process.env.RESOLVED_CLOSE_INTERVAL_MS || '3600000', 10),
   /** Idade mínima em Resolvido antes de virar Fechado (default 48h) */

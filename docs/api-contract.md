@@ -1,4 +1,4 @@
-# Contrato API Velodesk v1.1.0
+# Contrato API Velodesk v1.2.0
 
 Mapeamento provisório: protótipo vanilla (`../dev - desk/`) → API REST → MongoDB.
 
@@ -14,6 +14,8 @@ Mapeamento provisório: protótipo vanilla (`../dev - desk/`) → API REST → M
 | GET | `/api/stats` | alias dashboard |
 | GET | `/api/boxes` | boxes (Kanban) |
 | GET/POST/PUT/DELETE | `/api/tickets` | tickets (`chamados_n1`) |
+| GET | `/api/inbound/tickets/health` | inbound tickets (health) |
+| POST | `/api/inbound/tickets` | inbound tickets — criação App / Telefone / Agente IA |
 | GET | `/api/tickets/by-protocol/:protocolo` | tickets |
 | POST | `/api/tickets/:id/messages` | tickets.messages |
 | GET | `/api/forms` | forms |

@@ -1,4 +1,4 @@
-/** assignmentRouter.service v1.4.0 — atribuição por função especial (Agente 4) */
+/** assignmentRouter.service v1.4.1 — source inbound-ticket */
 import { env } from '../config/env';
 import type { AuthPayload } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -19,7 +19,7 @@ type RoletaPoolAgent = {
 };
 
 export interface AssignmentContext {
-  source: 'email-inbound' | 'app-integrado' | 'api-tickets' | 'backfill' | 'manual-retry' | 'casos-especiais';
+  source: 'email-inbound' | 'app-integrado' | 'api-tickets' | 'backfill' | 'manual-retry' | 'casos-especiais' | 'inbound-ticket';
   canal?: string;
 }
 
