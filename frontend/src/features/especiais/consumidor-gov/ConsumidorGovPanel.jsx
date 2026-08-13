@@ -21,7 +21,7 @@ import ConsumidorGovTableView from './ConsumidorGovTableView';
 import ConsumidorGovReportsView from './ConsumidorGovReportsView';
 
 function loadViewState({ search, activeChips }) {
-  const items = loadDemandas({ search, activeChips });
+  const items = loadDemandas({ search, activeChips, gestaoView: true });
   return {
     items,
     kpis: getConsumidorGovKpis(items),

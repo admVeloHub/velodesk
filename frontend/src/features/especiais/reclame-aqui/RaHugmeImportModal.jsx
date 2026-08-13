@@ -7,9 +7,23 @@ import { useNotifications } from '../../../context/NotificationContext';
 import {
   HUGME_ACCEPT,
   downloadErrorReport,
-  importHugmeRows,
+  importHugmeFileViaApi,
   parseHugmeFile,
 } from '../../../services/especiais/hugmeImportService';
+import { refreshReclamacoesFromApi } from '../../../services/especiais/reclameAquiStore';
+
+const IMPORT_MODES = {
+  base_inicial: {
+    id: 'base_inicial',
+    label: 'Base completa (somente armazenar)',
+    hint: 'Primeira carga histórica — grava no banco sem abrir tickets.',
+  },
+  incremental: {
+    id: 'incremental',
+    label: 'Atualização 7 meses (armazenar + tickets)',
+    hint: 'Atualiza registros existentes e abre ticket RA apenas para linhas sem ticket.',
+  },
+};
 
 const STEPS = { upload: 'upload', preview: 'preview', importing: 'importing', done: 'done' };
 
@@ -28,6 +42,8 @@ function StatusBadge({ status }) {
 export default function RaHugmeImportModal({ open, onClose, onComplete }) {
   const { showNotification } = useNotifications();
   const fileInputRef = useRef(null);
+  const fileRef = useRef(null);
+  const [importMode, setImportMode] = useState('base_inicial');
   const [step, setStep] = useState(STEPS.upload);
   const [fileName, setFileName] = useState('');
   const [preview, setPreview] = useState(null);
@@ -46,6 +62,8 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
     setParsing(false);
     setProgress({ current: 0, total: 0 });
     setImportResult(null);
+    setImportMode('base_inicial');
+    fileRef.current = null;
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
@@ -65,6 +83,7 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
 
   const handleFile = async (file) => {
     if (!file) return;
+    fileRef.current = file;
     setParsing(true);
     setParseError('');
     setFileName(file.name);
@@ -99,7 +118,8 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
   };
 
   const handleImport = async () => {
-    if (!preview?.rows?.length) return;
+    const file = fileRef.current;
+    if (!file || !preview?.rows?.length) return;
     const validRows = preview.rows.filter((r) => r.status === 'valid');
     if (!validRows.length) {
       showNotification('Nenhuma linha válida para importar.', 'error');
@@ -110,27 +130,36 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
     setProgress({ current: 0, total: validRows.length });
 
     try {
-      const result = await importHugmeRows(preview.rows, {
-        onProgress: ({ current, total }) => setProgress({ current, total }),
-      });
+      const result = await importHugmeFileViaApi(file, importMode);
       setImportResult(result);
       setStep(STEPS.done);
+      if (importMode === 'incremental') {
+        try {
+          await refreshReclamacoesFromApi();
+        } catch {
+          // fail-soft
+        }
+      }
       onComplete?.(result);
-      showNotification(
-        `${result.created} ticket(s) criado(s)${result.failed ? `, ${result.failed} erro(s)` : ''}.`,
-        result.failed ? 'warning' : 'success',
-      );
-    } catch {
-      showNotification('Falha na importação.', 'error');
+      const msg = importMode === 'base_inicial'
+        ? `${result.stored} registro(s) armazenado(s) no banco${result.failed ? `, ${result.failed} erro(s)` : ''}.`
+        : `${result.stored} registro(s) atualizado(s), ${result.created} ticket(s) criado(s)${result.failed ? `, ${result.failed} erro(s)` : ''}.`;
+      showNotification(msg, result.failed ? 'warning' : 'success');
+    } catch (err) {
+      showNotification(err?.response?.data?.message || err?.message || 'Falha na importação.', 'error');
       setStep(STEPS.preview);
     }
   };
 
   const handleDownloadErrors = () => {
-    if (!importResult && !preview) return;
-    const failed = importResult
-      ? importResult.details.filter((d) => d.status === 'failed')
-      : preview.rows.filter((r) => r.status !== 'valid');
+    const failed = importResult?.errors?.length
+      ? importResult.errors.map((item) => ({
+        rowIndex: item.rowIndex,
+        consumidor: item.idOrigem,
+        status: 'failed',
+        errors: [item.message],
+      }))
+      : preview?.rows?.filter((r) => r.status !== 'valid') || [];
     if (!failed.length) return;
     downloadErrorReport(failed);
   };
@@ -169,7 +198,9 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
               <p className="queue-box-modal__subtitle">
                 {step === STEPS.done
                   ? 'Importação concluída'
-                  : 'Anexe a base de dados Hugme para abrir tickets no CRM automaticamente'}
+                  : importMode === 'base_inicial'
+                    ? 'Armazene a base Hugme completa no banco de dados'
+                    : 'Atualize a base e abra tickets RA para novas reclamações'}
               </p>
             </div>
           </div>
@@ -188,6 +219,24 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
         <div className="queue-box-modal__body ra-hugme-modal__body">
           {step === STEPS.upload && (
             <>
+              <fieldset className="ra-hugme-mode">
+                <legend className="ra-hugme-mode__legend">Tipo de importação</legend>
+                {Object.values(IMPORT_MODES).map((mode) => (
+                  <label key={mode.id} className="ra-hugme-mode__option">
+                    <input
+                      type="radio"
+                      name="hugmeImportMode"
+                      value={mode.id}
+                      checked={importMode === mode.id}
+                      onChange={() => setImportMode(mode.id)}
+                    />
+                    <span>
+                      <strong>{mode.label}</strong>
+                      <small>{mode.hint}</small>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
               <div
                 className="upload-area ra-hugme-upload"
                 onClick={() => fileInputRef.current?.click()}
@@ -281,8 +330,13 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
             <div className="ra-hugme-result">
               <div className="ra-hugme-stats">
                 <span className="ra-hugme-stats__valid">
-                  <strong>{importResult.created}</strong> criados
+                  <strong>{importResult.stored ?? importResult.created}</strong> armazenados
                 </span>
+                {importMode === 'incremental' ? (
+                  <span className="ra-hugme-stats__valid">
+                    <strong>{importResult.created}</strong> tickets
+                  </span>
+                ) : null}
                 <span className="ra-hugme-stats__warn">
                   <strong>{importResult.skipped}</strong> ignorados
                 </span>
@@ -290,7 +344,7 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
                   <strong>{importResult.failed}</strong> erros
                 </span>
               </div>
-              {importResult.details.filter((d) => d.status === 'failed').length > 0 ? (
+              {(importResult.errors?.length > 0) ? (
                 <button
                   type="button"
                   className="btn-secondary ra-hugme-download-btn"
@@ -325,7 +379,9 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
                 onClick={handleImport}
                 disabled={!preview?.stats?.valid}
               >
-                Importar {preview.stats.valid} ticket(s)
+                {importMode === 'base_inicial'
+                  ? `Armazenar ${preview.stats.valid} registro(s)`
+                  : `Importar ${preview.stats.valid} linha(s)`}
               </button>
             </>
           )}

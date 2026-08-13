@@ -7,6 +7,7 @@ import { apiTicketToCockpit, adaptColumnsFromApi } from '../../api/adapters/tick
 import { getAgentName } from '../clientDb';
 import { createWorkflowState, getWorkflowTemplateById } from '../desk/workflowEngine';
 import { CG_STATUS } from './consumidorGovData';
+import { applyTicketStatusToEspeciaisItem } from './especiaisGroupKey';
 import {
   buildRegistroDefaults,
   createEmptyDemanda,
@@ -354,18 +355,20 @@ export function buildDemandaFromTicket(ticket) {
     atendente: lf.responsavel || ticket.responsibleAgent || '—',
     ticketId,
     chamadoProtocolo: ticket.chamadoProtocolo || '',
-    groupKey: 'nao-respondidas',
-    aberta: true,
     workflowAtivo: false,
     respostaAction: 'responder',
   });
 
-  return {
+  return applyTicketStatusToEspeciaisItem({
     ...defaults,
     id: `cg-ticket-${ticketId}`,
     ticketId,
     chamadoProtocolo: ticket.chamadoProtocolo || defaults.chamadoProtocolo,
-  };
+  }, ticket, {
+    statusField: 'statusGov',
+    naoRespondidaStatus: CG_STATUS.NAO_RESPONDIDA,
+    prazoField: 'prazoLegal',
+  });
 }
 
 export function syncConsumidorGovDemandaFromTicket(ticket) {

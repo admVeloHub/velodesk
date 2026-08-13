@@ -174,6 +174,14 @@ export const env = {
     .split(',')
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean),
+  inboundEmailBacenRecipients: (process.env.INBOUND_EMAIL_BACEN_RECIPIENTS || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean),
+  inboundEmailBacenSenderPatterns: (process.env.INBOUND_EMAIL_BACEN_SENDER_PATTERNS || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean),
   emailEnabled: process.env.EMAIL_ENABLED === 'true',
   deskEmailTransportCollection: process.env.DESK_EMAIL_TRANSPORT_COLLECTION || 'email_transport',
   deskEmailTransportDocumentId: process.env.DESK_EMAIL_TRANSPORT_DOCUMENT_ID || 'desk_email_transport',

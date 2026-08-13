@@ -8,6 +8,7 @@ const ESPECIAIS_ROUTES = [
   { prefix: '/especiais/reclame-aqui', pageId: 'especiais-reclame-aqui' },
   { prefix: '/especiais/procon', pageId: 'especiais-procon' },
   { prefix: '/especiais/consumidor-gov', pageId: 'especiais-consumidor-gov' },
+  { prefix: '/especiais/bacen', pageId: 'especiais-bacen' },
 ];
 
 function matchEspeciaisRoute(pathname) {

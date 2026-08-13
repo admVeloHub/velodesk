@@ -52,7 +52,7 @@ export const CASO_ESPECIAL_ORGAO_CONFIG: Record<
     funcaoSlug: 'bacen',
     source: 'bacen',
     canalLabel: 'Bacen',
-    workflowSlug: null,
+    workflowSlug: 'bacen-tratativa',
   },
   consumidor_gov: {
     orgao: 'consumidor_gov',

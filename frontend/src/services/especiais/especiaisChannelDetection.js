@@ -6,12 +6,14 @@
 import { isProconChannelTicket } from './proconTicketService';
 import { isConsumidorGovChannelTicket } from './consumidorGovTicketService';
 import { isReclameAquiChannelTicket } from './reclameAquiTicketService';
+import { isBacenChannelTicket } from './bacenTicketService';
 import { shouldViewAllDeskTickets } from '../desk/responsavelSegmentation';
 
 export function isEspeciaisChannelTicket(ticket) {
   return isProconChannelTicket(ticket)
     || isConsumidorGovChannelTicket(ticket)
-    || isReclameAquiChannelTicket(ticket);
+    || isReclameAquiChannelTicket(ticket)
+    || isBacenChannelTicket(ticket);
 }
 
 export function isEspeciaisDeskExcludedTicket(ticket, profileId) {
@@ -19,3 +21,5 @@ export function isEspeciaisDeskExcludedTicket(ticket, profileId) {
   if (shouldViewAllDeskTickets(profileId)) return false;
   return isEspeciaisChannelTicket(ticket);
 }
+
+export { isReclameAquiChannelTicket };

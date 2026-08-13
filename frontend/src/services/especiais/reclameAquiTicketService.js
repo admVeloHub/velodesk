@@ -12,6 +12,8 @@ import {
   buildRegistroDefaults,
   registerReclamacao,
   getReclamacaoById,
+  getReclamacaoByTicketId,
+  updateReclamacaoGroupFromTicket,
 } from './reclameAquiStore';
 
 const RA_WORKFLOW_SLUG = 'reclame-aqui-tratativa';
@@ -165,6 +167,8 @@ export async function registerReclamacaoAndCreateTicket(form) {
   };
 }
 
+export { updateReclamacaoGroupFromTicket, getReclamacaoByTicketId };
+
 export async function fetchRaTicketView(raId) {
   const raItem = getReclamacaoById(raId);
   if (!raItem) return null;
@@ -175,14 +179,16 @@ export async function fetchRaTicketView(raId) {
 
   const raw = await ticketsApi.get(raItem.ticketId);
   const ticket = apiTicketToCockpit(raw);
+  updateReclamacaoGroupFromTicket(ticket);
+  const syncedItem = getReclamacaoById(raId) || raItem;
   const apiRa = ticket.lateralForm?.reclameAqui;
 
   return {
     raItem: {
-      ...raItem,
+      ...syncedItem,
       ...(apiRa && typeof apiRa === 'object' ? apiRa : {}),
-      ticketId: raItem.ticketId,
-      chamadoProtocolo: ticket.chamadoProtocolo || raItem.chamadoProtocolo,
+      ticketId: syncedItem.ticketId,
+      chamadoProtocolo: ticket.chamadoProtocolo || syncedItem.chamadoProtocolo,
     },
     ticket,
   };

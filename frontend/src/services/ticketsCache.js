@@ -21,6 +21,8 @@ import {
   mergeApiTicketPreservingPendingWorkflow,
 } from './desk/pendingWorkflowStart';
 import { loadConsumidorGovTicketsFromApi } from './especiais/consumidorGovTicketService';
+import { loadBacenTicketsFromApi } from './especiais/bacenTicketService';
+import { syncEspeciaisGroupFromTicket } from './especiais/especiaisTicketGroupSync';
 
 const BOXES_CACHE_KEY = 'velodesk_boxes_cache_v2';
 const BOXES_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -386,6 +388,11 @@ export function patchTicketInCache(ticketId, nextTicket, userEmail = '') {
   // Substitui o item no array — entry.ticket = x só muda o wrapper local e não atualiza columns.
   entry.box.tickets[entry.index] = nextTicket;
   persistColumnsToStorage(columns, userEmail);
+  try {
+    syncEspeciaisGroupFromTicket(nextTicket);
+  } catch {
+    /* ignore sync errors */
+  }
   return true;
 }
 
@@ -418,6 +425,11 @@ export async function loadTicketDetailFromApi(ticketId) {
       }));
     } catch {
       /* ignore */
+    }
+    try {
+      syncEspeciaisGroupFromTicket(full);
+    } catch {
+      /* ignore sync errors */
     }
     deskLog.tickets('loadTicketDetailFromApi → ok', {
       ticketId,
@@ -512,9 +524,11 @@ async function loadBoxesFromApiOnce(userEmail = '') {
     );
     void loadProconTicketsFromApi();
     void loadConsumidorGovTicketsFromApi();
+    void loadBacenTicketsFromApi();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('velodesk:procon-sync'));
       window.dispatchEvent(new CustomEvent('velodesk:consumidor-gov-sync'));
+      window.dispatchEvent(new CustomEvent('velodesk:bacen-sync'));
     }
   } catch (err) {
     const message = err?.response?.data?.message || err?.message || 'Erro desconhecido';

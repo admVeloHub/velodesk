@@ -700,9 +700,21 @@ export default function DeskV2Root() {
     suppressAutoSelectRef.current = true;
     setTableQueueBrowsing(false);
     persistTabSession(activeTabId);
-    const entry = findTicketEntry(id);
+    let entry = findTicketEntry(id);
     if (!entry) {
-      showNotification('Não foi possível abrir o ticket — recarregue a lista.', 'warning');
+      void (async () => {
+        try {
+          await loadTicketDetailFromApi(id);
+          entry = findTicketEntry(id);
+          if (!entry) {
+            showNotification('Não foi possível abrir o ticket — recarregue a lista.', 'warning');
+            return;
+          }
+          selectTicket(id);
+        } catch {
+          showNotification('Não foi possível abrir o ticket — recarregue a lista.', 'warning');
+        }
+      })();
       return;
     }
     if (isFusaoAbsorvido(entry.ticket)) {

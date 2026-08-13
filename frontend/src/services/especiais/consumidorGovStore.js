@@ -8,10 +8,33 @@ import {
   computeIniciais,
 } from './consumidorGovData';
 import { reclamacoesApi } from '../../api/client';
+import {
+  applyTicketStatusToEspeciaisItem,
+  isEspeciaisItemFinalizada,
+  normalizeEspeciaisItemGroup,
+  passesGestaoListFilter,
+  resolveEspeciaisGroupKey,
+} from './especiaisGroupKey';
 
 const STORAGE_KEY = 'velodesk_consumidor_gov_items';
 
+const GROUP_OPTS = {
+  statusField: 'statusGov',
+  naoRespondidaStatus: CG_STATUS.NAO_RESPONDIDA,
+  prazoField: 'prazoLegal',
+};
+
 let memoryCache = null;
+
+function ensureNormalizedCache(items) {
+  const normalized = items.map((item) => normalizeEspeciaisItemGroup(item, GROUP_OPTS));
+  const changed = normalized.some(
+    (n, i) => n.groupKey !== items[i].groupKey || n.aberta !== items[i].aberta,
+  );
+  if (changed) writeAll(normalized);
+  memoryCache = normalized;
+  return normalized;
+}
 
 function todayAt(hour, minute = 0) {
   const d = new Date();
@@ -116,7 +139,9 @@ const SEED_ITEMS = [
     workflow: 'Acordo',
     tabulacao: 'Empréstimo',
     atendente: 'Ana Silva',
-    groupKey: 'respondidas',
+    groupKey: 'finalizadas',
+    ticketStatus: 'resolvido',
+    ticketId: 'cg-seed-resolvido-004',
     respostaAction: 'ver-resposta',
     aberta: false,
     workflowAtivo: false,
@@ -151,16 +176,24 @@ export function ensureConsumidorGovSeed() {
 
 function normalizeApiItem(row) {
   const statusGov = row.statusGov || row.statusCanal || CG_STATUS.NAO_RESPONDIDA;
-  return {
+  const base = {
     ...row,
     id: row.id || row._id,
     ticketId: row.ticketId || row.chamadoId,
     statusGov,
-    groupKey: row.groupKey || (statusGov === CG_STATUS.NAO_RESPONDIDA ? 'nao-respondidas' : 'respondidas'),
+    ticketStatus: row.ticketStatus || row.statusTicket,
     respostaAction: row.respostaAction || 'responder',
     workflow: row.workflow || (row.workflowAtivo ? 'Ativo' : '—'),
     tabulacao: row.tabulacao || row.produto || '—',
     atendente: row.atendente || row.responsavel || '—',
+  };
+  return {
+    ...base,
+    groupKey: resolveEspeciaisGroupKey(base, {
+      statusField: 'statusGov',
+      naoRespondidaStatus: CG_STATUS.NAO_RESPONDIDA,
+      prazoField: 'prazoLegal',
+    }),
   };
 }
 
@@ -178,13 +211,10 @@ export async function refreshDemandasFromApi() {
 }
 
 export function loadAllDemandas() {
-  if (memoryCache?.length) return memoryCache;
+  if (memoryCache?.length) return ensureNormalizedCache(memoryCache);
   const stored = readAll();
-  if (stored?.length) {
-    memoryCache = stored;
-    return stored;
-  }
-  return ensureConsumidorGovSeed();
+  if (stored?.length) return ensureNormalizedCache(stored);
+  return ensureNormalizedCache(ensureConsumidorGovSeed());
 }
 
 function isSameDay(a, b) {
@@ -207,6 +237,7 @@ function matchesSearch(item, query) {
 
 function matchesChip(item, chipId) {
   if (!chipId) return true;
+  if (chipId !== 'finalizadas' && isEspeciaisItemFinalizada(item)) return false;
   switch (chipId) {
     case 'nao-respondidas':
       return item.statusGov === CG_STATUS.NAO_RESPONDIDA || item.groupKey === 'nao-respondidas';
@@ -216,34 +247,38 @@ function matchesChip(item, chipId) {
       return item.workflowAtivo;
     case 'vencendo-hoje':
       return item.groupKey === 'vencendo-hoje';
+    case 'finalizadas':
+      return isEspeciaisItemFinalizada(item);
     default:
       return true;
   }
 }
 
-export function loadDemandas({ search = '', activeChips = [] } = {}) {
+export function loadDemandas({ search = '', activeChips = [], gestaoView = false } = {}) {
   const items = loadAllDemandas();
   return items.filter((item) => {
     if (!matchesSearch(item, search)) return false;
+    if (gestaoView && !passesGestaoListFilter(item, activeChips)) return false;
     if (activeChips.length && !activeChips.every((chip) => matchesChip(item, chip))) return false;
     return true;
   });
 }
 
 export function getConsumidorGovKpis(items = loadAllDemandas()) {
+  const operational = items.filter((i) => !isEspeciaisItemFinalizada(i));
   const today = new Date();
-  const vencendoHoje = items.filter((i) => {
+  const vencendoHoje = operational.filter((i) => {
     const d = new Date(i.prazoLegal);
     return isSameDay(d, today) && i.aberta;
   }).length;
-  const naoRespondidas = items.filter((i) =>
+  const naoRespondidas = operational.filter((i) =>
     i.statusGov === CG_STATUS.NAO_RESPONDIDA || i.groupKey === 'nao-respondidas',
   ).length;
-  const respondidas = items.filter((i) =>
+  const respondidas = operational.filter((i) =>
     i.statusGov === CG_STATUS.RESPONDIDA || i.statusGov === CG_STATUS.AGUARDANDO_AUDIENCIA,
   ).length;
-  const workflowAtivo = items.filter((i) => i.workflowAtivo).length;
-  const respondidasComPrazo = items.filter((i) => !i.aberta);
+  const workflowAtivo = operational.filter((i) => i.workflowAtivo).length;
+  const respondidasComPrazo = operational.filter((i) => !i.aberta);
   const noPrazo = respondidasComPrazo.filter((i) => i.slaPct >= 80).length;
   const pctNoPrazo = respondidasComPrazo.length
     ? Math.round((noPrazo / respondidasComPrazo.length) * 100)
@@ -272,7 +307,7 @@ export function getKanbanColumns(items) {
   return cols.map((col) => {
     let colItems = [];
     if (col.id === 'workflow-ativo') {
-      colItems = items.filter((i) => i.workflowAtivo && i.groupKey !== 'respondidas');
+      colItems = items.filter((i) => i.workflowAtivo && i.groupKey !== 'respondidas' && i.groupKey !== 'finalizadas');
     } else {
       colItems = items.filter((i) => i.groupKey === col.id);
     }
@@ -296,23 +331,24 @@ export function getCalendarEvents(items, year, month) {
 }
 
 export function getReportSeries(items = loadAllDemandas()) {
+  const operational = items.filter((i) => !isEspeciaisItemFinalizada(i));
   const byStatus = {
-    'Não respondida': items.filter((i) => i.statusGov === CG_STATUS.NAO_RESPONDIDA).length,
-    'Workflow ativo': items.filter((i) => i.workflowAtivo).length,
-    Respondida: items.filter((i) => i.statusGov === CG_STATUS.RESPONDIDA).length,
-    'Aguard. audiência': items.filter((i) => i.statusGov === CG_STATUS.AGUARDANDO_AUDIENCIA).length,
+    'Não respondida': operational.filter((i) => i.statusGov === CG_STATUS.NAO_RESPONDIDA).length,
+    'Workflow ativo': operational.filter((i) => i.workflowAtivo).length,
+    Respondida: operational.filter((i) => i.statusGov === CG_STATUS.RESPONDIDA).length,
+    'Aguard. audiência': operational.filter((i) => i.statusGov === CG_STATUS.AGUARDANDO_AUDIENCIA).length,
   };
   const slaBuckets = {
-    'No prazo (≥80%)': items.filter((i) => i.slaPct >= 80).length,
-    'Atenção (50–79%)': items.filter((i) => i.slaPct >= 50 && i.slaPct < 80).length,
-    'Crítico (<50%)': items.filter((i) => i.slaPct < 50).length,
+    'No prazo (≥80%)': operational.filter((i) => i.slaPct >= 80).length,
+    'Atenção (50–79%)': operational.filter((i) => i.slaPct >= 50 && i.slaPct < 80).length,
+    'Crítico (<50%)': operational.filter((i) => i.slaPct < 50).length,
   };
-  const byOrgao = items.reduce((acc, item) => {
+  const byOrgao = operational.reduce((acc, item) => {
     const orgao = item.orgaoGov || 'Não informado';
     acc[orgao] = (acc[orgao] || 0) + 1;
     return acc;
   }, {});
-  return { byStatus, slaBuckets, byOrgao, total: items.length };
+  return { byStatus, slaBuckets, byOrgao, total: operational.length };
 }
 
 export function getFooterSummary(items, selectedCount = 0) {
@@ -375,7 +411,12 @@ export function buildRegistroDefaults(item = {}) {
     workflow: item.workflow || '—',
     tabulacao: item.tabulacao || item.produto || '—',
     atendente: item.atendente || '—',
-    groupKey: item.groupKey || 'nao-respondidas',
+    groupKey: resolveEspeciaisGroupKey(item, {
+      statusField: 'statusGov',
+      naoRespondidaStatus: CG_STATUS.NAO_RESPONDIDA,
+      prazoField: 'prazoLegal',
+    }),
+    ticketStatus: item.ticketStatus || item.statusTicket || '',
     respostaAction: item.respostaAction || 'responder',
     aberta: item.aberta !== false,
     workflowAtivo: item.workflowAtivo || false,
@@ -399,6 +440,19 @@ export function getDemandaById(id) {
   const found = items.find((i) => i.id === id);
   if (!found) return null;
   return { ...found, ...buildRegistroDefaults(found) };
+}
+
+export function updateDemandaGroupFromTicket(ticket) {
+  const ticketId = String(ticket?.id || ticket?._id || '');
+  if (!ticketId) return null;
+  const item = getDemandaByTicketId(ticketId);
+  if (!item) return null;
+  const updated = applyTicketStatusToEspeciaisItem(item, ticket, {
+    statusField: 'statusGov',
+    naoRespondidaStatus: CG_STATUS.NAO_RESPONDIDA,
+    prazoField: 'prazoLegal',
+  });
+  return upsertDemanda(updated);
 }
 
 export function getDemandaByTicketId(ticketId) {
@@ -427,6 +481,10 @@ function upsertDemanda(item) {
   return normalized;
 }
 
+export function patchDemanda(item) {
+  return upsertDemanda(item);
+}
+
 export function saveDemandaDraft(item) {
   return upsertDemanda({ ...item, isDraft: true });
 }
@@ -453,16 +511,24 @@ export function registerDemanda(item) {
 export function mirrorDemandaFromTicket(item) {
   const prazoLegal = item.prazoLegal || daysFromNow(10, 18);
   const sla = computeSlaFromPrazo(prazoLegal);
-  return upsertDemanda({
+  const base = {
     ...item,
     isDraft: false,
     workflowAtivo: item.workflowAtivo || false,
     statusGov: item.statusGov || CG_STATUS.NAO_RESPONDIDA,
-    groupKey: item.groupKey || 'nao-respondidas',
-    aberta: item.aberta !== false,
     respostaAction: item.respostaAction || 'responder',
     prazoLegal,
     slaPct: item.slaPct ?? sla.slaPct,
     slaTone: item.slaTone || sla.slaTone,
+  };
+  const resolved = applyTicketStatusToEspeciaisItem(base, { status: item.ticketStatus }, {
+    statusField: 'statusGov',
+    naoRespondidaStatus: CG_STATUS.NAO_RESPONDIDA,
+    prazoField: 'prazoLegal',
+  });
+  return upsertDemanda({
+    ...resolved,
+    groupKey: resolved.groupKey || 'nao-respondidas',
+    aberta: resolved.aberta !== false,
   });
 }

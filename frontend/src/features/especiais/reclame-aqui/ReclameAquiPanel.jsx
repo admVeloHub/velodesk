@@ -1,7 +1,7 @@
 /**
  * ReclameAquiPanel — painel operacional Reclame Aqui
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useRaNovaReclamacaoModals } from '../../../hooks/useRaNovaReclamacaoModals';
@@ -20,7 +20,7 @@ import ReclameAquiTableView from './ReclameAquiTableView';
 import ReclameAquiReportsView from './ReclameAquiReportsView';
 
 function loadViewState({ search, activeChips }) {
-  const items = loadReclamacoes({ search, activeChips });
+  const items = loadReclamacoes({ search, activeChips, gestaoView: true });
   return {
     items,
     kpis: getReclameAquiKpis(items),
@@ -39,6 +39,12 @@ export default function ReclameAquiPanel() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [page, setPage] = useState(1);
   const [listVersion, setListVersion] = useState(0);
+
+  useEffect(() => {
+    const bumpList = () => setListVersion((v) => v + 1);
+    window.addEventListener('velodesk:ra-sync', bumpList);
+    return () => window.removeEventListener('velodesk:ra-sync', bumpList);
+  }, []);
 
   const { openNovaFlow, modals: novaModals } = useRaNovaReclamacaoModals({
     navigate,

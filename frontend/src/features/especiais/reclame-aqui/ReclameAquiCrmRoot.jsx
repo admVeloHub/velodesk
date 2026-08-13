@@ -9,6 +9,7 @@ import { RA_GROUPS } from '../../../services/especiais/reclameAquiData';
 import { loadReclamacoes } from '../../../services/especiais/reclameAquiStore';
 import { matchesTicketCpfSearch } from '../../../services/especiais/especiaisCrmSearch';
 import { fetchRaTicketView } from '../../../services/especiais/reclameAquiTicketService';
+import { useEspeciaisTicketCommit } from '../shared/useEspeciaisTicketCommit';
 import RaQueuePanel from './RaQueuePanel';
 import RaTicketList from './RaTicketList';
 import RaTicketMain from './RaTicketMain';
@@ -32,6 +33,12 @@ export default function ReclameAquiCrmRoot() {
   );
   const [listVersion, setListVersion] = useState(0);
 
+  useEffect(() => {
+    const bumpList = () => setListVersion((v) => v + 1);
+    window.addEventListener('velodesk:ra-sync', bumpList);
+    return () => window.removeEventListener('velodesk:ra-sync', bumpList);
+  }, []);
+
   const { openNovaFlow, modals: novaModals } = useRaNovaReclamacaoModals({
     navigate,
     onImported: () => setListVersion((v) => v + 1),
@@ -43,6 +50,10 @@ export default function ReclameAquiCrmRoot() {
   const [redirectTo, setRedirectTo] = useState(null);
   const [waChatOpen, setWaChatOpen] = useState(false);
   const [waComposeText, setWaComposeText] = useState('');
+  const [composeMode, setComposeMode] = useState('public');
+  const [composeText, setComposeText] = useState('');
+  const [internalText, setInternalText] = useState('');
+  const [composeAttachments, setComposeAttachments] = useState([]);
 
   const allItems = useMemo(
     () => loadReclamacoes({ search: appliedSearch }),
@@ -118,7 +129,51 @@ export default function ReclameAquiCrmRoot() {
   useEffect(() => {
     setWaChatOpen(false);
     setWaComposeText('');
+    setComposeMode('public');
+    setComposeText('');
+    setInternalText('');
+    setComposeAttachments([]);
   }, [id]);
+
+  const composeSession = useMemo(() => ({
+    composeText,
+    internalText,
+    composeAttachments,
+    clearCompose: (fields = {}) => {
+      if (fields.composeText) setComposeText('');
+      if (fields.internalText) setInternalText('');
+      if (fields.composeAttachments) setComposeAttachments([]);
+    },
+  }), [composeText, internalText, composeAttachments]);
+
+  const handleCommitSaved = useCallback((result) => {
+    setTicket(result.ticket);
+    if (result.channelItem) setRaItem(result.channelItem);
+    setListVersion((v) => v + 1);
+  }, []);
+
+  const handleCommitFinalized = useCallback((result) => {
+    setTicket(result.ticket);
+    if (result.channelItem) setRaItem(result.channelItem);
+    setActiveGroup('finalizadas');
+    setListVersion((v) => v + 1);
+  }, []);
+
+  const {
+    committing,
+    handleSaveTicket,
+    handleFinalizeTicket,
+    finalized,
+    readOnly,
+  } = useEspeciaisTicketCommit({
+    channelId: 'ra',
+    channelItem: raItem,
+    ticket,
+    composeSession,
+    onTicketSaved: handleCommitSaved,
+    onFinalized: handleCommitFinalized,
+    showNotification,
+  });
 
   const handleSearchSubmit = useCallback(() => {
     setAppliedSearch(searchDraft.trim());
@@ -199,6 +254,14 @@ export default function ReclameAquiCrmRoot() {
         waComposeText={waComposeText}
         onWaComposeTextChange={setWaComposeText}
         onTicketUpdated={handleTicketUpdated}
+        composeMode={composeMode}
+        onComposeModeChange={setComposeMode}
+        composeText={composeText}
+        onComposeTextChange={setComposeText}
+        internalText={internalText}
+        onInternalTextChange={setInternalText}
+        composeAttachments={composeAttachments}
+        onComposeAttachmentsChange={setComposeAttachments}
       />
 
       <RaTicketSide
@@ -208,6 +271,11 @@ export default function ReclameAquiCrmRoot() {
         onOpenChat={handleOpenChat}
         onCloseChat={handleCloseChat}
         onTicketUpdated={handleTicketUpdated}
+        onSave={handleSaveTicket}
+        onFinalize={handleFinalizeTicket}
+        saving={committing}
+        disabled={readOnly || finalized}
+        finalized={finalized}
       />
 
       {novaModals}

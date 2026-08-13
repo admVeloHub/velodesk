@@ -214,7 +214,7 @@ function readConsumidorGovFromBody(body: Record<string, unknown>): Record<string
   return null;
 }
 
-function findConsumidorGovFromChamado(chamado: IChamadoN1): Record<string, unknown> | null {
+export function findConsumidorGovFromChamado(chamado: IChamadoN1): Record<string, unknown> | null {
   for (const reg of chamado.registro ?? []) {
     const meta = registroMetadados(reg);
     if (String(meta.source ?? '').toLowerCase() === 'consumidor-gov') {
@@ -274,6 +274,7 @@ export function excludeEspeciaisChannelsMongoFilter(): Record<string, unknown> {
       proconChannelMongoFilter(),
       consumidorGovChannelMongoFilter(),
       reclameAquiChannelMongoFilter(),
+      bacenChannelMongoFilter(),
     ],
   };
 }
@@ -317,6 +318,109 @@ function ensureConsumidorGovChannelStamp(
     const reg = registro[clienteIdx];
     const existingMeta = registroMetadados(reg);
     if (String(existingMeta.source ?? '').toLowerCase() !== 'consumidor-gov') {
+      reg.metadados = { ...existingMeta, ...metadados };
+    }
+    return;
+  }
+
+  registro.unshift({
+    data: new Date(),
+    origin: 'cliente',
+    autor: String(body?.clientName ?? chamado.chamadoTitulo ?? 'Consumidor').trim() || 'Consumidor',
+    mensagemPublica: '',
+    anexosMensagemPublica: [],
+    anotacaoInterna: '',
+    anexosAnotacaoInterna: [],
+    alteracoes: [],
+    metadados,
+    status: targetStatus,
+  });
+  chamado.registro = registro;
+}
+
+function readBacenFromBody(body: Record<string, unknown>): Record<string, unknown> | null {
+  const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
+  const bc = lf.bacen;
+  if (bc && typeof bc === 'object' && !Array.isArray(bc)) {
+    return bc as Record<string, unknown>;
+  }
+  return null;
+}
+
+export function findBacenFromChamado(chamado: IChamadoN1): Record<string, unknown> | null {
+  for (const reg of chamado.registro ?? []) {
+    const meta = registroMetadados(reg);
+    if (String(meta.source ?? '').toLowerCase() === 'bacen') {
+      const nested = meta.bacen;
+      if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+        return nested as Record<string, unknown>;
+      }
+      return meta;
+    }
+  }
+  return null;
+}
+
+function isBacenCanalFromBody(body: Record<string, unknown>): boolean {
+  if (readBacenFromBody(body)) return true;
+  const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
+  if (normalizeCanalValue(lf.canal).includes('bacen')) return true;
+  const channel = normalizeCanalValue(body.channel ?? body.source);
+  return channel === 'bacen';
+}
+
+export function isBacenChamado(chamado: IChamadoN1): boolean {
+  return Boolean(findBacenFromChamado(chamado));
+}
+
+export function bacenChannelMongoFilter(): Record<string, unknown> {
+  return {
+    $or: [
+      { 'registro.metadados.source': 'bacen' },
+      { 'registro.metadados.bacen': { $exists: true, $ne: null } },
+    ],
+  };
+}
+
+function buildMinimalBacenMeta(
+  chamado: IChamadoN1,
+  body?: Record<string, unknown>,
+): Record<string, unknown> {
+  const lf = (body?.lateralForm ?? {}) as Record<string, unknown>;
+  const existing = readBacenFromBody(body ?? {}) || findBacenFromChamado(chamado);
+  if (existing) return existing;
+  const tab = readTabulacaoSnapshot(chamado.tabulacao?.[0]);
+  return {
+    protocoloBacen: String(chamado.chamadoProtocolo ?? '').trim() || undefined,
+    consumidor: String(body?.clientName ?? tab.motivo ?? chamado.chamadoTitulo ?? '').trim(),
+    assunto: String(chamado.chamadoTitulo ?? body?.title ?? '').trim(),
+    descricao: String(body?.text ?? body?.description ?? '').trim(),
+    cpf: String(lf.cpf ?? lf.clienteCpf ?? body?.clientCPF ?? '').trim(),
+    produto: tab.produto,
+    tipo: tab.tipoChamado,
+    motivo: tab.motivo,
+    statusBc: 'nao-respondida',
+  };
+}
+
+function ensureBacenChannelStamp(
+  chamado: IChamadoN1,
+  body?: Record<string, unknown>,
+  status = 'novo',
+): void {
+  if (findBacenFromChamado(chamado)) return;
+  if (body && !isBacenCanalFromBody(body)) return;
+
+  const bcMeta = buildMinimalBacenMeta(chamado, body);
+  const metadados: Record<string, unknown> = { source: 'bacen', bacen: bcMeta };
+  const registro = chamado.registro ?? [];
+  const targetStatus = currentStatus(chamado) || status;
+  const clienteIdx = registro.findIndex((reg) => String(reg.origin ?? '').toLowerCase() === 'cliente');
+
+  if (clienteIdx >= 0) {
+    const reg = registro[clienteIdx];
+    const existingMeta = registroMetadados(reg);
+    if (String(existingMeta.source ?? '').toLowerCase() !== 'bacen') {
       reg.metadados = { ...existingMeta, ...metadados };
     }
     return;
@@ -957,6 +1061,7 @@ export async function createChamadoFromBody(
   const raData = readReclameAquiFromBody(body);
   const pcData = readProconFromBody(body);
   const govData = readConsumidorGovFromBody(body);
+  const bacenData = readBacenFromBody(body);
   const lf = (body.lateralForm ?? {}) as Record<string, unknown>;
   const workflowMeta = lf.workflow;
 
@@ -1076,6 +1181,44 @@ export async function createChamadoFromBody(
         status,
       });
     }
+  } else if (bacenData) {
+    const complaintText = String(bacenData.descricao ?? text ?? '').trim();
+    const bcMetadados: Record<string, unknown> = {
+      source: 'bacen',
+      bacen: bacenData,
+    };
+    const clienteRegistro: IRegistro = {
+      data: new Date(),
+      origin: 'cliente',
+      autor: clientName || String(bacenData.consumidor ?? '').trim() || 'Consumidor',
+      mensagemPublica: internal ? '' : complaintText,
+      anexosMensagemPublica: internal ? [] : attachments,
+      anotacaoInterna: '',
+      anexosAnotacaoInterna: [],
+      alteracoes: [],
+      metadados: bcMetadados,
+      status,
+    };
+    registro = [clienteRegistro];
+
+    if (workflowMeta && typeof workflowMeta === 'object' && !Array.isArray(workflowMeta)) {
+      registro.push({
+        data: new Date(),
+        origin: 'agente',
+        autor: resolveRegistroAutor('agente', {
+          authUser,
+          authorHint: String(body.author ?? '').trim(),
+          clientName,
+        }),
+        mensagemPublica: '',
+        anexosMensagemPublica: [],
+        anotacaoInterna: '',
+        anexosAnotacaoInterna: [],
+        alteracoes: buildAlteracoesItem({ workflow: workflowMeta }),
+        metadados: { workflow: workflowMeta },
+        status,
+      });
+    }
   } else {
     const requestedOrigin = String(body.messageOrigin ?? '').trim().toLowerCase();
     const initialOrigin: RegistroOrigin = requestedOrigin === 'cliente' || body.sender === 'them'
@@ -1117,6 +1260,7 @@ export async function createChamadoFromBody(
   };
   ensureProconChannelStamp(partial as IChamadoN1, body, status);
   ensureConsumidorGovChannelStamp(partial as IChamadoN1, body, status);
+  ensureBacenChannelStamp(partial as IChamadoN1, body, status);
   return partial;
 }
 
@@ -1311,6 +1455,7 @@ export async function commitChamadoFromAgent(
 
   ensureProconChannelStamp(chamado, body);
   ensureConsumidorGovChannelStamp(chamado, body);
+  ensureBacenChannelStamp(chamado, body);
 
   return {
     messageResult,
@@ -1352,6 +1497,7 @@ export async function applyBodyToChamado(
 
   ensureProconChannelStamp(chamado, body);
   ensureConsumidorGovChannelStamp(chamado, body);
+  ensureBacenChannelStamp(chamado, body);
 }
 
 export interface AppendRegistroResult {

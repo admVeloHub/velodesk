@@ -8,6 +8,7 @@ export const RA_TABS = [
 
 export const RA_GROUPS = [
   { id: 'vencendo-hoje', label: 'Vencendo hoje', tone: 'danger' },
+  { id: 'finalizadas', label: 'Finalizadas', tone: 'neutral' },
   { id: 'nao-respondidas', label: 'Não respondidas', tone: 'warning' },
   { id: 'respondidas', label: 'Respondidas', tone: 'success' },
 ];
@@ -18,6 +19,7 @@ export const RA_FILTER_CHIPS = [
   { id: 'passivel-nota', label: 'Passível de nota' },
   { id: 'workflow-ativo', label: 'Workflow ativo' },
   { id: 'vencendo-hoje', label: 'Vencendo hoje' },
+  { id: 'finalizadas', label: 'Finalizadas' },
 ];
 
 export const RA_STATUS = {

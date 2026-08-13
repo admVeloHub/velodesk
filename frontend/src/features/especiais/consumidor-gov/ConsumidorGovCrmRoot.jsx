@@ -9,6 +9,7 @@ import { CG_GROUPS } from '../../../services/especiais/consumidorGovData';
 import { loadDemandas } from '../../../services/especiais/consumidorGovStore';
 import { matchesTicketCpfSearch } from '../../../services/especiais/especiaisCrmSearch';
 import { fetchCgTicketView, loadConsumidorGovTicketsFromApi } from '../../../services/especiais/consumidorGovTicketService';
+import { useEspeciaisTicketCommit } from '../shared/useEspeciaisTicketCommit';
 import CgQueuePanel from './CgQueuePanel';
 import CgTicketList from './CgTicketList';
 import CgTicketMain from './CgTicketMain';
@@ -54,6 +55,10 @@ export default function ConsumidorGovCrmRoot() {
   const [redirectTo, setRedirectTo] = useState(null);
   const [waChatOpen, setWaChatOpen] = useState(false);
   const [waComposeText, setWaComposeText] = useState('');
+  const [composeMode, setComposeMode] = useState('public');
+  const [composeText, setComposeText] = useState('');
+  const [internalText, setInternalText] = useState('');
+  const [composeAttachments, setComposeAttachments] = useState([]);
 
   const allItems = useMemo(
     () => loadDemandas({ search: appliedSearch }),
@@ -129,7 +134,51 @@ export default function ConsumidorGovCrmRoot() {
   useEffect(() => {
     setWaChatOpen(false);
     setWaComposeText('');
+    setComposeMode('public');
+    setComposeText('');
+    setInternalText('');
+    setComposeAttachments([]);
   }, [id]);
+
+  const composeSession = useMemo(() => ({
+    composeText,
+    internalText,
+    composeAttachments,
+    clearCompose: (fields = {}) => {
+      if (fields.composeText) setComposeText('');
+      if (fields.internalText) setInternalText('');
+      if (fields.composeAttachments) setComposeAttachments([]);
+    },
+  }), [composeText, internalText, composeAttachments]);
+
+  const handleCommitSaved = useCallback((result) => {
+    setTicket(result.ticket);
+    if (result.channelItem) setCgItem(result.channelItem);
+    setListVersion((v) => v + 1);
+  }, []);
+
+  const handleCommitFinalized = useCallback((result) => {
+    setTicket(result.ticket);
+    if (result.channelItem) setCgItem(result.channelItem);
+    setActiveGroup('finalizadas');
+    setListVersion((v) => v + 1);
+  }, []);
+
+  const {
+    committing,
+    handleSaveTicket,
+    handleFinalizeTicket,
+    finalized,
+    readOnly,
+  } = useEspeciaisTicketCommit({
+    channelId: 'gov',
+    channelItem: cgItem,
+    ticket,
+    composeSession,
+    onTicketSaved: handleCommitSaved,
+    onFinalized: handleCommitFinalized,
+    showNotification,
+  });
 
   const handleSearchSubmit = useCallback(() => {
     setAppliedSearch(searchDraft.trim());
@@ -210,6 +259,14 @@ export default function ConsumidorGovCrmRoot() {
         waComposeText={waComposeText}
         onWaComposeTextChange={setWaComposeText}
         onTicketUpdated={handleTicketUpdated}
+        composeMode={composeMode}
+        onComposeModeChange={setComposeMode}
+        composeText={composeText}
+        onComposeTextChange={setComposeText}
+        internalText={internalText}
+        onInternalTextChange={setInternalText}
+        composeAttachments={composeAttachments}
+        onComposeAttachmentsChange={setComposeAttachments}
       />
 
       <CgTicketSide
@@ -219,6 +276,11 @@ export default function ConsumidorGovCrmRoot() {
         onOpenChat={handleOpenChat}
         onCloseChat={handleCloseChat}
         onTicketUpdated={handleTicketUpdated}
+        onSave={handleSaveTicket}
+        onFinalize={handleFinalizeTicket}
+        saving={committing}
+        disabled={readOnly || finalized}
+        finalized={finalized}
       />
 
       {demandaModals}

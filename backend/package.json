@@ -35,7 +35,11 @@
     "test:twilio-auth": "tsx scripts/test-twilio-auth.ts",
     "test:casos-especiais-precheck": "tsx scripts/test-casos-especiais-precheck.ts",
     "test:inbound-especiais-channel": "tsx scripts/test-inbound-especiais-channel.ts",
+    "test:parse-consumidor-gov-email": "tsx scripts/test-parse-consumidor-gov-email.ts",
+    "test:parse-bacen-rdr-email": "tsx scripts/test-parse-bacen-rdr-email.ts",
     "test:reclamacoes-smoke": "tsx scripts/test-reclamacoes-smoke.ts",
+    "test:hugme-import-db": "tsx scripts/test-hugme-import-db.ts",
+    "import:reclame-aqui-base": "tsx scripts/import-reclame-aqui-base.ts",
     "backfill:ticket-ia": "tsx scripts/backfill-ticket-ia.ts",
     "octadesk:dump-tickets": "tsx scripts/octadesk-dump-tickets.ts",
     "octadesk:dump-interactions": "tsx scripts/octadesk-dump-interactions.ts",
@@ -60,7 +64,8 @@
     "openai": "^4.104.0",
     "qrcode-terminal": "^0.12.0",
     "twilio": "^6.0.2",
-    "whatsapp-web.js": "^1.23.0"
+    "whatsapp-web.js": "^1.23.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
