@@ -1,4 +1,4 @@
-﻿/* Velodesk CRM v1.15.0 - transcricao de audio WhatsApp sob demanda */
+﻿/* Velodesk CRM v1.16.0 - preview de anexos no Desk */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -3599,6 +3599,11 @@
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .msg-bubble__attachment-link:hover {
   background: #eef4ff;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .msg-bubble__attachment-link--pending {
+  color: #6b7280;
+  cursor: wait;
 }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .msg-bubble__attachment-link--error {
@@ -8636,4 +8641,198 @@ body.desk-v2-mode #cockpitFocusContext {
 
 #velodeskDeskV2Root .desk-my-tickets-table__row.is-sla-warning {
     background: #fffdf7;
+}
+
+/* Preview de anexo inbound — portal no body (mesmo padrão dos modais do Desk) */
+.desk-attachment-preview__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9700;
+    border: none;
+    padding: 0;
+    background: rgba(15, 23, 42, 0.45);
+    cursor: pointer;
+}
+
+.desk-attachment-preview {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 9701;
+    transform: translate(-50%, -50%);
+    width: min(920px, calc(100vw - 32px));
+    max-height: min(88vh, 860px);
+    display: flex;
+    flex-direction: column;
+    background: #F3F7FC;
+    border: 0.5px solid rgba(0, 0, 88, 0.12);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    font-family: 'Poppins', sans-serif;
+}
+
+.desk-attachment-preview--pdf,
+.desk-attachment-preview--video {
+    width: min(1100px, calc(100vw - 32px));
+    height: min(88vh, 860px);
+}
+
+.desk-attachment-preview__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 0.5px solid rgba(0, 0, 88, 0.1);
+    background: #F3F7FC;
+}
+
+.desk-attachment-preview__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #eef4ff;
+    color: #1634FF;
+    flex-shrink: 0;
+}
+
+.desk-attachment-preview__title {
+    margin: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #000058;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.desk-attachment-preview__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #272A30;
+    cursor: pointer;
+}
+
+.desk-attachment-preview__close:hover {
+    background: #eef4ff;
+    color: #000058;
+}
+
+.desk-attachment-preview__stage {
+    flex: 1 1 auto;
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    overflow: auto;
+    background: #272A30;
+}
+
+.desk-attachment-preview--audio .desk-attachment-preview__stage,
+.desk-attachment-preview--office .desk-attachment-preview__stage {
+    background: #F3F7FC;
+    min-height: 140px;
+}
+
+.desk-attachment-preview__img {
+    display: block;
+    max-width: 100%;
+    max-height: min(68vh, 640px);
+    object-fit: contain;
+}
+
+.desk-attachment-preview__audio {
+    width: min(420px, 100%);
+}
+
+.desk-attachment-preview__video {
+    display: block;
+    width: 100%;
+    max-height: min(68vh, 640px);
+    background: #000;
+}
+
+.desk-attachment-preview__pdf {
+    width: 100%;
+    height: min(68vh, 680px);
+    border: 0;
+    background: #F3F7FC;
+}
+
+.desk-attachment-preview__office {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    max-width: 440px;
+    text-align: center;
+    color: #000058;
+}
+
+.desk-attachment-preview__office i {
+    font-size: 28px;
+    color: #FCC200;
+}
+
+.desk-attachment-preview__office p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.45;
+    color: #272A30;
+}
+
+.desk-attachment-preview__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 12px 16px 16px;
+    border-top: 0.5px solid rgba(0, 0, 88, 0.1);
+    background: #F3F7FC;
+}
+
+.desk-attachment-preview__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 104px;
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.desk-attachment-preview__btn--ghost {
+    border: 0.5px solid rgba(0, 0, 88, 0.16);
+    background: #F3F7FC;
+    color: #000058;
+}
+
+.desk-attachment-preview__btn--ghost:hover {
+    background: #eef4ff;
+}
+
+.desk-attachment-preview__btn--primary {
+    border: none;
+    background: #1634FF;
+    color: #F3F7FC;
+}
+
+.desk-attachment-preview__btn--primary:hover {
+    background: #000058;
 }

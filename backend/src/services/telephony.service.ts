@@ -149,6 +149,35 @@ export async function listTelephonyCalls(query: TelephonyCallsQuery = {}) {
   };
 }
 
+/** Linha do export (XLSX) — horário, resumo e transcrição completa de cada ligação do período filtrado. */
+function callExportRow(doc: ITelephonyCall) {
+  return {
+    id: String(doc._id),
+    startedAt: doc.startedAt?.toISOString() ?? null,
+    endedAt: doc.endedAt?.toISOString() ?? null,
+    durationSeconds: doc.durationSeconds ?? null,
+    direction: doc.direction ?? null,
+    status: doc.status ?? null,
+    clientName: doc.clientName ?? null,
+    clientPhone: doc.clientPhone ?? null,
+    agentName: doc.agentName ?? null,
+    summary: doc.summary ?? '',
+    transcript: doc.transcript ?? '',
+  };
+}
+
+const EXPORT_MAX_ROWS = 10000;
+
+export async function exportTelephonyCalls(query: TelephonyCallsQuery = {}) {
+  const filter = buildDateFilter(query);
+  const rows = await TelephonyCall
+    .find(filter)
+    .sort({ endedAt: -1, createdAt: -1 })
+    .limit(EXPORT_MAX_ROWS)
+    .lean();
+  return rows.map((row) => callExportRow(row as unknown as ITelephonyCall));
+}
+
 export async function getTelephonyCallDetail(id: string) {
   if (!mongoose.Types.ObjectId.isValid(id)) return null;
   const doc = await TelephonyCall.findById(id).lean();

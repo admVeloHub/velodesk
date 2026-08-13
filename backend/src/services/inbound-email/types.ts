@@ -1,4 +1,4 @@
-﻿/** inbound-email/types v1.3.0 — gcsUri + fingerprint para dedupe por mensagem */
+﻿/** inbound-email/types v1.4.0 — scanStatus opcional no anexo */
 export interface InboundEmailAttachment {
   filename: string;
   contentType: string;
@@ -7,6 +7,7 @@ export interface InboundEmailAttachment {
   storageKey?: string;
   contentHash?: string;
   bytes?: number;
+  scanStatus?: string;
 }
 
 export interface InboundEmailPayload {

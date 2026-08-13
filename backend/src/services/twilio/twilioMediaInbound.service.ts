@@ -1,6 +1,7 @@
-/** twilioMediaInbound.service v1.0.0 — download autenticado e persistência de mídia WhatsApp */
+/** twilioMediaInbound.service v1.1.0 — attachmentGuard antes de persistir */
 import path from 'path';
 import { env } from '../../config/env';
+import { inspectAttachmentGuard } from '../attachmentGuard.util';
 import {
   persistInboundAttachment,
   type StoredInboundAttachment,
@@ -158,11 +159,16 @@ async function downloadAndPersistOne(
       contentType,
       String(response.headers.get('content-disposition') || ''),
     );
+    const guard = inspectAttachmentGuard(filename, contentType, buffer);
+    if (!guard.ok) {
+      throw new Error(`Mídia WhatsApp bloqueada: ${guard.reason}`);
+    }
     const stored = await persistInboundAttachment({
       messageId: messageSid,
       filename,
-      contentType,
+      contentType: guard.detectedMime || contentType,
       buffer,
+      scanStatus: guard.scanStatus,
     });
     return { ...stored, index: media.index };
   } finally {
@@ -177,7 +183,15 @@ export async function persistTwilioInboundMedia(
 ): Promise<PersistedTwilioInboundMedia[]> {
   const stored: PersistedTwilioInboundMedia[] = [];
   for (const item of media) {
-    stored.push(await downloadAndPersistOne(messageSid, accountSid, item));
+    try {
+      stored.push(await downloadAndPersistOne(messageSid, accountSid, item));
+    } catch (err) {
+      console.warn('[twilioMediaInbound] mídia ignorada', {
+        messageSid,
+        index: item.index,
+        error: (err as Error).message,
+      });
+    }
   }
   return stored;
 }

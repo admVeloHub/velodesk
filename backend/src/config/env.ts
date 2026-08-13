@@ -1,4 +1,4 @@
-/** env v1.36.1 — PENDENTE_RESOLVE_AFTER_MS (job pendente→resolvido) */
+/** env v1.37.0 — prefixo quarentena de anexos + secret do callback ClamAV */
 import fs from 'fs';
 import path from 'path';
 
@@ -137,6 +137,11 @@ export const env = {
   gcpStorageOctadeskLegacyAttachmentsPrefix: (
     process.env.GCP_STORAGE_OCTADESK_LEGACY_PREFIX || 'octadesk_legacy_attachments'
   ).trim().replace(/^\/+|\/+$/g, ''),
+  /** Inbound aguardando / reprovado no ClamAV */
+  gcpStorageInboundQuarantinePrefix: (
+    process.env.GCP_STORAGE_INBOUND_QUARANTINE_PREFIX || 'desk_ticket_attachments_quarantine'
+  ).trim().replace(/^\/+|\/+$/g, ''),
+  attachmentScanCallbackSecret: (process.env.ATTACHMENT_SCAN_CALLBACK_SECRET || '').trim(),
   /** Dump Octadesk → legado_tickets.importados_octadesk (scripts offline) */
   octadeskApiBase: (
     process.env.OCTADESK_API_BASE || 'https://o199103-bfa.api001.octadesk.services'

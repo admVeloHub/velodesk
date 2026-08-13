@@ -1,10 +1,31 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.79.0 | DATE: 2026-08-12 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.80.0 | DATE: 2026-08-13 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — filtro de anexos, preview no Desk e quarentena para ClamAV isolado
+
+- **Data/Hora**: 2026-08-13
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.80.0
+  - **Backend**: attachmentGuard v1.0.0, attachmentScanCallback v1.0.0, inboundAttachmentStorage v1.6.0, gcsAttachmentStorage v1.5.0, uploads.routes v1.5.0, gmailAttachment v1.6.0, twilioMediaInbound v1.1.0, whatsappInbound v1.6.0, whatsappThread v1.7.0, email-inbound v1.15.0, chamado.mapper v2.11.0, env v1.37.0, index v1.16.0
+  - **Frontend**: DeskConversation v1.8.0, DeskWhatsAppChat v1.11.0, DeskAttachmentPreviewModal v1.0.0, attachmentPreview v1.1.0, utils v3.14.0, velodesk-crm.css v1.16.0, velodesk-dark-theme.css v1.2.1
+- **Arquivos principais**:
+  - `backend/src/services/attachmentGuard.util.ts` — allowlist, magic bytes, teto por tipo, bloqueio de exe/HTML/SVG/ZIP com senha
+  - `backend/src/services/inboundAttachmentStorage.service.ts` + `gcsAttachmentStorage.service.ts` — prefixo `desk_ticket_attachments_quarantine`; cache local só para skipped/clean
+  - `backend/src/routes/uploads.routes.ts` — `Content-Disposition: attachment` + nosniff; GET inbound 423/403
+  - `backend/src/routes/internalAttachmentScan.routes.ts` — callback `POST /api/internal/attachment-scan-result`
+  - `frontend/src/features/desk/components/DeskAttachmentPreviewModal.jsx` — preview de imagem/áudio/vídeo/PDF no Desk
+- **Descrição**: Anexos inbound (e-mail e WhatsApp) passam por filtro na recepção. Imagem/áudio/vídeo válidos ficam no prefixo limpo (`skipped`). PDF/Office/ZIP vão à quarentena (`pending`) até o scanner isolado (`admVeloHub/security`, Cloud Run `velodesk-clamav`) promover. O agente visualiza no Desk em vez de baixar automaticamente; infectado não é servido. O binário do ClamAV não entra neste repositório. Eventarc/deploy do scanner ainda pendente de autorização.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — fix build Cloud Build: service de anexos legado Octadesk fora do versionamento
 

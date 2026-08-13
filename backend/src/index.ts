@@ -1,4 +1,4 @@
-/** index v1.15.0 — worker de transcrição de áudio WhatsApp */
+/** index v1.16.0 — callback interno de scan de anexo */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -48,6 +48,7 @@ import ticketSearchRoutes from './routes/ticketSearch.routes';
 import ticketFusaoRoutes from './routes/ticketFusao.routes';
 import realtimeRoutes from './routes/realtime.routes';
 import reclamacoesRoutes from './routes/reclamacoes.routes';
+import internalAttachmentScanRoutes from './routes/internalAttachmentScan.routes';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
@@ -168,6 +169,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/colaboradores', colaboradoresRoutes);
 app.use('/api', statsRoutes);
 app.use('/api/uploads', uploadsRoutes);
+app.use('/api/internal', internalAttachmentScanRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/tabulation', tabulationRoutes);
 app.use('/api/workflows', workflowsRoutes);

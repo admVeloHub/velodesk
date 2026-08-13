@@ -1,4 +1,4 @@
-/** chamado.mapper v2.10.1 — exclui RA/Procon/CG do Desk agente (meus-chamados) */
+/** chamado.mapper v2.11.0 — attachmentScanStatuses paralelo a attachments */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -49,6 +49,7 @@ export interface TicketMessageDto {
   transcriptionStatus?: string;
   time: Date;
   attachments?: string[];
+  attachmentScanStatuses?: string[];
 }
 
 const TABULACAO_TRACKED_FIELDS: (keyof ITabulacao)[] = [
@@ -66,6 +67,33 @@ function legacyAlteracoesObject(reg: IRegistro): Record<string, unknown> | null 
     return alt as Record<string, unknown>;
   }
   return null;
+}
+
+function scanStatusesAlignedToUrls(urls: string[], sourceUrls: string[], sourceStatuses?: string[]): string[] | undefined {
+  if (!urls.length) return undefined;
+  const map = new Map<string, string>();
+  (sourceUrls || []).forEach((url, index) => {
+    const key = String(url || '').trim();
+    if (!key) return;
+    map.set(key, String(sourceStatuses?.[index] || ''));
+  });
+  const aligned = urls.map((url) => map.get(url) || '');
+  return aligned.some(Boolean) ? aligned : undefined;
+}
+
+function scanStatusesForPublicAttachments(reg: IRegistro): string[] | undefined {
+  const urls = filterRealAttachmentUrls(reg.anexosMensagemPublica);
+  const meta = registroMetadados(reg);
+  const items = Array.isArray(meta.emailAttachments) ? meta.emailAttachments : [];
+  const sourceUrls = items.map((raw) => {
+    const item = raw && typeof raw === 'object' ? raw as Record<string, unknown> : null;
+    return String(item?.url || '').trim();
+  });
+  const sourceStatuses = items.map((raw) => {
+    const item = raw && typeof raw === 'object' ? raw as Record<string, unknown> : null;
+    return String(item?.scanStatus || '').trim();
+  });
+  return scanStatusesAlignedToUrls(urls, sourceUrls, sourceStatuses);
 }
 
 function registroMetadados(reg: IRegistro): Record<string, unknown> {
@@ -1574,6 +1602,11 @@ function buildTicketDtoCore(
             time: wa.data ? new Date(wa.data) : reg.data,
             registroIndex: index,
             attachments: filterRealAttachmentUrls(wa.anexos),
+            attachmentScanStatuses: scanStatusesAlignedToUrls(
+              filterRealAttachmentUrls(wa.anexos),
+              wa.anexos,
+              wa.anexosScanStatus,
+            ),
           });
         });
       } else if (reg.mensagemPublica || (reg.anexosMensagemPublica?.length ?? 0) > 0) {
@@ -1593,6 +1626,7 @@ function buildTicketDtoCore(
           time: reg.data,
           registroIndex: index,
           attachments: filterRealAttachmentUrls(reg.anexosMensagemPublica),
+          attachmentScanStatuses: scanStatusesForPublicAttachments(reg),
         });
       }
       if (reg.anotacaoInterna || (reg.anexosAnotacaoInterna?.length ?? 0) > 0) {

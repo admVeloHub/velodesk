@@ -1,6 +1,6 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.13.0 | DATE: 2026-08-12
+ * VERSION: v3.14.0 | DATE: 2026-08-13
  * — IDs estáveis e metadados de mídia/transcrição WhatsApp
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
@@ -1535,6 +1535,7 @@ export function buildRegistroThread(ticket) {
       deliveryStatus: m.deliveryStatus,
       deliveryErrorMessage: m.deliveryErrorMessage,
       mediaContentTypes: Array.isArray(m.mediaContentTypes) ? m.mediaContentTypes : [],
+      attachmentScanStatuses: Array.isArray(m.attachmentScanStatuses) ? m.attachmentScanStatuses : [],
       transcriptionStatus: m.transcriptionStatus,
     };
   });

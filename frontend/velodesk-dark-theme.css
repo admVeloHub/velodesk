@@ -1,6 +1,6 @@
 /**
  * Velodesk — modo escuro unificado (LAYOUT_GUIDELINES)
- * VERSION: v1.2.0 | DATE: 2026-08-11
+ * VERSION: v1.2.1 | DATE: 2026-08-13
  * Importar por último em src/styles/cockpit/index.css
  */
 
@@ -1547,4 +1547,55 @@ body.velodesk-dark .prod-solic-attachments__chip {
 
 body.velodesk-dark .prod-solic-attachments__chip-remove {
     color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .desk-attachment-preview,
+body.velodesk-dark .desk-attachment-preview__head,
+body.velodesk-dark .desk-attachment-preview__footer,
+body.velodesk-dark .desk-attachment-preview--audio .desk-attachment-preview__stage,
+body.velodesk-dark .desk-attachment-preview--office .desk-attachment-preview__stage {
+    background: var(--velo-dark-surface);
+}
+
+body.velodesk-dark .desk-attachment-preview {
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .desk-attachment-preview__head,
+body.velodesk-dark .desk-attachment-preview__footer {
+    border-color: var(--velo-dark-border);
+}
+
+body.velodesk-dark .desk-attachment-preview__title,
+body.velodesk-dark .desk-attachment-preview__office {
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .desk-attachment-preview__office p,
+body.velodesk-dark .desk-attachment-preview__close {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark .desk-attachment-preview__icon {
+    background: rgba(22, 148, 255, 0.16);
+    color: var(--velo-dark-accent);
+}
+
+body.velodesk-dark .desk-attachment-preview__close:hover {
+    background: var(--velo-dark-surface-hover);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .desk-attachment-preview__btn--ghost {
+    background: var(--velo-dark-surface);
+    border-color: var(--velo-dark-border-strong);
+    color: var(--velo-dark-text);
+}
+
+body.velodesk-dark .desk-attachment-preview__btn--ghost:hover {
+    background: var(--velo-dark-surface-hover);
+}
+
+body.velodesk-dark .desk-attachment-preview__pdf {
+    background: var(--velo-dark-surface-inset);
 }

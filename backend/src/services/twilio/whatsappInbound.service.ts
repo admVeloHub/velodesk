@@ -1,4 +1,4 @@
-/** whatsappInbound.service v1.5.0 — áudio armazenado para transcrição sob demanda */
+/** whatsappInbound.service v1.6.0 — anexosScanStatus no inbound */
 import twilio from 'twilio';
 import { env } from '../../config/env';
 import { ChamadoN1 } from '../../models/ChamadoN1';
@@ -129,6 +129,7 @@ export async function processInboundWhatsAppMessage(payload: TwilioWhatsAppWebho
     : [];
   const attachmentUrls = storedMedia.map((item) => item.url);
   const mediaContentTypes = storedMedia.map((item) => item.contentType);
+  const anexosScanStatus = storedMedia.map((item) => item.scanStatus);
   const hasAudio = mediaContentTypes.some((value) => value.toLowerCase().startsWith('audio/'));
   const waChatId = normalizeWaChatId(payload.waId || payload.from);
   appendWhatsAppMensagemToChamado(chamado, {
@@ -139,6 +140,7 @@ export async function processInboundWhatsAppMessage(payload: TwilioWhatsAppWebho
     waChatId,
     twilioMessageSid: payload.messageSid || undefined,
     mediaContentTypes,
+    anexosScanStatus,
     transcriptionStatus: hasAudio ? 'available' : undefined,
   });
 
