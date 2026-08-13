@@ -1,10 +1,44 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.80.0 | DATE: 2026-08-13 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.82.0 | DATE: 2026-08-13 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — inbound tickets (App / Telefone / Agente IA)
+
+- **Data/Hora**: 2026-08-13
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.82.0
+  - **Backend**: inbound.routes v1.8.0, inboundTicketAuth v1.0.0, inboundTicket.service v1.0.0, env v1.38.0, assignmentRouter v1.4.1
+- **Arquivos principais**:
+  - `POST /api/inbound/tickets` + `GET /api/inbound/tickets/health` — abertura canônica por origem (App, Telefone, Agente IA)
+  - `backend/src/middleware/inboundTicketAuth.ts` — secret dedicado por header (`[a-z0-9]{35}`)
+  - `docs/api-inbound-tickets-app.md`, `docs/api-inbound-tickets-agente-ia.md`
+- **Descrição**: Endpoint inbound para criação de chamados por integrações externas, com autenticação por origem e documentação de homologação.
+- **Status**: Push dev + main
+
+---
+
+### GCP Config — fio ClamAV: secret de callback, 2Gi no scanner e Eventarc
+
+- **Data/Hora**: 2026-08-13
+- **Tipo**: GCP Config (Secret Manager + Cloud Run + Eventarc)
+- **Serviço**: velodesk (`us-east1`) + security-git (`us-east1`)
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.82.0
+- **Cloud Run env / recursos**:
+  - Secret `ATTACHMENT_SCAN_CALLBACK_SECRET` no Secret Manager, anexado ao `velodesk` e ao `security-git`
+  - `security-git`: 2 GiB, min-instances=1, env de callback/bucket/prefixos
+  - Eventarc `velodesk-clamav-quarantine` em `object.v1.finalized` no bucket `velodesk_storage` → `security-git` `/scan`
+- **Descrição**: Completa o fio do scanner isolado. O Desk só ganhou o secret de callback (nenhum endpoint/schema alterado). PDF de teste `IPSUN LORUM.pdf` foi varrido (`clean`) e promovido ao prefixo limpo.
+- **Status**: Configurado no GCP
+
+---
 
 ### GitHub Push — filtro de anexos, preview no Desk e quarentena para ClamAV isolado
 

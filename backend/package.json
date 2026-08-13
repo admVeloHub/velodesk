@@ -27,6 +27,8 @@
     "test:status-lifecycle": "tsx scripts/test-status-lifecycle.ts",
     "test:ticket-ia": "tsx scripts/test-ticket-ia-adapter.ts",
     "test:telephony-inbound": "tsx scripts/test-telephony-inbound.ts",
+    "test:inbound-tickets": "tsx scripts/test-inbound-tickets.ts",
+    "generate:inbound-ticket-secrets": "tsx scripts/generate-inbound-ticket-secrets.ts",
     "test:whatsapp-send": "tsx scripts/test-whatsapp-send.ts",
     "create:twilio-subaccount": "tsx scripts/create-twilio-subaccount.ts",
     "register:twilio-whatsapp-sender": "tsx scripts/register-twilio-whatsapp-sender.ts",

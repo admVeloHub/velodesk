@@ -1,8 +1,9 @@
-/** inbound.routes v1.7.3 — WhatsApp inbound sem auto-reply sandbox */
+/** inbound.routes v1.8.0 — POST /api/inbound/tickets (App / Telefone / Agente IA) */
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { env } from '../config/env';
 import { inboundAppAuthMiddleware, inboundEmailAuthMiddleware, inboundTelephonyAuthMiddleware } from '../middleware/inboundAuth';
+import { inboundTicketAuthMiddleware } from '../middleware/inboundTicketAuth';
 import { twilioWebhookAuthMiddleware } from '../middleware/twilioWebhookAuth';
 import {
   buildInboundTwimlReply,
@@ -31,7 +32,8 @@ import {
   processTelecom55Webhook,
 } from '../services/realtime/telecom55/webhook.service';
 import { isRealtimeSupabaseConfigured } from '../config/supabaseRealtime';
-
+import { processInboundTicket } from '../services/inbound-ticket/inboundTicket.service';
+import { ORIGIN_CANAL_CONFIG } from '../services/inbound-ticket/types';
 const router = Router();
 const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024, files: 10 },
@@ -264,6 +266,36 @@ router.post('/app-notify', inboundAppAuthMiddleware, async (req, res: Response) 
     }
     console.error('[inbound/app-notify]', err);
     return res.status(500).json({ message: 'Falha ao processar notificação do app' });
+  }
+});
+
+/** Abertura de ticket — health (sem autenticação) */
+router.get('/tickets/health', (_req, res: Response) => {
+  res.json({
+    status: 'ok',
+    enabled: env.inboundTicketsEnabled,
+    apiVersion: '1.0.0',
+    origins: Object.keys(ORIGIN_CANAL_CONFIG),
+    secretFormat: '[a-z0-9]{35}',
+  });
+});
+
+router.post('/tickets', inboundTicketAuthMiddleware, async (req, res: Response) => {
+  try {
+    const origin = req.inboundTicketOrigin;
+    if (!origin) {
+      return res.status(401).json({ message: 'Origem inbound ticket não identificada' });
+    }
+    const result = await processInboundTicket(origin, req.body as Record<string, unknown>);
+    const statusCode = result.action === 'created' ? 201 : 200;
+    return res.status(statusCode).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/obrigatório|Informe|inválid/i.test(message)) {
+      return res.status(400).json({ message });
+    }
+    console.error('[inbound/tickets]', err);
+    return res.status(500).json({ message: 'Falha ao criar ticket inbound' });
   }
 });
 
