@@ -1,12 +1,21 @@
 /**
- * DeskConversation v1.6.1 — label de anexo só com nome do arquivo (sem gs:// ou path)
- * VERSION: v1.6.1 | DATE: 2026-08-12
+ * DeskConversation v1.8.0 — chip verificando/bloqueado conforme scanStatus
+ * VERSION: v1.8.0 | DATE: 2026-08-13
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
 import { normalizeMessageHtmlForDisplay } from '../../../services/desk/composeRichEditor';
 import { shouldHideWorkflowSystemThreadMessage } from '../../../services/desk/utils';
 import { normalizeMessageDisplayText } from '../../../utils/htmlText.util';
+import {
+  attachmentKindIcon,
+  attachmentLabelFromUrl,
+  classifyAttachmentKind,
+  downloadObjectUrl,
+  loadAttachmentForPreview,
+  shouldOpenPreviewModal,
+} from '../../../services/desk/attachmentPreview';
+import DeskAttachmentPreviewModal from './DeskAttachmentPreviewModal';
 
 const AUDIT_MIN_DISPLAY = 70;
 const AUDIT_HIGH_GREEN = 90;
@@ -20,16 +29,6 @@ function normalizeAuditScore(value) {
   return null;
 }
 
-function attachmentLabelFromUrl(url) {
-  const rawUrl = String(url || '').trim();
-  if (!rawUrl) return 'Anexo';
-  // gs://bucket/path/uuid__nome.pdf → nome.pdf
-  const withoutScheme = rawUrl.replace(/^gs:\/\//i, '').replace(/^https?:\/\/[^/]+/i, '');
-  const leaf = decodeURIComponent(withoutScheme.split('/').pop() || rawUrl.split('/').pop() || 'Anexo');
-  const withoutUuid = leaf.replace(/^[0-9a-f-]{36}-/i, '');
-  return withoutUuid.replace(/__/g, '/').split('/').pop() || 'Anexo';
-}
-
 function isBrandInlineAttachmentUrl(url) {
   const label = attachmentLabelFromUrl(url).toLowerCase();
   return label.includes('simbolo_velotax')
@@ -37,46 +36,45 @@ function isBrandInlineAttachmentUrl(url) {
     || /^logo\.(png|jpe?g|gif|webp)$/i.test(label);
 }
 
-function MessageAttachments({ attachments }) {
+function MessageAttachments({ attachments, scanStatuses }) {
   const items = (attachments || [])
-    .map((item) => String(item || '').trim())
-    .filter(Boolean)
-    .filter((url) => !isBrandInlineAttachmentUrl(url));
+    .map((item, index) => ({
+      url: String(item || '').trim(),
+      scanStatus: String(scanStatuses?.[index] || '').trim().toLowerCase(),
+    }))
+    .filter((item) => item.url)
+    .filter((item) => !isBrandInlineAttachmentUrl(item.url));
   const [loadingUrl, setLoadingUrl] = useState('');
   const [errorUrl, setErrorUrl] = useState('');
+  const [preview, setPreview] = useState(null);
+  const previewRef = useRef(null);
+  previewRef.current = preview;
+
+  useEffect(() => () => {
+    if (previewRef.current?.objectUrl) URL.revokeObjectURL(previewRef.current.objectUrl);
+  }, []);
+
+  const closePreview = useCallback(() => {
+    setPreview((current) => {
+      if (current?.objectUrl) URL.revokeObjectURL(current.objectUrl);
+      return null;
+    });
+  }, []);
 
   const openAttachment = useCallback(async (url) => {
     setErrorUrl('');
     setLoadingUrl(url);
     try {
-      const href = url.startsWith('/api/') ? url : `/api${url.startsWith('/') ? url : `/${url}`}`;
-      const token = localStorage.getItem('velodesk_token');
-      const res = await fetch(href, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) {
-        let detail = 'Não foi possível abrir o anexo.';
-        try {
-          const data = await res.json();
-          if (data?.message) detail = data.message;
-        } catch {
-          // resposta não-JSON
-        }
-        throw new Error(detail);
+      const loaded = await loadAttachmentForPreview(url);
+      if (shouldOpenPreviewModal(loaded.kind)) {
+        setPreview((current) => {
+          if (current?.objectUrl) URL.revokeObjectURL(current.objectUrl);
+          return loaded;
+        });
+        return;
       }
-      const blob = await res.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = objectUrl;
-      anchor.target = '_blank';
-      anchor.rel = 'noopener noreferrer';
-      const disp = res.headers.get('content-disposition') || '';
-      const match = /filename="([^"]+)"/i.exec(disp);
-      if (match?.[1]) anchor.download = match[1];
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      downloadObjectUrl(loaded.objectUrl, loaded.filename);
+      window.setTimeout(() => URL.revokeObjectURL(loaded.objectUrl), 60_000);
     } catch (err) {
       setErrorUrl(url);
       console.warn('[DeskConversation] anexo:', err?.message || err);
@@ -88,34 +86,47 @@ function MessageAttachments({ attachments }) {
   if (!items.length) return null;
 
   return (
-    <ul className="msg-bubble__attachments">
-      {items.map((url) => {
-        const isLoading = loadingUrl === url;
-        const hasError = errorUrl === url;
-        return (
-          <li key={url}>
-            <button
-              type="button"
-              className={`msg-bubble__attachment-link${hasError ? ' msg-bubble__attachment-link--error' : ''}`}
-              disabled={isLoading}
-              onClick={() => { openAttachment(url); }}
-            >
-              <i className="ti ti-paperclip" aria-hidden="true" />
-              {isLoading ? 'Abrindo…' : attachmentLabelFromUrl(url)}
-            </button>
-            {hasError ? (
-              <span className="msg-bubble__attachment-error" role="alert">
-                Anexo indisponível no servidor. Se o e-mail entrou por outro ambiente, o arquivo pode não ter sido sincronizado.
-              </span>
-            ) : null}
-          </li>
-        );
-      })}
-    </ul>
+    <>
+      <ul className="msg-bubble__attachments">
+        {items.map((item) => {
+          const url = item.url;
+          const isLoading = loadingUrl === url;
+          const hasError = errorUrl === url;
+          const pending = item.scanStatus === 'pending';
+          const blocked = item.scanStatus === 'infected' || item.scanStatus === 'unscannable';
+          const kind = classifyAttachmentKind('', attachmentLabelFromUrl(url));
+          return (
+            <li key={url}>
+              <button
+                type="button"
+                className={`msg-bubble__attachment-link${hasError || blocked ? ' msg-bubble__attachment-link--error' : ''}${pending ? ' msg-bubble__attachment-link--pending' : ''}`}
+                disabled={isLoading || pending || blocked}
+                onClick={() => { openAttachment(url); }}
+              >
+                <i className={`ti ${blocked ? 'ti-shield-x' : attachmentKindIcon(kind)}`} aria-hidden="true" />
+                {blocked ? 'Anexo bloqueado' : pending ? 'Verificando…' : isLoading ? 'Abrindo…' : attachmentLabelFromUrl(url)}
+              </button>
+              {hasError ? (
+                <span className="msg-bubble__attachment-error" role="alert">
+                  Anexo indisponível no servidor. Se o e-mail entrou por outro ambiente, o arquivo pode não ter sido sincronizado.
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+      <DeskAttachmentPreviewModal
+        open={Boolean(preview)}
+        kind={preview?.kind}
+        objectUrl={preview?.objectUrl}
+        filename={preview?.filename}
+        onClose={closePreview}
+      />
+    </>
   );
 }
 
-function MessageBubbleText({ text, attachments }) {
+function MessageBubbleText({ text, attachments, scanStatuses }) {
   const raw = normalizeMessageDisplayText(text);
   const hasText = Boolean(String(raw || '').trim());
 
@@ -136,7 +147,7 @@ function MessageBubbleText({ text, attachments }) {
           />
         )
       ) : null}
-      <MessageAttachments attachments={attachments} />
+      <MessageAttachments attachments={attachments} scanStatuses={scanStatuses} />
     </>
   );
 }
@@ -259,7 +270,7 @@ export default function DeskConversation({
               <div key={i} className="msg-row msg-row--system">
                 <div className="msg-body msg-body--system">
                   <div className="msg-bubble msg-bubble--system">
-                    <MessageBubbleText text={msg.text} attachments={msg.attachments} />
+                    <MessageBubbleText text={msg.text} attachments={msg.attachments} scanStatuses={msg.attachmentScanStatuses} />
                   </div>
                   {msg.meta ? <div className="msg-meta">{msg.meta}</div> : null}
                 </div>
@@ -272,7 +283,7 @@ export default function DeskConversation({
             <div className={'msg-avatar msg-avatar--' + (msg.type === 'internal' ? 'agent' : msg.type)}>{msg.initials || '?'}</div>
             <div className="msg-body">
               <div className={'msg-bubble msg-bubble--' + msg.type}>
-                <MessageBubbleText text={msg.text} attachments={msg.attachments} />
+                <MessageBubbleText text={msg.text} attachments={msg.attachments} scanStatuses={msg.attachmentScanStatuses} />
               </div>
               <div className="msg-meta">{msg.meta}</div>
             </div>

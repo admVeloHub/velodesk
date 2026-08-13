@@ -1,16 +1,21 @@
-/** inboundAttachmentStorage v1.5.0 — leitura em buffer para transcrição de mídia WhatsApp */
+/** inboundAttachmentStorage v1.6.0 — quarentena GCS; cache local só para skipped/clean */
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { Readable } from 'stream';
 import { env } from '../config/env';
+import type { AttachmentScanStatus } from './attachmentGuard.util';
 import {
   buildGcsObjectUri,
   getInboundAttachmentsPrefix,
+  getInboundQuarantinePrefix,
   isGcsAttachmentStorageConfigured,
+  inboundCleanObjectExists,
   readInboundAttachmentFromGcs,
+  readQuarantineAttachmentMeta,
   uploadInboundAttachmentToGcs,
+  uploadQuarantineAttachmentToGcs,
 } from './gcsAttachmentStorage.service';
 const STORAGE_KEY_SEP = '__';
 
@@ -66,6 +71,7 @@ export interface PersistInboundAttachmentInput {
   filename: string;
   contentType: string;
   buffer: Buffer;
+  scanStatus?: 'skipped' | 'pending';
 }
 
 export interface StoredInboundAttachment {
@@ -74,6 +80,7 @@ export interface StoredInboundAttachment {
   filename: string;
   contentType: string;
   storageKey: string;
+  scanStatus: AttachmentScanStatus;
 }
 
 export function buildInboundAttachmentApiUrl(storageKey: string): string {
@@ -98,11 +105,14 @@ export async function persistInboundAttachment(
   const safeName = sanitizeFilename(input.filename);
   const storageKey = `${crypto.randomUUID()}-${safeName}`;
 
-  const gcsUploaded = await uploadInboundAttachmentToGcs(
-    storageKey,
-    input.buffer,
-    input.contentType,
-  );
+  const canQuarantine = isGcsAttachmentStorageConfigured();
+  const scanStatus: AttachmentScanStatus = input.scanStatus === 'pending' && canQuarantine
+    ? 'pending'
+    : 'skipped';
+  const prefix = scanStatus === 'pending' ? getInboundQuarantinePrefix() : getInboundAttachmentsPrefix();
+  const gcsUploaded = scanStatus === 'pending'
+    ? await uploadQuarantineAttachmentToGcs(storageKey, input.buffer, input.contentType)
+    : await uploadInboundAttachmentToGcs(storageKey, input.buffer, input.contentType);
   if (isGcsAttachmentStorageConfigured() && !gcsUploaded) {
     throw new Error(`Falha ao enviar anexo "${safeName}" para o bucket ${env.gcpStorageBucket}`);
   }
@@ -112,13 +122,15 @@ export async function persistInboundAttachment(
     );
   }
 
-  const fullPath = path.join(resolveBaseDir(), storageKey);
-  try {
-    await fs.mkdir(path.dirname(fullPath), { recursive: true });
-    await fs.writeFile(fullPath, input.buffer);
-  } catch (err) {
-    if (!gcsUploaded) throw err;
-    console.warn('[inboundAttachment] cache local falhou (GCS ok):', (err as Error).message);
+  if (scanStatus !== 'pending') {
+    const fullPath = path.join(resolveBaseDir(), storageKey);
+    try {
+      await fs.mkdir(path.dirname(fullPath), { recursive: true });
+      await fs.writeFile(fullPath, input.buffer);
+    } catch (err) {
+      if (!gcsUploaded) throw err;
+      console.warn('[inboundAttachment] cache local falhou (GCS ok):', (err as Error).message);
+    }
   }
 
   console.info('[inboundAttachment] persistido', {
@@ -126,15 +138,18 @@ export async function persistInboundAttachment(
     filename: safeName,
     bytes: input.buffer.length,
     gcs: gcsUploaded,
+    scanStatus,
+    prefix,
     messageId: String(input.messageId || '').slice(0, 32),
   });
 
   return {
     url: buildInboundAttachmentApiUrl(storageKey),
-    gcsUri: buildGcsObjectUri(getInboundAttachmentsPrefix(), storageKey),
+    gcsUri: buildGcsObjectUri(prefix, storageKey),
     filename: safeName,
     contentType: String(input.contentType || 'application/octet-stream').trim(),
     storageKey,
+    scanStatus,
   };
 }
 
@@ -179,6 +194,34 @@ async function tryOpenFromDisk(relative: string): Promise<{
     // próximo candidato
   }
   return null;
+}
+
+export type InboundAttachmentGate =
+  | { state: 'ready' }
+  | { state: 'pending' }
+  | { state: 'infected'; reason?: string }
+  | { state: 'missing' };
+
+export async function inspectInboundAttachmentGate(storageKey: string): Promise<InboundAttachmentGate> {
+  const relative = decodeStorageKey(storageKey);
+  const candidates = expandInboundStorageKeyCandidates(relative);
+
+  for (const key of candidates) {
+    const disk = await tryOpenFromDisk(key);
+    if (disk) return { state: 'ready' };
+    if (await inboundCleanObjectExists(key)) return { state: 'ready' };
+  }
+
+  for (const key of candidates) {
+    const meta = await readQuarantineAttachmentMeta(key);
+    if (!meta) continue;
+    const status = String(meta.scanStatus || 'pending').toLowerCase();
+    if (status === 'infected') return { state: 'infected', reason: meta.scanReason };
+    if (status === 'unscannable') return { state: 'infected', reason: meta.scanReason || 'unscannable' };
+    return { state: 'pending' };
+  }
+
+  return { state: 'missing' };
 }
 
 export async function openInboundAttachment(storageKey: string): Promise<{

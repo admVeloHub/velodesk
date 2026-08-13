@@ -1,10 +1,11 @@
-/** sentAttachmentStorage v1.1.0 — arquivos flat no prefixo sent (sem subpasta por ticket) */
+/** sentAttachmentStorage v1.2.0 — attachmentGuard no upload do agente */
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { Readable } from 'stream';
 import { env } from '../config/env';
+import { inspectAttachmentGuard } from './attachmentGuard.util';
 import {
   buildGcsObjectUri,
   getSentAttachmentsPrefix,
@@ -134,10 +135,16 @@ export async function persistSentAttachment(
     throw new Error(`Anexo excede o limite de ${MAX_SENT_ATTACHMENT_BYTES / (1024 * 1024)}MB`);
   }
 
+  const guard = inspectAttachmentGuard(input.filename, input.contentType, input.buffer);
+  if (!guard.ok) {
+    throw new Error(guard.reason);
+  }
+
   const safeName = sanitizeFilename(input.filename);
   const storageKey = `${crypto.randomUUID()}-${safeName}`;
 
-  const gcsUploaded = await uploadSentAttachmentToGcs(storageKey, input.buffer, input.contentType);
+  const contentType = guard.detectedMime || input.contentType;
+  const gcsUploaded = await uploadSentAttachmentToGcs(storageKey, input.buffer, contentType);
   if (isGcsAttachmentStorageConfigured() && !gcsUploaded) {
     throw new Error(`Falha ao enviar anexo "${safeName}" para o bucket ${env.gcpStorageBucket}`);
   }
@@ -155,7 +162,7 @@ export async function persistSentAttachment(
     url: buildSentAttachmentApiUrl(storageKey),
     gcsUri: buildGcsObjectUri(getSentAttachmentsPrefix(), storageKey),
     filename: safeName,
-    contentType: String(input.contentType || 'application/octet-stream').trim(),
+    contentType: String(contentType || 'application/octet-stream').trim(),
     storageKey,
   };
 }

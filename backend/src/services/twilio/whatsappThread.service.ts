@@ -1,4 +1,4 @@
-/** whatsappThread.service v1.6.0 — áudio disponível para transcrição sob demanda */
+/** whatsappThread.service v1.7.0 — anexosScanStatus paralelo a anexos */
 import type { IChamadoN1, IRegistro } from '../../models/ChamadoN1';
 import { normalizePhoneE164 } from '../telephonyRecado.validation';
 
@@ -39,6 +39,7 @@ export interface WhatsAppMensagemItem {
   deliveryErrorCode?: string;
   deliveryErrorMessage?: string;
   mediaContentTypes?: string[];
+  anexosScanStatus?: string[];
   transcriptionStatus?: 'available' | 'pending' | 'processing' | 'completed' | 'failed';
   transcriptionText?: string;
   transcriptionError?: string;
@@ -53,6 +54,7 @@ export interface AppendWhatsAppMensagemInput {
   waChatId?: string;
   deliveryStatus?: WhatsAppDeliveryStatus;
   mediaContentTypes?: string[];
+  anexosScanStatus?: string[];
   transcriptionStatus?: WhatsAppMensagemItem['transcriptionStatus'];
 }
 
@@ -223,6 +225,9 @@ export function readWhatsAppMensagens(reg: IRegistro): WhatsAppMensagemItem[] {
         mediaContentTypes: Array.isArray(row.mediaContentTypes)
           ? row.mediaContentTypes.map((value) => String(value ?? '').trim()).filter(Boolean)
           : undefined,
+        anexosScanStatus: Array.isArray(row.anexosScanStatus)
+          ? row.anexosScanStatus.map((value) => String(value ?? '').trim())
+          : undefined,
         transcriptionStatus: ['available', 'pending', 'processing', 'completed', 'failed'].includes(
           String(row.transcriptionStatus ?? ''),
         )
@@ -264,6 +269,7 @@ export function appendWhatsAppMensagemToChamado(
       : undefined,
     deliveryStatusAt: input.origin === 'agente' ? now.toISOString() : undefined,
     mediaContentTypes: input.mediaContentTypes,
+    anexosScanStatus: input.anexosScanStatus,
     transcriptionStatus: input.transcriptionStatus,
   };
 

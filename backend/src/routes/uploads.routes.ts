@@ -1,10 +1,13 @@
-/** uploads.routes v1.4.0 — inbound/sent + leitura anexos legado Octadesk */
+/** uploads.routes v1.5.0 — attachment + nosniff; inbound 423/403 na quarentena */
 import path from 'path';
 import multer from 'multer';
 import { Router, Response, Request } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { env } from '../config/env';
-import { openInboundAttachment } from '../services/inboundAttachmentStorage.service';
+import {
+  inspectInboundAttachmentGate,
+  openInboundAttachment,
+} from '../services/inboundAttachmentStorage.service';
 import {
   openSentAttachment,
   persistSentAttachment,
@@ -19,7 +22,8 @@ const upload = multer({
 
 function sendOpenedAttachment(res: Response, opened: NonNullable<Awaited<ReturnType<typeof openInboundAttachment>>>) {
   const safeName = opened.filename.replace(/"/g, '');
-  res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
 
   if (opened.source === 'disk' && opened.filePath) {
     return res.sendFile(path.resolve(opened.filePath));
@@ -98,6 +102,13 @@ router.post('/sent', authMiddleware, upload.array('files', 10), async (req: Requ
 
 router.get('/inbound/:storageKey', authMiddleware, async (req, res: Response) => {
   try {
+    const gate = await inspectInboundAttachmentGate(String(req.params.storageKey ?? ''));
+    if (gate.state === 'pending') {
+      return res.status(423).json({ message: 'Anexo em verificação. Tente novamente em instantes.' });
+    }
+    if (gate.state === 'infected') {
+      return res.status(403).json({ message: 'Anexo bloqueado por segurança.' });
+    }
     const opened = await openInboundAttachment(String(req.params.storageKey ?? ''));
     if (!opened) {
       const hasGcs = Boolean(String(env.gcpStorageBucket || '').trim());

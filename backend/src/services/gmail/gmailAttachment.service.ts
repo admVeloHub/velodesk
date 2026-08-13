@@ -1,4 +1,4 @@
-/** gmailAttachment.service v1.5.0 — anexos + imagens inline CID resolvidas para URL API */
+/** gmailAttachment.service v1.6.0 — attachmentGuard antes de persistir */
 import crypto from 'crypto';
 import type { gmail_v1 } from 'googleapis';
 import type { InboundEmailAttachment } from '../inbound-email/types';
@@ -8,6 +8,7 @@ import {
   attachmentSizeNameFingerprint,
   isBrandInlineAttachmentFilename,
 } from '../attachmentFilter.util';
+import { inspectAttachmentGuard } from '../attachmentGuard.util';
 import { persistInboundAttachment } from '../inboundAttachmentStorage.service';
 
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
@@ -138,11 +139,23 @@ export async function downloadGmailAttachments(
         continue;
       }
 
+      const guard = inspectAttachmentGuard(part.filename, part.mimeType, buffer);
+      if (!guard.ok) {
+        console.warn('[gmailAttachment] anexo bloqueado pelo filtro', {
+          filename: part.filename,
+          reason: guard.reason,
+          code: guard.code,
+          messageId: messageIdForStorage,
+        });
+        continue;
+      }
+
       const saved = await persistInboundAttachment({
         messageId: messageIdForStorage,
         filename: part.filename,
-        contentType: part.mimeType,
+        contentType: guard.detectedMime || part.mimeType,
         buffer,
+        scanStatus: guard.scanStatus,
       });
 
       for (const fp of fingerprints) {
@@ -158,6 +171,7 @@ export async function downloadGmailAttachments(
         storageKey: saved.storageKey,
         contentHash,
         bytes: buffer.length,
+        scanStatus: saved.scanStatus,
       });
     } catch (err) {
       console.warn('[gmailAttachment] falha ao baixar anexo', {
@@ -281,12 +295,22 @@ export async function downloadAndRewriteGmailInlineImages(
   ) => {
     if (buffer.length > MAX_ATTACHMENT_BYTES) return;
     if (isBrandInlineAttachmentFilename(filename)) return;
+    const guard = inspectAttachmentGuard(filename, mimeType, buffer);
+    if (!guard.ok) {
+      console.warn('[gmailAttachment] imagem inline bloqueada pelo filtro', {
+        filename,
+        reason: guard.reason,
+        code: guard.code,
+      });
+      return;
+    }
     const contentHash = crypto.createHash('sha256').update(buffer).digest('hex');
     const saved = await persistInboundAttachment({
       messageId: messageIdForStorage,
       filename,
-      contentType: mimeType,
+      contentType: guard.detectedMime || mimeType,
       buffer,
+      scanStatus: guard.scanStatus,
     });
     cidToUrl.set(contentId, saved.url);
     inlineAttachments.push({
@@ -297,6 +321,7 @@ export async function downloadAndRewriteGmailInlineImages(
       storageKey: saved.storageKey,
       contentHash,
       bytes: buffer.length,
+      scanStatus: saved.scanStatus,
     });
   };
 

@@ -1,4 +1,4 @@
-/** email-inbound.service v1.14.0 — anexos no corpo só com nome; HTML com imgs inline */
+/** email-inbound.service v1.15.0 — scanStatus opcional em emailAttachments */
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
@@ -192,6 +192,7 @@ function buildAttachmentMetadados(payload: InboundEmailPayload): Record<string, 
       storageKey: item.storageKey,
       contentHash: item.contentHash,
       bytes: item.bytes,
+      scanStatus: item.scanStatus,
     }));
   return items.length ? { emailAttachments: items } : {};
 }

@@ -1,4 +1,4 @@
-/** gcsAttachmentStorage v1.4.0 — prefixos inbound/sent/octadesk-legacy; "No such object" = miss silencioso */
+/** gcsAttachmentStorage v1.5.0 — prefixo quarentena + metadado scan-status */
 import { Readable } from 'stream';
 import { google } from 'googleapis';
 import { env } from '../config/env';
@@ -21,6 +21,12 @@ export function getSentAttachmentsPrefix(): string {
 export function getOctadeskLegacyAttachmentsPrefix(): string {
   return normalizePrefix(
     env.gcpStorageOctadeskLegacyAttachmentsPrefix || 'octadesk_legacy_attachments',
+  );
+}
+
+export function getInboundQuarantinePrefix(): string {
+  return normalizePrefix(
+    env.gcpStorageInboundQuarantinePrefix || 'desk_ticket_attachments_quarantine',
   );
 }
 
@@ -55,6 +61,7 @@ export async function uploadAttachmentToGcs(
   storageKey: string,
   buffer: Buffer,
   contentType: string,
+  objectMetadata?: Record<string, string>,
 ): Promise<boolean> {
   if (!isGcsAttachmentStorageConfigured()) return false;
 
@@ -66,6 +73,7 @@ export async function uploadAttachmentToGcs(
       requestBody: {
         name,
         contentType: String(contentType || 'application/octet-stream').trim(),
+        metadata: objectMetadata,
       },
       media: {
         mimeType: String(contentType || 'application/octet-stream').trim(),
@@ -82,6 +90,33 @@ export async function uploadAttachmentToGcs(
       error: (err as Error).message,
     });
     return false;
+  }
+}
+
+export async function readAttachmentMetaFromGcs(
+  prefix: string,
+  storageKey: string,
+): Promise<{ scanStatus?: string; scanReason?: string; contentType?: string } | null> {
+  if (!isGcsAttachmentStorageConfigured()) return null;
+
+  try {
+    const storage = await createStorageClient();
+    const res = await storage.objects.get({
+      bucket: env.gcpStorageBucket,
+      object: objectName(prefix, storageKey),
+    });
+    const metadata = (res.data?.metadata || {}) as Record<string, string>;
+    return {
+      scanStatus: metadata['scan-status'] || metadata.scanStatus,
+      scanReason: metadata['scan-reason'] || metadata.scanReason,
+      contentType: String(res.data?.contentType || '').trim() || undefined,
+    };
+  } catch (err) {
+    const message = (err as Error).message || '';
+    if (!/404|not found|no such object/i.test(message)) {
+      console.warn('[gcsAttachment] meta falhou:', { prefix: normalizePrefix(prefix), storageKey, error: message });
+    }
+    return null;
   }
 }
 
@@ -157,4 +192,35 @@ export async function readOctadeskLegacyAttachmentFromGcs(
   storageKey: string,
 ): Promise<{ stream: Readable; contentType: string } | null> {
   return readAttachmentFromGcs(getOctadeskLegacyAttachmentsPrefix(), storageKey);
+}
+
+export async function uploadQuarantineAttachmentToGcs(
+  storageKey: string,
+  buffer: Buffer,
+  contentType: string,
+): Promise<boolean> {
+  return uploadAttachmentToGcs(
+    getInboundQuarantinePrefix(),
+    storageKey,
+    buffer,
+    contentType,
+    { 'scan-status': 'pending' },
+  );
+}
+
+export async function readQuarantineAttachmentFromGcs(
+  storageKey: string,
+): Promise<{ stream: Readable; contentType: string } | null> {
+  return readAttachmentFromGcs(getInboundQuarantinePrefix(), storageKey);
+}
+
+export async function readQuarantineAttachmentMeta(
+  storageKey: string,
+): Promise<{ scanStatus?: string; scanReason?: string; contentType?: string } | null> {
+  return readAttachmentMetaFromGcs(getInboundQuarantinePrefix(), storageKey);
+}
+
+export async function inboundCleanObjectExists(storageKey: string): Promise<boolean> {
+  const meta = await readAttachmentMetaFromGcs(getInboundAttachmentsPrefix(), storageKey);
+  return Boolean(meta);
 }

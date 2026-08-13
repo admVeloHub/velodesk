@@ -1,58 +1,54 @@
 /**
- * DeskWhatsAppChat v1.9.0 — botão de transcrição de áudio sob demanda
- * VERSION: v1.9.0 | DATE: 2026-08-12
+ * DeskWhatsAppChat v1.11.0 — chip verificando/bloqueado conforme scanStatus
+ * VERSION: v1.11.0 | DATE: 2026-08-13
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   formatWaTime,
   formatWaDateSeparator,
 } from '../../../services/desk/utils';
-
-function attachmentHref(url) {
-  return url.startsWith('/api/') ? url : `/api${url.startsWith('/') ? url : `/${url}`}`;
-}
+import {
+  attachmentKindIcon,
+  attachmentLabelFromUrl,
+  classifyAttachmentKind,
+  downloadObjectUrl,
+  fetchAuthenticatedAttachment,
+  loadAttachmentForPreview,
+  shouldOpenPreviewModal,
+} from '../../../services/desk/attachmentPreview';
+import DeskAttachmentPreviewModal from './DeskAttachmentPreviewModal';
 
 function attachmentLabel(url) {
-  try {
-    const raw = decodeURIComponent(String(url || '').split('/').pop() || 'Anexo');
-    return raw.replace(/^[0-9a-f-]{36}-/i, '').replace(/__/g, '/').split('/').pop() || 'Anexo';
-  } catch {
-    return 'Anexo';
-  }
+  return attachmentLabelFromUrl(url);
 }
 
 function mediaKind(contentType, url) {
-  const type = String(contentType || '').toLowerCase();
-  const label = attachmentLabel(url).toLowerCase();
-  if (type.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(label)) return 'image';
-  if (type.startsWith('audio/') || /\.(ogg|opus|mp3|m4a|aac|amr|wav)$/i.test(label)) return 'audio';
-  if (type.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(label)) return 'video';
+  const kind = classifyAttachmentKind(contentType, attachmentLabel(url));
+  if (kind === 'image' || kind === 'audio' || kind === 'video') return kind;
   return 'document';
 }
 
-async function fetchAuthenticatedAttachment(url) {
-  const token = localStorage.getItem('velodesk_token');
-  const response = await fetch(attachmentHref(url), {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!response.ok) throw new Error(`Anexo indisponível (HTTP ${response.status})`);
-  return response;
-}
-
-function WhatsAppMediaAttachments({ attachments, contentTypes }) {
+function WhatsAppMediaAttachments({ attachments, contentTypes, scanStatuses }) {
   const items = (attachments || []).map((url, index) => ({
     url: String(url || '').trim(),
     contentType: String(contentTypes?.[index] || ''),
+    scanStatus: String(scanStatuses?.[index] || '').trim().toLowerCase(),
   })).filter((item) => item.url);
-  const fingerprint = items.map((item) => `${item.url}|${item.contentType}`).join(';;');
+  const fingerprint = items.map((item) => `${item.url}|${item.contentType}|${item.scanStatus}`).join(';;');
   const [inlineUrls, setInlineUrls] = useState({});
   const [errors, setErrors] = useState({});
   const [downloading, setDownloading] = useState('');
+  const [preview, setPreview] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     const created = [];
-    const inlineItems = items.filter((item) => mediaKind(item.contentType, item.url) !== 'document');
+    const inlineItems = items.filter((item) => (
+      mediaKind(item.contentType, item.url) !== 'document'
+      && item.scanStatus !== 'pending'
+      && item.scanStatus !== 'infected'
+      && item.scanStatus !== 'unscannable'
+    ));
     Promise.all(inlineItems.map(async (item) => {
       try {
         const response = await fetchAuthenticatedAttachment(item.url);
@@ -72,23 +68,45 @@ function WhatsAppMediaAttachments({ attachments, contentTypes }) {
       created.forEach((url) => URL.revokeObjectURL(url));
       setInlineUrls({});
       setErrors({});
+      setPreview((current) => {
+        if (current?.ownsUrl && current.objectUrl) URL.revokeObjectURL(current.objectUrl);
+        return null;
+      });
     };
   // fingerprint representa exatamente a lista de anexos da mensagem
   }, [fingerprint]);
 
-  const downloadDocument = async (item) => {
+  const closePreview = useCallback(() => {
+    setPreview((current) => {
+      if (current?.ownsUrl && current.objectUrl) URL.revokeObjectURL(current.objectUrl);
+      return null;
+    });
+  }, []);
+
+  const openInlinePreview = (item, src) => {
+    const kind = classifyAttachmentKind(item.contentType, attachmentLabel(item.url));
+    setPreview({
+      kind,
+      objectUrl: src,
+      filename: attachmentLabel(item.url),
+      ownsUrl: false,
+    });
+  };
+
+  const openDocument = async (item) => {
     setDownloading(item.url);
     setErrors((current) => ({ ...current, [item.url]: '' }));
     try {
-      const response = await fetchAuthenticatedAttachment(item.url);
-      const objectUrl = URL.createObjectURL(await response.blob());
-      const anchor = document.createElement('a');
-      anchor.href = objectUrl;
-      anchor.download = attachmentLabel(item.url);
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      const loaded = await loadAttachmentForPreview(item.url, item.contentType);
+      if (shouldOpenPreviewModal(loaded.kind)) {
+        setPreview((current) => {
+          if (current?.ownsUrl && current.objectUrl) URL.revokeObjectURL(current.objectUrl);
+          return { ...loaded, ownsUrl: true };
+        });
+        return;
+      }
+      downloadObjectUrl(loaded.objectUrl, loaded.filename);
+      window.setTimeout(() => URL.revokeObjectURL(loaded.objectUrl), 60_000);
     } catch (err) {
       setErrors((current) => ({ ...current, [item.url]: err?.message || 'Anexo indisponível' }));
     } finally {
@@ -98,52 +116,71 @@ function WhatsAppMediaAttachments({ attachments, contentTypes }) {
 
   if (!items.length) return null;
   return (
-    <div className="wa-msg__media-list">
-      {items.map((item) => {
-        const kind = mediaKind(item.contentType, item.url);
-        const src = inlineUrls[item.url];
-        const error = errors[item.url];
-        return (
-          <div className={`wa-msg__media wa-msg__media--${kind}`} key={item.url}>
-            {kind === 'image' && src ? (
-              <button
-                type="button"
-                className="wa-msg__image-button"
-                onClick={() => window.open(src, '_blank', 'noopener,noreferrer')}
-                aria-label={`Abrir imagem ${attachmentLabel(item.url)}`}
-              >
-                <img src={src} alt={attachmentLabel(item.url)} loading="lazy" />
-              </button>
-            ) : null}
-            {kind === 'audio' && src ? (
-              <audio className="wa-msg__audio" controls preload="metadata" src={src}>
-                Seu navegador não conseguiu reproduzir este áudio.
-              </audio>
-            ) : null}
-            {kind === 'video' && src ? (
-              <video className="wa-msg__video" controls preload="metadata" src={src}>
-                Seu navegador não conseguiu reproduzir este vídeo.
-              </video>
-            ) : null}
-            {kind !== 'document' && !src && !error ? (
-              <span className="wa-msg__media-loading">Carregando mídia…</span>
-            ) : null}
-            {kind === 'document' ? (
-              <button
-                type="button"
-                className="wa-msg__document"
-                disabled={downloading === item.url}
-                onClick={() => { void downloadDocument(item); }}
-              >
-                <i className="ti ti-file-download" aria-hidden="true" />
-                <span>{downloading === item.url ? 'Baixando…' : attachmentLabel(item.url)}</span>
-              </button>
-            ) : null}
-            {error ? <span className="wa-msg__media-error" role="alert">{error}</span> : null}
-          </div>
-        );
-      })}
-    </div>
+    <>
+      <div className="wa-msg__media-list">
+        {items.map((item) => {
+          const kind = mediaKind(item.contentType, item.url);
+          const previewKind = classifyAttachmentKind(item.contentType, attachmentLabel(item.url));
+          const src = inlineUrls[item.url];
+          const error = errors[item.url];
+          const opening = downloading === item.url;
+          const pending = item.scanStatus === 'pending';
+          const blocked = item.scanStatus === 'infected' || item.scanStatus === 'unscannable';
+          return (
+            <div className={`wa-msg__media wa-msg__media--${kind}`} key={item.url}>
+              {pending ? (
+                <span className="wa-msg__media-loading">Verificando anexo…</span>
+              ) : null}
+              {blocked ? (
+                <span className="wa-msg__media-error" role="alert">Anexo bloqueado por segurança.</span>
+              ) : null}
+              {kind === 'image' && src && !pending && !blocked ? (
+                <button
+                  type="button"
+                  className="wa-msg__image-button"
+                  onClick={() => openInlinePreview(item, src)}
+                  aria-label={`Visualizar imagem ${attachmentLabel(item.url)}`}
+                >
+                  <img src={src} alt={attachmentLabel(item.url)} loading="lazy" />
+                </button>
+              ) : null}
+              {kind === 'audio' && src && !pending && !blocked ? (
+                <audio className="wa-msg__audio" controls preload="metadata" src={src}>
+                  Seu navegador não conseguiu reproduzir este áudio.
+                </audio>
+              ) : null}
+              {kind === 'video' && src && !pending && !blocked ? (
+                <video className="wa-msg__video" controls preload="metadata" src={src}>
+                  Seu navegador não conseguiu reproduzir este vídeo.
+                </video>
+              ) : null}
+              {kind !== 'document' && !src && !error && !pending && !blocked ? (
+                <span className="wa-msg__media-loading">Carregando mídia…</span>
+              ) : null}
+              {kind === 'document' && !pending && !blocked ? (
+                <button
+                  type="button"
+                  className="wa-msg__document"
+                  disabled={opening}
+                  onClick={() => { void openDocument(item); }}
+                >
+                  <i className={`ti ${attachmentKindIcon(previewKind)}`} aria-hidden="true" />
+                  <span>{opening ? 'Abrindo…' : attachmentLabel(item.url)}</span>
+                </button>
+              ) : null}
+              {error ? <span className="wa-msg__media-error" role="alert">{error}</span> : null}
+            </div>
+          );
+        })}
+      </div>
+      <DeskAttachmentPreviewModal
+        open={Boolean(preview)}
+        kind={preview?.kind}
+        objectUrl={preview?.objectUrl}
+        filename={preview?.filename}
+        onClose={closePreview}
+      />
+    </>
   );
 }
 
@@ -366,6 +403,7 @@ export default function DeskWhatsAppChat({
                 <WhatsAppMediaAttachments
                   attachments={msg.attachments}
                   contentTypes={msg.mediaContentTypes}
+                  scanStatuses={msg.attachmentScanStatuses}
                 />
                 <span className="wa-msg__text">{msg.text}</span>
                 {msg.transcriptionStatus === 'processing' || msg.transcriptionStatus === 'pending' ? (
