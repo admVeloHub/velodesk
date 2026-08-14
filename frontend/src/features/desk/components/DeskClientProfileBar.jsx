@@ -26,6 +26,7 @@ import ClientContactFieldsEditor, {
   buildContactDraftFromFields,
   validateClientContactDraft,
 } from './ClientContactFieldsEditor';
+import TicketPresenceAvatars from '../../../components/TicketPresenceAvatars';
 
 function resolveProtocolLabel(ticket) {
   const protocol = getTicketProtocolLabel(ticket);
@@ -324,6 +325,7 @@ export default function DeskClientProfileBar({
               ))}
             </div>
           ) : null}
+          <TicketPresenceAvatars ticketId={ticket?.id || ticket?._id} />
           {!inWorkflow ? (
             <div className="ticket-client-profile__protocol-actions">
               {historyButton}

@@ -225,7 +225,7 @@ export async function createDemandaFromCpf(cpfRaw) {
 }
 
 export async function fetchPcTicketView(pcId) {
-  const pcItem = getDemandaById(pcId);
+  const pcItem = getDemandaById(pcId) || getDemandaByTicketId(pcId);
   if (!pcItem) return null;
 
   if (!pcItem.ticketId) {

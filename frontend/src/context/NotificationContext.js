@@ -16,6 +16,13 @@ import { useAuth } from './AuthContext';
 const NotificationContext = createContext(null);
 const TOAST_VISIBLE_MS = 2000;
 
+const ESPECIAL_ORGAO_BY_WORKFLOW_SLUG = {
+  'bacen-tratativa': 'bacen',
+  'procon-tratativa': 'procon',
+  'consumidor-gov-tratativa': 'consumidor-gov',
+  'reclame-aqui-tratativa': 'reclame-aqui',
+};
+
 function mapPersistedNotification(row) {
   return {
     id: `wf-${row._id}`,
@@ -23,6 +30,7 @@ function mapPersistedNotification(row) {
     message: row.titulo ? `${row.titulo}: ${row.mensagem}` : row.mensagem,
     type: row.workflowSlug === 'telephony-inbound' ? 'telephony-cta' : 'workflow-cta',
     ticketId: row.ticketId ? String(row.ticketId) : '',
+    especialOrgao: ESPECIAL_ORGAO_BY_WORKFLOW_SLUG[row.workflowSlug] || '',
     protocolo: row.chamadoProtocolo,
     lida: row.lida,
     createdAt: row.createdAt,

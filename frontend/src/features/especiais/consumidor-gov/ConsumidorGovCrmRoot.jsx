@@ -1,7 +1,7 @@
 /**
  * ConsumidorGovCrmRoot — shell CRM RA (fila + lista + ticket + sidebar)
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useCgNovaDemandaModals } from '../../../hooks/useCgNovaDemandaModals';
@@ -32,10 +32,13 @@ export default function ConsumidorGovCrmRoot() {
     () => localStorage.getItem('velodeskCgListCollapsed') === '1',
   );
   const [listVersion, setListVersion] = useState(0);
+  const syncedOnceRef = useRef(false);
 
   useEffect(() => {
     const refreshFromApi = () => {
-      loadConsumidorGovTicketsFromApi().catch(() => {});
+      loadConsumidorGovTicketsFromApi().catch(() => {}).finally(() => {
+        syncedOnceRef.current = true;
+      });
     };
     refreshFromApi();
     const bumpList = () => setListVersion((v) => v + 1);
@@ -104,12 +107,18 @@ export default function ConsumidorGovCrmRoot() {
     try {
       const view = await fetchCgTicketView(id);
       if (!view?.cgItem) {
+        if (!syncedOnceRef.current) {
+          // ainda sincronizando com a API — mantém o loading e tenta de novo quando os dados chegarem
+          return;
+        }
         setCgItem(null);
         setTicket(null);
+        setTicketLoading(false);
         setRedirectTo('/especiais/consumidor-gov');
         return;
       }
       if (!view.cgItem.ticketId) {
+        setTicketLoading(false);
         setRedirectTo(`/especiais/consumidor-gov/registro/${view.cgItem.id}`);
         return;
       }
@@ -118,18 +127,18 @@ export default function ConsumidorGovCrmRoot() {
       if (view.cgItem.groupKey) {
         setActiveGroup(view.cgItem.groupKey);
       }
+      setTicketLoading(false);
     } catch {
       showNotification('Não foi possível carregar o ticket.', 'error');
       setCgItem(null);
       setTicket(null);
-    } finally {
       setTicketLoading(false);
     }
   }, [id, showNotification]);
 
   useEffect(() => {
     reloadTicket();
-  }, [reloadTicket]);
+  }, [reloadTicket, listVersion]);
 
   useEffect(() => {
     setWaChatOpen(false);

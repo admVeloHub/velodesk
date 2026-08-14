@@ -1,14 +1,14 @@
 /**
  * ReclameAquiCrmRoot — shell CRM RA (fila + lista + ticket + sidebar)
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useRaNovaReclamacaoModals } from '../../../hooks/useRaNovaReclamacaoModals';
 import { RA_GROUPS } from '../../../services/especiais/reclameAquiData';
 import { loadReclamacoes } from '../../../services/especiais/reclameAquiStore';
 import { matchesTicketCpfSearch } from '../../../services/especiais/especiaisCrmSearch';
-import { fetchRaTicketView } from '../../../services/especiais/reclameAquiTicketService';
+import { fetchRaTicketView, loadReclameAquiTicketsFromApi } from '../../../services/especiais/reclameAquiTicketService';
 import { useEspeciaisTicketCommit } from '../shared/useEspeciaisTicketCommit';
 import RaQueuePanel from './RaQueuePanel';
 import RaTicketList from './RaTicketList';
@@ -32,11 +32,22 @@ export default function ReclameAquiCrmRoot() {
     () => localStorage.getItem('velodeskRaListCollapsed') === '1',
   );
   const [listVersion, setListVersion] = useState(0);
+  const syncedOnceRef = useRef(false);
 
   useEffect(() => {
+    const refreshFromApi = () => {
+      loadReclameAquiTicketsFromApi().catch(() => {}).finally(() => {
+        syncedOnceRef.current = true;
+      });
+    };
+    refreshFromApi();
     const bumpList = () => setListVersion((v) => v + 1);
     window.addEventListener('velodesk:ra-sync', bumpList);
-    return () => window.removeEventListener('velodesk:ra-sync', bumpList);
+    window.addEventListener('velodesk:refresh-tickets', refreshFromApi);
+    return () => {
+      window.removeEventListener('velodesk:ra-sync', bumpList);
+      window.removeEventListener('velodesk:refresh-tickets', refreshFromApi);
+    };
   }, []);
 
   const { openNovaFlow, modals: novaModals } = useRaNovaReclamacaoModals({
@@ -99,12 +110,18 @@ export default function ReclameAquiCrmRoot() {
     try {
       const view = await fetchRaTicketView(id);
       if (!view?.raItem) {
+        if (!syncedOnceRef.current) {
+          // ainda sincronizando com a API — mantém o loading e tenta de novo quando os dados chegarem
+          return;
+        }
         setRaItem(null);
         setTicket(null);
+        setTicketLoading(false);
         setRedirectTo('/especiais/reclame-aqui');
         return;
       }
       if (!view.raItem.ticketId) {
+        setTicketLoading(false);
         setRedirectTo(`/especiais/reclame-aqui/registro/${view.raItem.id}`);
         return;
       }
@@ -113,18 +130,18 @@ export default function ReclameAquiCrmRoot() {
       if (view.raItem.groupKey) {
         setActiveGroup(view.raItem.groupKey);
       }
+      setTicketLoading(false);
     } catch {
       showNotification('Não foi possível carregar o ticket.', 'error');
       setRaItem(null);
       setTicket(null);
-    } finally {
       setTicketLoading(false);
     }
   }, [id, showNotification]);
 
   useEffect(() => {
     reloadTicket();
-  }, [reloadTicket]);
+  }, [reloadTicket, listVersion]);
 
   useEffect(() => {
     setWaChatOpen(false);

@@ -36,219 +36,12 @@ function ensureNormalizedCache(items) {
   return normalized;
 }
 
-function todayAt(hour, minute = 0) {
-  const d = new Date();
-  d.setHours(hour, minute, 0, 0);
-  return d.toISOString();
-}
-
 function daysFromNow(days, hour = 18) {
   const d = new Date();
   d.setDate(d.getDate() + days);
   d.setHours(hour, 0, 0, 0);
   return d.toISOString();
 }
-
-const SEED_ITEMS = [
-  {
-    id: 'ra-001',
-    consumidor: 'João Ferreira',
-    iniciais: 'JF',
-    assunto: 'Cancelamento não processado',
-    statusRa: RA_STATUS.NAO_RESPONDIDA,
-    slaPct: 95,
-    slaTone: 'red',
-    prazoRa: todayAt(18, 0),
-    passivelNota: true,
-    workflow: '—',
-    tabulacao: 'Produto X',
-    atendente: '—',
-    groupKey: 'vencendo-hoje',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-  },
-  {
-    id: 'ra-002',
-    consumidor: 'Carlos Barros',
-    iniciais: 'CB',
-    assunto: 'Cobrança indevida no cartão',
-    statusRa: RA_STATUS.NAO_RESPONDIDA,
-    slaPct: 88,
-    slaTone: 'red',
-    prazoRa: todayAt(20, 0),
-    passivelNota: true,
-    workflow: '—',
-    tabulacao: 'Financeiro',
-    atendente: '—',
-    groupKey: 'vencendo-hoje',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-  },
-  {
-    id: 'ra-003',
-    protocoloRa: 'RA-2026-00394821',
-    consumidor: 'Maria Oliveira',
-    iniciais: 'MO',
-    cpf: '123.456.789-01',
-    telefoneWhatsapp: '(11) 99821-3344',
-    assunto: 'Internet cai toda noite após 22h',
-    descricao:
-      'Contratei fibra óptica há 3 meses e, quase todas as noites após 22h, a internet fica completamente inacessível. Já reiniciei o roteador diversas vezes e o problema persiste. Preciso de solução urgente pois trabalho em home office.',
-    idReclamacaoRa: 'RA-EXT-394821',
-    dataReclamacao: daysFromNow(-2, 14),
-    produto: 'Fibra residencial',
-    tipo: 'Reclamação',
-    motivo: 'Lentidão / Instabilidade',
-    respostaPublica: '',
-    whatsappMensagem: RA_WHATSAPP_DEFAULT_MSG,
-    statusRa: RA_STATUS.NAO_RESPONDIDA,
-    slaPct: 72,
-    slaTone: 'yellow',
-    prazoRa: daysFromNow(2, 18),
-    passivelNota: true,
-    workflow: '—',
-    tabulacao: 'Produto X',
-    atendente: 'Ana Silva',
-    groupKey: 'nao-respondidas',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-    isDraft: false,
-  },
-  {
-    id: 'ra-004',
-    consumidor: 'Lúcia Santos',
-    iniciais: 'LS',
-    assunto: 'Dificuldade para cancelar assinatura',
-    statusRa: RA_STATUS.WORKFLOW_ATIVO,
-    slaPct: 65,
-    slaTone: 'yellow',
-    prazoRa: daysFromNow(2),
-    passivelNota: true,
-    workflow: 'Cancelamento',
-    tabulacao: 'TV',
-    atendente: 'Pedro Lima',
-    groupKey: 'nao-respondidas',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: true,
-  },
-  {
-    id: 'ra-005',
-    consumidor: 'Roberto Almeida',
-    iniciais: 'RA',
-    assunto: 'Produto diferente do anunciado',
-    statusRa: RA_STATUS.NAO_RESPONDIDA,
-    slaPct: 58,
-    slaTone: 'yellow',
-    prazoRa: daysFromNow(3),
-    passivelNota: false,
-    workflow: '—',
-    tabulacao: 'Combo',
-    atendente: '—',
-    groupKey: 'nao-respondidas',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-  },
-  {
-    id: 'ra-006',
-    consumidor: 'Fernanda Costa',
-    iniciais: 'FC',
-    assunto: 'Estorno não creditado',
-    statusRa: RA_STATUS.WORKFLOW_ATIVO,
-    slaPct: 45,
-    slaTone: 'green',
-    prazoRa: daysFromNow(4),
-    passivelNota: true,
-    workflow: 'Reembolso',
-    tabulacao: 'Financeiro',
-    atendente: 'Carla Mendes',
-    groupKey: 'nao-respondidas',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: true,
-  },
-  {
-    id: 'ra-007',
-    consumidor: 'Patricia Nunes',
-    iniciais: 'PN',
-    assunto: 'Atendimento telefônico insatisfatório',
-    statusRa: RA_STATUS.NAO_RESPONDIDA,
-    slaPct: 40,
-    slaTone: 'green',
-    prazoRa: daysFromNow(5),
-    passivelNota: true,
-    workflow: '—',
-    tabulacao: 'Telefone',
-    atendente: '—',
-    groupKey: 'nao-respondidas',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-  },
-  {
-    id: 'ra-008',
-    consumidor: 'Paula Rezende',
-    iniciais: 'PR',
-    assunto: 'Reclamação resolvida — aguardando avaliação',
-    statusRa: RA_STATUS.AGUARD_AVALIACAO,
-    slaPct: 100,
-    slaTone: 'green',
-    prazoRa: daysFromNow(-1),
-    passivelNota: true,
-    workflow: '—',
-    tabulacao: 'Produto X',
-    atendente: 'Ana Silva',
-    groupKey: 'respondidas',
-    respostaAction: 'avaliacao',
-    aberta: false,
-    workflowAtivo: false,
-    nota: 4,
-  },
-  {
-    id: 'ra-009',
-    consumidor: 'André Macedo',
-    iniciais: 'AM',
-    assunto: 'Problema resolvido com reembolso',
-    statusRa: RA_STATUS.RESPONDIDA,
-    slaPct: 100,
-    slaTone: 'green',
-    prazoRa: daysFromNow(-2),
-    passivelNota: false,
-    workflow: 'Reembolso',
-    tabulacao: 'Financeiro',
-    atendente: 'Pedro Lima',
-    groupKey: 'finalizadas',
-    ticketStatus: 'resolvido',
-    ticketId: 'ra-seed-resolvido-009',
-    respostaAction: 'ver-resposta',
-    aberta: false,
-    workflowAtivo: false,
-    nota: 5,
-  },
-  {
-    id: 'ra-010',
-    consumidor: 'Camila Souza',
-    iniciais: 'CS',
-    assunto: 'Dúvida esclarecida sobre fatura',
-    statusRa: RA_STATUS.RESPONDIDA,
-    slaPct: 100,
-    slaTone: 'green',
-    prazoRa: daysFromNow(-3),
-    passivelNota: false,
-    workflow: '—',
-    tabulacao: 'Internet Fibra',
-    atendente: 'Carla Mendes',
-    groupKey: 'respondidas',
-    respostaAction: 'ver-resposta',
-    aberta: false,
-    workflowAtivo: false,
-    nota: 4,
-  },
-];
 
 function readAll() {
   try {
@@ -263,17 +56,6 @@ function readAll() {
 
 function writeAll(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
-export function ensureReclameAquiSeed() {
-  const existing = readAll();
-  if (existing?.length) return existing;
-  if (process.env.NODE_ENV === 'development') {
-    writeAll(SEED_ITEMS);
-    memoryCache = SEED_ITEMS;
-    return SEED_ITEMS;
-  }
-  return [];
 }
 
 function normalizeApiItem(row) {
@@ -300,23 +82,18 @@ function normalizeApiItem(row) {
 }
 
 export async function refreshReclamacoesFromApi() {
-  try {
-    const data = await reclamacoesApi.list('reclame-aqui');
-    const items = (data?.items ?? []).map(normalizeApiItem);
-    memoryCache = items;
-    writeAll(items);
-    return items;
-  } catch (err) {
-    console.warn('reclameAquiStore: falha ao carregar reclamacoes_reclameAqui', err?.message || err);
-    return memoryCache ?? readAll() ?? [];
-  }
+  const data = await reclamacoesApi.list('reclame-aqui');
+  const items = (data?.items ?? []).map(normalizeApiItem);
+  memoryCache = items;
+  writeAll(items);
+  return items;
 }
 
 export function loadAllReclamacoes() {
-  if (memoryCache?.length) return ensureNormalizedCache(memoryCache);
+  if (memoryCache) return ensureNormalizedCache(memoryCache);
   const stored = readAll();
-  if (stored?.length) return ensureNormalizedCache(stored);
-  return ensureNormalizedCache(ensureReclameAquiSeed());
+  if (stored) return ensureNormalizedCache(stored);
+  return [];
 }
 
 function isSameDay(a, b) {

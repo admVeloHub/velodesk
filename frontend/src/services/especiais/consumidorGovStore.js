@@ -36,117 +36,12 @@ function ensureNormalizedCache(items) {
   return normalized;
 }
 
-function todayAt(hour, minute = 0) {
-  const d = new Date();
-  d.setHours(hour, minute, 0, 0);
-  return d.toISOString();
-}
-
 function daysFromNow(days, hour = 18) {
   const d = new Date();
   d.setDate(d.getDate() + days);
   d.setHours(hour, 0, 0, 0);
   return d.toISOString();
 }
-
-const SEED_ITEMS = [
-  {
-    id: 'cg-001',
-    consumidor: 'Ana Paula Ribeiro',
-    iniciais: 'AR',
-    assunto: 'Cobrança após cancelamento',
-    statusGov: CG_STATUS.NAO_RESPONDIDA,
-    slaPct: 92,
-    slaTone: 'red',
-    prazoLegal: todayAt(17, 0),
-    orgaoGov: 'Consumidor.gov.br',
-    cidade: 'São Paulo',
-    uf: 'SP',
-    workflow: '—',
-    tabulacao: 'Financeiro',
-    atendente: '—',
-    groupKey: 'vencendo-hoje',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-  },
-  {
-    id: 'cg-002',
-    protocoloGov: 'CG-2026-00012001',
-    consumidor: 'Marcos Vinícius Lima',
-    iniciais: 'ML',
-    cpf: '321.654.987-00',
-    telefoneWhatsapp: '(21) 98765-4321',
-    email: 'marcos.lima@email.com',
-    assunto: 'Negativa de estorno após audiência',
-    descricao:
-      'Protocolo aberto no Consumidor.gov.br do Rio de Janeiro. Consumidor solicita estorno integral referente a cobrança indevida após cancelamento do serviço.',
-    idDemanda: 'CIP-2026-8891',
-    dataDemanda: daysFromNow(-3, 10),
-    produto: 'Empréstimo',
-    tipo: 'Reclamação',
-    motivo: 'Cobrança indevida',
-    orgaoGov: 'Consumidor.gov.br',
-    cidade: 'Rio de Janeiro',
-    uf: 'RJ',
-    respostaPublica: '',
-    whatsappMensagem: CG_WHATSAPP_DEFAULT_MSG,
-    statusGov: CG_STATUS.NAO_RESPONDIDA,
-    slaPct: 68,
-    slaTone: 'yellow',
-    prazoLegal: daysFromNow(7, 18),
-    workflow: '—',
-    tabulacao: 'Empréstimo',
-    atendente: 'Carla Mendes',
-    groupKey: 'nao-respondidas',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-    isDraft: false,
-  },
-  {
-    id: 'cg-003',
-    consumidor: 'Helena Duarte',
-    iniciais: 'HD',
-    assunto: 'Resposta formal enviada — aguardando audiência',
-    statusGov: CG_STATUS.AGUARDANDO_AUDIENCIA,
-    slaPct: 100,
-    slaTone: 'green',
-    prazoLegal: daysFromNow(5),
-    orgaoGov: 'Consumidor.gov.br — Reclamação',
-    cidade: 'Belo Horizonte',
-    uf: 'MG',
-    workflow: 'Tratativa Consumidor.Gov',
-    tabulacao: 'Financeiro',
-    atendente: 'Pedro Lima',
-    groupKey: 'respondidas',
-    respostaAction: 'ver-resposta',
-    aberta: false,
-    workflowAtivo: false,
-  },
-  {
-    id: 'cg-004',
-    consumidor: 'Ricardo Souza',
-    iniciais: 'RS',
-    assunto: 'Demanda encerrada com acordo',
-    statusGov: CG_STATUS.RESPONDIDA,
-    slaPct: 100,
-    slaTone: 'green',
-    prazoLegal: daysFromNow(-2),
-    orgaoGov: 'CIP',
-    cidade: 'Curitiba',
-    uf: 'PR',
-    workflow: 'Acordo',
-    tabulacao: 'Empréstimo',
-    atendente: 'Ana Silva',
-    groupKey: 'finalizadas',
-    ticketStatus: 'resolvido',
-    ticketId: 'cg-seed-resolvido-004',
-    respostaAction: 'ver-resposta',
-    aberta: false,
-    workflowAtivo: false,
-  },
-];
 
 function readAll() {
   try {
@@ -161,17 +56,6 @@ function readAll() {
 
 function writeAll(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
-export function ensureConsumidorGovSeed() {
-  const existing = readAll();
-  if (existing?.length) return existing;
-  if (process.env.NODE_ENV === 'development') {
-    writeAll(SEED_ITEMS);
-    memoryCache = SEED_ITEMS;
-    return SEED_ITEMS;
-  }
-  return [];
 }
 
 function normalizeApiItem(row) {
@@ -198,23 +82,18 @@ function normalizeApiItem(row) {
 }
 
 export async function refreshDemandasFromApi() {
-  try {
-    const data = await reclamacoesApi.list('consumidor-gov');
-    const items = (data?.items ?? []).map(normalizeApiItem);
-    memoryCache = items;
-    writeAll(items);
-    return items;
-  } catch (err) {
-    console.warn('consumidorGovStore: falha ao carregar reclamacoes_consumidorGov', err?.message || err);
-    return memoryCache ?? readAll() ?? [];
-  }
+  const data = await reclamacoesApi.list('consumidor-gov');
+  const items = (data?.items ?? []).map(normalizeApiItem);
+  memoryCache = items;
+  writeAll(items);
+  return items;
 }
 
 export function loadAllDemandas() {
-  if (memoryCache?.length) return ensureNormalizedCache(memoryCache);
+  if (memoryCache) return ensureNormalizedCache(memoryCache);
   const stored = readAll();
-  if (stored?.length) return ensureNormalizedCache(stored);
-  return ensureNormalizedCache(ensureConsumidorGovSeed());
+  if (stored) return ensureNormalizedCache(stored);
+  return [];
 }
 
 function isSameDay(a, b) {

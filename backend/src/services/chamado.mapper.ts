@@ -116,7 +116,7 @@ function readProconFromBody(body: Record<string, unknown>): Record<string, unkno
   return null;
 }
 
-function findProconFromChamado(chamado: IChamadoN1): Record<string, unknown> | null {
+export function findProconFromChamado(chamado: IChamadoN1): Record<string, unknown> | null {
   for (const reg of chamado.registro ?? []) {
     const meta = registroMetadados(reg);
     if (String(meta.source ?? '').toLowerCase() === 'procon') {

@@ -12,6 +12,7 @@ import {
   groupReclamacoesByStatus,
   loadReclamacoes,
 } from '../../../services/especiais/reclameAquiStore';
+import { loadReclameAquiTicketsFromApi } from '../../../services/especiais/reclameAquiTicketService';
 import ReclameAquiTopBar from './ReclameAquiTopBar';
 import ReclameAquiPageHeader from './ReclameAquiPageHeader';
 import ReclameAquiToolbar from './ReclameAquiToolbar';
@@ -41,9 +42,17 @@ export default function ReclameAquiPanel() {
   const [listVersion, setListVersion] = useState(0);
 
   useEffect(() => {
+    const refreshFromApi = () => {
+      loadReclameAquiTicketsFromApi().catch(() => {});
+    };
+    refreshFromApi();
     const bumpList = () => setListVersion((v) => v + 1);
     window.addEventListener('velodesk:ra-sync', bumpList);
-    return () => window.removeEventListener('velodesk:ra-sync', bumpList);
+    window.addEventListener('velodesk:refresh-tickets', refreshFromApi);
+    return () => {
+      window.removeEventListener('velodesk:ra-sync', bumpList);
+      window.removeEventListener('velodesk:refresh-tickets', refreshFromApi);
+    };
   }, []);
 
   const { openNovaFlow, modals: novaModals } = useRaNovaReclamacaoModals({

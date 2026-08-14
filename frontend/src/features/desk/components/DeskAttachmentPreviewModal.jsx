@@ -1,12 +1,12 @@
 /**
- * DeskAttachmentPreviewModal v1.0.0 — preview no Desk (imagem, áudio, vídeo, PDF)
- * VERSION: v1.0.0 | DATE: 2026-08-13
+ * DeskAttachmentPreviewModal v1.0.1 — preview no Desk (imagem, áudio, vídeo, PDF)
+ * VERSION: v1.0.1 | DATE: 2026-08-14
  */
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { attachmentKindIcon, downloadObjectUrl } from '../../../services/desk/attachmentPreview';
 
-const OFFICE_HINT = 'Este arquivo do Office não pode ser visualizado com segurança no Desk. Baixe apenas se precisar editar ou conferir o conteúdo.';
+const OFFICE_HINT = 'Este arquivo do Office não pode ser visualizado no Desk.';
 
 export default function DeskAttachmentPreviewModal({
   open,
@@ -81,11 +81,16 @@ export default function DeskAttachmentPreviewModal({
             </video>
           ) : null}
           {kind === 'pdf' ? (
-            <iframe
+            <object
               className="desk-attachment-preview__pdf"
-              src={objectUrl}
-              title={title}
-            />
+              data={objectUrl}
+              type="application/pdf"
+              aria-label={title}
+            >
+              <p className="desk-attachment-preview__fallback">
+                Seu navegador não conseguiu exibir este PDF. Use Baixar.
+              </p>
+            </object>
           ) : null}
           {kind === 'office' ? (
             <div className="desk-attachment-preview__office">

@@ -1,11 +1,11 @@
 /**
- * ProcessosPopover v1.2.0 — drawer POP via portal (à esquerda do painel direito)
- * VERSION: v1.2.0 | DATE: 2026-07-10 | AUTHOR: VeloHub Development Team
+ * ProcessosPopover v2.0.0 — drawer POP via portal (à esquerda do painel direito)
+ * VERSION: v2.0.0 | DATE: 2026-08-14 | AUTHOR: VeloHub Development Team
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useTabulation } from '../../../context/TabulationContext';
-import { getDetalheOptionsForProduto, getProcessoInfo } from '../../../services/desk/processDefinitions';
+import { fetchPop, fetchPops, fetchProdutos, matchTabulacaoProdutoToPop } from '../../../services/desk/processosCatalog';
+import PopViewer from './PopViewer';
 
 const RIGHT_PANEL_ID = 'crmRightPanel';
 const DRAWER_MAX_WIDTH = 480;
@@ -67,68 +67,80 @@ function useProcessosDrawerPosition(open) {
   return layout;
 }
 
-function InfoSection({ title, children }) {
-  if (!children) return null;
-  return (
-    <section className="ia-processos-drawer__section">
-      <h4 className="ia-processos-drawer__section-title">{title}</h4>
-      {children}
-    </section>
-  );
-}
-
-function BulletList({ items }) {
-  if (!items?.length) return null;
-  return (
-    <ul className="ia-processos-drawer__list">
-      {items.map((item) => (
-        <li key={item}>{item}</li>
-      ))}
-    </ul>
-  );
-}
-
-export default function ProcessosPopover({ open, onClose }) {
-  const { config, getProdutoNames } = useTabulation();
+export default function ProcessosPopover({ open, onClose, tabulacaoProduto }) {
   const drawerRef = useRef(null);
   const [visible, setVisible] = useState(false);
-  const [produto, setProduto] = useState('');
-  const [detalheId, setDetalheId] = useState('');
+  const [produtos, setProdutos] = useState([]);
+  const [produtoSlug, setProdutoSlug] = useState('');
+  const [produtoAutoMatched, setProdutoAutoMatched] = useState(false);
+  const [pops, setPops] = useState([]);
+  const [popId, setPopId] = useState('');
+  const [detail, setDetail] = useState(null);
+  const [loadingPops, setLoadingPops] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [error, setError] = useState('');
 
   const layout = useProcessosDrawerPosition(open);
-
-  const produtoOptions = getProdutoNames();
-  const detalheOptions = useMemo(
-    () => getDetalheOptionsForProduto(config, produto),
-    [config, produto],
-  );
-
-  const selectedDetalhe = detalheOptions.find((item) => item.id === detalheId) || null;
-  const processoInfo = useMemo(
-    () => (produto && selectedDetalhe ? getProcessoInfo(produto, selectedDetalhe) : null),
-    [produto, selectedDetalhe],
-  );
 
   useEffect(() => {
     if (!open) {
       setVisible(false);
-      setProduto('');
-      setDetalheId('');
+      setProdutoSlug('');
+      setProdutoAutoMatched(false);
+      setPopId('');
+      setPops([]);
+      setDetail(null);
+      setError('');
       return undefined;
     }
 
     const raf = requestAnimationFrame(() => setVisible(true));
 
+    fetchProdutos()
+      .then((lista) => {
+        setProdutos(lista);
+        const match = matchTabulacaoProdutoToPop(tabulacaoProduto, lista);
+        if (match) {
+          setProdutoSlug(match.slug);
+          setProdutoAutoMatched(true);
+        }
+      })
+      .catch(() => setError('Não foi possível carregar os produtos.'));
+
     const onKeyDown = (event) => {
       if (event.key === 'Escape') onClose?.();
     };
-
     document.addEventListener('keydown', onKeyDown);
     return () => {
       cancelAnimationFrame(raf);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [open, onClose]);
+  }, [open, onClose, tabulacaoProduto]);
+
+  useEffect(() => {
+    setPopId('');
+    setDetail(null);
+    if (!produtoSlug) { setPops([]); return; }
+
+    setLoadingPops(true);
+    setError('');
+    fetchPops(produtoSlug)
+      .then(setPops)
+      .catch(() => setError('Não foi possível carregar os POPs deste produto.'))
+      .finally(() => setLoadingPops(false));
+  }, [produtoSlug]);
+
+  useEffect(() => {
+    setDetail(null);
+    if (!produtoSlug || !popId) return;
+
+    setLoadingDetail(true);
+    setError('');
+    fetchPop(produtoSlug, popId)
+      .then(setDetail)
+      .catch(() => setError('Não foi possível carregar o conteúdo do POP.'))
+      .finally(() => setLoadingDetail(false));
+  }, [produtoSlug, popId]);
 
   if (!open || !layout) return null;
 
@@ -165,159 +177,73 @@ export default function ProcessosPopover({ open, onClose }) {
         </div>
 
         <div className="ia-processos-drawer__fields ia-processos-drawer__fields--grid">
-          <div className="ia-processos-drawer__field">
-            <label className="ia-processos-drawer__label" htmlFor="processosSelProduto">Produto</label>
-            <select
-              id="processosSelProduto"
-              className="ia-processos-drawer__select"
-              value={produto}
-              onChange={(e) => {
-                setProduto(e.target.value);
-                setDetalheId('');
-              }}
-            >
-              <option value="">Selecionar produto</option>
-              {produtoOptions.map((name) => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
-          </div>
+          {produtoAutoMatched ? (
+            <div className="ia-processos-drawer__field ia-processos-drawer__field--produto-locked">
+              <label className="ia-processos-drawer__label">Produto</label>
+              <div className="ia-processos-drawer__produto-locked">
+                <span>{produtos.find((p) => p.slug === produtoSlug)?.label}</span>
+                <button
+                  type="button"
+                  className="ia-processos-drawer__produto-trocar"
+                  onClick={() => setProdutoAutoMatched(false)}
+                >
+                  trocar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="ia-processos-drawer__field">
+              <label className="ia-processos-drawer__label" htmlFor="processosSelProduto">Produto</label>
+              <select
+                id="processosSelProduto"
+                className="ia-processos-drawer__select"
+                value={produtoSlug}
+                onChange={(e) => setProdutoSlug(e.target.value)}
+              >
+                <option value="">Selecionar produto</option>
+                {produtos.map((p) => (
+                  <option key={p.slug} value={p.slug}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="ia-processos-drawer__field">
-            <label className="ia-processos-drawer__label" htmlFor="processosSelDetalhe">Detalhe</label>
+            <label className="ia-processos-drawer__label" htmlFor="processosSelPop">POP</label>
             <select
-              id="processosSelDetalhe"
+              id="processosSelPop"
               className="ia-processos-drawer__select"
-              value={detalheId}
-              disabled={!produto || detalheOptions.length === 0}
-              onChange={(e) => setDetalheId(e.target.value)}
+              value={popId}
+              disabled={!produtoSlug || loadingPops || pops.length === 0}
+              onChange={(e) => setPopId(e.target.value)}
             >
               <option value="">
-                {!produto
+                {!produtoSlug
                   ? 'Selecione um produto primeiro'
-                  : detalheOptions.length === 0
-                    ? 'Nenhum detalhe cadastrado'
-                    : 'Selecionar detalhe'}
+                  : loadingPops
+                    ? 'Carregando…'
+                    : pops.length === 0
+                      ? 'Nenhum POP cadastrado'
+                      : 'Selecionar POP'}
               </option>
-              {detalheOptions.map((item) => (
-                <option key={item.id} value={item.id}>{item.label}</option>
+              {pops.map((pop) => (
+                <option key={pop.id} value={pop.id}>{pop.label}</option>
               ))}
             </select>
           </div>
         </div>
 
         <div className="ia-processos-drawer__body">
-          {processoInfo ? (
-            <>
-              <div className="ia-processos-drawer__result">
-                <div className="ia-processos-drawer__result-title">{processoInfo.title}</div>
-                <p className="ia-processos-drawer__resumo">{processoInfo.resumo}</p>
-
-                <dl className="ia-processos-drawer__meta">
-                  <div>
-                    <dt>Produto</dt>
-                    <dd>{processoInfo.produto}</dd>
-                  </div>
-                  <div>
-                    <dt>Motivo</dt>
-                    <dd>{processoInfo.motivo || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt>Detalhe</dt>
-                    <dd>{processoInfo.detalhe || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt>Tipo de chamado</dt>
-                    <dd>{processoInfo.tipo}</dd>
-                  </div>
-                  <div>
-                    <dt>SLA</dt>
-                    <dd>{processoInfo.sla}</dd>
-                  </div>
-                  <div>
-                    <dt>Responsável</dt>
-                    <dd>{processoInfo.responsavel}</dd>
-                  </div>
-                  {processoInfo.workflow ? (
-                    <div className="ia-processos-drawer__meta-span">
-                      <dt>Workflow vinculado</dt>
-                      <dd>{processoInfo.workflow}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-              </div>
-
-              <InfoSection title="Sobre o produto">
-                <p className="ia-processos-drawer__text">{processoInfo.produtoDescricao}</p>
-                {processoInfo.publicoAlvo ? (
-                  <p className="ia-processos-drawer__text">
-                    <strong>Público:</strong>
-                    {' '}
-                    {processoInfo.publicoAlvo}
-                  </p>
-                ) : null}
-                {processoInfo.canaisAtendimento?.length ? (
-                  <p className="ia-processos-drawer__tags">
-                    {processoInfo.canaisAtendimento.map((canal) => (
-                      <span key={canal} className="ia-processos-drawer__tag">{canal}</span>
-                    ))}
-                  </p>
-                ) : null}
-              </InfoSection>
-
-              {processoInfo.sobreDetalhe ? (
-                <InfoSection title="Sobre o detalhe selecionado">
-                  <p className="ia-processos-drawer__text">{processoInfo.sobreDetalhe}</p>
-                </InfoSection>
-              ) : null}
-
-              <InfoSection title="Elegibilidade">
-                <BulletList items={processoInfo.elegibilidade} />
-              </InfoSection>
-
-              <InfoSection title="Documentos necessários">
-                <BulletList items={processoInfo.documentos} />
-              </InfoSection>
-
-              <InfoSection title="Procedimento — passo a passo">
-                <ol className="ia-processos-drawer__steps">
-                  {processoInfo.passos?.map((passo) => (
-                    <li key={passo}>{passo}</li>
-                  ))}
-                </ol>
-              </InfoSection>
-
-              {processoInfo.workflowEtapas?.length ? (
-                <InfoSection title="Etapas do workflow">
-                  <BulletList items={processoInfo.workflowEtapas} />
-                </InfoSection>
-              ) : null}
-
-              {processoInfo.comunicacaoCliente ? (
-                <InfoSection title="Comunicação ao cliente">
-                  <p className="ia-processos-drawer__text">{processoInfo.comunicacaoCliente}</p>
-                </InfoSection>
-              ) : null}
-
-              {processoInfo.restricoes?.length ? (
-                <InfoSection title="Restrições">
-                  <BulletList items={processoInfo.restricoes} />
-                </InfoSection>
-              ) : null}
-
-              {processoInfo.observacoes ? (
-                <p className="ia-processos-drawer__obs">
-                  <strong>Observação interna:</strong>
-                  {' '}
-                  {processoInfo.observacoes}
-                </p>
-              ) : null}
-            </>
-          ) : (
+          {error ? <p className="ia-processos-drawer__hint ia-processos-drawer__hint--error">{error}</p> : null}
+          {!error && loadingDetail ? <p className="ia-processos-drawer__hint">Carregando POP…</p> : null}
+          {!error && !loadingDetail && detail ? (
+            <PopViewer produtoSlug={produtoSlug} popId={popId} detail={detail} />
+          ) : null}
+          {!error && !loadingDetail && !detail ? (
             <p className="ia-processos-drawer__hint">
-              Escolha o produto e o detalhe para visualizar o procedimento operacional completo.
+              Escolha o produto e o POP para visualizar o procedimento operacional completo.
             </p>
-          )}
+          ) : null}
         </div>
       </aside>
     </div>,

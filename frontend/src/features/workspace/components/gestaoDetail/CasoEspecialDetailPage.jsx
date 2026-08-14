@@ -178,9 +178,7 @@ export default function CasoEspecialDetailPage() {
           {!loading && data ? (
             <p className="gestao-insight-card__mock-note">
               <i className="ti ti-info-circle" aria-hidden="true" />
-              {data.mock === false
-                ? 'Dados reais — tickets Reclame Aqui registrados no CRM.'
-                : 'Dados ilustrativos — aguardando integração dos demais canais especiais.'}
+              {`Dados reais — tickets ${meta.label} registrados no CRM.`}
             </p>
           ) : null}
         </header>
@@ -305,11 +303,6 @@ export default function CasoEspecialDetailPage() {
               ))}
             </div>
           )}
-
-          <p className="gestao-insight-card__mock-note">
-            <i className="ti ti-info-circle" aria-hidden="true" />
-            Motivos ilustrativos — os produtos refletem a tabulação real de tickets; a associação por órgão ainda não existe.
-          </p>
         </section>
       </div>
     </div>

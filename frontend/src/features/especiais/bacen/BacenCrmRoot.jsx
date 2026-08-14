@@ -1,7 +1,7 @@
 /**
  * BacenCrmRoot — shell CRM RA (fila + lista + ticket + sidebar)
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useBcNovaDemandaModals } from '../../../hooks/useBcNovaDemandaModals';
@@ -32,10 +32,13 @@ export default function BacenCrmRoot() {
     () => localStorage.getItem('velodeskBcListCollapsed') === '1',
   );
   const [listVersion, setListVersion] = useState(0);
+  const syncedOnceRef = useRef(false);
 
   useEffect(() => {
     const refreshFromApi = () => {
-      loadBacenTicketsFromApi().catch(() => {});
+      loadBacenTicketsFromApi().catch(() => {}).finally(() => {
+        syncedOnceRef.current = true;
+      });
     };
     refreshFromApi();
     const bumpList = () => setListVersion((v) => v + 1);
@@ -104,12 +107,18 @@ export default function BacenCrmRoot() {
     try {
       const view = await fetchBcTicketView(id);
       if (!view?.bcItem) {
+        if (!syncedOnceRef.current) {
+          // ainda sincronizando com a API — mantém o loading e tenta de novo quando os dados chegarem
+          return;
+        }
         setBcItem(null);
         setTicket(null);
+        setTicketLoading(false);
         setRedirectTo('/especiais/bacen');
         return;
       }
       if (!view.bcItem.ticketId) {
+        setTicketLoading(false);
         setRedirectTo(`/especiais/bacen/registro/${view.bcItem.id}`);
         return;
       }
@@ -118,18 +127,18 @@ export default function BacenCrmRoot() {
       if (view.bcItem.groupKey) {
         setActiveGroup(view.bcItem.groupKey);
       }
+      setTicketLoading(false);
     } catch {
       showNotification('Não foi possível carregar o ticket.', 'error');
       setBcItem(null);
       setTicket(null);
-    } finally {
       setTicketLoading(false);
     }
   }, [id, showNotification]);
 
   useEffect(() => {
     reloadTicket();
-  }, [reloadTicket]);
+  }, [reloadTicket, listVersion]);
 
   useEffect(() => {
     setWaChatOpen(false);

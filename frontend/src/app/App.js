@@ -18,6 +18,7 @@ import { NotificationProvider } from '../context/NotificationContext';
 import { ThemeProvider } from '../context/ThemeContext';
 
 import { TicketsProvider } from '../context/TicketsContext';
+import { TicketPresenceProvider } from '../context/TicketPresenceContext';
 
 import { ProfileProvider } from '../context/ProfileContext';
 import { TabulationProvider } from '../context/TabulationContext';
@@ -168,10 +169,12 @@ function AppProviders({ children }) {
 
           null,
 
-          React.createElement(PermissionProvider, null,
-            React.createElement(ProfileProvider, null,
-              React.createElement(TabulationProvider, null,
-                React.createElement(WorkflowConfigProvider, null, children)
+          React.createElement(TicketPresenceProvider, null,
+            React.createElement(PermissionProvider, null,
+              React.createElement(ProfileProvider, null,
+                React.createElement(TabulationProvider, null,
+                  React.createElement(WorkflowConfigProvider, null, children)
+                )
               )
             )
           )

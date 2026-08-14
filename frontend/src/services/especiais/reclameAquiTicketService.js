@@ -14,6 +14,7 @@ import {
   getReclamacaoById,
   getReclamacaoByTicketId,
   updateReclamacaoGroupFromTicket,
+  refreshReclamacoesFromApi,
 } from './reclameAquiStore';
 
 const RA_WORKFLOW_SLUG = 'reclame-aqui-tratativa';
@@ -169,8 +170,21 @@ export async function registerReclamacaoAndCreateTicket(form) {
 
 export { updateReclamacaoGroupFromTicket, getReclamacaoByTicketId };
 
+export async function loadReclameAquiTicketsFromApi() {
+  try {
+    const items = await refreshReclamacoesFromApi();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('velodesk:ra-sync'));
+    }
+    return items.length;
+  } catch (err) {
+    console.warn('reclameAquiTicketService: falha ao carregar reclamacoes reclame-aqui', err?.message || err);
+    return 0;
+  }
+}
+
 export async function fetchRaTicketView(raId) {
-  const raItem = getReclamacaoById(raId);
+  const raItem = getReclamacaoById(raId) || getReclamacaoByTicketId(raId);
   if (!raItem) return null;
 
   if (!raItem.ticketId) {

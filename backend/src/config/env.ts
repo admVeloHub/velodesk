@@ -91,6 +91,10 @@ export const env = {
     process.env.MONGODB_FUNCIONARIOS_COLLECTION || 'funcionarios_cadastroColaboradores',
   jwtSecret: process.env.JWT_SECRET || 'velodesk-dev-secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  /** Diretório com os .docx dos POPs, um subdiretório por produto (quadro de Processos) */
+  popsSourceDir: (
+    process.env.POPS_SOURCE_DIR || path.resolve(__dirname, '..', '..', 'source file', 'POPs')
+  ).trim(),
   enableWhatsapp: process.env.ENABLE_WHATSAPP !== 'false',
   twilioAccountSid: (process.env.TWILIO_ACCOUNT_SID || '').trim(),
   twilioAuthToken: (process.env.TWILIO_AUTH_TOKEN || '').trim(),
@@ -320,5 +324,8 @@ export const env = {
     || process.env.WEBHOOK_SECRET
     || ''
   ).trim(),
+  /** Presence de ticket (quem está olhando/tem aberto) — Supabase Realtime via JWT custom (HS256) */
+  ticketPresenceJwtSecret: (process.env.PRESENCE_REALTIME_JWT_SECRET || '').trim(),
+  ticketPresenceTokenTtlSec: parseInt(process.env.PRESENCE_REALTIME_TOKEN_TTL_SEC || '600', 10),
 };
 

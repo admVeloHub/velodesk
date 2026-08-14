@@ -225,7 +225,7 @@ export async function createDemandaFromCpf(cpfRaw) {
 }
 
 export async function fetchBcTicketView(bcId) {
-  const bcItem = getDemandaById(bcId);
+  const bcItem = getDemandaById(bcId) || getDemandaByTicketId(bcId);
   if (!bcItem) return null;
 
   if (!bcItem.ticketId) {

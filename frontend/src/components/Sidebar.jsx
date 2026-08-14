@@ -28,7 +28,7 @@ function isInsideVeloNewsPopover(target) {
 
 export default function Sidebar() {
   const { logout } = useAuth();
-  const { isNavAllowed, profile } = useProfile();
+  const { isNavAllowed } = useProfile();
   const { unreadCount, popoverOpen, togglePopover, bellAnchorRef } = useVeloNews();
   const navigate = useNavigate();
   const location = useLocation();
@@ -73,13 +73,9 @@ export default function Sidebar() {
     });
   }, []);
 
-  const visibleNav = NAV_ITEMS
-    .filter((item) => isNavAllowed(item.id))
-    .sort((a, b) => {
-      const orderA = profile.nav.indexOf(a.id);
-      const orderB = profile.nav.indexOf(b.id);
-      return (orderA === -1 ? 999 : orderA) - (orderB === -1 ? 999 : orderB);
-    });
+  // Ordem natural de NAV_ITEMS (não a ordem de um único perfil "ativo"), pra quem acumula
+  // funções ver todos os módulos liberados numa posição estável e previsível.
+  const visibleNav = NAV_ITEMS.filter((item) => isNavAllowed(item.id));
 
   const { primaryNav, especiaisNav } = useMemo(() => {
     const primary = [];

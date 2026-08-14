@@ -36,117 +36,12 @@ function ensureNormalizedCache(items) {
   return normalized;
 }
 
-function todayAt(hour, minute = 0) {
-  const d = new Date();
-  d.setHours(hour, minute, 0, 0);
-  return d.toISOString();
-}
-
 function daysFromNow(days, hour = 18) {
   const d = new Date();
   d.setDate(d.getDate() + days);
   d.setHours(hour, 0, 0, 0);
   return d.toISOString();
 }
-
-const SEED_ITEMS = [
-  {
-    id: 'pc-001',
-    consumidor: 'Ana Paula Ribeiro',
-    iniciais: 'AR',
-    assunto: 'Cobrança após cancelamento',
-    statusPc: PC_STATUS.NAO_RESPONDIDA,
-    slaPct: 92,
-    slaTone: 'red',
-    prazoLegal: todayAt(17, 0),
-    orgaoProcon: 'Procon Municipal',
-    cidade: 'São Paulo',
-    uf: 'SP',
-    workflow: '—',
-    tabulacao: 'Financeiro',
-    atendente: '—',
-    groupKey: 'vencendo-hoje',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-  },
-  {
-    id: 'pc-002',
-    protocoloProcon: 'PC-2026-00012001',
-    consumidor: 'Marcos Vinícius Lima',
-    iniciais: 'ML',
-    cpf: '321.654.987-00',
-    telefoneWhatsapp: '(21) 98765-4321',
-    email: 'marcos.lima@email.com',
-    assunto: 'Negativa de estorno após audiência',
-    descricao:
-      'Protocolo aberto no Procon Municipal do Rio de Janeiro. Consumidor solicita estorno integral referente a cobrança indevida após cancelamento do serviço.',
-    idDemanda: 'CIP-2026-8891',
-    dataDemanda: daysFromNow(-3, 10),
-    produto: 'Empréstimo',
-    tipo: 'Reclamação',
-    motivo: 'Cobrança indevida',
-    orgaoProcon: 'Procon Municipal',
-    cidade: 'Rio de Janeiro',
-    uf: 'RJ',
-    respostaPublica: '',
-    whatsappMensagem: PC_WHATSAPP_DEFAULT_MSG,
-    statusPc: PC_STATUS.NAO_RESPONDIDA,
-    slaPct: 68,
-    slaTone: 'yellow',
-    prazoLegal: daysFromNow(7, 18),
-    workflow: '—',
-    tabulacao: 'Empréstimo',
-    atendente: 'Carla Mendes',
-    groupKey: 'nao-respondidas',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-    isDraft: false,
-  },
-  {
-    id: 'pc-003',
-    consumidor: 'Helena Duarte',
-    iniciais: 'HD',
-    assunto: 'Resposta formal enviada — aguardando audiência',
-    statusPc: PC_STATUS.AGUARDANDO_AUDIENCIA,
-    slaPct: 100,
-    slaTone: 'green',
-    prazoLegal: daysFromNow(5),
-    orgaoProcon: 'Procon Estadual',
-    cidade: 'Belo Horizonte',
-    uf: 'MG',
-    workflow: 'Tratativa Procon',
-    tabulacao: 'Financeiro',
-    atendente: 'Pedro Lima',
-    groupKey: 'respondidas',
-    respostaAction: 'ver-resposta',
-    aberta: false,
-    workflowAtivo: false,
-  },
-  {
-    id: 'pc-004',
-    consumidor: 'Ricardo Souza',
-    iniciais: 'RS',
-    assunto: 'Demanda encerrada com acordo',
-    statusPc: PC_STATUS.RESPONDIDA,
-    slaPct: 100,
-    slaTone: 'green',
-    prazoLegal: daysFromNow(-2),
-    orgaoProcon: 'CIP',
-    cidade: 'Curitiba',
-    uf: 'PR',
-    workflow: 'Acordo',
-    tabulacao: 'Empréstimo',
-    atendente: 'Ana Silva',
-    groupKey: 'finalizadas',
-    ticketStatus: 'resolvido',
-    ticketId: 'pc-seed-resolvido-004',
-    respostaAction: 'ver-resposta',
-    aberta: false,
-    workflowAtivo: false,
-  },
-];
 
 function readAll() {
   try {
@@ -161,17 +56,6 @@ function readAll() {
 
 function writeAll(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
-export function ensureProconSeed() {
-  const existing = readAll();
-  if (existing?.length) return existing;
-  if (process.env.NODE_ENV === 'development') {
-    writeAll(SEED_ITEMS);
-    memoryCache = SEED_ITEMS;
-    return SEED_ITEMS;
-  }
-  return [];
 }
 
 function normalizeApiItem(row) {
@@ -198,23 +82,18 @@ function normalizeApiItem(row) {
 }
 
 export async function refreshDemandasFromApi() {
-  try {
-    const data = await reclamacoesApi.list('procon');
-    const items = (data?.items ?? []).map(normalizeApiItem);
-    memoryCache = items;
-    writeAll(items);
-    return items;
-  } catch (err) {
-    console.warn('proconStore: falha ao carregar reclamacoes_procon', err?.message || err);
-    return memoryCache ?? readAll() ?? [];
-  }
+  const data = await reclamacoesApi.list('procon');
+  const items = (data?.items ?? []).map(normalizeApiItem);
+  memoryCache = items;
+  writeAll(items);
+  return items;
 }
 
 export function loadAllDemandas() {
-  if (memoryCache?.length) return ensureNormalizedCache(memoryCache);
+  if (memoryCache) return ensureNormalizedCache(memoryCache);
   const stored = readAll();
-  if (stored?.length) return ensureNormalizedCache(stored);
-  return ensureNormalizedCache(ensureProconSeed());
+  if (stored) return ensureNormalizedCache(stored);
+  return [];
 }
 
 function isSameDay(a, b) {

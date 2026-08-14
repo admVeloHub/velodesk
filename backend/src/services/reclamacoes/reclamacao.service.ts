@@ -8,7 +8,7 @@ import {
   getReclamacaoProconModel,
   getReclamacaoReclameAquiModel,
 } from '../../models/reclamacoes/reclamacaoModels';
-import { currentStatus, findBacenFromChamado, findConsumidorGovFromChamado, normalizeStatusValue, readTabulacaoSnapshot } from '../chamado.mapper';
+import { currentStatus, findBacenFromChamado, findConsumidorGovFromChamado, findProconFromChamado, normalizeStatusValue, readTabulacaoSnapshot } from '../chamado.mapper';
 import type {
   CasoEspecialOrgao,
   CasoEspecialTriagemPersisted,
@@ -92,6 +92,8 @@ function readCanalMeta(chamado: IChamadoN1): Record<string, unknown> {
   if (procon && typeof procon === 'object' && !Array.isArray(procon)) {
     return procon as Record<string, unknown>;
   }
+  const proconFromRegistro = findProconFromChamado(chamado);
+  if (proconFromRegistro) return proconFromRegistro;
   const gov = tab.consumidorGov;
   if (gov && typeof gov === 'object' && !Array.isArray(gov)) {
     return gov as Record<string, unknown>;
