@@ -2,8 +2,8 @@
  * hugmeImportService — parse e importação em lote de planilhas Hugme (Reclame Aqui)
  */
 import * as XLSX from 'xlsx';
+import { reclameAquiHugmeApi } from '../../api/client';
 import { loadAllReclamacoes } from './reclameAquiStore';
-import { registerReclamacaoAndCreateTicket } from './reclameAquiTicketService';
 
 /** Aliases de colunas — export Hugme "Base Completa" (Relatório de Tickets) */
 export const HUGME_COLUMN_MAP = {
@@ -322,7 +322,25 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export async function importHugmeFileViaApi(file, modo = 'incremental') {
+  const result = await reclameAquiHugmeApi.import(file, modo);
+  return {
+    batchId: result.batchId,
+    modo: result.modo,
+    created: result.stats?.ticketsCreated ?? 0,
+    stored: (result.stats?.inserted ?? 0) + (result.stats?.updated ?? 0),
+    inserted: result.stats?.inserted ?? 0,
+    updated: result.stats?.updated ?? 0,
+    skipped: result.stats?.skipped ?? 0,
+    failed: result.stats?.failed ?? 0,
+    stats: result.stats,
+    errors: result.errors || [],
+  };
+}
+
+/** @deprecated use importHugmeFileViaApi — importação local linha a linha */
 export async function importHugmeRows(validRows, { onProgress, throttleMs = 200 } = {}) {
+  const { registerReclamacaoAndCreateTicket } = await import('./reclameAquiTicketService');
   const result = {
     created: 0,
     skipped: 0,

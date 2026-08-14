@@ -3,6 +3,12 @@
  * Volume diário (abertos/encerrados) + nota média, top motivos por produto e casos especiais.
  */
 import { ChamadoN1, IChamadoN1 } from '../models/ChamadoN1';
+import {
+  bacenChannelMongoFilter,
+  consumidorGovChannelMongoFilter,
+  proconChannelMongoFilter,
+  reclameAquiChannelMongoFilter,
+} from './chamado.mapper';
 
 const TZ = 'America/Sao_Paulo';
 const TERMINAL_STATUSES = new Set(['resolvido', 'cancelado', 'fechado']);
@@ -515,31 +521,35 @@ export const CASOS_ESPECIAIS_ORGAOS: { id: CasoEspecialEntry['id']; label: strin
   { id: 'reclameAqui', label: 'Reclame Aqui' },
 ];
 
-const REAL_CASOS_ESPECIAIS_ORGAOS = new Set<CasoEspecialEntry['id']>(['reclameAqui']);
+const CASO_ESPECIAL_CHANNEL_FILTER: Record<CasoEspecialEntry['id'], () => Record<string, unknown>> = {
+  bacen: bacenChannelMongoFilter,
+  procon: proconChannelMongoFilter,
+  consumidorGov: consumidorGovChannelMongoFilter,
+  reclameAqui: reclameAquiChannelMongoFilter,
+};
 
-function isRealCasoEspecialOrgao(orgaoId: string): orgaoId is 'reclameAqui' {
-  return REAL_CASOS_ESPECIAIS_ORGAOS.has(orgaoId as CasoEspecialEntry['id']);
-}
-
-function buildReclameAquiTicketMatch(extra: Record<string, unknown> = {}): Record<string, unknown> {
+function buildCasoEspecialMatch(orgaoId: CasoEspecialEntry['id'], extra: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    'registro.metadados.source': 'reclame-aqui',
+    ...CASO_ESPECIAL_CHANNEL_FILTER[orgaoId](),
     ...extra,
   };
 }
 
-async function countReclameAquiInRange(range: DateRange): Promise<number> {
+async function countCasoEspecialInRange(orgaoId: CasoEspecialEntry['id'], range: DateRange): Promise<number> {
   return ChamadoN1.countDocuments({
-    ...buildReclameAquiTicketMatch(),
+    ...buildCasoEspecialMatch(orgaoId),
     createdAt: { $gte: range.start, $lte: range.end },
   });
 }
 
-async function getReclameAquiDailyCounts(range: DateRange): Promise<Map<string, number>> {
+async function getCasoEspecialDailyCounts(
+  orgaoId: CasoEspecialEntry['id'],
+  range: DateRange,
+): Promise<Map<string, number>> {
   const rows = await ChamadoN1.aggregate<{ _id: string; total: number }>([
     {
       $match: {
-        ...buildReclameAquiTicketMatch(),
+        ...buildCasoEspecialMatch(orgaoId),
         createdAt: { $gte: range.start, $lte: range.end },
       },
     },
@@ -557,13 +567,14 @@ async function getReclameAquiDailyCounts(range: DateRange): Promise<Map<string, 
   return map;
 }
 
-async function buildReclameAquiDailySeries(
+async function buildCasoEspecialDailySeries(
+  orgaoId: CasoEspecialEntry['id'],
   range: DateRange,
   comparisonRange?: DateRange,
 ): Promise<CasoEspecialSeriesDay[]> {
   const [currentCounts, previousCounts] = await Promise.all([
-    getReclameAquiDailyCounts(range),
-    comparisonRange ? getReclameAquiDailyCounts(comparisonRange) : Promise.resolve(new Map<string, number>()),
+    getCasoEspecialDailyCounts(orgaoId, range),
+    comparisonRange ? getCasoEspecialDailyCounts(orgaoId, comparisonRange) : Promise.resolve(new Map<string, number>()),
   ]);
   const keys = dayKeysBetween(range);
   const comparisonKeys = comparisonRange ? dayKeysBetween(comparisonRange) : [];
@@ -578,14 +589,17 @@ async function buildReclameAquiDailySeries(
   });
 }
 
-async function getReclameAquiMotivosPorProduto(range: DateRange): Promise<CasoEspecialMotivoProduto[]> {
+async function getCasoEspecialMotivosPorProduto(
+  orgaoId: CasoEspecialEntry['id'],
+  range: DateRange,
+): Promise<CasoEspecialMotivoProduto[]> {
   const rows = await ChamadoN1.aggregate<{
     _id: { produto: string; motivo: string };
     count: number;
   }>([
     {
       $match: {
-        ...buildReclameAquiTicketMatch(),
+        ...buildCasoEspecialMatch(orgaoId),
         createdAt: { $gte: range.start, $lte: range.end },
       },
     },
@@ -633,74 +647,22 @@ async function getReclameAquiMotivosPorProduto(range: DateRange): Promise<CasoEs
     .slice(0, 6);
 }
 
-/** Base diária fictícia (determinística) de casos por órgão — usada tanto no total do card quanto na série do detalhe. */
-function casoEspecialDailyTotal(orgaoId: string, key: string): number {
-  const ratio = seededRatio(`casos-especiais-daily:${orgaoId}:${key}`);
-  return Math.max(0, Math.round(1 + ratio * 4));
-}
-
-function casoEspecialTotalForRange(orgaoId: string, range: DateRange): number {
-  return dayKeysBetween(range).reduce((sum, key) => sum + casoEspecialDailyTotal(orgaoId, key), 0);
-}
-
-/**
- * Totais de casos especiais por órgão/canal.
- * Reclame Aqui usa tickets reais (`registro.metadados.source = reclame-aqui`).
- * Demais canais permanecem ilustrativos até integração.
- */
+/** Totais de casos especiais por órgão/canal, a partir de tickets reais marcados com o canal (`registro.metadados.source`). */
 export async function getCasosEspeciais(query: GestaoInsightsQuery = {}): Promise<CasosEspeciaisResult> {
   const range = resolvePeriodRange(query);
 
   const items = await Promise.all(
     CASOS_ESPECIAIS_ORGAOS.map(async (org) => {
-      if (isRealCasoEspecialOrgao(org.id)) {
-        const total = await countReclameAquiInRange(range);
-        return { id: org.id, label: org.label, total, mock: false };
-      }
-      return {
-        id: org.id,
-        label: org.label,
-        total: casoEspecialTotalForRange(org.id, range),
-        mock: true,
-      };
+      const total = await countCasoEspecialInRange(org.id, range);
+      return { id: org.id, label: org.label, total, mock: false };
     }),
   );
 
   return {
     range: { start: range.start.toISOString(), end: range.end.toISOString() },
     items,
-    mock: items.some((item) => item.mock),
+    mock: false,
   };
-}
-
-const CASOS_ESPECIAIS_MOTIVOS = [
-  'Cobrança indevida',
-  'Divergência de valores',
-  'Demora no atendimento',
-  'Solicitação de cancelamento',
-  'Negativação indevida',
-  'Falha no sistema/app',
-  'Informação insuficiente',
-  'Descumprimento de prazo',
-];
-
-const DEFAULT_PRODUTOS_FALLBACK = ['Cartão', 'Empréstimo', 'Conta Digital', 'Seguros'];
-
-/** Produtos reais mais frequentes na tabulação de tickets — usados como recorte para os motivos fictícios do detalhe. */
-async function getReferenceProdutos(limit = 6): Promise<string[]> {
-  try {
-    const rows = await ChamadoN1.aggregate<{ _id: string; count: number }>([
-      { $unwind: '$tabulacao' },
-      { $match: { 'tabulacao.produto': { $nin: [null, ''] } } },
-      { $group: { _id: '$tabulacao.produto', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: limit },
-    ]);
-    const produtos = rows.map((r) => String(r._id)).filter(Boolean);
-    return produtos.length ? produtos : DEFAULT_PRODUTOS_FALLBACK;
-  } catch {
-    return DEFAULT_PRODUTOS_FALLBACK;
-  }
 }
 
 export interface CasoEspecialSeriesDay {
@@ -756,8 +718,9 @@ function aggregateCasoEspecialByMonth(daily: CasoEspecialSeriesDay[]): CasoEspec
 }
 
 /**
- * Detalhe (fictício) de um órgão/canal de caso especial: totais mês/ano, série do gráfico
- * (com comparativo opcional MoM/YoY, em granularidade dia ou mês fechado) e principais motivos por produto.
+ * Detalhe de um órgão/canal de caso especial: totais mês/ano, série do gráfico
+ * (com comparativo opcional MoM/YoY, em granularidade dia ou mês fechado) e principais motivos por produto,
+ * a partir de tickets reais marcados com o canal (`registro.metadados.source`).
  */
 export async function getCasoEspecialDetail(
   orgaoId: string,
@@ -775,73 +738,13 @@ export async function getCasoEspecialDetail(
     comparisonRange = resolveComparisonRange(range, compareMode);
   }
 
-  if (isRealCasoEspecialOrgao(org.id)) {
-    const [currentMonth, currentYear, dailySeries, motivosPorProduto] = await Promise.all([
-      countReclameAquiInRange(getCurrentMonthRange()),
-      countReclameAquiInRange(getCurrentYearRange()),
-      buildReclameAquiDailySeries(range, comparisonRange),
-      getReclameAquiMotivosPorProduto(range),
-    ]);
-    const series = granularity === 'mes' ? aggregateCasoEspecialByMonth(dailySeries) : dailySeries;
-
-    return {
-      orgao: { id: org.id, label: org.label },
-      range: { start: range.start.toISOString(), end: range.end.toISOString() },
-      totals: { currentMonth, currentYear },
-      series,
-      granularity,
-      comparison:
-        compareMode && comparisonRange
-          ? {
-              mode: compareMode,
-              range: { start: comparisonRange.start.toISOString(), end: comparisonRange.end.toISOString() },
-            }
-          : undefined,
-      motivosPorProduto,
-      mock: false,
-    };
-  }
-
-  const currentMonth = casoEspecialTotalForRange(org.id, getCurrentMonthRange());
-  const currentYear = casoEspecialTotalForRange(org.id, getCurrentYearRange());
-
-  const keys = dayKeysBetween(range);
-  let comparisonKeys: string[] = [];
-  if (compareMode && comparisonRange) {
-    comparisonKeys = dayKeysBetween(comparisonRange);
-  }
-
-  const dailySeries: CasoEspecialSeriesDay[] = keys.map((key, idx) => {
-    const prevKey = comparisonKeys[idx];
-    return {
-      date: key,
-      label: labelForDay(key),
-      total: casoEspecialDailyTotal(org.id, key),
-      ...(prevKey ? { totalAnterior: casoEspecialDailyTotal(org.id, prevKey) } : {}),
-    };
-  });
-
+  const [currentMonth, currentYear, dailySeries, motivosPorProduto] = await Promise.all([
+    countCasoEspecialInRange(org.id, getCurrentMonthRange()),
+    countCasoEspecialInRange(org.id, getCurrentYearRange()),
+    buildCasoEspecialDailySeries(org.id, range, comparisonRange),
+    getCasoEspecialMotivosPorProduto(org.id, range),
+  ]);
   const series = granularity === 'mes' ? aggregateCasoEspecialByMonth(dailySeries) : dailySeries;
-
-  const produtos = await getReferenceProdutos();
-  const motivosPorProduto: CasoEspecialMotivoProduto[] = produtos.map((produto) => {
-    const motivos = CASOS_ESPECIAIS_MOTIVOS
-      .map((motivo) => {
-        const ratio = seededRatio(`caso-motivo:${org.id}:${produto}:${motivo}`);
-        return { motivo, count: Math.max(1, Math.round(3 + ratio * 22)) };
-      })
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-    const total = motivos.reduce((sum, m) => sum + m.count, 0);
-    return {
-      produto,
-      total,
-      motivos: motivos.map((m) => ({
-        ...m,
-        pct: total > 0 ? Math.round((m.count / total) * 1000) / 10 : 0,
-      })),
-    };
-  });
 
   return {
     orgao: { id: org.id, label: org.label },
@@ -857,6 +760,6 @@ export async function getCasoEspecialDetail(
           }
         : undefined,
     motivosPorProduto,
-    mock: true,
+    mock: false,
   };
 }

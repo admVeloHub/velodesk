@@ -7,6 +7,7 @@ import { apiTicketToCockpit, adaptColumnsFromApi } from '../../api/adapters/tick
 import { getAgentName } from '../clientDb';
 import { createWorkflowState, getWorkflowTemplateById } from '../desk/workflowEngine';
 import { PC_STATUS } from './proconData';
+import { applyTicketStatusToEspeciaisItem } from './especiaisGroupKey';
 import {
   buildRegistroDefaults,
   createEmptyDemanda,
@@ -224,7 +225,7 @@ export async function createDemandaFromCpf(cpfRaw) {
 }
 
 export async function fetchPcTicketView(pcId) {
-  const pcItem = getDemandaById(pcId);
+  const pcItem = getDemandaById(pcId) || getDemandaByTicketId(pcId);
   if (!pcItem) return null;
 
   if (!pcItem.ticketId) {
@@ -353,18 +354,20 @@ export function buildDemandaFromTicket(ticket) {
     atendente: lf.responsavel || ticket.responsibleAgent || '—',
     ticketId,
     chamadoProtocolo: ticket.chamadoProtocolo || '',
-    groupKey: 'nao-respondidas',
-    aberta: true,
     workflowAtivo: false,
     respostaAction: 'responder',
   });
 
-  return {
+  return applyTicketStatusToEspeciaisItem({
     ...defaults,
     id: `pc-ticket-${ticketId}`,
     ticketId,
     chamadoProtocolo: ticket.chamadoProtocolo || defaults.chamadoProtocolo,
-  };
+  }, ticket, {
+    statusField: 'statusPc',
+    naoRespondidaStatus: PC_STATUS.NAO_RESPONDIDA,
+    prazoField: 'prazoLegal',
+  });
 }
 
 export function syncProconDemandaFromTicket(ticket) {

@@ -8,6 +8,7 @@ export const CG_TABS = [
 
 export const CG_GROUPS = [
   { id: 'vencendo-hoje', label: 'Vencendo hoje', tone: 'danger' },
+  { id: 'finalizadas', label: 'Finalizadas', tone: 'neutral' },
   { id: 'nao-respondidas', label: 'Não respondidas', tone: 'warning' },
   { id: 'respondidas', label: 'Respondidas', tone: 'success' },
 ];
@@ -17,6 +18,7 @@ export const CG_FILTER_CHIPS = [
   { id: 'abertas', label: 'Abertas' },
   { id: 'workflow-ativo', label: 'Workflow ativo' },
   { id: 'vencendo-hoje', label: 'Vencendo hoje' },
+  { id: 'finalizadas', label: 'Finalizadas' },
 ];
 
 export const CG_STATUS = {

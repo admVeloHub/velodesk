@@ -960,7 +960,11 @@ body:has(.eco-prototype-banner) {
 #mainSidebar.velo-nav-rail .nav-item[data-page="especiais-consumidor-gov"]:hover i {
     color: #ffffff;
 }
-#mainSidebar.velo-nav-rail .nav-item[data-page="especiais-bacen"] i { color: #000058; }
+#mainSidebar.velo-nav-rail .nav-item[data-page="especiais-bacen"] i { color: #7dd3fc; }
+#mainSidebar.velo-nav-rail .nav-item[data-page="especiais-bacen"].active i,
+#mainSidebar.velo-nav-rail .nav-item[data-page="especiais-bacen"]:hover i {
+    color: #ffffff;
+}
 #mainSidebar.velo-nav-rail .nav-item[data-page="especiais-processos"] i { color: #fdba74; }
 
 /* ?? Ecosystem modal ?? */
@@ -12125,7 +12129,7 @@ body.desk-v2-mode #aiChatbotModal {
     background: rgba(234, 88, 12, 0.04);
 }
 
-#especiais-reclame-aqui .ra-ticket__side .ra-ticket__moderacao , #especiais-procon .ra-ticket__side .ra-ticket__moderacao, #especiais-consumidor-gov .ra-ticket__side .ra-ticket__moderacao {
+#especiais-reclame-aqui .ra-ticket__side .ra-ticket__moderacao , #especiais-procon .ra-ticket__side .ra-ticket__moderacao, #especiais-consumidor-gov .ra-ticket__side .ra-ticket__moderacao, #especiais-bacen .ra-ticket__side .ra-ticket__moderacao {
     margin-bottom: 0;
     flex-shrink: 0;
 }
@@ -12178,15 +12182,42 @@ body.desk-v2-mode #aiChatbotModal {
     cursor: pointer;
 }
 
+.ra-ticket__save-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.ra-ticket__finalize-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    width: 100%;
+    border: 1.5px solid var(--especiais-accent);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    background: transparent;
+    color: var(--especiais-accent);
+    font-weight: 700;
+    font-size: 0.88rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.ra-ticket__finalize-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
 
 /* Reclame Aqui ? shell CRM (fila + lista + ticket + sidebar) */
-#especiais-reclame-aqui, #especiais-procon, #especiais-consumidor-gov {
+#especiais-reclame-aqui, #especiais-procon, #especiais-consumidor-gov, #especiais-bacen {
     --ra-crm-col-queue: 168px;
     --ra-crm-col-list: 236px;
     --ra-crm-col-side: 300px;
 }
 
-#especiais-reclame-aqui .ra-crm-shell , #especiais-procon .ra-crm-shell, #especiais-consumidor-gov .ra-crm-shell {
+#especiais-reclame-aqui .ra-crm-shell , #especiais-procon .ra-crm-shell, #especiais-consumidor-gov .ra-crm-shell, #especiais-bacen .ra-crm-shell {
     display: flex;
     align-items: stretch;
     flex: 1;
@@ -12197,9 +12228,9 @@ body.desk-v2-mode #aiChatbotModal {
     font-family: 'Poppins', sans-serif;
 }
 
-#especiais-reclame-aqui .ra-crm-shell *, #especiais-procon .ra-crm-shell *, #especiais-consumidor-gov .ra-crm-shell *,
-#especiais-reclame-aqui .ra-crm-shell *::before, #especiais-procon .ra-crm-shell *::before, #especiais-consumidor-gov .ra-crm-shell *::before,
-#especiais-reclame-aqui .ra-crm-shell *::after , #especiais-procon .ra-crm-shell *::after, #especiais-consumidor-gov .ra-crm-shell *::after {
+#especiais-reclame-aqui .ra-crm-shell *, #especiais-procon .ra-crm-shell *, #especiais-consumidor-gov .ra-crm-shell *, #especiais-bacen .ra-crm-shell *,
+#especiais-reclame-aqui .ra-crm-shell *::before, #especiais-procon .ra-crm-shell *::before, #especiais-consumidor-gov .ra-crm-shell *::before, #especiais-bacen .ra-crm-shell *::before,
+#especiais-reclame-aqui .ra-crm-shell *::after , #especiais-procon .ra-crm-shell *::after, #especiais-consumidor-gov .ra-crm-shell *::after, #especiais-bacen .ra-crm-shell *::after {
     box-sizing: border-box;
 }
 
@@ -12217,7 +12248,7 @@ body.desk-v2-mode #aiChatbotModal {
     transition: width 0.28s ease, min-width 0.28s ease;
 }
 
-#especiais-reclame-aqui .ra-crm-queue__inner , #especiais-procon .ra-crm-queue__inner, #especiais-consumidor-gov .ra-crm-queue__inner {
+#especiais-reclame-aqui .ra-crm-queue__inner , #especiais-procon .ra-crm-queue__inner, #especiais-consumidor-gov .ra-crm-queue__inner, #especiais-bacen .ra-crm-queue__inner {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -12227,26 +12258,26 @@ body.desk-v2-mode #aiChatbotModal {
     transition: opacity 0.2s ease;
 }
 
-#especiais-reclame-aqui .ra-crm-queue.is-collapsed , #especiais-procon .ra-crm-queue.is-collapsed, #especiais-consumidor-gov .ra-crm-queue.is-collapsed {
+#especiais-reclame-aqui .ra-crm-queue.is-collapsed , #especiais-procon .ra-crm-queue.is-collapsed, #especiais-consumidor-gov .ra-crm-queue.is-collapsed, #especiais-bacen .ra-crm-queue.is-collapsed {
     width: 36px;
     min-width: 36px;
 }
 
-#especiais-reclame-aqui .ra-crm-queue.is-collapsed .ra-crm-queue__inner , #especiais-procon .ra-crm-queue.is-collapsed .ra-crm-queue__inner, #especiais-consumidor-gov .ra-crm-queue.is-collapsed .ra-crm-queue__inner {
+#especiais-reclame-aqui .ra-crm-queue.is-collapsed .ra-crm-queue__inner , #especiais-procon .ra-crm-queue.is-collapsed .ra-crm-queue__inner, #especiais-consumidor-gov .ra-crm-queue.is-collapsed .ra-crm-queue__inner, #especiais-bacen .ra-crm-queue.is-collapsed .ra-crm-queue__inner {
     opacity: 0;
     pointer-events: none;
     visibility: hidden;
 }
 
-#especiais-reclame-aqui .ra-crm-queue.is-collapsed .ra-crm-panel-expand--queue , #especiais-procon .ra-crm-queue.is-collapsed .ra-crm-panel-expand--queue, #especiais-consumidor-gov .ra-crm-queue.is-collapsed .ra-crm-panel-expand--queue {
+#especiais-reclame-aqui .ra-crm-queue.is-collapsed .ra-crm-panel-expand--queue , #especiais-procon .ra-crm-queue.is-collapsed .ra-crm-panel-expand--queue, #especiais-consumidor-gov .ra-crm-queue.is-collapsed .ra-crm-panel-expand--queue, #especiais-bacen .ra-crm-queue.is-collapsed .ra-crm-panel-expand--queue {
     display: flex;
 }
 
-#especiais-reclame-aqui .ra-crm-queue__header , #especiais-procon .ra-crm-queue__header, #especiais-consumidor-gov .ra-crm-queue__header {
+#especiais-reclame-aqui .ra-crm-queue__header , #especiais-procon .ra-crm-queue__header, #especiais-consumidor-gov .ra-crm-queue__header, #especiais-bacen .ra-crm-queue__header {
     padding: 12px 10px;
 }
 
-#especiais-reclame-aqui .ra-crm-queue__header-top , #especiais-procon .ra-crm-queue__header-top, #especiais-consumidor-gov .ra-crm-queue__header-top {
+#especiais-reclame-aqui .ra-crm-queue__header-top , #especiais-procon .ra-crm-queue__header-top, #especiais-consumidor-gov .ra-crm-queue__header-top, #especiais-bacen .ra-crm-queue__header-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -12254,7 +12285,7 @@ body.desk-v2-mode #aiChatbotModal {
     margin-bottom: 10px;
 }
 
-#especiais-reclame-aqui .ra-crm-queue__title , #especiais-procon .ra-crm-queue__title, #especiais-consumidor-gov .ra-crm-queue__title {
+#especiais-reclame-aqui .ra-crm-queue__title , #especiais-procon .ra-crm-queue__title, #especiais-consumidor-gov .ra-crm-queue__title, #especiais-bacen .ra-crm-queue__title {
     margin: 0;
     font-size: 0.68rem;
     font-weight: 600;
@@ -12265,7 +12296,7 @@ body.desk-v2-mode #aiChatbotModal {
     min-width: 0;
 }
 
-#especiais-reclame-aqui .ra-crm-queue-search , #especiais-procon .ra-crm-queue-search, #especiais-consumidor-gov .ra-crm-queue-search {
+#especiais-reclame-aqui .ra-crm-queue-search , #especiais-procon .ra-crm-queue-search, #especiais-consumidor-gov .ra-crm-queue-search, #especiais-bacen .ra-crm-queue-search {
     display: flex;
     align-items: center;
     gap: 5px;
@@ -12277,7 +12308,7 @@ body.desk-v2-mode #aiChatbotModal {
     font-size: 0.72rem;
 }
 
-#especiais-reclame-aqui .ra-crm-queue-search input , #especiais-procon .ra-crm-queue-search input, #especiais-consumidor-gov .ra-crm-queue-search input {
+#especiais-reclame-aqui .ra-crm-queue-search input , #especiais-procon .ra-crm-queue-search input, #especiais-consumidor-gov .ra-crm-queue-search input, #especiais-bacen .ra-crm-queue-search input {
     flex: 1;
     min-width: 0;
     border: 0;
@@ -12287,11 +12318,11 @@ body.desk-v2-mode #aiChatbotModal {
     outline: none;
 }
 
-#especiais-reclame-aqui .ra-crm-queue-search input::placeholder , #especiais-procon .ra-crm-queue-search input::placeholder, #especiais-consumidor-gov .ra-crm-queue-search input::placeholder {
+#especiais-reclame-aqui .ra-crm-queue-search input::placeholder , #especiais-procon .ra-crm-queue-search input::placeholder, #especiais-consumidor-gov .ra-crm-queue-search input::placeholder, #especiais-bacen .ra-crm-queue-search input::placeholder {
     color: rgba(255, 255, 255, 0.35);
 }
 
-#especiais-reclame-aqui .ra-crm-queue-list , #especiais-procon .ra-crm-queue-list, #especiais-consumidor-gov .ra-crm-queue-list {
+#especiais-reclame-aqui .ra-crm-queue-list , #especiais-procon .ra-crm-queue-list, #especiais-consumidor-gov .ra-crm-queue-list, #especiais-bacen .ra-crm-queue-list {
     list-style: none;
     margin: 0;
     padding: 0 8px;
@@ -12300,7 +12331,7 @@ body.desk-v2-mode #aiChatbotModal {
     overflow-y: auto;
 }
 
-#especiais-reclame-aqui .ra-crm-queue-item , #especiais-procon .ra-crm-queue-item, #especiais-consumidor-gov .ra-crm-queue-item {
+#especiais-reclame-aqui .ra-crm-queue-item , #especiais-procon .ra-crm-queue-item, #especiais-consumidor-gov .ra-crm-queue-item, #especiais-bacen .ra-crm-queue-item {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -12312,7 +12343,7 @@ body.desk-v2-mode #aiChatbotModal {
     margin-bottom: 2px;
 }
 
-#especiais-reclame-aqui .ra-crm-queue-item:hover , #especiais-procon .ra-crm-queue-item:hover, #especiais-consumidor-gov .ra-crm-queue-item:hover {
+#especiais-reclame-aqui .ra-crm-queue-item:hover , #especiais-procon .ra-crm-queue-item:hover, #especiais-consumidor-gov .ra-crm-queue-item:hover, #especiais-bacen .ra-crm-queue-item:hover {
     background: rgba(255, 255, 255, 0.08);
 }
 
@@ -12325,14 +12356,14 @@ body.desk-v2-mode #aiChatbotModal {
     background: var(--especiais-accent-light);
 }
 
-#especiais-reclame-aqui .ra-crm-queue-item__dot , #especiais-procon .ra-crm-queue-item__dot, #especiais-consumidor-gov .ra-crm-queue-item__dot {
+#especiais-reclame-aqui .ra-crm-queue-item__dot , #especiais-procon .ra-crm-queue-item__dot, #especiais-consumidor-gov .ra-crm-queue-item__dot, #especiais-bacen .ra-crm-queue-item__dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui .ra-crm-queue-item__name , #especiais-procon .ra-crm-queue-item__name, #especiais-consumidor-gov .ra-crm-queue-item__name {
+#especiais-reclame-aqui .ra-crm-queue-item__name , #especiais-procon .ra-crm-queue-item__name, #especiais-consumidor-gov .ra-crm-queue-item__name, #especiais-bacen .ra-crm-queue-item__name {
     flex: 1;
     min-width: 0;
     white-space: nowrap;
@@ -12340,20 +12371,20 @@ body.desk-v2-mode #aiChatbotModal {
     text-overflow: ellipsis;
 }
 
-#especiais-reclame-aqui .ra-crm-queue-item__count , #especiais-procon .ra-crm-queue-item__count, #especiais-consumidor-gov .ra-crm-queue-item__count {
+#especiais-reclame-aqui .ra-crm-queue-item__count , #especiais-procon .ra-crm-queue-item__count, #especiais-consumidor-gov .ra-crm-queue-item__count, #especiais-bacen .ra-crm-queue-item__count {
     font-size: 0.72rem;
     font-weight: 700;
     color: rgba(255, 255, 255, 0.55);
 }
 
-#especiais-reclame-aqui .ra-crm-queue__footer , #especiais-procon .ra-crm-queue__footer, #especiais-consumidor-gov .ra-crm-queue__footer {
+#especiais-reclame-aqui .ra-crm-queue__footer , #especiais-procon .ra-crm-queue__footer, #especiais-consumidor-gov .ra-crm-queue__footer, #especiais-bacen .ra-crm-queue__footer {
     padding: 10px 8px 12px;
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-#especiais-reclame-aqui .ra-crm-queue-btn , #especiais-procon .ra-crm-queue-btn, #especiais-consumidor-gov .ra-crm-queue-btn {
+#especiais-reclame-aqui .ra-crm-queue-btn , #especiais-procon .ra-crm-queue-btn, #especiais-consumidor-gov .ra-crm-queue-btn, #especiais-bacen .ra-crm-queue-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -12368,7 +12399,7 @@ body.desk-v2-mode #aiChatbotModal {
     border: 0;
 }
 
-#especiais-reclame-aqui .ra-crm-queue-btn--secondary , #especiais-procon .ra-crm-queue-btn--secondary, #especiais-consumidor-gov .ra-crm-queue-btn--secondary {
+#especiais-reclame-aqui .ra-crm-queue-btn--secondary , #especiais-procon .ra-crm-queue-btn--secondary, #especiais-consumidor-gov .ra-crm-queue-btn--secondary, #especiais-bacen .ra-crm-queue-btn--secondary {
     background: rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.85);
     border: 0.5px solid rgba(255, 255, 255, 0.15);
@@ -12384,7 +12415,7 @@ body.desk-v2-mode #aiChatbotModal {
 }
 
 /* Col 2 ? lista */
-#especiais-reclame-aqui .ra-crm-list , #especiais-procon .ra-crm-list, #especiais-consumidor-gov .ra-crm-list {
+#especiais-reclame-aqui .ra-crm-list , #especiais-procon .ra-crm-list, #especiais-consumidor-gov .ra-crm-list, #especiais-bacen .ra-crm-list {
     width: var(--ra-crm-col-list);
     flex-shrink: 0;
     height: 100%;
@@ -12398,7 +12429,7 @@ body.desk-v2-mode #aiChatbotModal {
     transition: width 0.28s ease, min-width 0.28s ease;
 }
 
-#especiais-reclame-aqui .ra-crm-list__inner , #especiais-procon .ra-crm-list__inner, #especiais-consumidor-gov .ra-crm-list__inner {
+#especiais-reclame-aqui .ra-crm-list__inner , #especiais-procon .ra-crm-list__inner, #especiais-consumidor-gov .ra-crm-list__inner, #especiais-bacen .ra-crm-list__inner {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -12408,35 +12439,35 @@ body.desk-v2-mode #aiChatbotModal {
     transition: opacity 0.2s ease;
 }
 
-#especiais-reclame-aqui .ra-crm-list.is-collapsed , #especiais-procon .ra-crm-list.is-collapsed, #especiais-consumidor-gov .ra-crm-list.is-collapsed {
+#especiais-reclame-aqui .ra-crm-list.is-collapsed , #especiais-procon .ra-crm-list.is-collapsed, #especiais-consumidor-gov .ra-crm-list.is-collapsed, #especiais-bacen .ra-crm-list.is-collapsed {
     width: 36px;
     min-width: 36px;
 }
 
-#especiais-reclame-aqui .ra-crm-list.is-collapsed .ra-crm-list__inner , #especiais-procon .ra-crm-list.is-collapsed .ra-crm-list__inner, #especiais-consumidor-gov .ra-crm-list.is-collapsed .ra-crm-list__inner {
+#especiais-reclame-aqui .ra-crm-list.is-collapsed .ra-crm-list__inner , #especiais-procon .ra-crm-list.is-collapsed .ra-crm-list__inner, #especiais-consumidor-gov .ra-crm-list.is-collapsed .ra-crm-list__inner, #especiais-bacen .ra-crm-list.is-collapsed .ra-crm-list__inner {
     opacity: 0;
     pointer-events: none;
     visibility: hidden;
 }
 
-#especiais-reclame-aqui .ra-crm-list.is-collapsed .ra-crm-panel-expand--list , #especiais-procon .ra-crm-list.is-collapsed .ra-crm-panel-expand--list, #especiais-consumidor-gov .ra-crm-list.is-collapsed .ra-crm-panel-expand--list {
+#especiais-reclame-aqui .ra-crm-list.is-collapsed .ra-crm-panel-expand--list , #especiais-procon .ra-crm-list.is-collapsed .ra-crm-panel-expand--list, #especiais-consumidor-gov .ra-crm-list.is-collapsed .ra-crm-panel-expand--list, #especiais-bacen .ra-crm-list.is-collapsed .ra-crm-panel-expand--list {
     display: flex;
 }
 
-#especiais-reclame-aqui .ra-crm-list-header , #especiais-procon .ra-crm-list-header, #especiais-consumidor-gov .ra-crm-list-header {
+#especiais-reclame-aqui .ra-crm-list-header , #especiais-procon .ra-crm-list-header, #especiais-consumidor-gov .ra-crm-list-header, #especiais-bacen .ra-crm-list-header {
     padding: 10px 10px 8px;
     border-bottom: 0.5px solid #e4e6ea;
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui .ra-crm-list-header__row , #especiais-procon .ra-crm-list-header__row, #especiais-consumidor-gov .ra-crm-list-header__row {
+#especiais-reclame-aqui .ra-crm-list-header__row , #especiais-procon .ra-crm-list-header__row, #especiais-consumidor-gov .ra-crm-list-header__row, #especiais-bacen .ra-crm-list-header__row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 6px;
 }
 
-#especiais-reclame-aqui .ra-crm-list-header__title , #especiais-procon .ra-crm-list-header__title, #especiais-consumidor-gov .ra-crm-list-header__title {
+#especiais-reclame-aqui .ra-crm-list-header__title , #especiais-procon .ra-crm-list-header__title, #especiais-consumidor-gov .ra-crm-list-header__title, #especiais-bacen .ra-crm-list-header__title {
     margin: 0;
     font-size: 0.78rem;
     font-weight: 700;
@@ -12448,19 +12479,19 @@ body.desk-v2-mode #aiChatbotModal {
     text-overflow: ellipsis;
 }
 
-#especiais-reclame-aqui .ra-crm-list-header__actions , #especiais-procon .ra-crm-list-header__actions, #especiais-consumidor-gov .ra-crm-list-header__actions {
+#especiais-reclame-aqui .ra-crm-list-header__actions , #especiais-procon .ra-crm-list-header__actions, #especiais-consumidor-gov .ra-crm-list-header__actions, #especiais-bacen .ra-crm-list-header__actions {
     display: flex;
     align-items: center;
     gap: 4px;
 }
 
-#especiais-reclame-aqui .ra-crm-sort-chips , #especiais-procon .ra-crm-sort-chips, #especiais-consumidor-gov .ra-crm-sort-chips {
+#especiais-reclame-aqui .ra-crm-sort-chips , #especiais-procon .ra-crm-sort-chips, #especiais-consumidor-gov .ra-crm-sort-chips, #especiais-bacen .ra-crm-sort-chips {
     display: flex;
     gap: 4px;
     margin-top: 8px;
 }
 
-#especiais-reclame-aqui .ra-crm-sort-chip , #especiais-procon .ra-crm-sort-chip, #especiais-consumidor-gov .ra-crm-sort-chip {
+#especiais-reclame-aqui .ra-crm-sort-chip , #especiais-procon .ra-crm-sort-chip, #especiais-consumidor-gov .ra-crm-sort-chip, #especiais-bacen .ra-crm-sort-chip {
     border: 0.5px solid #e4e6ea;
     background: #f8fafc;
     border-radius: 999px;
@@ -12478,7 +12509,7 @@ body.desk-v2-mode #aiChatbotModal {
     color: var(--especiais-accent-dark);
 }
 
-#especiais-reclame-aqui .ra-crm-ticket-cards , #especiais-procon .ra-crm-ticket-cards, #especiais-consumidor-gov .ra-crm-ticket-cards {
+#especiais-reclame-aqui .ra-crm-ticket-cards , #especiais-procon .ra-crm-ticket-cards, #especiais-consumidor-gov .ra-crm-ticket-cards, #especiais-bacen .ra-crm-ticket-cards {
     list-style: none;
     margin: 0;
     padding: 6px;
@@ -12487,7 +12518,7 @@ body.desk-v2-mode #aiChatbotModal {
     overflow-y: auto;
 }
 
-#especiais-reclame-aqui .ra-crm-ticket-card , #especiais-procon .ra-crm-ticket-card, #especiais-consumidor-gov .ra-crm-ticket-card {
+#especiais-reclame-aqui .ra-crm-ticket-card , #especiais-procon .ra-crm-ticket-card, #especiais-consumidor-gov .ra-crm-ticket-card, #especiais-bacen .ra-crm-ticket-card {
     position: relative;
     padding: 10px 10px 28px;
     border: 1.5px solid transparent;
@@ -12508,7 +12539,7 @@ body.desk-v2-mode #aiChatbotModal {
     box-shadow: inset 3px 0 0 var(--especiais-accent);
 }
 
-#especiais-reclame-aqui .ra-crm-ticket-card__top , #especiais-procon .ra-crm-ticket-card__top, #especiais-consumidor-gov .ra-crm-ticket-card__top {
+#especiais-reclame-aqui .ra-crm-ticket-card__top , #especiais-procon .ra-crm-ticket-card__top, #especiais-consumidor-gov .ra-crm-ticket-card__top, #especiais-bacen .ra-crm-ticket-card__top {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -12516,7 +12547,7 @@ body.desk-v2-mode #aiChatbotModal {
     margin-bottom: 4px;
 }
 
-#especiais-reclame-aqui .ra-crm-ticket-card__name , #especiais-procon .ra-crm-ticket-card__name, #especiais-consumidor-gov .ra-crm-ticket-card__name {
+#especiais-reclame-aqui .ra-crm-ticket-card__name , #especiais-procon .ra-crm-ticket-card__name, #especiais-consumidor-gov .ra-crm-ticket-card__name, #especiais-bacen .ra-crm-ticket-card__name {
     font-size: 0.78rem;
     font-weight: 700;
     color: #1a1a2e;
@@ -12527,13 +12558,13 @@ body.desk-v2-mode #aiChatbotModal {
     text-overflow: ellipsis;
 }
 
-#especiais-reclame-aqui .ra-crm-ticket-card__top .ra-badge , #especiais-procon .ra-crm-ticket-card__top .ra-badge, #especiais-consumidor-gov .ra-crm-ticket-card__top .ra-badge {
+#especiais-reclame-aqui .ra-crm-ticket-card__top .ra-badge , #especiais-procon .ra-crm-ticket-card__top .ra-badge, #especiais-consumidor-gov .ra-crm-ticket-card__top .ra-badge, #especiais-bacen .ra-crm-ticket-card__top .ra-badge {
     font-size: 0.62rem;
     padding: 2px 6px;
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui .ra-crm-ticket-card__subject , #especiais-procon .ra-crm-ticket-card__subject, #especiais-consumidor-gov .ra-crm-ticket-card__subject {
+#especiais-reclame-aqui .ra-crm-ticket-card__subject , #especiais-procon .ra-crm-ticket-card__subject, #especiais-consumidor-gov .ra-crm-ticket-card__subject, #especiais-bacen .ra-crm-ticket-card__subject {
     font-size: 0.74rem;
     color: #475569;
     line-height: 1.35;
@@ -12544,7 +12575,7 @@ body.desk-v2-mode #aiChatbotModal {
     overflow: hidden;
 }
 
-#especiais-reclame-aqui .ra-crm-ticket-card__meta , #especiais-procon .ra-crm-ticket-card__meta, #especiais-consumidor-gov .ra-crm-ticket-card__meta {
+#especiais-reclame-aqui .ra-crm-ticket-card__meta , #especiais-procon .ra-crm-ticket-card__meta, #especiais-consumidor-gov .ra-crm-ticket-card__meta, #especiais-bacen .ra-crm-ticket-card__meta {
     display: flex;
     justify-content: space-between;
     gap: 6px;
@@ -12552,7 +12583,7 @@ body.desk-v2-mode #aiChatbotModal {
     color: #94a3b8;
 }
 
-#especiais-reclame-aqui .ra-crm-ticket-card__sla , #especiais-procon .ra-crm-ticket-card__sla, #especiais-consumidor-gov .ra-crm-ticket-card__sla {
+#especiais-reclame-aqui .ra-crm-ticket-card__sla , #especiais-procon .ra-crm-ticket-card__sla, #especiais-consumidor-gov .ra-crm-ticket-card__sla, #especiais-bacen .ra-crm-ticket-card__sla {
     position: absolute;
     right: 10px;
     bottom: 8px;
@@ -12562,28 +12593,28 @@ body.desk-v2-mode #aiChatbotModal {
     border-radius: 999px;
 }
 
-#especiais-reclame-aqui .ra-crm-ticket-card__sla--danger , #especiais-procon .ra-crm-ticket-card__sla--danger, #especiais-consumidor-gov .ra-crm-ticket-card__sla--danger {
+#especiais-reclame-aqui .ra-crm-ticket-card__sla--danger , #especiais-procon .ra-crm-ticket-card__sla--danger, #especiais-consumidor-gov .ra-crm-ticket-card__sla--danger, #especiais-bacen .ra-crm-ticket-card__sla--danger {
     background: #fef2f2;
     color: #dc2626;
 }
 
-#especiais-reclame-aqui .ra-crm-ticket-card__sla--warning , #especiais-procon .ra-crm-ticket-card__sla--warning, #especiais-consumidor-gov .ra-crm-ticket-card__sla--warning {
+#especiais-reclame-aqui .ra-crm-ticket-card__sla--warning , #especiais-procon .ra-crm-ticket-card__sla--warning, #especiais-consumidor-gov .ra-crm-ticket-card__sla--warning, #especiais-bacen .ra-crm-ticket-card__sla--warning {
     background: #fffbeb;
     color: #d97706;
 }
 
-#especiais-reclame-aqui .ra-crm-ticket-card__sla--ok , #especiais-procon .ra-crm-ticket-card__sla--ok, #especiais-consumidor-gov .ra-crm-ticket-card__sla--ok {
+#especiais-reclame-aqui .ra-crm-ticket-card__sla--ok , #especiais-procon .ra-crm-ticket-card__sla--ok, #especiais-consumidor-gov .ra-crm-ticket-card__sla--ok, #especiais-bacen .ra-crm-ticket-card__sla--ok {
     background: #f0fdf4;
     color: #16a34a;
 }
 
-#especiais-reclame-aqui .ra-crm-ticket-card__sla--neutral , #especiais-procon .ra-crm-ticket-card__sla--neutral, #especiais-consumidor-gov .ra-crm-ticket-card__sla--neutral {
+#especiais-reclame-aqui .ra-crm-ticket-card__sla--neutral , #especiais-procon .ra-crm-ticket-card__sla--neutral, #especiais-consumidor-gov .ra-crm-ticket-card__sla--neutral, #especiais-bacen .ra-crm-ticket-card__sla--neutral {
     background: #f1f5f9;
     color: #64748b;
 }
 
 /* Col 3 ? main */
-#especiais-reclame-aqui .ra-crm-main , #especiais-procon .ra-crm-main, #especiais-consumidor-gov .ra-crm-main {
+#especiais-reclame-aqui .ra-crm-main , #especiais-procon .ra-crm-main, #especiais-consumidor-gov .ra-crm-main, #especiais-bacen .ra-crm-main {
     flex: 1;
     min-width: 0;
     min-height: 0;
@@ -12593,8 +12624,8 @@ body.desk-v2-mode #aiChatbotModal {
     background: #f8fafc;
 }
 
-#especiais-reclame-aqui .ra-crm-main--loading, #especiais-procon .ra-crm-main--loading, #especiais-consumidor-gov .ra-crm-main--loading,
-#especiais-reclame-aqui .ra-crm-empty-state--main , #especiais-procon .ra-crm-empty-state--main, #especiais-consumidor-gov .ra-crm-empty-state--main {
+#especiais-reclame-aqui .ra-crm-main--loading, #especiais-procon .ra-crm-main--loading, #especiais-consumidor-gov .ra-crm-main--loading, #especiais-bacen .ra-crm-main--loading,
+#especiais-reclame-aqui .ra-crm-empty-state--main , #especiais-procon .ra-crm-empty-state--main, #especiais-consumidor-gov .ra-crm-empty-state--main, #especiais-bacen .ra-crm-empty-state--main {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -12605,7 +12636,7 @@ body.desk-v2-mode #aiChatbotModal {
 
 
 /* Col 4 ? sidebar */
-#especiais-reclame-aqui .ra-crm-side , #especiais-procon .ra-crm-side, #especiais-consumidor-gov .ra-crm-side {
+#especiais-reclame-aqui .ra-crm-side , #especiais-procon .ra-crm-side, #especiais-consumidor-gov .ra-crm-side, #especiais-bacen .ra-crm-side {
     width: var(--ra-crm-col-side);
     flex-shrink: 0;
     min-height: 0;
@@ -12614,7 +12645,7 @@ body.desk-v2-mode #aiChatbotModal {
     border-left: 0.5px solid #e2e8f0;
 }
 
-#especiais-reclame-aqui .ra-crm-side .ra-ticket__side , #especiais-procon .ra-crm-side .ra-ticket__side, #especiais-consumidor-gov .ra-crm-side .ra-ticket__side {
+#especiais-reclame-aqui .ra-crm-side .ra-ticket__side , #especiais-procon .ra-crm-side .ra-ticket__side, #especiais-consumidor-gov .ra-crm-side .ra-ticket__side, #especiais-bacen .ra-crm-side .ra-ticket__side {
     height: 100%;
     overflow-y: auto;
     padding: 1rem 0.85rem 1rem 0;
@@ -12622,7 +12653,7 @@ body.desk-v2-mode #aiChatbotModal {
 }
 
 /* Pain?is recolher/expandir */
-#especiais-reclame-aqui .ra-crm-panel-retract , #especiais-procon .ra-crm-panel-retract, #especiais-consumidor-gov .ra-crm-panel-retract {
+#especiais-reclame-aqui .ra-crm-panel-retract , #especiais-procon .ra-crm-panel-retract, #especiais-consumidor-gov .ra-crm-panel-retract, #especiais-bacen .ra-crm-panel-retract {
     width: 26px;
     height: 26px;
     flex-shrink: 0;
@@ -12637,13 +12668,13 @@ body.desk-v2-mode #aiChatbotModal {
     padding: 0;
 }
 
-#especiais-reclame-aqui .ra-crm-panel-retract--list , #especiais-procon .ra-crm-panel-retract--list, #especiais-consumidor-gov .ra-crm-panel-retract--list {
+#especiais-reclame-aqui .ra-crm-panel-retract--list , #especiais-procon .ra-crm-panel-retract--list, #especiais-consumidor-gov .ra-crm-panel-retract--list, #especiais-bacen .ra-crm-panel-retract--list {
     border-color: #e4e6ea;
     background: #f8fafc;
     color: #64748b;
 }
 
-#especiais-reclame-aqui .ra-crm-icon-btn , #especiais-procon .ra-crm-icon-btn, #especiais-consumidor-gov .ra-crm-icon-btn {
+#especiais-reclame-aqui .ra-crm-icon-btn , #especiais-procon .ra-crm-icon-btn, #especiais-consumidor-gov .ra-crm-icon-btn, #especiais-bacen .ra-crm-icon-btn {
     width: 26px;
     height: 26px;
     border: 0.5px solid #e4e6ea;
@@ -12657,7 +12688,7 @@ body.desk-v2-mode #aiChatbotModal {
     padding: 0;
 }
 
-#especiais-reclame-aqui .ra-crm-panel-expand , #especiais-procon .ra-crm-panel-expand, #especiais-consumidor-gov .ra-crm-panel-expand {
+#especiais-reclame-aqui .ra-crm-panel-expand , #especiais-procon .ra-crm-panel-expand, #especiais-consumidor-gov .ra-crm-panel-expand, #especiais-bacen .ra-crm-panel-expand {
     display: none;
     position: absolute;
     top: 0;
@@ -12680,12 +12711,12 @@ body.desk-v2-mode #aiChatbotModal {
     padding: 8px 0;
 }
 
-#especiais-reclame-aqui .ra-crm-panel-expand--list , #especiais-procon .ra-crm-panel-expand--list, #especiais-consumidor-gov .ra-crm-panel-expand--list {
+#especiais-reclame-aqui .ra-crm-panel-expand--list , #especiais-procon .ra-crm-panel-expand--list, #especiais-consumidor-gov .ra-crm-panel-expand--list, #especiais-bacen .ra-crm-panel-expand--list {
     color: #64748b;
     background: #fff;
 }
 
-#especiais-reclame-aqui .ra-crm-empty-state , #especiais-procon .ra-crm-empty-state, #especiais-consumidor-gov .ra-crm-empty-state {
+#especiais-reclame-aqui .ra-crm-empty-state , #especiais-procon .ra-crm-empty-state, #especiais-consumidor-gov .ra-crm-empty-state, #especiais-bacen .ra-crm-empty-state {
     padding: 16px;
     text-align: center;
     color: #94a3b8;
@@ -12694,7 +12725,7 @@ body.desk-v2-mode #aiChatbotModal {
 }
 
 @media (max-width: 1200px) {
-    #especiais-reclame-aqui, #especiais-procon, #especiais-consumidor-gov {
+    #especiais-reclame-aqui, #especiais-procon, #especiais-consumidor-gov, #especiais-bacen {
         --ra-crm-col-queue: 128px;
         --ra-crm-col-list: 184px;
         --ra-crm-col-side: 260px;
@@ -12702,26 +12733,26 @@ body.desk-v2-mode #aiChatbotModal {
 }
 
 @media (max-width: 960px) {
-    #especiais-reclame-aqui .ra-crm-shell , #especiais-procon .ra-crm-shell, #especiais-consumidor-gov .ra-crm-shell {
+    #especiais-reclame-aqui .ra-crm-shell , #especiais-procon .ra-crm-shell, #especiais-consumidor-gov .ra-crm-shell, #especiais-bacen .ra-crm-shell {
         flex-wrap: wrap;
         height: auto;
         min-height: 100%;
         overflow: auto;
     }
 
-    #especiais-reclame-aqui .ra-crm-queue, #especiais-procon .ra-crm-queue, #especiais-consumidor-gov .ra-crm-queue,
-    #especiais-reclame-aqui .ra-crm-list , #especiais-procon .ra-crm-list, #especiais-consumidor-gov .ra-crm-list {
+    #especiais-reclame-aqui .ra-crm-queue, #especiais-procon .ra-crm-queue, #especiais-consumidor-gov .ra-crm-queue, #especiais-bacen .ra-crm-queue,
+    #especiais-reclame-aqui .ra-crm-list , #especiais-procon .ra-crm-list, #especiais-consumidor-gov .ra-crm-list, #especiais-bacen .ra-crm-list {
         width: 50%;
         height: 220px;
     }
 
-    #especiais-reclame-aqui .ra-crm-main , #especiais-procon .ra-crm-main, #especiais-consumidor-gov .ra-crm-main {
+    #especiais-reclame-aqui .ra-crm-main , #especiais-procon .ra-crm-main, #especiais-consumidor-gov .ra-crm-main, #especiais-bacen .ra-crm-main {
         width: 100%;
         min-height: 50vh;
         order: 3;
     }
 
-    #especiais-reclame-aqui .ra-crm-side , #especiais-procon .ra-crm-side, #especiais-consumidor-gov .ra-crm-side {
+    #especiais-reclame-aqui .ra-crm-side , #especiais-procon .ra-crm-side, #especiais-consumidor-gov .ra-crm-side, #especiais-bacen .ra-crm-side {
         width: 100%;
         max-height: 38vh;
         order: 4;
@@ -12729,7 +12760,7 @@ body.desk-v2-mode #aiChatbotModal {
 }
 
 /* RA ticket ? footer sidebar + Abrir conversa */
-#especiais-reclame-aqui .ra-ticket__side-footer , #especiais-procon .ra-ticket__side-footer, #especiais-consumidor-gov .ra-ticket__side-footer {
+#especiais-reclame-aqui .ra-ticket__side-footer , #especiais-procon .ra-ticket__side-footer, #especiais-consumidor-gov .ra-ticket__side-footer, #especiais-bacen .ra-ticket__side-footer {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -12737,11 +12768,15 @@ body.desk-v2-mode #aiChatbotModal {
     padding-top: 0.25rem;
 }
 
-#especiais-reclame-aqui .ra-ticket__side-footer .ra-ticket__save-btn , #especiais-procon .ra-ticket__side-footer .ra-ticket__save-btn, #especiais-consumidor-gov .ra-ticket__side-footer .ra-ticket__save-btn {
+#especiais-reclame-aqui .ra-ticket__side-footer .ra-ticket__save-btn , #especiais-procon .ra-ticket__side-footer .ra-ticket__save-btn, #especiais-consumidor-gov .ra-ticket__side-footer .ra-ticket__save-btn, #especiais-bacen .ra-ticket__side-footer .ra-ticket__save-btn {
     margin-top: 0;
 }
 
-#especiais-reclame-aqui .rp-footer-btn , #especiais-procon .rp-footer-btn, #especiais-consumidor-gov .rp-footer-btn {
+#especiais-reclame-aqui .ra-ticket__side-footer .ra-ticket__finalize-btn , #especiais-procon .ra-ticket__side-footer .ra-ticket__finalize-btn, #especiais-consumidor-gov .ra-ticket__side-footer .ra-ticket__finalize-btn, #especiais-bacen .ra-ticket__side-footer .ra-ticket__finalize-btn {
+    margin-top: 0;
+}
+
+#especiais-reclame-aqui .rp-footer-btn , #especiais-procon .rp-footer-btn, #especiais-consumidor-gov .rp-footer-btn, #especiais-bacen .rp-footer-btn {
     width: 100%;
     padding: 8px;
     border-radius: 8px;
@@ -12756,24 +12791,24 @@ body.desk-v2-mode #aiChatbotModal {
     transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-#especiais-reclame-aqui .rp-footer-btn--secondary , #especiais-procon .rp-footer-btn--secondary, #especiais-consumidor-gov .rp-footer-btn--secondary {
+#especiais-reclame-aqui .rp-footer-btn--secondary , #especiais-procon .rp-footer-btn--secondary, #especiais-consumidor-gov .rp-footer-btn--secondary, #especiais-bacen .rp-footer-btn--secondary {
     background: transparent;
     border: 1.5px solid #000058;
     color: #000058;
 }
 
-#especiais-reclame-aqui .rp-footer-btn--secondary.is-active , #especiais-procon .rp-footer-btn--secondary.is-active, #especiais-consumidor-gov .rp-footer-btn--secondary.is-active {
+#especiais-reclame-aqui .rp-footer-btn--secondary.is-active , #especiais-procon .rp-footer-btn--secondary.is-active, #especiais-consumidor-gov .rp-footer-btn--secondary.is-active, #especiais-bacen .rp-footer-btn--secondary.is-active {
     background: #E8F5E9;
     border: 1.5px solid #15A237;
     color: #15A237;
 }
 
-#especiais-reclame-aqui .ra-ticket__main--wa , #especiais-procon .ra-ticket__main--wa, #especiais-consumidor-gov .ra-ticket__main--wa {
+#especiais-reclame-aqui .ra-ticket__main--wa , #especiais-procon .ra-ticket__main--wa, #especiais-consumidor-gov .ra-ticket__main--wa, #especiais-bacen .ra-ticket__main--wa {
     padding: 0;
     min-height: 0;
 }
 
-#especiais-reclame-aqui .ra-crm-wa-wrap , #especiais-procon .ra-crm-wa-wrap, #especiais-consumidor-gov .ra-crm-wa-wrap {
+#especiais-reclame-aqui .ra-crm-wa-wrap , #especiais-procon .ra-crm-wa-wrap, #especiais-consumidor-gov .ra-crm-wa-wrap, #especiais-bacen .ra-crm-wa-wrap {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -12782,7 +12817,7 @@ body.desk-v2-mode #aiChatbotModal {
     background: #E5DDD5;
 }
 
-#especiais-reclame-aqui .wa-chat , #especiais-procon .wa-chat, #especiais-consumidor-gov .wa-chat {
+#especiais-reclame-aqui .wa-chat , #especiais-procon .wa-chat, #especiais-consumidor-gov .wa-chat, #especiais-bacen .wa-chat {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -12791,7 +12826,7 @@ body.desk-v2-mode #aiChatbotModal {
     background: #E5DDD5;
 }
 
-#especiais-reclame-aqui .wa-chat__header , #especiais-procon .wa-chat__header, #especiais-consumidor-gov .wa-chat__header {
+#especiais-reclame-aqui .wa-chat__header , #especiais-procon .wa-chat__header, #especiais-consumidor-gov .wa-chat__header, #especiais-bacen .wa-chat__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -12802,14 +12837,14 @@ body.desk-v2-mode #aiChatbotModal {
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui .wa-chat__header-main , #especiais-procon .wa-chat__header-main, #especiais-consumidor-gov .wa-chat__header-main {
+#especiais-reclame-aqui .wa-chat__header-main , #especiais-procon .wa-chat__header-main, #especiais-consumidor-gov .wa-chat__header-main, #especiais-bacen .wa-chat__header-main {
     display: flex;
     align-items: center;
     gap: 12px;
     min-width: 0;
 }
 
-#especiais-reclame-aqui .wa-chat__avatar , #especiais-procon .wa-chat__avatar, #especiais-consumidor-gov .wa-chat__avatar {
+#especiais-reclame-aqui .wa-chat__avatar , #especiais-procon .wa-chat__avatar, #especiais-consumidor-gov .wa-chat__avatar, #especiais-bacen .wa-chat__avatar {
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -12823,14 +12858,14 @@ body.desk-v2-mode #aiChatbotModal {
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui .wa-chat__header-info , #especiais-procon .wa-chat__header-info, #especiais-consumidor-gov .wa-chat__header-info {
+#especiais-reclame-aqui .wa-chat__header-info , #especiais-procon .wa-chat__header-info, #especiais-consumidor-gov .wa-chat__header-info, #especiais-bacen .wa-chat__header-info {
     display: flex;
     flex-direction: column;
     gap: 2px;
     min-width: 0;
 }
 
-#especiais-reclame-aqui .wa-chat__name , #especiais-procon .wa-chat__name, #especiais-consumidor-gov .wa-chat__name {
+#especiais-reclame-aqui .wa-chat__name , #especiais-procon .wa-chat__name, #especiais-consumidor-gov .wa-chat__name, #especiais-bacen .wa-chat__name {
     font-size: 0.9rem;
     font-weight: 600;
     white-space: nowrap;
@@ -12838,7 +12873,7 @@ body.desk-v2-mode #aiChatbotModal {
     text-overflow: ellipsis;
 }
 
-#especiais-reclame-aqui .wa-chat__status , #especiais-procon .wa-chat__status, #especiais-consumidor-gov .wa-chat__status {
+#especiais-reclame-aqui .wa-chat__status , #especiais-procon .wa-chat__status, #especiais-consumidor-gov .wa-chat__status, #especiais-bacen .wa-chat__status {
     font-size: 0.72rem;
     color: rgba(255, 255, 255, 0.78);
     white-space: nowrap;
@@ -12846,14 +12881,14 @@ body.desk-v2-mode #aiChatbotModal {
     text-overflow: ellipsis;
 }
 
-#especiais-reclame-aqui .wa-chat__header-actions , #especiais-procon .wa-chat__header-actions, #especiais-consumidor-gov .wa-chat__header-actions {
+#especiais-reclame-aqui .wa-chat__header-actions , #especiais-procon .wa-chat__header-actions, #especiais-consumidor-gov .wa-chat__header-actions, #especiais-bacen .wa-chat__header-actions {
     display: flex;
     align-items: center;
     gap: 18px;
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui .wa-chat__header-btn , #especiais-procon .wa-chat__header-btn, #especiais-consumidor-gov .wa-chat__header-btn {
+#especiais-reclame-aqui .wa-chat__header-btn , #especiais-procon .wa-chat__header-btn, #especiais-consumidor-gov .wa-chat__header-btn, #especiais-bacen .wa-chat__header-btn {
     border: none;
     background: transparent;
     color: #fff;
@@ -12863,7 +12898,7 @@ body.desk-v2-mode #aiChatbotModal {
     line-height: 1;
 }
 
-#especiais-reclame-aqui .wa-chat__body.conversation , #especiais-procon .wa-chat__body.conversation, #especiais-consumidor-gov .wa-chat__body.conversation {
+#especiais-reclame-aqui .wa-chat__body.conversation , #especiais-procon .wa-chat__body.conversation, #especiais-consumidor-gov .wa-chat__body.conversation, #especiais-bacen .wa-chat__body.conversation {
     flex: 1;
     overflow-y: auto;
     padding: 12px 16px 16px;
@@ -12874,7 +12909,7 @@ body.desk-v2-mode #aiChatbotModal {
     min-height: 0;
 }
 
-#especiais-reclame-aqui .wa-chat__date-sep , #especiais-procon .wa-chat__date-sep, #especiais-consumidor-gov .wa-chat__date-sep {
+#especiais-reclame-aqui .wa-chat__date-sep , #especiais-procon .wa-chat__date-sep, #especiais-consumidor-gov .wa-chat__date-sep, #especiais-bacen .wa-chat__date-sep {
     align-self: center;
     background: rgba(255, 255, 255, 0.92);
     color: #54656f;
@@ -12886,20 +12921,20 @@ body.desk-v2-mode #aiChatbotModal {
     margin: 4px 0 10px;
 }
 
-#especiais-reclame-aqui .wa-msg , #especiais-procon .wa-msg, #especiais-consumidor-gov .wa-msg {
+#especiais-reclame-aqui .wa-msg , #especiais-procon .wa-msg, #especiais-consumidor-gov .wa-msg, #especiais-bacen .wa-msg {
     display: flex;
     max-width: 78%;
 }
 
-#especiais-reclame-aqui .wa-msg--in , #especiais-procon .wa-msg--in, #especiais-consumidor-gov .wa-msg--in {
+#especiais-reclame-aqui .wa-msg--in , #especiais-procon .wa-msg--in, #especiais-consumidor-gov .wa-msg--in, #especiais-bacen .wa-msg--in {
     align-self: flex-start;
 }
 
-#especiais-reclame-aqui .wa-msg--out , #especiais-procon .wa-msg--out, #especiais-consumidor-gov .wa-msg--out {
+#especiais-reclame-aqui .wa-msg--out , #especiais-procon .wa-msg--out, #especiais-consumidor-gov .wa-msg--out, #especiais-bacen .wa-msg--out {
     align-self: flex-end;
 }
 
-#especiais-reclame-aqui .wa-msg__bubble , #especiais-procon .wa-msg__bubble, #especiais-consumidor-gov .wa-msg__bubble {
+#especiais-reclame-aqui .wa-msg__bubble , #especiais-procon .wa-msg__bubble, #especiais-consumidor-gov .wa-msg__bubble, #especiais-bacen .wa-msg__bubble {
     position: relative;
     padding: 7px 10px 6px;
     border-radius: 8px;
@@ -12909,31 +12944,31 @@ body.desk-v2-mode #aiChatbotModal {
     word-break: break-word;
 }
 
-#especiais-reclame-aqui .wa-msg__bubble--in , #especiais-procon .wa-msg__bubble--in, #especiais-consumidor-gov .wa-msg__bubble--in {
+#especiais-reclame-aqui .wa-msg__bubble--in , #especiais-procon .wa-msg__bubble--in, #especiais-consumidor-gov .wa-msg__bubble--in, #especiais-bacen .wa-msg__bubble--in {
     background: #fff;
     border-radius: 0 8px 8px 8px;
     color: #111b21;
 }
 
-#especiais-reclame-aqui .wa-msg__bubble--out , #especiais-procon .wa-msg__bubble--out, #especiais-consumidor-gov .wa-msg__bubble--out {
+#especiais-reclame-aqui .wa-msg__bubble--out , #especiais-procon .wa-msg__bubble--out, #especiais-consumidor-gov .wa-msg__bubble--out, #especiais-bacen .wa-msg__bubble--out {
     background: #DCF8C6;
     border-radius: 8px 0 8px 8px;
     color: #111b21;
 }
 
-#especiais-reclame-aqui .wa-msg__bubble--internal , #especiais-procon .wa-msg__bubble--internal, #especiais-consumidor-gov .wa-msg__bubble--internal {
+#especiais-reclame-aqui .wa-msg__bubble--internal , #especiais-procon .wa-msg__bubble--internal, #especiais-consumidor-gov .wa-msg__bubble--internal, #especiais-bacen .wa-msg__bubble--internal {
     background: rgba(234, 179, 8, 0.15);
     border: 0.5px solid rgba(234, 179, 8, 0.35);
     border-radius: 8px 0 8px 8px;
     color: #111b21;
 }
 
-#especiais-reclame-aqui .wa-msg__text , #especiais-procon .wa-msg__text, #especiais-consumidor-gov .wa-msg__text {
+#especiais-reclame-aqui .wa-msg__text , #especiais-procon .wa-msg__text, #especiais-consumidor-gov .wa-msg__text, #especiais-bacen .wa-msg__text {
     display: block;
     padding-right: 4px;
 }
 
-#especiais-reclame-aqui .wa-msg__time , #especiais-procon .wa-msg__time, #especiais-consumidor-gov .wa-msg__time {
+#especiais-reclame-aqui .wa-msg__time , #especiais-procon .wa-msg__time, #especiais-consumidor-gov .wa-msg__time, #especiais-bacen .wa-msg__time {
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -12945,12 +12980,12 @@ body.desk-v2-mode #aiChatbotModal {
     white-space: nowrap;
 }
 
-#especiais-reclame-aqui .wa-msg__checks , #especiais-procon .wa-msg__checks, #especiais-consumidor-gov .wa-msg__checks {
+#especiais-reclame-aqui .wa-msg__checks , #especiais-procon .wa-msg__checks, #especiais-consumidor-gov .wa-msg__checks, #especiais-bacen .wa-msg__checks {
     font-size: 0.82rem;
     color: #53bdeb;
 }
 
-#especiais-reclame-aqui .wa-ia-card , #especiais-procon .wa-ia-card, #especiais-consumidor-gov .wa-ia-card {
+#especiais-reclame-aqui .wa-ia-card , #especiais-procon .wa-ia-card, #especiais-consumidor-gov .wa-ia-card, #especiais-bacen .wa-ia-card {
     align-self: flex-start;
     max-width: 88%;
     background: #fff;
@@ -12961,7 +12996,7 @@ body.desk-v2-mode #aiChatbotModal {
     margin-top: 8px;
 }
 
-#especiais-reclame-aqui .wa-ia-card__head , #especiais-procon .wa-ia-card__head, #especiais-consumidor-gov .wa-ia-card__head {
+#especiais-reclame-aqui .wa-ia-card__head , #especiais-procon .wa-ia-card__head, #especiais-consumidor-gov .wa-ia-card__head, #especiais-bacen .wa-ia-card__head {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -12972,20 +13007,20 @@ body.desk-v2-mode #aiChatbotModal {
     letter-spacing: 0.04em;
 }
 
-#especiais-reclame-aqui .wa-ia-card__text , #especiais-procon .wa-ia-card__text, #especiais-consumidor-gov .wa-ia-card__text {
+#especiais-reclame-aqui .wa-ia-card__text , #especiais-procon .wa-ia-card__text, #especiais-consumidor-gov .wa-ia-card__text, #especiais-bacen .wa-ia-card__text {
     font-size: 0.82rem;
     line-height: 1.45;
     color: #111b21;
     margin: 0 0 10px;
 }
 
-#especiais-reclame-aqui .wa-ia-card__actions , #especiais-procon .wa-ia-card__actions, #especiais-consumidor-gov .wa-ia-card__actions {
+#especiais-reclame-aqui .wa-ia-card__actions , #especiais-procon .wa-ia-card__actions, #especiais-consumidor-gov .wa-ia-card__actions, #especiais-bacen .wa-ia-card__actions {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
 }
 
-#especiais-reclame-aqui .wa-ia-card__btn , #especiais-procon .wa-ia-card__btn, #especiais-consumidor-gov .wa-ia-card__btn {
+#especiais-reclame-aqui .wa-ia-card__btn , #especiais-procon .wa-ia-card__btn, #especiais-consumidor-gov .wa-ia-card__btn, #especiais-bacen .wa-ia-card__btn {
     padding: 6px 12px;
     border-radius: 6px;
     font-size: 0.72rem;
@@ -12995,19 +13030,19 @@ body.desk-v2-mode #aiChatbotModal {
     border: 1.5px solid transparent;
 }
 
-#especiais-reclame-aqui .wa-ia-card__btn--primary , #especiais-procon .wa-ia-card__btn--primary, #especiais-consumidor-gov .wa-ia-card__btn--primary {
+#especiais-reclame-aqui .wa-ia-card__btn--primary , #especiais-procon .wa-ia-card__btn--primary, #especiais-consumidor-gov .wa-ia-card__btn--primary, #especiais-bacen .wa-ia-card__btn--primary {
     background: #15A237;
     color: #fff;
     border-color: #15A237;
 }
 
-#especiais-reclame-aqui .wa-ia-card__btn--outline , #especiais-procon .wa-ia-card__btn--outline, #especiais-consumidor-gov .wa-ia-card__btn--outline {
+#especiais-reclame-aqui .wa-ia-card__btn--outline , #especiais-procon .wa-ia-card__btn--outline, #especiais-consumidor-gov .wa-ia-card__btn--outline, #especiais-bacen .wa-ia-card__btn--outline {
     background: #fff;
     color: #15A237;
     border-color: #15A237;
 }
 
-#especiais-reclame-aqui .wa-chat__footer , #especiais-procon .wa-chat__footer, #especiais-consumidor-gov .wa-chat__footer {
+#especiais-reclame-aqui .wa-chat__footer , #especiais-procon .wa-chat__footer, #especiais-consumidor-gov .wa-chat__footer, #especiais-bacen .wa-chat__footer {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -13016,7 +13051,7 @@ body.desk-v2-mode #aiChatbotModal {
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui .wa-chat__input-bar , #especiais-procon .wa-chat__input-bar, #especiais-consumidor-gov .wa-chat__input-bar {
+#especiais-reclame-aqui .wa-chat__input-bar , #especiais-procon .wa-chat__input-bar, #especiais-consumidor-gov .wa-chat__input-bar, #especiais-bacen .wa-chat__input-bar {
     flex: 1;
     display: flex;
     align-items: center;
@@ -13027,7 +13062,7 @@ body.desk-v2-mode #aiChatbotModal {
     min-width: 0;
 }
 
-#especiais-reclame-aqui .wa-chat__input-icon , #especiais-procon .wa-chat__input-icon, #especiais-consumidor-gov .wa-chat__input-icon {
+#especiais-reclame-aqui .wa-chat__input-icon , #especiais-procon .wa-chat__input-icon, #especiais-consumidor-gov .wa-chat__input-icon, #especiais-bacen .wa-chat__input-icon {
     border: none;
     background: transparent;
     color: #54656f;
@@ -13038,7 +13073,7 @@ body.desk-v2-mode #aiChatbotModal {
     line-height: 1;
 }
 
-#especiais-reclame-aqui .wa-chat__input , #especiais-procon .wa-chat__input, #especiais-consumidor-gov .wa-chat__input {
+#especiais-reclame-aqui .wa-chat__input , #especiais-procon .wa-chat__input, #especiais-consumidor-gov .wa-chat__input, #especiais-bacen .wa-chat__input {
     flex: 1;
     border: none;
     outline: none;
@@ -13049,11 +13084,11 @@ body.desk-v2-mode #aiChatbotModal {
     min-width: 0;
 }
 
-#especiais-reclame-aqui .wa-chat__input::placeholder , #especiais-procon .wa-chat__input::placeholder, #especiais-consumidor-gov .wa-chat__input::placeholder {
+#especiais-reclame-aqui .wa-chat__input::placeholder , #especiais-procon .wa-chat__input::placeholder, #especiais-consumidor-gov .wa-chat__input::placeholder, #especiais-bacen .wa-chat__input::placeholder {
     color: #8696a0;
 }
 
-#especiais-reclame-aqui .wa-chat__send , #especiais-procon .wa-chat__send, #especiais-consumidor-gov .wa-chat__send {
+#especiais-reclame-aqui .wa-chat__send , #especiais-procon .wa-chat__send, #especiais-consumidor-gov .wa-chat__send, #especiais-bacen .wa-chat__send {
     width: 44px;
     height: 44px;
     border: none;
@@ -13068,11 +13103,11 @@ body.desk-v2-mode #aiChatbotModal {
     flex-shrink: 0;
 }
 
-#especiais-reclame-aqui .wa-chat__send:hover , #especiais-procon .wa-chat__send:hover, #especiais-consumidor-gov .wa-chat__send:hover {
+#especiais-reclame-aqui .wa-chat__send:hover , #especiais-procon .wa-chat__send:hover, #especiais-consumidor-gov .wa-chat__send:hover, #especiais-bacen .wa-chat__send:hover {
     background: #1da851;
 }
 
-#especiais-reclame-aqui .ra-crm-wa-wrap .crm-empty-state , #especiais-procon .ra-crm-wa-wrap .crm-empty-state, #especiais-consumidor-gov .ra-crm-wa-wrap .crm-empty-state {
+#especiais-reclame-aqui .ra-crm-wa-wrap .crm-empty-state , #especiais-procon .ra-crm-wa-wrap .crm-empty-state, #especiais-consumidor-gov .ra-crm-wa-wrap .crm-empty-state, #especiais-bacen .ra-crm-wa-wrap .crm-empty-state {
     color: #54656f;
     font-size: 0.85rem;
     text-align: center;

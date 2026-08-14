@@ -234,6 +234,35 @@ export async function seedWorkflowConfig(): Promise<void> {
     console.log('Seed: workflow consumidor-gov-tratativa criado');
   }
 
+  const bcTratativaExists = await Workflow.findOne({ slug: 'bacen-tratativa' }).select('_id').lean();
+  if (!bcTratativaExists) {
+    const doc = await Workflow.create({
+      slug: 'bacen-tratativa',
+      titulo: 'TRATATIVA BACEN',
+      descricao: 'Fluxo de tratativa de demandas registradas no Bacen',
+      ordem: 8,
+      ativo: true,
+      gatilho: {
+        tipo: 'tabulacao',
+        criterios: [
+          { fonte: 'tabulacao', campo: 'canal', operador: 'equals', valor: 'Bacen' },
+        ],
+      },
+      passos: [
+        { ordem: 0, passo: { nome: 'Triagem N1', descricao: 'N1 analisa a demanda Bacen.', icone: 'ti-circle-check', slaHoras: 8, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
+        { ordem: 1, passo: { nome: 'Resposta formal', descricao: 'Elaborar resposta formal ao Bacen.', icone: 'ti-file-text', slaHoras: 72, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
+        { ordem: 2, passo: { nome: 'Encerramento', descricao: 'Encerrar demanda após tratativa.', icone: 'ti-check', slaHoras: 24, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
+      ],
+      updatedBy: 'seed',
+    });
+    const first = doc.passos?.[0];
+    if (first?._id) {
+      doc.passoInicialId = first._id;
+      await doc.save();
+    }
+    console.log('Seed: workflow bacen-tratativa criado');
+  }
+
   const escalonarSeeds = [
     {
       slug: 'escalonar-financeiro',
@@ -293,7 +322,7 @@ export async function seedWorkflowConfig(): Promise<void> {
     console.log(`Seed: workflow ${seed.slug} criado`);
   }
 
-  const repairSlugs = ['reembolso-7dias', 'reclame-aqui-tratativa', 'procon-tratativa', 'consumidor-gov-tratativa', 'escalonar-financeiro', 'escalonar-produtos', 'escalonar-n2', 'escalonar-suporte'];
+  const repairSlugs = ['reembolso-7dias', 'reclame-aqui-tratativa', 'procon-tratativa', 'consumidor-gov-tratativa', 'bacen-tratativa', 'escalonar-financeiro', 'escalonar-produtos', 'escalonar-n2', 'escalonar-suporte'];
   for (const slug of repairSlugs) {
     const doc = await Workflow.findOne({ slug });
     if (doc) await repairWorkflowPassos(doc);

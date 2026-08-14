@@ -24,6 +24,14 @@ export default function CgTicketMain({
   waComposeText = '',
   onWaComposeTextChange,
   onTicketUpdated,
+  composeMode,
+  onComposeModeChange,
+  composeText,
+  onComposeTextChange,
+  internalText,
+  onInternalTextChange,
+  composeAttachments,
+  onComposeAttachmentsChange,
 }) {
   const { showNotification } = useNotifications();
   const [mergeInProgress, setMergeInProgress] = useState(false);
@@ -114,6 +122,14 @@ export default function CgTicketMain({
       onSelectHistoryTicket={handleSelectHistoryTicket}
       onFundirTickets={handleFundirTickets}
       merging={mergeInProgress}
+      composeMode={composeMode}
+      onComposeModeChange={onComposeModeChange}
+      composeText={composeText}
+      onComposeTextChange={onComposeTextChange}
+      internalText={internalText}
+      onInternalTextChange={onInternalTextChange}
+      composeAttachments={composeAttachments}
+      onComposeAttachmentsChange={onComposeAttachmentsChange}
     />
   );
 }

@@ -33,6 +33,7 @@ import {
 import { validateTicketAiInput } from '../services/openaiTicketSuggest.service';
 import type { RevisaoOrigem, TicketAiTabulationResult } from '../services/agents/agentTypes';
 import { recordAgentHeartbeat, recordAgentOffline } from '../services/agentPresence.service';
+import { isTicketPresenceConfigured, mintTicketPresenceToken } from '../services/presence/ticketPresenceToken.service';
 import { rebalanceAgentToCap, provisionalResponsavelFromAuth } from '../services/assignmentRouter.service';
 
 const router = Router();
@@ -58,6 +59,21 @@ router.post('/presence/offline', authMiddleware, async (req: Request, res: Respo
   if (!req.user) return res.status(401).json({ success: false, error: 'Não autenticado' });
   await recordAgentOffline(req.user);
   return res.json({ success: true, online: false, source: 'agents_presence_offline' });
+});
+
+router.get('/presence/realtime-token', authMiddleware, (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'Não autenticado' });
+
+  if (!isTicketPresenceConfigured()) {
+    return res.status(503).json({ success: false, error: 'Presence de ticket não configurado no servidor.' });
+  }
+
+  try {
+    const result = mintTicketPresenceToken(req.user);
+    return res.json({ success: true, ...result, source: 'agents_presence_realtime_token' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: (err as Error).message });
+  }
 });
 
 router.get('/status', authMiddleware, (_req: Request, res: Response) => {

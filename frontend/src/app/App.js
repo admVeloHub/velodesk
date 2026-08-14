@@ -18,6 +18,7 @@ import { NotificationProvider } from '../context/NotificationContext';
 import { ThemeProvider } from '../context/ThemeContext';
 
 import { TicketsProvider } from '../context/TicketsContext';
+import { TicketPresenceProvider } from '../context/TicketPresenceContext';
 
 import { ProfileProvider } from '../context/ProfileContext';
 import { TabulationProvider } from '../context/TabulationContext';
@@ -53,6 +54,7 @@ import EspeciaisChannelPage from '../features/especiais/EspeciaisChannelPage';
 import ReclameAquiChannelPage from '../features/especiais/ReclameAquiChannelPage';
 import ProconChannelPage from '../features/especiais/ProconChannelPage';
 import ConsumidorGovChannelPage from '../features/especiais/ConsumidorGovChannelPage';
+import BacenChannelPage from '../features/especiais/BacenChannelPage';
 import CasoEspecialDetailPage from '../features/workspace/components/gestaoDetail/CasoEspecialDetailPage';
 import AiUsageDetailPage from '../features/workspace/components/gestaoDetail/AiUsageDetailPage';
 import AtendimentoIaTelefonicoPage from '../pages/AtendimentoIaTelefonicoPage';
@@ -106,6 +108,8 @@ function AppRoutes() {
             { path: 'especiais/procon/*', element: React.createElement(ProconChannelPage) },
 
             { path: 'especiais/consumidor-gov/*', element: React.createElement(ConsumidorGovChannelPage) },
+
+            { path: 'especiais/bacen/*', element: React.createElement(BacenChannelPage) },
 
             { path: 'especiais/:channelId', element: React.createElement(EspeciaisChannelPage) },
 
@@ -165,10 +169,12 @@ function AppProviders({ children }) {
 
           null,
 
-          React.createElement(PermissionProvider, null,
-            React.createElement(ProfileProvider, null,
-              React.createElement(TabulationProvider, null,
-                React.createElement(WorkflowConfigProvider, null, children)
+          React.createElement(TicketPresenceProvider, null,
+            React.createElement(PermissionProvider, null,
+              React.createElement(ProfileProvider, null,
+                React.createElement(TabulationProvider, null,
+                  React.createElement(WorkflowConfigProvider, null, children)
+                )
               )
             )
           )

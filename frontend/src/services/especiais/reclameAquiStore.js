@@ -8,15 +8,32 @@ import {
   computeIniciais,
 } from './reclameAquiData';
 import { reclamacoesApi } from '../../api/client';
+import {
+  applyTicketStatusToEspeciaisItem,
+  isEspeciaisItemFinalizada,
+  normalizeEspeciaisItemGroup,
+  passesGestaoListFilter,
+  resolveEspeciaisGroupKey,
+} from './especiaisGroupKey';
 
 const STORAGE_KEY = 'velodesk_reclame_aqui_items';
 
+const GROUP_OPTS = {
+  statusField: 'statusRa',
+  naoRespondidaStatus: RA_STATUS.NAO_RESPONDIDA,
+  prazoField: 'prazoRa',
+};
+
 let memoryCache = null;
 
-function todayAt(hour, minute = 0) {
-  const d = new Date();
-  d.setHours(hour, minute, 0, 0);
-  return d.toISOString();
+function ensureNormalizedCache(items) {
+  const normalized = items.map((item) => normalizeEspeciaisItemGroup(item, GROUP_OPTS));
+  const changed = normalized.some(
+    (n, i) => n.groupKey !== items[i].groupKey || n.aberta !== items[i].aberta,
+  );
+  if (changed) writeAll(normalized);
+  memoryCache = normalized;
+  return normalized;
 }
 
 function daysFromNow(days, hour = 18) {
@@ -25,205 +42,6 @@ function daysFromNow(days, hour = 18) {
   d.setHours(hour, 0, 0, 0);
   return d.toISOString();
 }
-
-const SEED_ITEMS = [
-  {
-    id: 'ra-001',
-    consumidor: 'João Ferreira',
-    iniciais: 'JF',
-    assunto: 'Cancelamento não processado',
-    statusRa: RA_STATUS.NAO_RESPONDIDA,
-    slaPct: 95,
-    slaTone: 'red',
-    prazoRa: todayAt(18, 0),
-    passivelNota: true,
-    workflow: '—',
-    tabulacao: 'Produto X',
-    atendente: '—',
-    groupKey: 'vencendo-hoje',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-  },
-  {
-    id: 'ra-002',
-    consumidor: 'Carlos Barros',
-    iniciais: 'CB',
-    assunto: 'Cobrança indevida no cartão',
-    statusRa: RA_STATUS.NAO_RESPONDIDA,
-    slaPct: 88,
-    slaTone: 'red',
-    prazoRa: todayAt(20, 0),
-    passivelNota: true,
-    workflow: '—',
-    tabulacao: 'Financeiro',
-    atendente: '—',
-    groupKey: 'vencendo-hoje',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-  },
-  {
-    id: 'ra-003',
-    protocoloRa: 'RA-2026-00394821',
-    consumidor: 'Maria Oliveira',
-    iniciais: 'MO',
-    cpf: '123.456.789-01',
-    telefoneWhatsapp: '(11) 99821-3344',
-    assunto: 'Internet cai toda noite após 22h',
-    descricao:
-      'Contratei fibra óptica há 3 meses e, quase todas as noites após 22h, a internet fica completamente inacessível. Já reiniciei o roteador diversas vezes e o problema persiste. Preciso de solução urgente pois trabalho em home office.',
-    idReclamacaoRa: 'RA-EXT-394821',
-    dataReclamacao: daysFromNow(-2, 14),
-    produto: 'Fibra residencial',
-    tipo: 'Reclamação',
-    motivo: 'Lentidão / Instabilidade',
-    respostaPublica: '',
-    whatsappMensagem: RA_WHATSAPP_DEFAULT_MSG,
-    statusRa: RA_STATUS.NAO_RESPONDIDA,
-    slaPct: 72,
-    slaTone: 'yellow',
-    prazoRa: daysFromNow(2, 18),
-    passivelNota: true,
-    workflow: '—',
-    tabulacao: 'Produto X',
-    atendente: 'Ana Silva',
-    groupKey: 'nao-respondidas',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-    isDraft: false,
-  },
-  {
-    id: 'ra-004',
-    consumidor: 'Lúcia Santos',
-    iniciais: 'LS',
-    assunto: 'Dificuldade para cancelar assinatura',
-    statusRa: RA_STATUS.WORKFLOW_ATIVO,
-    slaPct: 65,
-    slaTone: 'yellow',
-    prazoRa: daysFromNow(2),
-    passivelNota: true,
-    workflow: 'Cancelamento',
-    tabulacao: 'TV',
-    atendente: 'Pedro Lima',
-    groupKey: 'nao-respondidas',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: true,
-  },
-  {
-    id: 'ra-005',
-    consumidor: 'Roberto Almeida',
-    iniciais: 'RA',
-    assunto: 'Produto diferente do anunciado',
-    statusRa: RA_STATUS.NAO_RESPONDIDA,
-    slaPct: 58,
-    slaTone: 'yellow',
-    prazoRa: daysFromNow(3),
-    passivelNota: false,
-    workflow: '—',
-    tabulacao: 'Combo',
-    atendente: '—',
-    groupKey: 'nao-respondidas',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-  },
-  {
-    id: 'ra-006',
-    consumidor: 'Fernanda Costa',
-    iniciais: 'FC',
-    assunto: 'Estorno não creditado',
-    statusRa: RA_STATUS.WORKFLOW_ATIVO,
-    slaPct: 45,
-    slaTone: 'green',
-    prazoRa: daysFromNow(4),
-    passivelNota: true,
-    workflow: 'Reembolso',
-    tabulacao: 'Financeiro',
-    atendente: 'Carla Mendes',
-    groupKey: 'nao-respondidas',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: true,
-  },
-  {
-    id: 'ra-007',
-    consumidor: 'Patricia Nunes',
-    iniciais: 'PN',
-    assunto: 'Atendimento telefônico insatisfatório',
-    statusRa: RA_STATUS.NAO_RESPONDIDA,
-    slaPct: 40,
-    slaTone: 'green',
-    prazoRa: daysFromNow(5),
-    passivelNota: true,
-    workflow: '—',
-    tabulacao: 'Telefone',
-    atendente: '—',
-    groupKey: 'nao-respondidas',
-    respostaAction: 'responder',
-    aberta: true,
-    workflowAtivo: false,
-  },
-  {
-    id: 'ra-008',
-    consumidor: 'Paula Rezende',
-    iniciais: 'PR',
-    assunto: 'Reclamação resolvida — aguardando avaliação',
-    statusRa: RA_STATUS.AGUARD_AVALIACAO,
-    slaPct: 100,
-    slaTone: 'green',
-    prazoRa: daysFromNow(-1),
-    passivelNota: true,
-    workflow: '—',
-    tabulacao: 'Produto X',
-    atendente: 'Ana Silva',
-    groupKey: 'respondidas',
-    respostaAction: 'avaliacao',
-    aberta: false,
-    workflowAtivo: false,
-    nota: 4,
-  },
-  {
-    id: 'ra-009',
-    consumidor: 'André Macedo',
-    iniciais: 'AM',
-    assunto: 'Problema resolvido com reembolso',
-    statusRa: RA_STATUS.RESPONDIDA,
-    slaPct: 100,
-    slaTone: 'green',
-    prazoRa: daysFromNow(-2),
-    passivelNota: false,
-    workflow: 'Reembolso',
-    tabulacao: 'Financeiro',
-    atendente: 'Pedro Lima',
-    groupKey: 'respondidas',
-    respostaAction: 'ver-resposta',
-    aberta: false,
-    workflowAtivo: false,
-    nota: 5,
-  },
-  {
-    id: 'ra-010',
-    consumidor: 'Camila Souza',
-    iniciais: 'CS',
-    assunto: 'Dúvida esclarecida sobre fatura',
-    statusRa: RA_STATUS.RESPONDIDA,
-    slaPct: 100,
-    slaTone: 'green',
-    prazoRa: daysFromNow(-3),
-    passivelNota: false,
-    workflow: '—',
-    tabulacao: 'Internet Fibra',
-    atendente: 'Carla Mendes',
-    groupKey: 'respondidas',
-    respostaAction: 'ver-resposta',
-    aberta: false,
-    workflowAtivo: false,
-    nota: 4,
-  },
-];
 
 function readAll() {
   try {
@@ -240,53 +58,42 @@ function writeAll(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
-export function ensureReclameAquiSeed() {
-  const existing = readAll();
-  if (existing?.length) return existing;
-  if (process.env.NODE_ENV === 'development') {
-    writeAll(SEED_ITEMS);
-    memoryCache = SEED_ITEMS;
-    return SEED_ITEMS;
-  }
-  return [];
-}
-
 function normalizeApiItem(row) {
   const statusRa = row.statusRa || row.statusCanal || RA_STATUS.NAO_RESPONDIDA;
-  return {
+  const base = {
     ...row,
     id: row.id || row._id,
     ticketId: row.ticketId || row.chamadoId,
     statusRa,
-    groupKey: row.groupKey || (statusRa === RA_STATUS.NAO_RESPONDIDA ? 'nao-respondidas' : 'respondidas'),
+    ticketStatus: row.ticketStatus || row.statusTicket,
     respostaAction: row.respostaAction || 'responder',
     workflow: row.workflow || (row.workflowAtivo ? 'Ativo' : '—'),
     tabulacao: row.tabulacao || row.produto || '—',
     atendente: row.atendente || row.responsavel || '—',
   };
+  return {
+    ...base,
+    groupKey: resolveEspeciaisGroupKey(base, {
+      statusField: 'statusRa',
+      naoRespondidaStatus: RA_STATUS.NAO_RESPONDIDA,
+      prazoField: 'prazoRa',
+    }),
+  };
 }
 
 export async function refreshReclamacoesFromApi() {
-  try {
-    const data = await reclamacoesApi.list('reclame-aqui');
-    const items = (data?.items ?? []).map(normalizeApiItem);
-    memoryCache = items;
-    writeAll(items);
-    return items;
-  } catch (err) {
-    console.warn('reclameAquiStore: falha ao carregar reclamacoes_reclameAqui', err?.message || err);
-    return memoryCache ?? readAll() ?? [];
-  }
+  const data = await reclamacoesApi.list('reclame-aqui');
+  const items = (data?.items ?? []).map(normalizeApiItem);
+  memoryCache = items;
+  writeAll(items);
+  return items;
 }
 
 export function loadAllReclamacoes() {
-  if (memoryCache?.length) return memoryCache;
+  if (memoryCache) return ensureNormalizedCache(memoryCache);
   const stored = readAll();
-  if (stored?.length) {
-    memoryCache = stored;
-    return stored;
-  }
-  return ensureReclameAquiSeed();
+  if (stored) return ensureNormalizedCache(stored);
+  return [];
 }
 
 function isSameDay(a, b) {
@@ -308,6 +115,7 @@ function matchesSearch(item, query) {
 
 function matchesChip(item, chipId) {
   if (!chipId) return true;
+  if (chipId !== 'finalizadas' && isEspeciaisItemFinalizada(item)) return false;
   switch (chipId) {
     case 'nao-respondidas':
       return item.statusRa === RA_STATUS.NAO_RESPONDIDA || item.groupKey === 'nao-respondidas';
@@ -319,38 +127,42 @@ function matchesChip(item, chipId) {
       return item.workflowAtivo;
     case 'vencendo-hoje':
       return item.groupKey === 'vencendo-hoje';
+    case 'finalizadas':
+      return isEspeciaisItemFinalizada(item);
     default:
       return true;
   }
 }
 
-export function loadReclamacoes({ search = '', activeChips = [] } = {}) {
+export function loadReclamacoes({ search = '', activeChips = [], gestaoView = false } = {}) {
   const items = loadAllReclamacoes();
   return items.filter((item) => {
     if (!matchesSearch(item, search)) return false;
+    if (gestaoView && !passesGestaoListFilter(item, activeChips)) return false;
     if (activeChips.length && !activeChips.every((chip) => matchesChip(item, chip))) return false;
     return true;
   });
 }
 
 export function getReclameAquiKpis(items = loadAllReclamacoes()) {
+  const operational = items.filter((i) => !isEspeciaisItemFinalizada(i));
   const today = new Date();
-  const vencendoHoje = items.filter((i) => {
+  const vencendoHoje = operational.filter((i) => {
     const d = new Date(i.prazoRa);
     return isSameDay(d, today) && i.aberta;
   }).length;
-  const naoRespondidas = items.filter((i) =>
+  const naoRespondidas = operational.filter((i) =>
     i.statusRa === RA_STATUS.NAO_RESPONDIDA || i.groupKey === 'nao-respondidas',
   ).length;
-  const respondidas = items.filter((i) =>
+  const respondidas = operational.filter((i) =>
     i.statusRa === RA_STATUS.RESPONDIDA || i.statusRa === RA_STATUS.AGUARD_AVALIACAO,
   ).length;
-  const workflowAtivo = items.filter((i) => i.workflowAtivo).length;
-  const notas = items.filter((i) => typeof i.nota === 'number').map((i) => i.nota);
+  const workflowAtivo = operational.filter((i) => i.workflowAtivo).length;
+  const notas = operational.filter((i) => typeof i.nota === 'number').map((i) => i.nota);
   const notaMedia = notas.length
     ? (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1)
     : '—';
-  const respondidasComPrazo = items.filter((i) => !i.aberta);
+  const respondidasComPrazo = operational.filter((i) => !i.aberta);
   const noPrazo = respondidasComPrazo.filter((i) => i.slaPct >= 80).length;
   const pctNoPrazo = respondidasComPrazo.length
     ? Math.round((noPrazo / respondidasComPrazo.length) * 100)
@@ -379,7 +191,7 @@ export function getKanbanColumns(items) {
   return cols.map((col) => {
     let colItems = [];
     if (col.id === 'workflow-ativo') {
-      colItems = items.filter((i) => i.workflowAtivo && i.groupKey !== 'respondidas');
+      colItems = items.filter((i) => i.workflowAtivo && i.groupKey !== 'respondidas' && i.groupKey !== 'finalizadas');
     } else {
       colItems = items.filter((i) => i.groupKey === col.id);
     }
@@ -403,23 +215,24 @@ export function getCalendarEvents(items, year, month) {
 }
 
 export function getReportSeries(items = loadAllReclamacoes()) {
+  const operational = items.filter((i) => !isEspeciaisItemFinalizada(i));
   const byStatus = {
-    'Não respondida': items.filter((i) => i.statusRa === RA_STATUS.NAO_RESPONDIDA).length,
-    'Workflow ativo': items.filter((i) => i.workflowAtivo).length,
-    Respondida: items.filter((i) => i.statusRa === RA_STATUS.RESPONDIDA).length,
-    'Aguard. avaliação': items.filter((i) => i.statusRa === RA_STATUS.AGUARD_AVALIACAO).length,
+    'Não respondida': operational.filter((i) => i.statusRa === RA_STATUS.NAO_RESPONDIDA).length,
+    'Workflow ativo': operational.filter((i) => i.workflowAtivo).length,
+    Respondida: operational.filter((i) => i.statusRa === RA_STATUS.RESPONDIDA).length,
+    'Aguard. avaliação': operational.filter((i) => i.statusRa === RA_STATUS.AGUARD_AVALIACAO).length,
   };
   const slaBuckets = {
-    'No prazo (≥80%)': items.filter((i) => i.slaPct >= 80).length,
-    'Atenção (50–79%)': items.filter((i) => i.slaPct >= 50 && i.slaPct < 80).length,
-    'Crítico (<50%)': items.filter((i) => i.slaPct < 50).length,
+    'No prazo (≥80%)': operational.filter((i) => i.slaPct >= 80).length,
+    'Atenção (50–79%)': operational.filter((i) => i.slaPct >= 50 && i.slaPct < 80).length,
+    'Crítico (<50%)': operational.filter((i) => i.slaPct < 50).length,
   };
-  const notas = items.filter((i) => typeof i.nota === 'number');
+  const notas = operational.filter((i) => typeof i.nota === 'number');
   const notaDistrib = [1, 2, 3, 4, 5].map((n) => ({
     label: `${n} estrela${n > 1 ? 's' : ''}`,
     value: notas.filter((i) => i.nota === n).length,
   }));
-  return { byStatus, slaBuckets, notaDistrib, total: items.length };
+  return { byStatus, slaBuckets, notaDistrib, total: operational.length };
 }
 
 export function getFooterSummary(items, selectedCount = 0) {
@@ -481,7 +294,12 @@ export function buildRegistroDefaults(item = {}) {
     workflow: item.workflow || '—',
     tabulacao: item.tabulacao || item.produto || '—',
     atendente: item.atendente || '—',
-    groupKey: item.groupKey || 'nao-respondidas',
+    groupKey: resolveEspeciaisGroupKey(item, {
+      statusField: 'statusRa',
+      naoRespondidaStatus: RA_STATUS.NAO_RESPONDIDA,
+      prazoField: 'prazoRa',
+    }),
+    ticketStatus: item.ticketStatus || item.statusTicket || '',
     respostaAction: item.respostaAction || 'responder',
     aberta: item.aberta !== false,
     workflowAtivo: item.workflowAtivo || false,
@@ -498,6 +316,28 @@ export function createEmptyReclamacao() {
     }),
     id,
   };
+}
+
+export function getReclamacaoByTicketId(ticketId) {
+  if (!ticketId) return null;
+  const id = String(ticketId);
+  const items = loadAllReclamacoes();
+  const found = items.find((i) => String(i.ticketId || '') === id);
+  if (!found) return null;
+  return { ...found, ...buildRegistroDefaults(found) };
+}
+
+export function updateReclamacaoGroupFromTicket(ticket) {
+  const ticketId = String(ticket?.id || ticket?._id || '');
+  if (!ticketId) return null;
+  const item = getReclamacaoByTicketId(ticketId);
+  if (!item) return null;
+  const updated = applyTicketStatusToEspeciaisItem(item, ticket, {
+    statusField: 'statusRa',
+    naoRespondidaStatus: RA_STATUS.NAO_RESPONDIDA,
+    prazoField: 'prazoRa',
+  });
+  return upsertReclamacao(updated);
 }
 
 export function getReclamacaoById(id) {
@@ -522,6 +362,10 @@ function upsertReclamacao(item) {
   }
   writeAll(items);
   return normalized;
+}
+
+export function patchReclamacao(item) {
+  return upsertReclamacao(item);
 }
 
 export function saveReclamacaoDraft(item) {

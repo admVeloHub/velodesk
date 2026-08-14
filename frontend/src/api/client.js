@@ -350,3 +350,22 @@ export const reclamacoesApi = {
   patch: (orgao, id, body) =>
     api.patch(`/reclamacoes/${encodeURIComponent(orgao)}/${encodeURIComponent(id)}`, body).then((r) => r.data),
 };
+
+/** reclame-aqui/hugme — base Hugme persistida no MongoDB */
+export const reclameAquiHugmeApi = {
+  import: (file, modo = 'incremental') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('modo', modo);
+    return api.post(`/reclame-aqui/hugme/import?modo=${encodeURIComponent(modo)}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data);
+  },
+  listRegistros: (params = {}) =>
+    api.get('/reclame-aqui/hugme/registros', { params }).then((r) => r.data),
+  getRegistro: (idOrigem) =>
+    api.get(`/reclame-aqui/hugme/registros/${encodeURIComponent(idOrigem)}`).then((r) => r.data),
+  listBatches: (params = {}) =>
+    api.get('/reclame-aqui/hugme/import-batches', { params }).then((r) => r.data),
+  stats: () => api.get('/reclame-aqui/hugme/stats').then((r) => r.data),
+};

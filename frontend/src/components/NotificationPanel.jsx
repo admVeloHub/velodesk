@@ -23,6 +23,10 @@ export default function NotificationPanel() {
     const ticketId = item.ticketId ? String(item.ticketId) : '';
     if (ticketId) {
       togglePanel();
+      if (item.especialOrgao) {
+        navigate(`/especiais/${item.especialOrgao}/ticket/${encodeURIComponent(ticketId)}`);
+        return;
+      }
       navigate(`/tickets?desk=v2&ticket=${encodeURIComponent(ticketId)}`);
       return;
     }

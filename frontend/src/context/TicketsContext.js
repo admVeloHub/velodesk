@@ -3,7 +3,7 @@
  * VERSION: v1.8.2 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { findTicketEntry, getTicketColumns, refreshTicketsFromApi } from '../services/ticketsStorage';
+import { findTicketEntry, getTicketColumns, refreshTicketsFromApi, loadTicketDetailFromApi } from '../services/ticketsStorage';
 import { hydrateColumnsFromStorage, patchTicketInCache, fingerprintQueueColumns, isDraftTicket } from '../services/ticketsCache';
 import {
   hydrateQueueCountsFromStorage,
@@ -186,11 +186,10 @@ export function TicketsProvider({ children }) {
             if (isDraftTicket({ id: tab.id }) || String(tab.id).startsWith('draft-')) {
               return tab;
             }
-            return null;
+            return tab;
           }
           return { ...tab, ...buildTabMeta(entry) };
-        })
-        .filter(Boolean);
+        });
       setActiveTabId((current) => {
         if (!current) return current;
         if (next.some((tab) => String(tab.id) === String(current))) return current;
@@ -201,19 +200,40 @@ export function TicketsProvider({ children }) {
   }, [refreshKey]);
 
   const openTicket = useCallback((ticketId) => {
-    const entry = findTicketEntry(ticketId);
-    if (!entry) return;
-    const meta = buildTabMeta(entry);
-    setOpenTabs((prev) => {
-      const idx = prev.findIndex((t) => String(t.id) === String(ticketId));
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = { ...next[idx], ...meta };
-        return next;
-      }
-      return [...prev, meta];
-    });
-    setActiveTabId(ticketId);
+    const id = String(ticketId || '').trim();
+    if (!id) return;
+
+    const applyOpen = () => {
+      const entry = findTicketEntry(id);
+      if (!entry) return false;
+      const meta = buildTabMeta(entry);
+      setOpenTabs((prev) => {
+        const idx = prev.findIndex((t) => String(t.id) === id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = { ...next[idx], ...meta };
+          return next;
+        }
+        return [...prev, meta];
+      });
+      setActiveTabId(id);
+      return true;
+    };
+
+    if (applyOpen()) return;
+
+    void loadTicketDetailFromApi(id)
+      .then(() => {
+        if (applyOpen()) return;
+        setRefreshKey((k) => k + 1);
+        applyOpen();
+      })
+      .catch((err) => {
+        deskLog.error('TICKETS', 'openTicket: falha ao carregar detalhe', {
+          ticketId: id,
+          message: err?.response?.data?.message || err?.message,
+        });
+      });
   }, [refreshKey]);
 
   const closeTicketTab = useCallback((ticketId) => {

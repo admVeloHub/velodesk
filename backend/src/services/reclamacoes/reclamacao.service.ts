@@ -8,7 +8,7 @@ import {
   getReclamacaoProconModel,
   getReclamacaoReclameAquiModel,
 } from '../../models/reclamacoes/reclamacaoModels';
-import { currentStatus, normalizeStatusValue, readTabulacaoSnapshot } from '../chamado.mapper';
+import { currentStatus, findBacenFromChamado, findConsumidorGovFromChamado, findProconFromChamado, normalizeStatusValue, readTabulacaoSnapshot } from '../chamado.mapper';
 import type {
   CasoEspecialOrgao,
   CasoEspecialTriagemPersisted,
@@ -92,10 +92,14 @@ function readCanalMeta(chamado: IChamadoN1): Record<string, unknown> {
   if (procon && typeof procon === 'object' && !Array.isArray(procon)) {
     return procon as Record<string, unknown>;
   }
+  const proconFromRegistro = findProconFromChamado(chamado);
+  if (proconFromRegistro) return proconFromRegistro;
   const gov = tab.consumidorGov;
   if (gov && typeof gov === 'object' && !Array.isArray(gov)) {
     return gov as Record<string, unknown>;
   }
+  const govFromRegistro = findConsumidorGovFromChamado(chamado);
+  if (govFromRegistro) return govFromRegistro;
   const ra = tab.reclameAqui;
   if (ra && typeof ra === 'object' && !Array.isArray(ra)) {
     return ra as Record<string, unknown>;
@@ -104,6 +108,8 @@ function readCanalMeta(chamado: IChamadoN1): Record<string, unknown> {
   if (bacen && typeof bacen === 'object' && !Array.isArray(bacen)) {
     return bacen as Record<string, unknown>;
   }
+  const bacenFromRegistro = findBacenFromChamado(chamado);
+  if (bacenFromRegistro) return bacenFromRegistro;
   return {};
 }
 
@@ -148,6 +154,9 @@ function buildMetaForOrgao(
   }
   if (orgao === 'bacen' && canalMeta.protocoloBacen) {
     base.protocoloBacen = canalMeta.protocoloBacen;
+  }
+  if (orgao === 'bacen' && canalMeta.statusBc) {
+    base.statusBc = canalMeta.statusBc;
   }
   return base;
 }
@@ -225,6 +234,7 @@ function buildReclamacaoPayload(
       meta.statusPc
       ?? meta.statusGov
       ?? meta.statusRa
+      ?? meta.statusBc
       ?? meta.statusCanal
       ?? defaultStatusForOrgao(orgao),
     ).trim(),
@@ -325,6 +335,7 @@ export async function syncFromChamado(chamado: IChamadoN1): Promise<IReclamacao 
       meta.statusPc
       ?? meta.statusGov
       ?? meta.statusRa
+      ?? meta.statusBc
       ?? existing.statusCanal,
     ).trim(),
     meta: buildMetaForOrgao(orgao, { ...(existing.meta as Record<string, unknown>), ...meta }),

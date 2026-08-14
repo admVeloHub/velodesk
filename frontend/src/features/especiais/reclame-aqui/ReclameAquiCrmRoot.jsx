@@ -1,14 +1,15 @@
 /**
  * ReclameAquiCrmRoot — shell CRM RA (fila + lista + ticket + sidebar)
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useRaNovaReclamacaoModals } from '../../../hooks/useRaNovaReclamacaoModals';
 import { RA_GROUPS } from '../../../services/especiais/reclameAquiData';
 import { loadReclamacoes } from '../../../services/especiais/reclameAquiStore';
 import { matchesTicketCpfSearch } from '../../../services/especiais/especiaisCrmSearch';
-import { fetchRaTicketView } from '../../../services/especiais/reclameAquiTicketService';
+import { fetchRaTicketView, loadReclameAquiTicketsFromApi } from '../../../services/especiais/reclameAquiTicketService';
+import { useEspeciaisTicketCommit } from '../shared/useEspeciaisTicketCommit';
 import RaQueuePanel from './RaQueuePanel';
 import RaTicketList from './RaTicketList';
 import RaTicketMain from './RaTicketMain';
@@ -31,6 +32,23 @@ export default function ReclameAquiCrmRoot() {
     () => localStorage.getItem('velodeskRaListCollapsed') === '1',
   );
   const [listVersion, setListVersion] = useState(0);
+  const syncedOnceRef = useRef(false);
+
+  useEffect(() => {
+    const refreshFromApi = () => {
+      loadReclameAquiTicketsFromApi().catch(() => {}).finally(() => {
+        syncedOnceRef.current = true;
+      });
+    };
+    refreshFromApi();
+    const bumpList = () => setListVersion((v) => v + 1);
+    window.addEventListener('velodesk:ra-sync', bumpList);
+    window.addEventListener('velodesk:refresh-tickets', refreshFromApi);
+    return () => {
+      window.removeEventListener('velodesk:ra-sync', bumpList);
+      window.removeEventListener('velodesk:refresh-tickets', refreshFromApi);
+    };
+  }, []);
 
   const { openNovaFlow, modals: novaModals } = useRaNovaReclamacaoModals({
     navigate,
@@ -43,6 +61,10 @@ export default function ReclameAquiCrmRoot() {
   const [redirectTo, setRedirectTo] = useState(null);
   const [waChatOpen, setWaChatOpen] = useState(false);
   const [waComposeText, setWaComposeText] = useState('');
+  const [composeMode, setComposeMode] = useState('public');
+  const [composeText, setComposeText] = useState('');
+  const [internalText, setInternalText] = useState('');
+  const [composeAttachments, setComposeAttachments] = useState([]);
 
   const allItems = useMemo(
     () => loadReclamacoes({ search: appliedSearch }),
@@ -88,12 +110,18 @@ export default function ReclameAquiCrmRoot() {
     try {
       const view = await fetchRaTicketView(id);
       if (!view?.raItem) {
+        if (!syncedOnceRef.current) {
+          // ainda sincronizando com a API — mantém o loading e tenta de novo quando os dados chegarem
+          return;
+        }
         setRaItem(null);
         setTicket(null);
+        setTicketLoading(false);
         setRedirectTo('/especiais/reclame-aqui');
         return;
       }
       if (!view.raItem.ticketId) {
+        setTicketLoading(false);
         setRedirectTo(`/especiais/reclame-aqui/registro/${view.raItem.id}`);
         return;
       }
@@ -102,23 +130,67 @@ export default function ReclameAquiCrmRoot() {
       if (view.raItem.groupKey) {
         setActiveGroup(view.raItem.groupKey);
       }
+      setTicketLoading(false);
     } catch {
       showNotification('Não foi possível carregar o ticket.', 'error');
       setRaItem(null);
       setTicket(null);
-    } finally {
       setTicketLoading(false);
     }
   }, [id, showNotification]);
 
   useEffect(() => {
     reloadTicket();
-  }, [reloadTicket]);
+  }, [reloadTicket, listVersion]);
 
   useEffect(() => {
     setWaChatOpen(false);
     setWaComposeText('');
+    setComposeMode('public');
+    setComposeText('');
+    setInternalText('');
+    setComposeAttachments([]);
   }, [id]);
+
+  const composeSession = useMemo(() => ({
+    composeText,
+    internalText,
+    composeAttachments,
+    clearCompose: (fields = {}) => {
+      if (fields.composeText) setComposeText('');
+      if (fields.internalText) setInternalText('');
+      if (fields.composeAttachments) setComposeAttachments([]);
+    },
+  }), [composeText, internalText, composeAttachments]);
+
+  const handleCommitSaved = useCallback((result) => {
+    setTicket(result.ticket);
+    if (result.channelItem) setRaItem(result.channelItem);
+    setListVersion((v) => v + 1);
+  }, []);
+
+  const handleCommitFinalized = useCallback((result) => {
+    setTicket(result.ticket);
+    if (result.channelItem) setRaItem(result.channelItem);
+    setActiveGroup('finalizadas');
+    setListVersion((v) => v + 1);
+  }, []);
+
+  const {
+    committing,
+    handleSaveTicket,
+    handleFinalizeTicket,
+    finalized,
+    readOnly,
+  } = useEspeciaisTicketCommit({
+    channelId: 'ra',
+    channelItem: raItem,
+    ticket,
+    composeSession,
+    onTicketSaved: handleCommitSaved,
+    onFinalized: handleCommitFinalized,
+    showNotification,
+  });
 
   const handleSearchSubmit = useCallback(() => {
     setAppliedSearch(searchDraft.trim());
@@ -199,6 +271,14 @@ export default function ReclameAquiCrmRoot() {
         waComposeText={waComposeText}
         onWaComposeTextChange={setWaComposeText}
         onTicketUpdated={handleTicketUpdated}
+        composeMode={composeMode}
+        onComposeModeChange={setComposeMode}
+        composeText={composeText}
+        onComposeTextChange={setComposeText}
+        internalText={internalText}
+        onInternalTextChange={setInternalText}
+        composeAttachments={composeAttachments}
+        onComposeAttachmentsChange={setComposeAttachments}
       />
 
       <RaTicketSide
@@ -208,6 +288,11 @@ export default function ReclameAquiCrmRoot() {
         onOpenChat={handleOpenChat}
         onCloseChat={handleCloseChat}
         onTicketUpdated={handleTicketUpdated}
+        onSave={handleSaveTicket}
+        onFinalize={handleFinalizeTicket}
+        saving={committing}
+        disabled={readOnly || finalized}
+        finalized={finalized}
       />
 
       {novaModals}

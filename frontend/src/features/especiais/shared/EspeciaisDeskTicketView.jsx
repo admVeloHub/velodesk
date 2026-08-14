@@ -29,13 +29,17 @@ export default function EspeciaisDeskTicketView({
   onSelectHistoryTicket,
   onFundirTickets,
   merging = false,
+  composeMode = 'public',
+  onComposeModeChange,
+  composeText = '',
+  onComposeTextChange,
+  internalText = '',
+  onInternalTextChange,
+  composeAttachments = [],
+  onComposeAttachmentsChange,
 }) {
   const { showNotification } = useNotifications();
   const [mainTab, setMainTab] = useState('conversa');
-  const [composeMode, setComposeMode] = useState('public');
-  const [composeText, setComposeText] = useState('');
-  const [internalText, setInternalText] = useState('');
-  const [composeAttachments, setComposeAttachments] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const convMsgs = useMemo(
@@ -49,9 +53,6 @@ export default function EspeciaisDeskTicketView({
 
   useEffect(() => {
     setMainTab('conversa');
-    setComposeText('');
-    setInternalText('');
-    setComposeAttachments([]);
   }, [ticketId]);
 
   const handleSaveContact = useCallback(async (draft) => {
@@ -182,10 +183,10 @@ export default function EspeciaisDeskTicketView({
                     composeText={composeText}
                     internalText={internalText}
                     composeAttachments={composeAttachments}
-                    onComposeAttachmentsChange={setComposeAttachments}
-                    onComposeModeChange={setComposeMode}
-                    onComposeTextChange={setComposeText}
-                    onInternalTextChange={setInternalText}
+                    onComposeAttachmentsChange={onComposeAttachmentsChange}
+                    onComposeModeChange={onComposeModeChange}
+                    onComposeTextChange={onComposeTextChange}
+                    onInternalTextChange={onInternalTextChange}
                     ticketReadOnly={ticketReadOnly}
                   />
                 </>

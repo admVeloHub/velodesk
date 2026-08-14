@@ -269,6 +269,7 @@ export default function DeskRightPanel({
           <ProcessosPopover
             open={processosOpen}
             onClose={() => setProcessosOpen(false)}
+            tabulacaoProduto={effectiveRightFields.produto}
           />
         </section>
       </div>

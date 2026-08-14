@@ -2,9 +2,9 @@
  * ProfileContext v2.0.0 — visão fixa por RBAC (sem troca manual)
  * VERSION: v2.0.0 | DATE: 2026-07-23 | AUTHOR: VeloHub Development Team
  */
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getProfileMeta, getProfileDefaultPath, normalizeProfileId } from '../config/profiles';
+import { PROFILES, getProfileMeta, getProfileDefaultPath, normalizeProfileId } from '../config/profiles';
 import { usePermissions } from './PermissionContext';
 import {
   readCachedPermissions,
@@ -131,7 +131,18 @@ export function ProfileProvider({ children }) {
     setDropdownOpen(false);
   }, []);
 
-  const isNavAllowed = useCallback((pageId) => profile.nav.indexOf(pageId) >= 0, [profile]);
+  // União dos módulos liberados por TODOS os portais que as funções da pessoa desbloqueiam
+  // (não só o portal "preferido"), pra quem acumula funções não perder acesso a nenhuma delas.
+  const allowedNavIds = useMemo(() => {
+    const allowedPortals = getAllowedProfilePortals(permissions);
+    const ids = new Set();
+    allowedPortals.forEach((portalId) => {
+      PROFILES[portalId]?.nav.forEach((id) => ids.add(id));
+    });
+    return ids;
+  }, [permissions]);
+
+  const isNavAllowed = useCallback((pageId) => allowedNavIds.has(pageId), [allowedNavIds]);
 
   return (
     <ProfileContext.Provider value={{

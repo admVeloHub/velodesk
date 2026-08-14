@@ -1,4 +1,4 @@
-/** email-inbound.service v1.15.0 — scanStatus opcional em emailAttachments */
+/** email-inbound.service v1.16.0 — Bacen RDR structured inbound; scanStatus opcional em emailAttachments */
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
@@ -30,6 +30,20 @@ import {
   classifyInboundEspeciaisChannel,
   type InboundEspeciaisChannel,
 } from './inbound-email/inboundChannelClassifier.service';
+import {
+  isCgovPrioritySubject,
+  isCgovStructuredInboundEmail,
+  parseConsumidorGovInboundEmail,
+  type ParsedCgovInboundEmail,
+} from './inbound-email/parseConsumidorGovEmail.service';
+import {
+  isBacenRdrPrioritySubject,
+  isBacenRdrStructuredInboundEmail,
+  parseBacenRdrInboundEmail,
+  type ParsedBacenRdrInboundEmail,
+} from './inbound-email/parseBacenRdrEmail.service';
+import { buildFastPathTriagem } from './agents/casosEspeciaisAgent.service';
+import { upsertFromChamado } from './reclamacoes/reclamacao.service';
 
 export const LEGACY_PROTOCOL_PATTERN = /VD-\d{8}-\d{4}/i;
 export const NUMERIC_PROTOCOL_PATTERN = /\[(\d{8,10})\]/;
@@ -123,6 +137,35 @@ export function buildEmailMetadados(payload: InboundEmailPayload): Record<string
 
 /** @deprecated use buildEmailMetadados */
 export const buildEmailAlteracoes = buildEmailMetadados;
+
+export async function findChamadoByCgovProtocolo(protocolo: string) {
+  const normalized = String(protocolo ?? '').trim();
+  if (!normalized) return null;
+  return ChamadoN1.findOne({
+    $or: [
+      { 'registro.metadados.consumidorGov.protocoloGov': normalized },
+      { 'registro.metadados.consumidorGov.idDemanda': normalized },
+    ],
+  });
+}
+
+export async function findChamadoByBacenIdDemanda(idDemanda: string) {
+  const normalized = String(idDemanda ?? '').trim();
+  if (!normalized) return null;
+  return ChamadoN1.findOne({
+    $or: [
+      { 'registro.metadados.bacen.idDemanda': normalized },
+      { 'registro.metadados.bacen.protocoloBacen': normalized },
+    ],
+  });
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const date = new Date(iso);
+  date.setDate(date.getDate() + days);
+  date.setHours(18, 0, 0, 0);
+  return date.toISOString();
+}
 
 export async function findChamadoByEmailMessageId(messageId: string) {
   const normalized = normalizeMessageId(messageId);
@@ -247,7 +290,13 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
   }
 
   try {
-    const result = await runInboundEmailFlow(payload, messageId, rule === 'priority');
+    const priorityFromSubject = isCgovPrioritySubject(payload.subject)
+      || isBacenRdrPrioritySubject(payload.subject);
+    const result = await runInboundEmailFlow(
+      payload,
+      messageId,
+      rule === 'priority' || priorityFromSubject,
+    );
     await markInboundMessageDone(messageId, {
       action: result.action,
       chamadoProtocolo: result.chamadoProtocolo,
@@ -257,6 +306,152 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
   } catch (err) {
     await markInboundMessageFailed(messageId, (err as Error).message);
     throw err;
+  }
+}
+
+export function buildCgovStructuredTicketBody(
+  parsed: ParsedCgovInboundEmail,
+  payload: InboundEmailPayload,
+  attachments: string[],
+  isPriority: boolean,
+): Record<string, unknown> {
+  const assunto = String(parsed.assunto || '').trim() || 'Demanda Consumidor.Gov';
+  const descricao = String(parsed.descricao || '').trim();
+  const telefone = parsed.telefone ? [parsed.telefone] : [];
+
+  return {
+    title: assunto,
+    chamadoTitulo: assunto,
+    description: descricao,
+    text: descricao,
+    status: 'novo',
+    priority: isPriority ? 'alta' : 'media',
+    clientName: parsed.nome,
+    clientCPF: parsed.cpf,
+    attachments,
+    messageOrigin: 'cliente',
+    sender: 'them',
+    lateralForm: {
+      canal: 'Consumidor.Gov',
+      classificacaoTipo: 'Reclamação',
+      tipoChamado: 'Reclamação',
+      produto: parsed.area || 'Empréstimo',
+      motivo: parsed.problema || assunto,
+      detalhe: descricao.slice(0, 500),
+      clienteCpf: parsed.cpf,
+      cpf: parsed.cpf,
+      clienteNome: parsed.nome,
+      clienteEmail: parsed.email ? [parsed.email] : [],
+      clienteTelefone: telefone,
+      consumidorGov: {
+        protocoloGov: parsed.protocolo,
+        idDemanda: parsed.protocolo,
+        assunto,
+        descricao,
+        consumidor: parsed.nome,
+        cpf: parsed.cpf,
+        motivo: parsed.problema,
+        produto: parsed.area,
+        orgaoGov: 'Consumidor.gov.br',
+        cidade: parsed.cidade,
+        uf: parsed.uf,
+        prazoLegal: parsed.prazoIso,
+        dataDemanda: parsed.dataAberturaIso,
+        statusGov: 'nao-respondida',
+      },
+    },
+    emailInboundMeta: {
+      emailFrom: payload.from.email,
+      emailSubject: payload.subject,
+    },
+  };
+}
+
+export function buildBacenStructuredTicketBody(
+  parsed: ParsedBacenRdrInboundEmail,
+  payload: InboundEmailPayload,
+  attachments: string[],
+  isPriority: boolean,
+): Record<string, unknown> {
+  const assunto = String(parsed.assunto || '').trim() || 'Demanda Bacen RDR';
+  const descricao = String(parsed.descricao || '').trim();
+  const telefone = parsed.telefone ? [parsed.telefone] : [];
+  const dataDemanda = parsed.dataDemandaIso || new Date().toISOString();
+  const prazoLegal = addDaysIso(dataDemanda, 10);
+
+  return {
+    title: assunto,
+    chamadoTitulo: assunto,
+    description: descricao,
+    text: descricao,
+    status: 'novo',
+    priority: isPriority ? 'alta' : 'media',
+    clientName: parsed.nome,
+    clientCPF: parsed.cpf,
+    attachments,
+    messageOrigin: 'cliente',
+    sender: 'them',
+    lateralForm: {
+      canal: 'Bacen',
+      classificacaoTipo: parsed.tipo || 'Reclamação',
+      tipoChamado: parsed.tipo || 'Reclamação',
+      produto: 'Empréstimo',
+      motivo: parsed.motivo || assunto,
+      detalhe: descricao.slice(0, 500),
+      clienteCpf: parsed.cpf,
+      cpf: parsed.cpf,
+      clienteNome: parsed.nome,
+      clienteEmail: parsed.email ? [parsed.email] : [],
+      clienteTelefone: telefone,
+      bacen: {
+        protocoloBacen: parsed.protocoloBacen,
+        idDemanda: parsed.idDemanda,
+        assunto,
+        descricao,
+        consumidor: parsed.nome,
+        cpf: parsed.cpf,
+        email: parsed.email,
+        telefoneWhatsapp: parsed.telefone,
+        motivo: parsed.motivo || assunto,
+        produto: 'Empréstimo',
+        tipo: parsed.tipo || 'Reclamação',
+        orgaoBacen: 'Bacen — RDR',
+        cidade: parsed.cidade,
+        uf: parsed.uf,
+        prazoLegal,
+        dataDemanda,
+        statusBc: 'nao-respondida',
+        contrato: parsed.contrato || undefined,
+        workflow: 'Tratativa Bacen',
+        workflowAtivo: true,
+      },
+    },
+    emailInboundMeta: {
+      emailFrom: payload.from.email,
+      emailSubject: payload.subject,
+    },
+  };
+}
+
+async function ensureStructuredBacenReclamacao(
+  chamado: IChamadoN1,
+  emailThreadRootId: string,
+): Promise<void> {
+  try {
+    const signals = ['inbox_dedicada:bacen', 'bacenStructuredInbound'];
+    const triagemBase = buildFastPathTriagem('bacen', signals);
+    await upsertFromChamado(chamado, {
+      ...triagemBase,
+      signals,
+      at: new Date().toISOString(),
+    }, {
+      origemEntrada: 'email-inbound-bacen-structured',
+      inboxDedicada: true,
+      emailThreadRootId,
+      workflowSlug: 'bacen-tratativa',
+    });
+  } catch (err) {
+    console.warn('[email-inbound] upsert reclamacao bacen fail-soft:', (err as Error).message);
   }
 }
 
@@ -297,6 +492,32 @@ function buildInboundEspeciaisTicketBody(
           descricao: bodyText,
           consumidor: displayName,
           statusPc: 'nao-respondida',
+        },
+      },
+    };
+  }
+
+  if (channel === 'bacen') {
+    return {
+      title: subject,
+      chamadoTitulo: subject,
+      description: bodyText,
+      text: bodyText,
+      status: 'novo',
+      priority: isPriority ? 'alta' : 'media',
+      clientName: displayName,
+      attachments,
+      messageOrigin: 'cliente',
+      sender: 'them',
+      lateralForm: {
+        ...lateralBase,
+        canal: 'Bacen',
+        bacen: {
+          assunto: subject,
+          descricao: bodyText,
+          consumidor: displayName,
+          statusBc: 'nao-respondida',
+          orgaoBacen: 'Bacen — RDR',
         },
       },
     };
@@ -344,6 +565,39 @@ async function runInboundEmailFlow(
   retainOnlyNewAttachments(payload, existing);
 
   const bodyText = appendAttachmentReferencesToBody(resolveEmailBody(payload), payload);
+
+  const bacenParsed = isBacenRdrStructuredInboundEmail(payload, bodyText)
+    ? parseBacenRdrInboundEmail(bodyText)
+    : null;
+  const bacenStructured = Boolean(bacenParsed?.isValid());
+
+  const cgovParsed = !bacenStructured && isCgovStructuredInboundEmail(payload, bodyText)
+    ? parseConsumidorGovInboundEmail(bodyText)
+    : null;
+  const cgovStructured = Boolean(cgovParsed?.isValid());
+
+  if (bacenStructured && bacenParsed?.idDemanda) {
+    const duplicateByBacen = await findChamadoByBacenIdDemanda(bacenParsed.idDemanda);
+    if (duplicateByBacen) {
+      return {
+        action: 'duplicate',
+        chamadoProtocolo: duplicateByBacen.chamadoProtocolo,
+        ticketId: duplicateByBacen._id.toString(),
+      };
+    }
+  }
+
+  if (cgovStructured && cgovParsed?.protocolo) {
+    const duplicateByProtocol = await findChamadoByCgovProtocolo(cgovParsed.protocolo);
+    if (duplicateByProtocol) {
+      return {
+        action: 'duplicate',
+        chamadoProtocolo: duplicateByProtocol.chamadoProtocolo,
+        ticketId: duplicateByProtocol._id.toString(),
+      };
+    }
+  }
+
   const emailMeta = {
     ...buildEmailMetadados(payload),
     ...buildAttachmentMetadados(payload),
@@ -368,49 +622,74 @@ async function runInboundEmailFlow(
     };
   }
 
-  const clienteRef = await resolveClienteRefFromEmail(payload.from.email, payload.from.name);
+  const clienteRef = (cgovStructured || bacenStructured)
+    ? null
+    : await resolveClienteRefFromEmail(payload.from.email, payload.from.name);
   const subject = payload.subject.trim() || 'Atendimento por e-mail';
   const displayName = payload.from.name || payload.from.email.split('@')[0];
   const inboundRootId = normalizeMessageId(payload.messageId);
-  const canalProvavel = classifyInboundEspeciaisChannel(payload);
+  let canalProvavel = classifyInboundEspeciaisChannel(payload);
+  if (bacenStructured) {
+    canalProvavel = 'bacen';
+  } else if (cgovStructured) {
+    canalProvavel = 'consumidor-gov';
+  }
 
-  const ticketBody: Record<string, unknown> = canalProvavel
-    ? buildInboundEspeciaisTicketBody(
-      payload,
-      canalProvavel,
-      bodyText,
-      displayName,
-      subject,
-      attachments,
-      isPriority,
-    )
-    : {
-      title: subject,
-      chamadoTitulo: subject,
-      description: bodyText,
-      text: bodyText,
-      status: 'novo',
-      priority: isPriority ? 'alta' : 'media',
-      clientName: displayName,
-      attachments,
-      lateralForm: {
-        clienteEmail: [payload.from.email],
-        clienteEmailResposta: payload.from.email,
-        clienteNome: displayName,
-        canal: 'E-mail',
-        classificacaoTipo: 'Solicitação',
-        motivo: subject,
-        detalhe: bodyText.slice(0, 500),
-      },
-    };
+  const ticketBody: Record<string, unknown> = bacenStructured && bacenParsed
+    ? buildBacenStructuredTicketBody(bacenParsed, payload, attachments, isPriority)
+    : cgovStructured && cgovParsed
+      ? buildCgovStructuredTicketBody(cgovParsed, payload, attachments, isPriority)
+      : canalProvavel
+      ? buildInboundEspeciaisTicketBody(
+        payload,
+        canalProvavel,
+        bodyText,
+        displayName,
+        subject,
+        attachments,
+        isPriority,
+      )
+      : {
+        title: subject,
+        chamadoTitulo: subject,
+        description: bodyText,
+        text: bodyText,
+        status: 'novo',
+        priority: isPriority ? 'alta' : 'media',
+        clientName: displayName,
+        attachments,
+        lateralForm: {
+          clienteEmail: [payload.from.email],
+          clienteEmailResposta: payload.from.email,
+          clienteNome: displayName,
+          canal: 'E-mail',
+          classificacaoTipo: 'Solicitação',
+          motivo: subject,
+          detalhe: bodyText.slice(0, 500),
+        },
+      };
 
-  if (clienteRef?.clienteId) ticketBody.clienteId = clienteRef.clienteId.toString();
-  if (clienteRef?.clienteCpf) ticketBody.clientCPF = clienteRef.clienteCpf;
+  if (!cgovStructured && !bacenStructured) {
+    if (clienteRef?.clienteId) ticketBody.clienteId = clienteRef.clienteId.toString();
+    if (clienteRef?.clienteCpf) ticketBody.clientCPF = clienteRef.clienteCpf;
+  }
 
   const partial = await createChamadoFromBody(ticketBody, 'novo');
   if (partial.registro?.[0]) {
     partial.registro[0].origin = 'cliente';
-    partial.registro[0].autor = displayName;
+    if (bacenStructured && bacenParsed) {
+      partial.registro[0].autor = bacenParsed.nome;
+      if (bacenParsed.dataDemandaIso) {
+        partial.registro[0].data = new Date(bacenParsed.dataDemandaIso);
+      }
+    } else if (cgovStructured && cgovParsed) {
+      partial.registro[0].autor = cgovParsed.nome;
+      if (cgovParsed.dataAberturaIso) {
+        partial.registro[0].data = new Date(cgovParsed.dataAberturaIso);
+      }
+    } else {
+      partial.registro[0].autor = displayName;
+    }
     partial.registro[0].metadados = {
       ...(partial.registro[0].metadados ?? {}),
       ...emailMeta,
@@ -418,12 +697,14 @@ async function runInboundEmailFlow(
       emailInbound: true,
       emailThreadRootId: inboundRootId,
       ...(canalProvavel ? { canalProvavel, inboxDedicada: true } : {}),
+      ...(bacenStructured ? { bacenStructuredInbound: true } : {}),
+      ...(cgovStructured ? { cgovStructuredInbound: true } : {}),
       ...(isPriority ? { mailPriority: 'alta' } : {}),
     };
     partial.registro[0].alteracoes = partial.registro[0].alteracoes ?? [];
   }
 
-  if (clienteRef && (!partial.cliente || partial.cliente.length === 0)) {
+  if (!cgovStructured && !bacenStructured && clienteRef && (!partial.cliente || partial.cliente.length === 0)) {
     partial.cliente = [clienteRef];
   }
 
@@ -433,11 +714,17 @@ async function runInboundEmailFlow(
       ? 'Procon'
       : canalProvavel === 'consumidor-gov'
         ? 'Consumidor.Gov'
-        : 'E-mail',
+        : canalProvavel === 'bacen'
+          ? 'Bacen'
+          : 'E-mail',
   });
 
   const chamado = await ChamadoN1.create(partial);
   await notifyTicketOpenedAsync(chamado, payload.from.email);
+
+  if (bacenStructured) {
+    await ensureStructuredBacenReclamacao(chamado, inboundRootId);
+  }
 
   void runInboundPostCreateHooks(chamado, { source: 'email-inbound' }).catch((err: Error) => {
     console.warn('[email-inbound] hooks inbound fail-soft:', err.message);

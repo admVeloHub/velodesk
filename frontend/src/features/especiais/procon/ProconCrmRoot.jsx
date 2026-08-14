@@ -1,7 +1,7 @@
 /**
  * ProconCrmRoot — shell CRM RA (fila + lista + ticket + sidebar)
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationContext';
 import { usePcNovaDemandaModals } from '../../../hooks/usePcNovaDemandaModals';
@@ -9,6 +9,7 @@ import { PC_GROUPS } from '../../../services/especiais/proconData';
 import { loadDemandas } from '../../../services/especiais/proconStore';
 import { matchesTicketCpfSearch } from '../../../services/especiais/especiaisCrmSearch';
 import { fetchPcTicketView, loadProconTicketsFromApi } from '../../../services/especiais/proconTicketService';
+import { useEspeciaisTicketCommit } from '../shared/useEspeciaisTicketCommit';
 import PcQueuePanel from './PcQueuePanel';
 import PcTicketList from './PcTicketList';
 import PcTicketMain from './PcTicketMain';
@@ -31,10 +32,13 @@ export default function ProconCrmRoot() {
     () => localStorage.getItem('velodeskPcListCollapsed') === '1',
   );
   const [listVersion, setListVersion] = useState(0);
+  const syncedOnceRef = useRef(false);
 
   useEffect(() => {
     const refreshFromApi = () => {
-      loadProconTicketsFromApi().catch(() => {});
+      loadProconTicketsFromApi().catch(() => {}).finally(() => {
+        syncedOnceRef.current = true;
+      });
     };
     refreshFromApi();
     const bumpList = () => setListVersion((v) => v + 1);
@@ -54,6 +58,10 @@ export default function ProconCrmRoot() {
   const [redirectTo, setRedirectTo] = useState(null);
   const [waChatOpen, setWaChatOpen] = useState(false);
   const [waComposeText, setWaComposeText] = useState('');
+  const [composeMode, setComposeMode] = useState('public');
+  const [composeText, setComposeText] = useState('');
+  const [internalText, setInternalText] = useState('');
+  const [composeAttachments, setComposeAttachments] = useState([]);
 
   const allItems = useMemo(
     () => loadDemandas({ search: appliedSearch }),
@@ -99,12 +107,18 @@ export default function ProconCrmRoot() {
     try {
       const view = await fetchPcTicketView(id);
       if (!view?.pcItem) {
+        if (!syncedOnceRef.current) {
+          // ainda sincronizando com a API — mantém o loading e tenta de novo quando os dados chegarem
+          return;
+        }
         setPcItem(null);
         setTicket(null);
+        setTicketLoading(false);
         setRedirectTo('/especiais/procon');
         return;
       }
       if (!view.pcItem.ticketId) {
+        setTicketLoading(false);
         setRedirectTo(`/especiais/procon/registro/${view.pcItem.id}`);
         return;
       }
@@ -113,23 +127,67 @@ export default function ProconCrmRoot() {
       if (view.pcItem.groupKey) {
         setActiveGroup(view.pcItem.groupKey);
       }
+      setTicketLoading(false);
     } catch {
       showNotification('Não foi possível carregar o ticket.', 'error');
       setPcItem(null);
       setTicket(null);
-    } finally {
       setTicketLoading(false);
     }
   }, [id, showNotification]);
 
   useEffect(() => {
     reloadTicket();
-  }, [reloadTicket]);
+  }, [reloadTicket, listVersion]);
 
   useEffect(() => {
     setWaChatOpen(false);
     setWaComposeText('');
+    setComposeMode('public');
+    setComposeText('');
+    setInternalText('');
+    setComposeAttachments([]);
   }, [id]);
+
+  const composeSession = useMemo(() => ({
+    composeText,
+    internalText,
+    composeAttachments,
+    clearCompose: (fields = {}) => {
+      if (fields.composeText) setComposeText('');
+      if (fields.internalText) setInternalText('');
+      if (fields.composeAttachments) setComposeAttachments([]);
+    },
+  }), [composeText, internalText, composeAttachments]);
+
+  const handleCommitSaved = useCallback((result) => {
+    setTicket(result.ticket);
+    if (result.channelItem) setPcItem(result.channelItem);
+    setListVersion((v) => v + 1);
+  }, []);
+
+  const handleCommitFinalized = useCallback((result) => {
+    setTicket(result.ticket);
+    if (result.channelItem) setPcItem(result.channelItem);
+    setActiveGroup('finalizadas');
+    setListVersion((v) => v + 1);
+  }, []);
+
+  const {
+    committing,
+    handleSaveTicket,
+    handleFinalizeTicket,
+    finalized,
+    readOnly,
+  } = useEspeciaisTicketCommit({
+    channelId: 'pc',
+    channelItem: pcItem,
+    ticket,
+    composeSession,
+    onTicketSaved: handleCommitSaved,
+    onFinalized: handleCommitFinalized,
+    showNotification,
+  });
 
   const handleSearchSubmit = useCallback(() => {
     setAppliedSearch(searchDraft.trim());
@@ -210,6 +268,14 @@ export default function ProconCrmRoot() {
         waComposeText={waComposeText}
         onWaComposeTextChange={setWaComposeText}
         onTicketUpdated={handleTicketUpdated}
+        composeMode={composeMode}
+        onComposeModeChange={setComposeMode}
+        composeText={composeText}
+        onComposeTextChange={setComposeText}
+        internalText={internalText}
+        onInternalTextChange={setInternalText}
+        composeAttachments={composeAttachments}
+        onComposeAttachmentsChange={setComposeAttachments}
       />
 
       <PcTicketSide
@@ -219,6 +285,11 @@ export default function ProconCrmRoot() {
         onOpenChat={handleOpenChat}
         onCloseChat={handleCloseChat}
         onTicketUpdated={handleTicketUpdated}
+        onSave={handleSaveTicket}
+        onFinalize={handleFinalizeTicket}
+        saving={committing}
+        disabled={readOnly || finalized}
+        finalized={finalized}
       />
 
       {demandaModals}

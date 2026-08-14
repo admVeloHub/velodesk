@@ -22,6 +22,8 @@ const googleClientId = normalizeEnvValue(
 );
 const deskAuthMode = normalizeEnvValue(process.env.VITE_DESK_AUTH_MODE) || 'google';
 const velohubApiUrl = normalizeEnvValue(process.env.VITE_VELOHUB_API_URL);
+const presenceSupabaseUrl = normalizeEnvValue(process.env.VITE_PRESENCE_SUPABASE_URL);
+const presenceSupabaseAnonKey = normalizeEnvValue(process.env.VITE_PRESENCE_SUPABASE_ANON_KEY);
 
 if (googleClientId) {
   process.env.VITE_GOOGLE_CLIENT_ID = googleClientId;
@@ -47,6 +49,8 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(googleClientId),
     'import.meta.env.VITE_DESK_AUTH_MODE': JSON.stringify(deskAuthMode),
+    'import.meta.env.VITE_PRESENCE_SUPABASE_URL': JSON.stringify(presenceSupabaseUrl),
+    'import.meta.env.VITE_PRESENCE_SUPABASE_ANON_KEY': JSON.stringify(presenceSupabaseAnonKey),
   },
   plugins: [react()],
   esbuild: {

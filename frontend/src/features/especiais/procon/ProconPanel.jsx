@@ -21,7 +21,7 @@ import ProconTableView from './ProconTableView';
 import ProconReportsView from './ProconReportsView';
 
 function loadViewState({ search, activeChips }) {
-  const items = loadDemandas({ search, activeChips });
+  const items = loadDemandas({ search, activeChips, gestaoView: true });
   return {
     items,
     kpis: getProconKpis(items),

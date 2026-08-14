@@ -1,8 +1,10 @@
-/** inboundChannelClassifier v1.0.0 — classifica e-mail inbound por destino + remetente */
+/** inboundChannelClassifier v1.2.0 — classifica e-mail inbound por destino + remetente + PRIORIZAR */
 import { normalizeEmail } from '../cliente.service';
+import { isBacenRdrPrioritySubject } from './parseBacenRdrEmail.service';
+import { isCgovPrioritySubject } from './parseConsumidorGovEmail.service';
 import type { InboundEmailPayload } from './types';
 
-export type InboundEspeciaisChannel = 'procon' | 'consumidor-gov';
+export type InboundEspeciaisChannel = 'procon' | 'consumidor-gov' | 'bacen';
 
 function readEnvList(key: string): string[] {
   return String(process.env[key] || '')
@@ -36,6 +38,12 @@ function matchesChannelRules(
   return senderPatterns.some((pattern) => senderMatchesPattern(senderEmail, pattern));
 }
 
+function recipientMatchesList(recipients: string[], allowedRecipients: string[]): boolean {
+  if (!allowedRecipients.length) return false;
+  const recipientSet = new Set(allowedRecipients.map((item) => normalizeEmail(item)));
+  return recipients.some((item) => recipientSet.has(normalizeEmail(item)));
+}
+
 export function classifyInboundEspeciaisChannel(
   payload: InboundEmailPayload,
 ): InboundEspeciaisChannel | null {
@@ -51,12 +59,25 @@ export function classifyInboundEspeciaisChannel(
     return 'procon';
   }
 
-  if (matchesChannelRules(
-    recipients,
-    sender,
-    readEnvList('INBOUND_EMAIL_CONSUMIDOR_GOV_RECIPIENTS'),
-    readEnvList('INBOUND_EMAIL_CONSUMIDOR_GOV_SENDER_PATTERNS'),
-  )) {
+  const bcRecipients = readEnvList('INBOUND_EMAIL_BACEN_RECIPIENTS');
+  const bcSenderPatterns = readEnvList('INBOUND_EMAIL_BACEN_SENDER_PATTERNS');
+
+  if (recipientMatchesList(recipients, bcRecipients) && isBacenRdrPrioritySubject(payload.subject)) {
+    return 'bacen';
+  }
+
+  if (matchesChannelRules(recipients, sender, bcRecipients, bcSenderPatterns)) {
+    return 'bacen';
+  }
+
+  const cgRecipients = readEnvList('INBOUND_EMAIL_CONSUMIDOR_GOV_RECIPIENTS');
+  const cgSenderPatterns = readEnvList('INBOUND_EMAIL_CONSUMIDOR_GOV_SENDER_PATTERNS');
+
+  if (recipientMatchesList(recipients, cgRecipients) && isCgovPrioritySubject(payload.subject)) {
+    return 'consumidor-gov';
+  }
+
+  if (matchesChannelRules(recipients, sender, cgRecipients, cgSenderPatterns)) {
     return 'consumidor-gov';
   }
 

@@ -49,6 +49,8 @@ import ticketFusaoRoutes from './routes/ticketFusao.routes';
 import realtimeRoutes from './routes/realtime.routes';
 import reclamacoesRoutes from './routes/reclamacoes.routes';
 import internalAttachmentScanRoutes from './routes/internalAttachmentScan.routes';
+import reclameAquiHugmeRoutes from './routes/reclameAquiHugme.routes';
+import processosRoutes from './routes/processos.routes';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
@@ -188,6 +190,8 @@ app.use('/api/ticket-search', ticketSearchRoutes);
 app.use('/api/ticket-fusao', ticketFusaoRoutes);
 app.use('/api/realtime', realtimeRoutes);
 app.use('/api/reclamacoes', reclamacoesRoutes);
+app.use('/api/reclame-aqui/hugme', reclameAquiHugmeRoutes);
+app.use('/api/processos', processosRoutes);
 
 if (env.enableWhatsapp) {
   whatsapp.mountWhatsAppRoutes(app);

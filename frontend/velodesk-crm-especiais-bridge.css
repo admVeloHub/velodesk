@@ -72,16 +72,19 @@
 
 #especiais-reclame-aqui .ra-crm-main,
 #especiais-procon .ra-crm-main,
-#especiais-consumidor-gov .ra-crm-main {
+#especiais-consumidor-gov .ra-crm-main,
+#especiais-bacen .ra-crm-main {
   min-height: 0;
 }
 
 #especiais-reclame-aqui .ra-crm-main > .desk-crm-ticket-scope,
 #especiais-procon .ra-crm-main > .desk-crm-ticket-scope,
 #especiais-consumidor-gov .ra-crm-main > .desk-crm-ticket-scope,
+#especiais-bacen .ra-crm-main > .desk-crm-ticket-scope,
 #especiais-reclame-aqui .ra-crm-main > .crm-ticket-view,
 #especiais-procon .ra-crm-main > .crm-ticket-view,
-#especiais-consumidor-gov .ra-crm-main > .crm-ticket-view {
+#especiais-consumidor-gov .ra-crm-main > .crm-ticket-view,
+#especiais-bacen .ra-crm-main > .crm-ticket-view {
   flex: 1;
   min-height: 0;
   height: 100%;

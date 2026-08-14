@@ -3,7 +3,7 @@
  * VERSION: v1.1.0 | DATE: 2026-08-07
  */
 import { Types } from 'mongoose';
-import type { IChamadoN1 } from '../../models/ChamadoN1';
+import type { IChamadoN1, ITabulacao } from '../../models/ChamadoN1';
 import { env } from '../../config/env';
 import {
   appendRegistroEntry,
@@ -52,7 +52,7 @@ export const CASO_ESPECIAL_ORGAO_CONFIG: Record<
     funcaoSlug: 'bacen',
     source: 'bacen',
     canalLabel: 'Bacen',
-    workflowSlug: null,
+    workflowSlug: 'bacen-tratativa',
   },
   consumidor_gov: {
     orgao: 'consumidor_gov',
@@ -104,16 +104,22 @@ function stampEspecialChannel(chamado: IChamadoN1, config: CasoEspecialOrgaoConf
 }
 
 function updateTabulacaoCanal(chamado: IChamadoN1, config: CasoEspecialOrgaoConfig): void {
-  const last = readTabulacaoSnapshot(
-    chamado.tabulacao?.[chamado.tabulacao.length - 1] ?? chamado.tabulacao?.[0],
-  );
-  const next = {
+  // Atualiza a tabulação existente NO LUGAR (nunca acrescenta uma 2ª entrada): todo o resto do
+  // sistema (segmentação por canal em permission.service.ts, exibição em chamado.mapper.ts,
+  // merge, workflow) lê sempre tabulacao[0] como a tabulação corrente do chamado.
+  const idx = chamado.tabulacao?.length ? chamado.tabulacao.length - 1 : 0;
+  const last = readTabulacaoSnapshot(chamado.tabulacao?.[idx]);
+  const next: ITabulacao = {
     ...last,
     tipoChamado: last.tipoChamado || 'Reclamação',
     motivo: last.motivo || config.canalLabel,
     detalhe: last.detalhe || `Demanda ${config.canalLabel}`,
   };
-  chamado.tabulacao = [...(chamado.tabulacao ?? []), next];
+  if (!chamado.tabulacao?.length) {
+    chamado.tabulacao = [next];
+  } else {
+    chamado.tabulacao[idx] = next;
+  }
   chamado.markModified('tabulacao');
 }
 
