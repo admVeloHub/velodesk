@@ -1,12 +1,13 @@
 /**
- * telephonyTicketNotify.service v1.0.0 — ticket Desk + CTA no sininho para agente da ligação
- * VERSION: v1.0.0 | DATE: 2026-08-12
+ * telephonyTicketNotify.service v1.1.0 — dispara pipeline do Agente 1 na criação do ticket
+ * VERSION: v1.1.0 | DATE: 2026-08-17
  */
 import { Types } from 'mongoose';
 import { User } from '../models/User';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { createChamadoFromBody } from './chamado.mapper';
 import { createWorkflowNotificacao } from './workflowNotificacao.service';
+import { runInboundPostCreateHooks } from './agents/inboundAgentPipeline.service';
 import type { TelephonyCallInput } from './telephony-inbound/types';
 import type { ITelephonyCall } from '../models/TelephonyCall';
 
@@ -78,6 +79,10 @@ export async function createTicketAndNotifyFromTelephonyCall(
   const chamado = await ChamadoN1.create(partial);
   const ticketId = String(chamado._id);
   const protocolo = String(chamado.chamadoProtocolo || '');
+
+  void runInboundPostCreateHooks(chamado, { source: 'telephony-inbound' }).catch((err: Error) => {
+    console.warn('[telephony-ticket] runInboundPostCreateHooks fail-soft:', err.message);
+  });
 
   call.chamadoId = chamado._id as Types.ObjectId;
   call.ticketStatus = 'created';

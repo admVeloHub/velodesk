@@ -259,7 +259,7 @@ function buildUserBlock(params: TicketAiSuggestInput, tabulationCatalog: string)
     `- **Cliente:** ${clientFullName || 'não informado'}`,
     `- **Nome do agente:** ${params.nomeOperador || 'não informado'}`,
     `- **Título:** ${params.titulo || 'não informado'}`,
-    `- **Fonte de contexto:** ${params.contextSource === 'internal' ? 'anotação interna (telefone)' : 'mensagens públicas'}`,
+    `- **Fonte de contexto:** ${params.contextSource === 'internal' ? 'anotação interna do agente (sem 1ª mensagem do cliente)' : 'mensagens públicas'}`,
   ];
 
   if (clientFirstName) {

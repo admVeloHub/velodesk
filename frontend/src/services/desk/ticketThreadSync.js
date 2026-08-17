@@ -1,6 +1,6 @@
 /**
- * ticketThreadSync v1.5.0 — refresh IA considera fingerprint WhatsApp persistido
- * VERSION: v1.5.0 | DATE: 2026-08-12
+ * ticketThreadSync v1.7.0 — chave de refresh IA sempre invalida por nota interna, mesmo com msg do cliente
+ * VERSION: v1.7.0 | DATE: 2026-08-17
  */
 
 function normalizeMsgText(value) {
@@ -97,20 +97,24 @@ export function hasWhatsAppThreadChanged(prevTicket, nextTicket) {
   return buildWhatsAppThreadFingerprint(prevTicket) !== buildWhatsAppThreadFingerprint(nextTicket);
 }
 
-/** Dispara refresh da sugestão IA (e-mail/chat: nova msg cliente; telefone: notas persistidas). */
+/**
+ * Dispara refresh da sugestão IA. Sempre considera notas internas persistidas —
+ * mesmo com mensagem do cliente, o Agente 1 usa nota interna como contexto adicional,
+ * então uma nota nova/editada precisa invalidar a sugestão em cache.
+ */
 export function buildAiSuggestionRefreshKey({
   ticketId,
   contextSource,
-  isPhone,
+  useInternalContext,
   convMsgs,
   ticket,
 }) {
   const id = String(ticketId || '');
-  if (isPhone) {
+  if (useInternalContext) {
     return [
       id,
       contextSource,
-      'phone',
+      'internal-context',
       buildPersistedInternalNotesFingerprint(ticket),
     ].join('::');
   }
@@ -120,6 +124,7 @@ export function buildAiSuggestionRefreshKey({
     'client',
     buildClientThreadFingerprint(convMsgs),
     buildWhatsAppThreadFingerprint(ticket),
+    buildPersistedInternalNotesFingerprint(ticket),
   ].join('::');
 }
 

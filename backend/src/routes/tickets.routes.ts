@@ -1,4 +1,4 @@
-/** tickets.routes v1.17.0 — transcrição WhatsApp sob demanda */
+/** tickets.routes v1.18.0 — dispara pipeline do Agente 1 na criação manual e na 1ª nota interna sem contexto do cliente */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -23,6 +23,7 @@ import {
 } from '../services/chamado.mapper';
 import { TabulacaoValidationError } from '../services/tabulation.service';
 import { notifyAgentReplyAsync, notifyChamadoCreatedAsync } from '../services/emailNotification.service';
+import { runInboundAgentPipeline, runInboundPostCreateHooks } from '../services/agents/inboundAgentPipeline.service';
 import {
   advanceWorkflowManual,
   advanceWorkflowWithDecision,
@@ -172,6 +173,9 @@ router.post('/', authMiddleware, async (req, res: Response) => {
     applySessionResponsavelIfNeeded(partial, req.user);
     const chamado = await ChamadoN1.create(partial);
     await notifyChamadoCreatedAsync(chamado);
+    void runInboundPostCreateHooks(chamado, { source: 'manual' }).catch((err: Error) => {
+      console.warn('[tickets.routes] runInboundPostCreateHooks fail-soft:', err.message);
+    });
     const ticket = await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes));
     res.status(201).json(ticket);
   } catch (err) {
@@ -259,11 +263,23 @@ router.post('/:id/commit', authMiddleware, async (req, res: Response) => {
     req.body.author = req.user.name || req.user.email || '';
   }
 
+  /** Ticket sem 1ª msg do cliente e sem nota interna prévia: esta será a nota que dá contexto ao Agente 1. */
+  const isFirstContextNote = !String(req.body.text ?? '').trim()
+    && Boolean(String(req.body.internalText ?? req.body.anotacaoInterna ?? '').trim())
+    && !(chamado.registro || []).some((r) => r.origin === 'cliente' && String(r.mensagemPublica || '').trim())
+    && !(chamado.registro || []).some((r) => String(r.anotacaoInterna || '').trim());
+
   try {
     applyManualResponsavelClaim(chamado, req.user);
     const commitResult = await commitChamadoFromAgent(chamado, req.body, req.user);
     applyManualResponsavelClaim(chamado, req.user);
     await chamado.save();
+
+    if (isFirstContextNote) {
+      void runInboundAgentPipeline(chamado, { source: 'nota-interna-inicial' }).catch((err: Error) => {
+        console.warn('[tickets.routes] runInboundAgentPipeline (nota inicial) fail-soft:', err.message);
+      });
+    }
 
     if (commitResult.messageResult.public) {
       const publicAttachments = (commitResult.messageResult.public.attachments ?? [])
@@ -315,6 +331,12 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
     ? String(text ?? '')
     : String(internalText ?? anotacaoInterna ?? '');
 
+  /** Ticket sem 1ª msg do cliente e sem nota interna prévia: esta será a nota que dá contexto ao Agente 1. */
+  const isFirstContextNote = isInternalOnly
+    && noteText.trim().length > 0
+    && !(chamado.registro || []).some((r) => r.origin === 'cliente' && String(r.mensagemPublica || '').trim())
+    && !(chamado.registro || []).some((r) => String(r.anotacaoInterna || '').trim());
+
   applyManualResponsavelClaim(chamado, req.user);
 
   const result = appendRegistroEntry(chamado, {
@@ -337,6 +359,12 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
       { chamadoId: chamado._id, origem: { $ne: 'manual' } },
       { $set: { needsReanalysis: true } },
     );
+  }
+
+  if (isFirstContextNote) {
+    void runInboundAgentPipeline(chamado, { source: 'nota-interna-inicial' }).catch((err: Error) => {
+      console.warn('[tickets.routes] runInboundAgentPipeline (nota inicial) fail-soft:', err.message);
+    });
   }
 
   if (!isInternalOnly && (publicText.trim() || attachmentList.length)) {

@@ -1,6 +1,6 @@
 /**
- * inboundAgentPipeline.service v1.1.0 — respeita skipAgentPipeline (Agente 4)
- * VERSION: v1.1.0 | DATE: 2026-08-07
+ * inboundAgentPipeline.service v1.3.0 — leva anotações internas como contexto mesmo com msg do cliente
+ * VERSION: v1.3.0 | DATE: 2026-08-17
  */
 import type { IChamadoN1 } from '../../models/ChamadoN1';
 import { env } from '../../config/env';
@@ -10,6 +10,7 @@ import type { TicketAiMessageInput } from './agentTypes';
 import { shouldSkipAgentPipeline } from './casosEspeciais.util';
 import { runCasosEspeciaisTriagem } from './casosEspeciaisTrigger.service';
 import { ChamadoN1 } from '../../models/ChamadoN1';
+import { buildTicketIaInternalNotesFromChamado } from '../ticketIaAdapter.service';
 
 function extractClientName(chamado: IChamadoN1): string {
   const reg = chamado.registro?.[0];
@@ -35,6 +36,24 @@ function extractCanal(chamado: IChamadoN1): string {
   return 'digital';
 }
 
+/**
+ * Primeira nota interna do agente com conteúdo, em qualquer posição do registro
+ * (não só o evento inicial) — cobre tanto anotações internas explícitas quanto
+ * o resumo automático de ligação (gravado como mensagemPublica de origem "agente").
+ */
+function findFirstInternalContextNote(chamado: IChamadoN1): string {
+  for (const reg of chamado.registro || []) {
+    const note = String(reg.anotacaoInterna || '').trim();
+    if (note) return note;
+  }
+  for (const reg of chamado.registro || []) {
+    if (reg.origin === 'cliente') continue;
+    const pub = String(reg.mensagemPublica || '').trim();
+    if (pub) return pub;
+  }
+  return '';
+}
+
 export async function runInboundAgentPipeline(
   chamado: IChamadoN1,
   context: { source: string },
@@ -50,10 +69,13 @@ export async function runInboundAgentPipeline(
   try {
     const messages = extractMessagesFromChamado(chamado);
     const hasClient = messages.some((m) => m.role === 'cliente');
-    if (!hasClient && messages.length === 0) {
-      const firstNote = String(chamado.registro?.[0]?.anotacaoInterna || chamado.registro?.[0]?.mensagemPublica || '').trim();
-      if (!firstNote) return;
-    }
+    // Com msg do cliente, ainda assim leva as anotações internas como contexto adicional
+    // (o Agente 1 as usa independente do contextSource) — sem elas, cai no resumo automático
+    // de ligação/1ª nota, único contexto disponível quando não há msg do cliente.
+    const internalNote = hasClient
+      ? buildTicketIaInternalNotesFromChamado(chamado)
+      : findFirstInternalContextNote(chamado);
+    if (!hasClient && !internalNote) return;
 
     const pipelineModo = env.agentsAutonomyEnabled ? 'inbound' as const : 'desk' as const;
 
@@ -67,7 +89,7 @@ export async function runInboundAgentPipeline(
       nomeOperador: 'Atendimento Velotax',
       contextSource: hasClient ? 'public' : 'internal',
       messages: hasClient ? messages : undefined,
-      internalNote: hasClient ? undefined : String(chamado.registro?.[0]?.mensagemPublica || chamado.registro?.[0]?.anotacaoInterna || ''),
+      internalNote: internalNote || undefined,
       pipelineModo,
     });
 

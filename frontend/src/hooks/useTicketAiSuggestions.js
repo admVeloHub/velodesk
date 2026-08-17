@@ -1,6 +1,6 @@
 /**
- * useTicketAiSuggestions v1.9.0 — refresh e payload alinhados ao thread WhatsApp
- * VERSION: v1.9.0 | DATE: 2026-08-12
+ * useTicketAiSuggestions v1.10.0 — contexto interno usado sempre que não há 1ª msg do cliente (não só telefone)
+ * VERSION: v1.10.0 | DATE: 2026-08-17
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ticketAiApi, agentsApi } from '../api/client';
@@ -58,10 +58,6 @@ function resolveCanal(ticket, rightFields) {
   return String(
     rightFields?.canal || ticket?.lateralForm?.canal || ticket?.channel || ''
   ).trim();
-}
-
-function isPhoneChannel(canal) {
-  return /^telefone$/i.test(String(canal || '').trim());
 }
 
 function mapConvMsgsToApi(messages) {
@@ -260,45 +256,46 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
   const agentsEnabledRef = useRef(false);
   const fetchContextRef = useRef({});
 
-  const canal = useMemo(() => resolveCanal(ticket, rightFields), [ticket, rightFields]);
-  const isPhone = isPhoneChannel(canal);
   const internalPlain = useMemo(() => htmlToPlainText(internalText || '').trim(), [internalText]);
   const internalNotesBlock = useMemo(
     () => collectInternalNotesPlain(ticket, internalPlain),
     [ticket, internalPlain],
   );
-  const contextSource = isPhone ? 'internal' : 'public';
+  const aiMsgs = useMemo(() => mergePublicMessagesForAi(convMsgs, ticket), [convMsgs, ticket]);
+  /**
+   * Sem 1ª mensagem do cliente (ticket criado manualmente ou por trigger de telefonia,
+   * sem histórico do canal), usa a nota interna do agente como contexto da consulta —
+   * independente do canal do ticket.
+   */
+  const useInternalContext = !hasClientMessage(aiMsgs);
+  const contextSource = useInternalContext ? 'internal' : 'public';
 
   /** Agente já respondeu — só nova msg do cliente reabre sugestão (rascunho no compose não conta). */
   const awaitingClientAfterAgentReply = useMemo(() => {
-    if (isPhone) return false;
-    const aiMsgs = mergePublicMessagesForAi(convMsgs, ticket);
-    if (!hasClientMessage(aiMsgs)) return false;
+    if (useInternalContext) return false;
     if (isWhatsAppCustomerSessionOpen(ticket)) return false;
     return isLastPublicInteractionFromAgent(aiMsgs);
-  }, [isPhone, convMsgs, ticket]);
+  }, [useInternalContext, aiMsgs, ticket]);
 
   const canFetch = useMemo(() => {
     if (!ticket) return false;
-    if (isPhone) {
+    if (useInternalContext) {
       return internalNotesBlock.length >= TICKET_AI_INTERNAL_NOTE_MIN_CHARS;
     }
-    const aiMsgs = mergePublicMessagesForAi(convMsgs, ticket);
-    if (!hasClientMessage(aiMsgs)) return false;
     if (awaitingClientAfterAgentReply) return false;
     return true;
-  }, [ticket, isPhone, internalNotesBlock, convMsgs, awaitingClientAfterAgentReply]);
+  }, [ticket, useInternalContext, internalNotesBlock, awaitingClientAfterAgentReply]);
 
   const aiRefreshKey = useMemo(() => {
     if (!ticket || !canFetch) return '';
     return buildAiSuggestionRefreshKey({
       ticketId: ticket.id || ticket._id,
       contextSource,
-      isPhone,
+      useInternalContext,
       convMsgs,
       ticket,
     });
-  }, [ticket, canFetch, contextSource, isPhone, convMsgs]);
+  }, [ticket, canFetch, contextSource, useInternalContext, convMsgs]);
 
   fetchContextRef.current = {
     ticket,
@@ -322,7 +319,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       return '';
     }
     if (waitingReason === 'awaiting_internal_note') {
-      return 'Registre a anotação interna do atendimento para gerar sugestões';
+      return 'Adicione um comentário interno para obter a primeira sugestão';
     }
     if (waitingReason === 'service_unconfigured') {
       return error || 'Sugestão IA indisponível no servidor.';
@@ -560,7 +557,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       setAuditAprovado(null);
       setAuditComplete(false);
       let reason = 'awaiting_client_message';
-      if (isPhone) {
+      if (useInternalContext) {
         reason = 'awaiting_internal_note';
       } else if (awaitingClientAfterAgentReply) {
         reason = 'awaiting_client_reply';
@@ -590,7 +587,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       debounceRef.current = null;
     }
 
-    const debounceMs = isPhone ? INTERNAL_DEBOUNCE_MS : PUBLIC_DEBOUNCE_MS;
+    const debounceMs = useInternalContext ? INTERNAL_DEBOUNCE_MS : PUBLIC_DEBOUNCE_MS;
     logTicketAi('info', `Agendando fetch em ${debounceMs}ms…`, {
       ticketId,
       aiRefreshKey: hashPreview(aiRefreshKey),
@@ -610,7 +607,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     ticket?._id,
     canFetch,
     aiRefreshKey,
-    isPhone,
+    useInternalContext,
     fetchSuggestions,
     awaitingClientAfterAgentReply,
   ]);
