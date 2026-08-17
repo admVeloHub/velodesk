@@ -32,6 +32,7 @@ function ensureTabulacao(chamado: IChamadoN1): void {
       produto: '',
       motivo: '',
       detalhe: '',
+      canal: '',
       responsavel: '',
       atribuido: '',
     }];

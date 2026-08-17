@@ -1,22 +1,28 @@
-/** Labels do catálogo RBAC por função — v1.2.1 | DATE: 2026-07-30 */
+/** Labels do catálogo RBAC por função — v1.3.0 | DATE: 2026-08-17 */
 import { derivePortalVisivelFromPermissoes } from '../../../services/permissions/permissionService';
-export const MODULO_ORDER = ['portal', 'tickets', 'workspace', 'workflow', 'preferencias', 'config', 'especiais'];
+import { NAV_ITEMS } from '../../../config/profiles';
+
+/**
+ * Módulos ocultos no editor de overrides (dado/permissão continua existindo e sendo aplicada
+ * onde já era — só não aparece mais nesta tela):
+ * - portal: função vai fazer mais sentido numa nova modalidade; por ora fica oculto.
+ * - config / especiais: a visibilidade que essas seções tentavam controlar na barra retrátil
+ *   agora é responsabilidade de "acesso" (Módulos de Acesso), mais granular. As permissões de
+ *   ação (formularios_criar, *_gerenciar etc.) continuam existindo e sendo aplicadas nas rotas.
+ * - preferencias: sem override — visível para todas as funções.
+ */
+const HIDDEN_MODULOS = new Set(['portal', 'config', 'especiais', 'preferencias']);
+
+export const MODULO_ORDER = ['tickets', 'workspace', 'workflow', 'acesso'];
 
 export const MODULO_LABELS = {
-  portal: 'Portal',
   tickets: 'Tickets',
   workspace: 'Workspace 360°',
   workflow: 'Workflow',
-  preferencias: 'Preferências',
-  config: 'Configurações',
-  especiais: 'Canais Especiais',
+  acesso: 'Módulos de Acesso',
 };
 
 export const SUB_LABELS = {
-  agente: 'Visão Agente',
-  gestao: 'Visão Gestão',
-  workflow: 'Visão Workflow',
-  especiais: 'Visão Especiais',
   ver_todos: 'Ver todos os tickets',
   ver_meus: 'Ver meus tickets',
   atuar_responsavel: 'Atuar como responsável',
@@ -28,19 +34,17 @@ export const SUB_LABELS = {
   aprovar: 'Aprovar workflow',
   rejeitar: 'Rejeitar workflow',
   interromper: 'Interromper workflow',
-  visualizar: 'Visualizar',
-  formularios_criar: 'Formulários — criar',
-  formularios_editar: 'Formulários — editar',
-  formularios_excluir: 'Formulários — excluir',
-  automacoes_criar: 'Automações — criar',
-  automacoes_editar: 'Automações — editar',
-  automacoes_excluir: 'Automações — excluir',
-  workflows_editar: 'Workflows — editar',
-  reclame_aqui_gerenciar: 'Reclame Aqui — gerenciar',
-  bacen_gerenciar: 'Bacen — gerenciar',
-  procon_gerenciar: 'Procon — gerenciar',
-  consumidor_gov_gerenciar: 'Consumidor .GOV — gerenciar',
 };
+
+/** Rótulo de cada módulo dentro de "acesso" — reaproveita o label já usado na barra retrátil. */
+export function acessoSubLabel(navId) {
+  return NAV_ITEMS.find((item) => item.id === navId)?.label || navId;
+}
+
+/** Entradas do catálogo prontas para render — já sem os módulos ocultos, na ordem certa. */
+export function sortCatalogEntriesVisible(catalog) {
+  return sortCatalogEntries(catalog).filter(([modulo]) => !HIDDEN_MODULOS.has(modulo));
+}
 
 export function syncDraftPortalVisivel(draft) {
   if (!draft) return draft;

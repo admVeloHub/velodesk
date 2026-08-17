@@ -3,8 +3,6 @@
  * VERSION: v1.0.3 | DATE: 2026-07-31
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useProfile } from '../../context/ProfileContext';
 import { usePermissions } from '../../context/PermissionContext';
 import { useNotifications } from '../../context/NotificationContext';
 import {
@@ -20,8 +18,7 @@ import { summarizeCriterios } from '../../services/desk/customQueueBoxCriteria';
 import CreateQueueBoxModal from '../desk/components/CreateQueueBoxModal';
 
 export default function PreferenciasView() {
-  const { isNavAllowed } = useProfile();
-  const { can, loading: permissionsLoading } = usePermissions();
+  const { loading: permissionsLoading } = usePermissions();
   const { showNotification } = useNotifications();
 
   const [autoCloseOnSave, setAutoCloseOnSaveState] = useState(() => getAutoCloseOnSave());
@@ -30,9 +27,6 @@ export default function PreferenciasView() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBox, setEditingBox] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-
-  const navAllowed = isNavAllowed('preferencias');
-  const canView = navAllowed && can('preferencias', 'visualizar');
 
   const refreshBoxes = useCallback(async () => {
     setLoadingBoxes(true);
@@ -44,15 +38,10 @@ export default function PreferenciasView() {
     }
   }, []);
 
+  // Preferências não tem override — visível/acessível para todas as funções.
   useEffect(() => {
-    if (!canView) return undefined;
     void refreshBoxes();
-    return undefined;
-  }, [canView, refreshBoxes]);
-
-  if (!navAllowed) {
-    return <Navigate to="/workspace" replace />;
-  }
+  }, [refreshBoxes]);
 
   if (permissionsLoading) {
     return (
@@ -62,10 +51,6 @@ export default function PreferenciasView() {
         </div>
       </div>
     );
-  }
-
-  if (!canView) {
-    return <Navigate to="/workspace" replace />;
   }
 
   const toggleAutoCloseOnSave = () => {

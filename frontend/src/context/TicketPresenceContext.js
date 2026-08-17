@@ -1,5 +1,6 @@
 /**
- * TicketPresenceContext v1.0.0 — quem mais está vendo/tem aberto cada ticket (Supabase Presence)
+ * TicketPresenceContext v1.1.0 — presence desliga sozinho quando o servidor responde 503
+ * VERSION: v1.1.0 | DATE: 2026-08-17
  */
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';

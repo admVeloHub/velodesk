@@ -1,12 +1,15 @@
 /**
- * ticketPresenceRealtime v1.0.0 — canal único de presença por agente (Supabase Realtime Presence)
+ * ticketPresenceRealtime v1.1.0 — 503 (não configurado) não reintenta em loop
  * Indica, por ticket, quem está com foco (verde) e quem só tem aberto em aba adicional (amarelo).
+ * VERSION: v1.1.0 | DATE: 2026-08-17
  */
 import { createClient } from '@supabase/supabase-js';
 import api from '../../api/client';
 
 const PRESENCE_CHANNEL_TOPIC = 'presence:desk';
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
+const TOKEN_RETRY_BASE_MS = 15_000;
+const TOKEN_RETRY_MAX_MS = 5 * 60_000;
 
 const SUPABASE_URL = String(import.meta.env.VITE_PRESENCE_SUPABASE_URL || '').trim();
 const SUPABASE_ANON_KEY = String(import.meta.env.VITE_PRESENCE_SUPABASE_ANON_KEY || '').trim();
@@ -18,6 +21,8 @@ let listeners = new Set();
 let myKey = '';
 let myMeta = { name: '' };
 let lastTrackedPayload = null;
+let presenceUnavailable = false;
+let refreshGeneration = 0;
 
 export function isTicketPresenceConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
@@ -58,20 +63,30 @@ async function fetchPresenceToken() {
   return data;
 }
 
-async function refreshAuthAndScheduleNext() {
+async function refreshAuthAndScheduleNext(attempt = 0) {
+  if (presenceUnavailable) return false;
+  const generation = ++refreshGeneration;
   try {
     const { token, expiresAt } = await fetchPresenceToken();
+    if (generation !== refreshGeneration) return false;
     getSupabaseClient().realtime.setAuth(token);
 
     const expiresInMs = new Date(expiresAt).getTime() - Date.now();
     const nextInMs = Math.max(expiresInMs - TOKEN_REFRESH_MARGIN_MS, TOKEN_REFRESH_MARGIN_MS);
     clearTimeout(tokenRefreshTimer);
-    tokenRefreshTimer = setTimeout(refreshAuthAndScheduleNext, nextInMs);
+    tokenRefreshTimer = setTimeout(() => { void refreshAuthAndScheduleNext(0); }, nextInMs);
     return true;
   } catch (err) {
-    console.warn('[ticketPresenceRealtime] falha ao obter token de presence', err?.response?.status || err?.message);
+    if (generation !== refreshGeneration) return false;
+    const status = err?.response?.status;
+    console.warn('[ticketPresenceRealtime] falha ao obter token de presence', status || err?.message);
     clearTimeout(tokenRefreshTimer);
-    tokenRefreshTimer = setTimeout(refreshAuthAndScheduleNext, TOKEN_REFRESH_MARGIN_MS);
+    if (status === 503) {
+      presenceUnavailable = true;
+      return false;
+    }
+    const delay = Math.min(TOKEN_RETRY_BASE_MS * (2 ** attempt), TOKEN_RETRY_MAX_MS);
+    tokenRefreshTimer = setTimeout(() => { void refreshAuthAndScheduleNext(attempt + 1); }, delay);
     return false;
   }
 }
@@ -112,6 +127,7 @@ export async function startTicketPresence({ userKey, name }) {
 }
 
 export function stopTicketPresence() {
+  refreshGeneration += 1;
   clearTimeout(tokenRefreshTimer);
   tokenRefreshTimer = null;
   if (channel) {

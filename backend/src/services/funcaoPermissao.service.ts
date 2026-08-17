@@ -3,6 +3,7 @@
  * VERSION: v1.2.0 | DATE: 2026-07-30
  */
 import {
+  ACESSO_MODULO_IDS,
   DEFAULT_FUNCOES_PERMISSOES,
   derivePortalVisivelFromPermissoes,
   PERMISSION_CATALOG,
@@ -123,6 +124,36 @@ async function backfillPreferenciasVisualizar(): Promise<number> {
   return updated;
 }
 
+/**
+ * Módulos de Acesso é novo (2026-08-17): funções já seedadas antes dele não têm
+ * permissoes.acesso — preenche a partir do default hardcoded da própria função (mesma
+ * segmentação por órgão/portal que o seed usaria hoje), sem sobrescrever quem já foi
+ * configurado manualmente via a nova seção do editor de overrides.
+ */
+async function backfillAcessoModulos(): Promise<number> {
+  const Model = getDeskFuncaoPermissaoModel();
+  const docs = await Model.find({
+    $or: [
+      { 'permissoes.acesso': { $exists: false } },
+      ...ACESSO_MODULO_IDS.map((id) => ({ [`permissoes.acesso.${id}`]: { $exists: false } })),
+    ],
+  });
+
+  let updated = 0;
+  for (const doc of docs) {
+    const defaults = DEFAULT_FUNCOES_PERMISSOES.find((entry) => entry.slug === doc.slug);
+    const acessoDefault = defaults?.permissoes?.acesso;
+    if (!acessoDefault) continue;
+
+    if (!doc.permissoes) doc.permissoes = {};
+    doc.permissoes.acesso = { ...acessoDefault, ...(doc.permissoes.acesso || {}) };
+    doc.markModified('permissoes');
+    await doc.save();
+    updated += 1;
+  }
+  return updated;
+}
+
 export async function seedFuncoesPermissoes(): Promise<void> {
   const Model = getDeskFuncaoPermissaoModel();
   const count = await Model.countDocuments();
@@ -142,6 +173,12 @@ export async function seedFuncoesPermissoes(): Promise<void> {
   if (backfilled > 0) {
     invalidateFuncaoPermissaoCache();
     console.log(`Seed: backfill preferencias.visualizar em ${backfilled} função(ões)`);
+  }
+
+  const acessoBackfilled = await backfillAcessoModulos();
+  if (acessoBackfilled > 0) {
+    invalidateFuncaoPermissaoCache();
+    console.log(`Seed: backfill permissoes.acesso (Módulos de Acesso) em ${acessoBackfilled} função(ões)`);
   }
 }
 

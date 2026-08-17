@@ -3,7 +3,7 @@
  * VERSION: v1.11.0 | DATE: 2026-07-27
  * Perfil: VeloHub (sem botÃ£o local na barra)
  */
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { isEspeciaisNavId, NAV_ITEMS } from '../config/profiles';
 import { useAuth } from '../context/AuthContext';
@@ -77,16 +77,6 @@ export default function Sidebar() {
   // funções ver todos os módulos liberados numa posição estável e previsível.
   const visibleNav = NAV_ITEMS.filter((item) => isNavAllowed(item.id));
 
-  const { primaryNav, especiaisNav } = useMemo(() => {
-    const primary = [];
-    const especiais = [];
-    visibleNav.forEach((item) => {
-      if (isEspeciaisNavId(item.id)) especiais.push(item);
-      else primary.push(item);
-    });
-    return { primaryNav: primary, especiaisNav: especiais };
-  }, [visibleNav]);
-
   const handleNavClick = useCallback((item) => {
     const path = item.id === 'tickets' ? '/tickets?desk=v2' : item.path;
     // Canais Especiais usam React Router direto — navigateToPage remove .active cedo demais
@@ -144,19 +134,22 @@ export default function Sidebar() {
     </li>
   );
 
-  const renderEspeciaisSection = () => {
-    if (!especiaisNav.length) return null;
-    if (!pinned) return especiaisNav.map(renderNavItem);
+  const renderNavList = () => visibleNav.map((item, index) => {
+    const isEspeciais = isEspeciaisNavId(item.id);
+    const prevIsEspeciais = index > 0 && isEspeciaisNavId(visibleNav[index - 1].id);
+    const showDivider = isEspeciais && pinned && !prevIsEspeciais;
     return (
-      <>
-        <li className="velo-nav-rail__nav-section" role="presentation">
-          <div className="velo-nav-rail__section-divider" aria-hidden="true" />
-          <span className="velo-nav-rail__section-label">Especiais</span>
-        </li>
-        {especiaisNav.map(renderNavItem)}
-      </>
+      <React.Fragment key={item.id}>
+        {showDivider && (
+          <li className="velo-nav-rail__nav-section" role="presentation">
+            <div className="velo-nav-rail__section-divider" aria-hidden="true" />
+            <span className="velo-nav-rail__section-label">Especiais</span>
+          </li>
+        )}
+        {renderNavItem(item)}
+      </React.Fragment>
     );
-  };
+  });
 
   return (
     <div
@@ -193,8 +186,7 @@ export default function Sidebar() {
           </button>
         </div>
         <ul className="nav-list">
-          {primaryNav.map(renderNavItem)}
-          {renderEspeciaisSection()}
+          {renderNavList()}
         </ul>
         <div className="velo-nav-rail__foot">
           <div ref={bellAnchorRef} className="velo-nav-rail__foot-actions" data-tooltip="VeloNews">

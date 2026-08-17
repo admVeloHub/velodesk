@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.14.0 | DATE: 2026-08-13
- * — IDs estáveis e metadados de mídia/transcrição WhatsApp
+ * VERSION: v3.16.0 | DATE: 2026-08-17
+ * — Aba Notas também lê anotacaoInterna do registro histórico
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
 import { getDeskQueueDisplayCount, markTicketResolvedOptimistic } from './queueCounts';
@@ -1408,6 +1408,10 @@ export function shouldHideWorkflowSystemThreadMessage(text) {
 function mapAgentInternalNote(note, ticket) {
   const text = String(note.text || '').trim();
   if (!text) return null;
+  const plain = /<[a-z][\s\S]*>/i.test(text)
+    ? text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    : text;
+  if (!plain) return null;
 
   const isWorkflowInfo = isWorkflowInfoNoteText(text);
   const author = note.author || 'Agente';
@@ -2028,14 +2032,32 @@ function mapSupervisorRegistroOccurrence(entry, ticket, client, previousTabulati
 function buildAgentInternalNotesFeed(ticket) {
   const merged = [];
   const seen = new Set();
+  const seenBody = new Set();
 
   normalizeTicketForDeskV2(ticket);
 
-  (ticket.internalNotes || []).forEach((note) => {
-    const mappedNote = mapAgentInternalNote(note, ticket);
+  const pushMappedNote = (mappedNote) => {
     if (!mappedNote || seen.has(mappedNote.id)) return;
+    const bodyKey = String(mappedNote.body || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (bodyKey && seenBody.has(bodyKey)) return;
     seen.add(mappedNote.id);
+    if (bodyKey) seenBody.add(bodyKey);
     merged.push(mappedNote);
+  };
+
+  (ticket.internalNotes || []).forEach((note) => {
+    pushMappedNote(mapAgentInternalNote(note, ticket));
+  });
+
+  (ticket.registroHistorico || ticket.registroAlteracoes || []).forEach((entry, index) => {
+    const text = String(entry.anotacaoInterna ?? '').trim();
+    if (!text) return;
+    pushMappedNote(mapAgentInternalNote({
+      id: `${entry.id || index}-int-reg`,
+      text,
+      timestamp: entry.time || entry.timestamp,
+      author: entry.autor,
+    }, ticket));
   });
 
   getWorkflowInfoRequestsForTicket(ticket).forEach((req) => {

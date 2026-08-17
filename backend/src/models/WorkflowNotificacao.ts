@@ -1,16 +1,21 @@
-/** WorkflowNotificacao v1.0.0 — CTA workflow persistido (sininho + Painel 360) */
+/** WorkflowNotificacao v1.1.0 — tipo 'caso_especial' (sininho sem workflow dedicado) */
 import { Schema, Document, Model, Types } from 'mongoose';
 import { getDeskConfigConnection } from '../config/database';
 
+export type WorkflowNotificacaoTipo = 'workflow_cta' | 'caso_especial';
+
 export interface IWorkflowNotificacao extends Document {
   _id: Types.ObjectId;
+  tipo: WorkflowNotificacaoTipo;
   destinatarioEmail: string;
   ticketId: Types.ObjectId;
   chamadoProtocolo: string;
-  workflowId: Types.ObjectId;
+  workflowId?: Types.ObjectId | null;
   workflowSlug: string;
   step: number;
   passoId: Types.ObjectId | null;
+  orgao?: string;
+  reclamacaoId?: Types.ObjectId | null;
   titulo: string;
   mensagem: string;
   lida: boolean;
@@ -20,13 +25,16 @@ export interface IWorkflowNotificacao extends Document {
 
 const WorkflowNotificacaoSchema = new Schema<IWorkflowNotificacao>(
   {
+    tipo: { type: String, enum: ['workflow_cta', 'caso_especial'], default: 'workflow_cta' },
     destinatarioEmail: { type: String, required: true, index: true },
     ticketId: { type: Schema.Types.ObjectId, required: true, index: true },
     chamadoProtocolo: { type: String, default: '' },
-    workflowId: { type: Schema.Types.ObjectId, required: true },
+    workflowId: { type: Schema.Types.ObjectId, default: null },
     workflowSlug: { type: String, default: '' },
     step: { type: Number, default: 0 },
     passoId: { type: Schema.Types.ObjectId, default: null },
+    orgao: { type: String, default: '' },
+    reclamacaoId: { type: Schema.Types.ObjectId, default: null },
     titulo: { type: String, default: '' },
     mensagem: { type: String, default: '' },
     lida: { type: Boolean, default: false },

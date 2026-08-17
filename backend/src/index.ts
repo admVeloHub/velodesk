@@ -68,9 +68,6 @@ import { bootstrapEmailServices } from './services/emailBootstrap.service';
 import { startChamadoProtocoloWatcher } from './services/chamadoProtocoloWatcher.service';
 import { startWhatsAppAudioTranscriptionWorker } from './services/twilio/whatsappAudioTranscription.service';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const whatsapp = require('./whatsapp/whatsappModule.js');
-
 const app = express();
 
 app.set('trust proxy', 1);
@@ -130,7 +127,6 @@ app.get('/api/health', (_req, res) => {
     funcionariosDbName: env.mongoFuncionariosDbName,
     mongoEnvConfigured: Boolean(getMongoHubCentralUri()),
     funcionariosConnected: isFuncionariosConnected(),
-    whatsapp: whatsapp.getWhatsAppHealth(),
     languageTool: {
       configured: isLanguageToolConfigured(),
       url: isLanguageToolConfigured() ? env.languageToolUrl : null,
@@ -157,7 +153,6 @@ app.get('/health', (_req, res) => {
     funcionariosDbName: env.mongoFuncionariosDbName,
     mongoEnvConfigured: Boolean(getMongoHubCentralUri()),
     funcionariosConnected: isFuncionariosConnected(),
-    whatsapp: whatsapp.getWhatsAppHealth(),
     languageTool: {
       configured: isLanguageToolConfigured(),
     },
@@ -193,9 +188,6 @@ app.use('/api/reclamacoes', reclamacoesRoutes);
 app.use('/api/reclame-aqui/hugme', reclameAquiHugmeRoutes);
 app.use('/api/processos', processosRoutes);
 
-if (env.enableWhatsapp) {
-  whatsapp.mountWhatsAppRoutes(app);
-}
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('[express] erro não tratado:', err);
@@ -329,10 +321,6 @@ async function start() {
       startCloseResolvedTicketsJob();
       startResolvePendenteTicketsJob();
       startWhatsAppAudioTranscriptionWorker();
-      if (env.enableWhatsapp) {
-        console.log('Inicializando WhatsApp Web...');
-        whatsapp.initializeWhatsApp();
-      }
     });
   });
 }
@@ -346,7 +334,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 process.on('SIGINT', async () => {
-  await whatsapp.destroyWhatsApp();
   await disconnectDatabase();
   process.exit(0);
 });

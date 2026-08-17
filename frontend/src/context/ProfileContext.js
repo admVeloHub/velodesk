@@ -1,10 +1,11 @@
 /**
- * ProfileContext v2.0.0 — visão fixa por RBAC (sem troca manual)
- * VERSION: v2.0.0 | DATE: 2026-07-23 | AUTHOR: VeloHub Development Team
+ * ProfileContext v2.1.0 — isNavAllowed via Módulos de Acesso (permissoes.acesso), não mais
+ * união fixa de PROFILES[portal].nav
+ * VERSION: v2.1.0 | DATE: 2026-08-17 | AUTHOR: VeloHub Development Team
  */
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { PROFILES, getProfileMeta, getProfileDefaultPath, normalizeProfileId } from '../config/profiles';
+import { getProfileMeta, getProfileDefaultPath, normalizeProfileId } from '../config/profiles';
 import { usePermissions } from './PermissionContext';
 import {
   readCachedPermissions,
@@ -131,18 +132,14 @@ export function ProfileProvider({ children }) {
     setDropdownOpen(false);
   }, []);
 
-  // União dos módulos liberados por TODOS os portais que as funções da pessoa desbloqueiam
-  // (não só o portal "preferido"), pra quem acumula funções não perder acesso a nenhuma delas.
-  const allowedNavIds = useMemo(() => {
-    const allowedPortals = getAllowedProfilePortals(permissions);
-    const ids = new Set();
-    allowedPortals.forEach((portalId) => {
-      PROFILES[portalId]?.nav.forEach((id) => ids.add(id));
-    });
-    return ids;
+  // Visibilidade por módulo (Módulos de Acesso) — um boolean por item da barra, sem depender
+  // da união fixa de PROFILES[portal].nav (que misturava tudo que o portal "permite" e causava
+  // módulos aparecendo/faltando fora de controle, ex.: canais especiais). 'preferencias' não
+  // tem override — visível para todos.
+  const isNavAllowed = useCallback((pageId) => {
+    if (pageId === 'preferencias') return true;
+    return permissions?.permissoes?.acesso?.[pageId] === true;
   }, [permissions]);
-
-  const isNavAllowed = useCallback((pageId) => allowedNavIds.has(pageId), [allowedNavIds]);
 
   return (
     <ProfileContext.Provider value={{

@@ -1,4 +1,4 @@
-/** ReclamacaoBase.schema v1.0.0 — schema compartilhado chamados_reclamacoes */
+/** ReclamacaoBase.schema v1.1.0 — bloco workflow completo (paridade com chamados_n1.workflow) */
 import { Schema, Document, Types } from 'mongoose';
 import type { CasoEspecialOrgao } from '../../services/agents/casosEspeciais.types';
 
@@ -11,6 +11,29 @@ export interface IReclamacaoTriagem {
   signals: string[];
   at: Date;
   agenteVersao: string;
+}
+
+export interface IReclamacaoWorkflowRequisicao {
+  preenchidaEm?: Date;
+  preenchidaPor?: string;
+  valores?: Record<string, unknown>;
+  comunicacaoWorkflow?: Array<{ mensagem: string; data: Date; autor: string }>;
+}
+
+/**
+ * Espelha IChamadoWorkflow (ChamadoN1.ts) — o ticket permanece elegível a qualquer workflow
+ * real (não um "*-tratativa" dedicado ao órgão); este bloco é o snapshot denormalizado do
+ * workflow ativo no ticket, para consulta/ação direto do dash do órgão sem join em chamados_n1.
+ */
+export interface IReclamacaoWorkflow {
+  active: boolean;
+  workflowId: Types.ObjectId | null;
+  step: number;
+  passoId: Types.ObjectId | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  pendingDecision?: 'approve' | 'reject' | null;
+  requisicao?: IReclamacaoWorkflowRequisicao;
 }
 
 export interface IReclamacao extends Document {
@@ -43,6 +66,7 @@ export interface IReclamacao extends Document {
   workflowId?: Types.ObjectId;
   workflowSlug?: string;
   workflowAtivo: boolean;
+  workflow?: IReclamacaoWorkflow;
   aberta: boolean;
   meta: Record<string, unknown>;
   createdAt: Date;
@@ -59,6 +83,39 @@ const ReclamacaoTriagemSchema = new Schema<IReclamacaoTriagem>(
     signals: { type: [String], default: [] },
     at: { type: Date, required: true },
     agenteVersao: { type: String, default: 'casosEspeciaisAgent v1.0.0' },
+  },
+  { _id: false },
+);
+
+const ReclamacaoWorkflowComunicacaoSchema = new Schema(
+  {
+    mensagem: { type: String, default: '' },
+    data: { type: Date, default: Date.now },
+    autor: { type: String, default: '' },
+  },
+  { _id: false },
+);
+
+const ReclamacaoWorkflowRequisicaoSchema = new Schema<IReclamacaoWorkflowRequisicao>(
+  {
+    preenchidaEm: { type: Date, default: null },
+    preenchidaPor: { type: String, default: '' },
+    valores: { type: Schema.Types.Mixed, default: {} },
+    comunicacaoWorkflow: { type: [ReclamacaoWorkflowComunicacaoSchema], default: [] },
+  },
+  { _id: false },
+);
+
+const ReclamacaoWorkflowSchema = new Schema<IReclamacaoWorkflow>(
+  {
+    active: { type: Boolean, default: false },
+    workflowId: { type: Schema.Types.ObjectId, default: null },
+    step: { type: Number, default: 0 },
+    passoId: { type: Schema.Types.ObjectId, default: null },
+    startedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    pendingDecision: { type: String, enum: ['approve', 'reject', null], default: null },
+    requisicao: { type: ReclamacaoWorkflowRequisicaoSchema, default: undefined },
   },
   { _id: false },
 );
@@ -94,6 +151,7 @@ export const ReclamacaoBaseSchema = new Schema<IReclamacao>(
     workflowId: { type: Schema.Types.ObjectId, default: undefined },
     workflowSlug: { type: String, default: '' },
     workflowAtivo: { type: Boolean, default: false },
+    workflow: { type: ReclamacaoWorkflowSchema, default: undefined },
     aberta: { type: Boolean, default: true },
     meta: { type: Schema.Types.Mixed, default: {} },
   },

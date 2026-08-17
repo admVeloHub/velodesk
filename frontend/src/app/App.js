@@ -36,7 +36,6 @@ import WorkspacePage from '../pages/WorkspacePage';
 
 import TicketsPage from '../pages/TicketsPage';
 
-import ChatPage from '../pages/ChatPage';
 
 import ConfigPage from '../pages/ConfigPage';
 
@@ -112,8 +111,6 @@ function AppRoutes() {
             { path: 'especiais/bacen/*', element: React.createElement(BacenChannelPage) },
 
             { path: 'especiais/:channelId', element: React.createElement(EspeciaisChannelPage) },
-
-            { path: 'chat', element: React.createElement(ChatPage) },
 
             { path: 'config', element: React.createElement(ConfigPage) },
 

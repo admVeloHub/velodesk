@@ -23,7 +23,7 @@ export const PROFILES = {
     icon: 'fa-headset',
     color: '#1634FF',
     desc: 'Tickets, fila operacional e registro rápido',
-    nav: ['workspace', 'tickets', 'busca-tickets', 'preferencias', 'atendimento-ia-telefonico', 'chat', ...ESPECIAIS_NAV_IDS],
+    nav: ['workspace', 'tickets', 'busca-tickets', 'preferencias', 'atendimento-ia-telefonico', ...ESPECIAIS_NAV_IDS],
     defaultPage: 'workspace',
   },
   gestao: {
@@ -61,8 +61,21 @@ export const PROFILES = {
 
 export const NAV_ITEMS = [
   { id: 'workspace', path: '/workspace', label: 'Painel 360°', icon: 'ti-layout-grid', tooltip: 'Painel 360°' },
+  {
+    id: 'realtime',
+    path: '/realtime',
+    label: 'Realtime',
+    icon: 'ti-broadcast',
+    tooltip: 'Painel operacional ao vivo',
+  },
   { id: 'workflow-inbox', path: '/workflow', label: 'Aprovações', icon: 'ti-checkbox', tooltip: 'Console de aprovações' },
-  { id: 'reports', path: '/reports', label: 'Relatórios', icon: 'ti-chart-bar', tooltip: 'Relatórios' },
+  {
+    id: 'atendimento-ia-telefonico',
+    path: '/atendimento-ia-telefonico',
+    label: 'IA Telefônica',
+    icon: 'ti-phone-call',
+    tooltip: 'Atendimento IA Telefônico',
+  },
   { id: 'tickets', path: '/tickets', label: 'Tickets', icon: 'ti-ticket', tooltip: 'Tickets' },
   {
     id: 'busca-tickets',
@@ -70,27 +83,6 @@ export const NAV_ITEMS = [
     label: 'Busca de Tickets',
     icon: 'ti-search',
     tooltip: 'Busca avançada de tickets',
-  },
-  {
-    id: 'preferencias',
-    path: '/preferencias',
-    label: 'Preferências',
-    icon: 'ti-adjustments',
-    tooltip: 'Preferências do agente',
-  },
-  {
-    id: 'realtime',
-    path: '/realtime',
-    label: 'Realtime',
-    icon: 'ti-pulse',
-    tooltip: 'Painel operacional ao vivo',
-  },
-  {
-    id: 'atendimento-ia-telefonico',
-    path: '/atendimento-ia-telefonico',
-    label: 'IA Telefônica',
-    icon: 'ti-phone-call',
-    tooltip: 'Atendimento IA Telefônico',
   },
   {
     id: 'especiais-reclame-aqui',
@@ -127,8 +119,15 @@ export const NAV_ITEMS = [
     icon: 'ti-briefcase',
     tooltip: 'Processos',
   },
-  { id: 'chat', path: '/chat', label: 'Mensagens', icon: 'ti-message-2', tooltip: 'Mensagens', badge: true },
+  {
+    id: 'preferencias',
+    path: '/preferencias',
+    label: 'Preferências',
+    icon: 'ti-adjustments',
+    tooltip: 'Preferências do agente',
+  },
   { id: 'config', path: '/config', label: 'Configurações', icon: 'ti-settings', tooltip: 'Configurações' },
+  { id: 'reports', path: '/reports', label: 'Relatórios', icon: 'ti-chart-bar', tooltip: 'Relatórios' },
   { id: 'especiais-canais', path: '/especiais', label: 'Canais Especiais', icon: 'ti-star', tooltip: 'Canais Especiais' },
   { id: 'client-portal', path: '/client-portal', label: 'Portal Cliente', icon: 'ti-external-link', tooltip: 'Portal do Cliente' },
 ];

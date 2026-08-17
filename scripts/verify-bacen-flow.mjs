@@ -46,10 +46,12 @@ assert('evento bacen-sync', cache.includes('velodesk:bacen-sync'));
 
 console.log('\n4. Backend');
 const routing = read('backend/src/services/agents/casosEspeciaisRouting.service.ts');
-assert('workflowSlug bacen-tratativa', routing.includes("workflowSlug: 'bacen-tratativa'"));
+assert('sem workflowSlug dedicado por órgão', !routing.includes("workflowSlug: 'bacen-tratativa'"));
+assert('elegível a workflow real via tabulação', routing.includes('tryActivateWorkflowOnTabulation'));
+assert('notificação via sininho (sem workflow)', routing.includes('createCasoEspecialNotificacao'));
 
 const seed = read('backend/src/services/workflowConfigSeed.service.ts');
-assert('workflow seed', seed.includes('bacen-tratativa'));
+assert('seed desativa bacen-tratativa (não recria mais)', seed.includes('deactivateCasosEspeciaisTratativaWorkflows'));
 
 console.log('\n5. UI module');
 const bacenDir = path.join(root, 'frontend/src/features/especiais/bacen');

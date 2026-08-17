@@ -49,8 +49,7 @@ RUN chmod +x /start-velodesk.sh
 ENV NODE_ENV=production \
     PORT=8080 \
     API_INTERNAL_PORT=8081 \
-    BACKEND_URL=http://127.0.0.1:8081 \
-    ENABLE_WHATSAPP=false
+    BACKEND_URL=http://127.0.0.1:8081
 
 EXPOSE 8080
 

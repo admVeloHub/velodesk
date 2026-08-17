@@ -202,11 +202,11 @@
   color: #666;
 }
 
-/* Balão crítico persistente — inferior esquerdo */
+/* Balão crítico persistente — inferior esquerdo (acima do botão Criar ticket da fila) */
 .velonews-critical-bubble {
   position: fixed;
   left: 16px;
-  bottom: 16px;
+  bottom: 76px;
   z-index: 9200;
   display: flex;
   flex-direction: column;

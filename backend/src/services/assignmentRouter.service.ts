@@ -108,6 +108,7 @@ function ensureTabulacaoSlot(partial: Partial<IChamadoN1> | IChamadoN1): void {
       produto: '',
       motivo: '',
       detalhe: '',
+      canal: '',
       responsavel: '',
       atribuido: '',
     }];

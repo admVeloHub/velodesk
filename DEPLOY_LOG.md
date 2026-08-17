@@ -1,10 +1,33 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.82.0 | DATE: 2026-08-13 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.83.0 | DATE: 2026-08-17 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Desk v2: compose, notas internas, presence e remoção Chat/WhatsApp legado
+
+- **Data/Hora**: 2026-08-17
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.83.0
+  - **Frontend**: DeskV2Root v3.33.1, ComposeRichEditor v1.2.0, DeskNoteCardParts v1.1.0, ticketThreadSync v1.8.0, utils v3.16.0, ticketsCache v1.13.0, ticketPresenceRealtime v1.1.0, TicketPresenceContext v1.1.0
+  - **Backend**: chamado.mapper, funcaoPermissao v1.x, permission.service, reclamacao.service, workflowNotificacao, casosEspeciaisRouting, env (remoção vars WhatsApp legado)
+- **Arquivos principais**:
+  - `frontend/src/features/desk/DeskV2Root.jsx` — fim do loop poll→refresh; commit com text/internalText corretos; sync assíncrono pós-save; rascunho persistido
+  - `frontend/src/features/desk/components/ComposeRichEditor.jsx` — não sobrescreve DOM enquanto agente digita
+  - `frontend/src/services/desk/utils.js` — feed Notas lê `anotacaoInterna` do registro; ignora HTML vazio
+  - `frontend/src/services/ticketsCache.js` — detalhe do ticket antes de loadBoxes no commit
+  - `frontend/src/services/presence/ticketPresenceRealtime.js` — para retry em 503; backoff nos demais erros
+  - Remoção `frontend/src/features/chat/*`, `ChatPage.js`, `backend/src/whatsapp/whatsappModule.js`
+  - Permissões/funções, reclamações, workflow notificações, Docker e `.env.example` alinhados
+- **Descrição**: Corrige re-render que apagava texto do compose (anotação interna), notas internas que não apareciam/salvavam na aba Notas, e lentidão extrema no commit (loadBoxes bloqueante + loop de GET). Presence para de martelar 503 em loop. Remove módulo Chat e WhatsApp legado do monólito. Push completo para forçar rebuild Cloud Build.
+- **Status**: Push main
+
+---
 
 ### GitHub Push — inbound tickets (App / Telefone / Agente IA)
 

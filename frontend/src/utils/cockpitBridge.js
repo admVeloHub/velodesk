@@ -18,7 +18,6 @@ const PAGE_ROUTES = {
   'especiais-processos': '/especiais/processos',
   'workflow-inbox': '/workflow',
   reports: '/reports',
-  chat: '/chat',
   config: '/config',
   'analytics-ia': '/analytics-ia',
   'client-portal': '/client-portal',

@@ -520,6 +520,7 @@ export function readTabulacaoSnapshot(tab?: ITabulacao | null): ITabulacao {
       produto: '',
       motivo: '',
       detalhe: '',
+      canal: '',
       responsavel: '',
       atribuido: '',
     };
@@ -535,9 +536,40 @@ export function readTabulacaoSnapshot(tab?: ITabulacao | null): ITabulacao {
     produto: String(plain.produto ?? '').trim(),
     motivo: String(plain.motivo ?? '').trim(),
     detalhe: String(plain.detalhe ?? '').trim(),
+    canal: String(plain.canal ?? '').trim(),
     responsavel: String(plain.responsavel ?? '').trim(),
     atribuido: String(plain.atribuido ?? '').trim(),
   };
+}
+
+/** Rótulo de Canal (tabulação) a partir da origem real do ticket (registro[0].metadados.source). */
+const CANAL_LABEL_BY_SOURCE: Record<string, string> = {
+  'whatsapp-thread': 'WhatsApp',
+  whatsapp: 'WhatsApp',
+  'email-inbound': 'E-mail',
+  email: 'E-mail',
+  'inbound-ticket-app': 'App',
+  app: 'App',
+  'inbound-ticket-telefone': 'Telefone',
+  telefone: 'Telefone',
+  'inbound-ticket-agente-ia': 'Agente IA',
+  'agente-ia': 'Agente IA',
+  'reclame-aqui': 'Reclame Aqui',
+  procon: 'Procon',
+  'consumidor-gov': 'Consumidor.Gov',
+  bacen: 'Bacen',
+};
+
+export function resolveCanalLabelFromSource(source: unknown): string {
+  const key = String(source ?? '').trim().toLowerCase();
+  return CANAL_LABEL_BY_SOURCE[key] || '';
+}
+
+/** Origem do primeiro evento do chamado (metadados.source) — usado como fallback de Canal em tickets antigos. */
+export function readChamadoOriginSource(chamado: IChamadoN1): string {
+  const first = chamado.registro?.[0];
+  const meta = (first?.metadados && typeof first.metadados === 'object' ? first.metadados : {}) as Record<string, unknown>;
+  return String(meta.source ?? '').trim();
 }
 
 function buildAlteracoesItem(changes: Record<string, unknown>): unknown[] {
@@ -1037,6 +1069,7 @@ function tabulacaoFromBody(body: Record<string, unknown>, fallbackTitle?: string
     produto: lateral.produto ?? String(body.produto ?? ''),
     motivo: lateral.motivo ?? fallbackTitle ?? String(body.title ?? ''),
     detalhe: lateral.detalhe ?? String(body.description ?? ''),
+    canal: String(lateral.canal ?? body.canal ?? '').trim(),
     responsavel: sanitizeResponsavel(lateral.responsavel ?? body.responsibleAgent),
     atribuido: lateral.atribuido ?? '',
   };
@@ -1247,6 +1280,13 @@ export async function createChamadoFromBody(
       },
       status,
     }];
+  }
+
+  if (!tab.canal) {
+    const effectiveSource = String(
+      (registro[0]?.metadados as Record<string, unknown> | undefined)?.source ?? '',
+    );
+    tab.canal = resolveCanalLabelFromSource(effectiveSource) || 'Portal';
   }
 
   await assertTabulacaoForStatus(tab, status);
@@ -1816,6 +1856,7 @@ function buildTicketDtoCore(
   const reclameAquiMeta = extras.reclameAqui ?? findReclameAquiFromChamado(chamado);
   const proconMeta = extras.procon ?? findProconFromChamado(chamado);
   const consumidorGovMeta = extras.consumidorGov ?? findConsumidorGovFromChamado(chamado);
+  const bacenMeta = findBacenFromChamado(chamado);
   const reclameAqui = listOnly ? null : reclameAquiMeta;
   const procon = listOnly ? null : proconMeta;
   const consumidorGov = listOnly ? null : consumidorGovMeta;
@@ -1833,6 +1874,18 @@ function buildTicketDtoCore(
       : consumidorGovMeta
         ? 'consumidor-gov'
         : 'velodesk';
+  // Canal real de contato: prioriza órgão especial detectado, depois tabulacao.canal persistido
+  // (a partir daqui, todo ticket novo já é criado com canal correto — ver createChamadoFromBody),
+  // com fallback para tickets antigos sem canal persistido (deriva de registro[0].metadados.source).
+  const canalLabel = reclameAquiMeta
+    ? 'Reclame Aqui'
+    : proconMeta
+      ? 'Procon'
+      : consumidorGovMeta
+        ? 'Consumidor.Gov'
+        : bacenMeta
+          ? 'Bacen'
+          : (tab?.canal || resolveCanalLabelFromSource(readChamadoOriginSource(chamado)) || 'Portal');
 
   return {
     _id: chamado._id.toString(),
@@ -1902,13 +1955,7 @@ function buildTicketDtoCore(
       clienteTelefone: listOnly ? [] : (cadastro?.clienteTelefone?.lista ?? []),
       clienteTelefoneWhatsapp: listOnly ? undefined : (cadastro?.clienteTelefone?.whatsapp ?? undefined),
       cpf: clientCpf,
-      canal: reclameAquiMeta
-        ? 'Reclame Aqui'
-        : proconMeta
-          ? 'Procon'
-          : consumidorGovMeta
-            ? 'Consumidor.Gov'
-            : undefined,
+      canal: canalLabel,
       reclameAqui: reclameAqui ?? undefined,
       procon: procon ?? undefined,
       consumidorGov: consumidorGov ?? undefined,

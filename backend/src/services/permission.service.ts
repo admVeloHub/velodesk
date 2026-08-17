@@ -1,4 +1,4 @@
-/** permission.service v1.7.0 — WF: avanço só atribuído; compose interno para observadores */
+/** permission.service v1.8.0 — bypass Configurações por conta (lucas.gravina@velotax.com.br) */
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { findColaboradorByEmail } from './colaboradoresCadastro.service';
@@ -98,6 +98,20 @@ export async function resolveUserFuncoes(authUser: AuthPayload): Promise<string[
   return [...new Set(funcoes)];
 }
 
+/** Bypass por conta — Configurações sempre visível, independente da função. */
+const CONFIG_ALWAYS_VISIBLE_EMAILS = new Set(['lucas.gravina@velotax.com.br']);
+
+function applyConfigAlwaysVisibleBypass(permissoes: PermissoesMap, email?: string): void {
+  const normalized = String(email ?? '').trim().toLowerCase();
+  if (!CONFIG_ALWAYS_VISIBLE_EMAILS.has(normalized)) return;
+
+  if (!permissoes.config) permissoes.config = {};
+  permissoes.config.visualizar = true;
+
+  if (!permissoes.acesso) permissoes.acesso = {};
+  permissoes.acesso.config = true;
+}
+
 export async function resolveUserPermissions(authUser: AuthPayload): Promise<ResolvedUserPermissions> {
   const dbUser = await resolveDbUser(authUser.userId);
   const colaborador = await findColaboradorByEmail(authUser.email);
@@ -128,6 +142,8 @@ export async function resolveUserPermissions(authUser: AuthPayload): Promise<Res
     permissoes,
     effective?.portalVisivel || ['agent'],
   );
+
+  applyConfigAlwaysVisibleBypass(permissoes, authUser.email);
 
   const candidates = buildResponsavelCandidates(authUser, dbUser);
 

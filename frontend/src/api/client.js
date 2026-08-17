@@ -272,15 +272,6 @@ export const tabulationApi = {
     api.delete(`/tabulation/opcoes/${encodeURIComponent(categoria)}/items/${encodeURIComponent(itemId)}`).then((r) => r.data),
 };
 
-export const whatsappApi = {
-  status: () => api.get('/whatsapp/status').then((r) => r.data),
-  conversations: () => api.get('/whatsapp/conversations').then((r) => r.data),
-  messages: (id) =>
-    api.get(`/whatsapp/conversations/${encodeURIComponent(id)}/messages`).then((r) => r.data),
-  send: (conversationId, message) =>
-    api.post('/whatsapp/send-message', { conversationId, message }).then((r) => r.data),
-};
-
 export const ticketAiApi = {
   status: () => api.get('/ticket-ai/status').then((r) => r.data),
   suggest: (payload, config) =>

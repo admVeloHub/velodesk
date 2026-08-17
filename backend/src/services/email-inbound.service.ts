@@ -448,7 +448,6 @@ async function ensureStructuredBacenReclamacao(
       origemEntrada: 'email-inbound-bacen-structured',
       inboxDedicada: true,
       emailThreadRootId,
-      workflowSlug: 'bacen-tratativa',
     });
   } catch (err) {
     console.warn('[email-inbound] upsert reclamacao bacen fail-soft:', (err as Error).message);

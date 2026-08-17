@@ -164,7 +164,7 @@ export function buildDraftTicketFromCliente(doc, agentName) {
     clienteId: contact.clienteId,
     clientCPF: contact.clientCPF,
     clientName: contact.clientName,
-    channel: 'WhatsApp',
+    channel: 'Portal',
     tipo: 'Solicitação',
     atribuir: `${agent} (eu)`,
     lateralForm: {
@@ -175,7 +175,7 @@ export function buildDraftTicketFromCliente(doc, agentName) {
       clienteEmailResposta: contact.replyEmail,
       clienteTelefone: contact.phones,
       clienteTelefoneWhatsapp: contact.whatsappPhone,
-      canal: 'WhatsApp',
+      canal: 'Portal',
       classificacaoTipo: 'Solicitação',
       produto: '',
       motivo: '',
@@ -220,7 +220,6 @@ export function applyClienteDocToTicket(ticket, doc) {
 export function ticketNeedsContactHydration(ticket) {
   if (!ticket) return false;
   const lf = ticket.lateralForm || {};
-  const hasClienteId = Boolean(ticket.clienteId || lf.clienteId);
   const nome = String(lf.clienteNome || ticket.clientName || ticket.solicitante || '').trim();
-  return !hasClienteId || !nome;
+  return !nome;
 }

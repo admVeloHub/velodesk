@@ -5,17 +5,18 @@ import React, { useState } from 'react';
 import {
   MODULO_LABELS,
   SUB_LABELS,
+  acessoSubLabel,
   countActivePerms,
-  sortCatalogEntries,
+  sortCatalogEntriesVisible,
   syncDraftPortalVisivel,
 } from './funcaoPermissoesLabels';
 
 export default function FuncaoOverridesEditor({ catalog, draft, setDraft, className = '' }) {
-  const [moduloOpen, setModuloOpen] = useState('portal');
+  const [moduloOpen, setModuloOpen] = useState('tickets');
 
   if (!draft) return null;
 
-  const catalogEntries = sortCatalogEntries(catalog);
+  const catalogEntries = sortCatalogEntriesVisible(catalog);
 
   const togglePerm = (modulo, key) => {
     setDraft((prev) => {
@@ -92,7 +93,7 @@ export default function FuncaoOverridesEditor({ catalog, draft, setDraft, classN
                           checked={draft.permissoes?.[modulo]?.[key] === true}
                           onChange={() => togglePerm(modulo, key)}
                         />
-                        <span>{SUB_LABELS[key] || key}</span>
+                        <span>{modulo === 'acesso' ? acessoSubLabel(key) : (SUB_LABELS[key] || key)}</span>
                       </label>
                     ))}
                   </div>

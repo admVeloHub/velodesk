@@ -184,7 +184,7 @@ export function buildDefaultRightFields(_config, ticket, getAgentName) {
   const responsavel = sanitizeResponsavel(lf.responsavel) || sanitizeResponsavel(ticket?.responsibleAgent);
   return {
     responsavel,
-    canal: lf.canal || ticket?.channel || 'WhatsApp',
+    canal: lf.canal || ticket?.channel || 'Portal',
     tipo,
     produto,
     motivo,
@@ -211,7 +211,7 @@ export function mergeRightFieldsWithDefaults(partial, ticket, getAgentName) {
   const merged = overlayNonEmptyTabulationFields(defaults, partial);
   merged.tipo = String(merged.tipo || defaults.tipo || DEFAULT_TIPO).trim() || DEFAULT_TIPO;
   merged.responsavel = sanitizeResponsavel(merged.responsavel) || defaults.responsavel;
-  merged.canal = String(merged.canal || defaults.canal || 'WhatsApp').trim() || defaults.canal;
+  merged.canal = String(merged.canal || defaults.canal || 'Portal').trim() || defaults.canal;
   return merged;
 }
 

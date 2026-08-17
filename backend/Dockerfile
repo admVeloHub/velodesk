@@ -17,8 +17,7 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 ENV NODE_ENV=production \
-    PORT=8080 \
-    ENABLE_WHATSAPP=false
+    PORT=8080
 
 COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/node_modules ./node_modules

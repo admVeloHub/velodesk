@@ -1,6 +1,6 @@
 /**
- * casosEspeciais.types v1.0.1 — tipos do Agente de Casos especiais
- * VERSION: v1.0.0 | DATE: 2026-08-07
+ * casosEspeciais.types v1.1.0 — remove workflowSlug dedicado por órgão (sem workflow "*-tratativa")
+ * VERSION: v1.1.0 | DATE: 2026-08-17
  */
 
 export type CasoEspecialOrgao =
@@ -46,5 +46,4 @@ export interface CasoEspecialOrgaoConfig {
   funcaoSlug: string;
   source: string;
   canalLabel: string;
-  workflowSlug: string | null;
 }

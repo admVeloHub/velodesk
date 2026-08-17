@@ -1,8 +1,9 @@
 /**
- * DeskNoteCardParts v1.0.0 — blocos compartilhados de cards Notas/Eventos
- * VERSION: v1.0.0 | DATE: 2026-07-28
+ * DeskNoteCardParts v1.1.0 — corpo de nota interna renderiza HTML sanitizado do compose
+ * VERSION: v1.1.0 | DATE: 2026-08-17
  */
 import React from 'react';
+import { htmlToPlainText, normalizeMessageHtmlForDisplay } from '../../../services/desk/composeRichEditor';
 
 export const NOTE_KIND_META = {
   agent: { icon: null, useInitials: true },
@@ -21,6 +22,22 @@ export function isSameTicketNote(note, ticket) {
 }
 
 export function NoteBody({ body, boldSegments }) {
+  const raw = String(body || '');
+  if (!boldSegments?.length && /<[a-z][\s\S]*>/i.test(raw)) {
+    const html = normalizeMessageHtmlForDisplay(raw);
+    if (html) {
+      return (
+        <div
+          className="crm-note-card__body crm-note-card__body--html"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      );
+    }
+    const plain = htmlToPlainText(raw).trim();
+    if (!plain) return null;
+    return <p className="crm-note-card__body">{plain}</p>;
+  }
+
   if (!boldSegments?.length) {
     return <p className="crm-note-card__body">{body}</p>;
   }
@@ -59,7 +76,7 @@ export function RegistroOccurrenceBody({ note }) {
       {note.internalExcerpt ? (
         <div className="crm-note-card__registro-block">
           <span className="crm-note-card__body-label">Anotação interna:</span>
-          <p className="crm-note-card__body">{note.internalExcerpt}</p>
+          <NoteBody body={note.internalExcerpt} />
         </div>
       ) : null}
       {note.tabulationChanges?.length ? (

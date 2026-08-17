@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.32.1 | DATE: 2026-08-12
- * — Ao fechar última aba em Meus Tickets/Resolvidos, restaura tabela
+ * VERSION: v3.33.1 | DATE: 2026-08-17
+ * — Rascunho do compose persiste a cada tecla; poll ignora GET atrasado
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -110,7 +110,7 @@ import ProdutosForwardPopover from './components/ProdutosForwardPopover';
 import WorkflowComunicacaoModal from '../workflow/components/WorkflowComunicacaoModal';
 import { replyWorkflowComunicacao } from '../../services/workflow/workflowDecisionHandlers';
 import deskPlatformTrace, { createPlatformTraceCounter } from '../../utils/deskPlatformTrace';
-import { hasPublicThreadChanged, hasWhatsAppThreadChanged } from '../../services/desk/ticketThreadSync';
+import { hasPublicThreadChanged, hasWhatsAppThreadChanged, hasPersistedInternalNotesChanged } from '../../services/desk/ticketThreadSync';
 import { hasAtendimentoFuncao } from '../../services/desk/atuacaoVision';
 
 /** Respostas de cliente chegam por e-mail a qualquer momento: a thread se atualiza sozinha */
@@ -357,6 +357,23 @@ export default function DeskV2Root() {
     };
   }, [mainTab, composeMode, composeText, internalText, composeAttachments, sendStatus, rightFields, waChatOpen, spellIgnoredWords]);
 
+  const persistComposeDraft = useCallback((patch) => {
+    if (!activeTabId) return;
+    const sessionKey = String(activeTabId);
+    const session = tabSessionsRef.current[sessionKey] || {};
+    tabSessionsRef.current[sessionKey] = { ...session, ...patch };
+  }, [activeTabId]);
+
+  const handleComposeTextChange = useCallback((html) => {
+    setComposeText(html);
+    persistComposeDraft({ composeText: html });
+  }, [persistComposeDraft]);
+
+  const handleInternalTextChange = useCallback((html) => {
+    setInternalText(html);
+    persistComposeDraft({ internalText: html });
+  }, [persistComposeDraft]);
+
   const restoreTabSession = useCallback((ticketId) => {
     const ticketEntry = findTicketEntry(ticketId);
     if (!ticketEntry) return;
@@ -512,14 +529,17 @@ export default function DeskV2Root() {
     const ticketId = String(activeTabId);
     let cancelled = false;
     let inFlight = false;
+    let requestSeq = 0;
 
     const syncDetail = async () => {
       if (cancelled || inFlight) return;
       if (document.hidden) return;
       if (commitInProgressRef.current) return;
       inFlight = true;
+      const seq = ++requestSeq;
       try {
         const raw = await ticketsApi.get(ticketId);
+        if (cancelled || seq !== requestSeq) return;
         if (raw?.listOnly === true) return;
         const full = apiTicketToCockpit(raw);
         if (!full?.id && !full?._id) return;
@@ -533,9 +553,10 @@ export default function DeskV2Root() {
           : full;
         const threadChanged = hasPublicThreadChanged(prevTicket, merged);
         const waThreadChanged = hasWhatsAppThreadChanged(prevTicket, merged);
+        const internalNotesChanged = hasPersistedInternalNotesChanged(prevTicket, merged);
         const detailFilled = ticketNeedsDetailLoad(prevTicket) && !ticketNeedsDetailLoad(merged);
 
-        if (threadChanged || waThreadChanged || detailFilled) {
+        if (threadChanged || waThreadChanged || internalNotesChanged || detailFilled) {
           const msgs = merged?.messages?.length ?? 0;
           const prevMsgs = prevTicket?.messages?.length;
           const last = merged?.messages?.[msgs - 1];
@@ -550,7 +571,12 @@ export default function DeskV2Root() {
           });
         }
 
-        if (!cancelled && !commitInProgressRef.current && (threadChanged || waThreadChanged || detailFilled)) {
+        if (
+          !cancelled
+          && seq === requestSeq
+          && !commitInProgressRef.current
+          && (threadChanged || waThreadChanged || internalNotesChanged || detailFilled)
+        ) {
           patchTicket(ticketId, merged);
         }
       } catch (err) {
@@ -588,18 +614,13 @@ export default function DeskV2Root() {
     const onVisibilityChange = () => {
       if (!document.hidden) void syncDetail();
     };
-    const onTicketDetailChanged = (event) => {
-      const changedId = String(event?.detail?.ticketId ?? '');
-      if (changedId && changedId === ticketId) void syncDetail();
-    };
     document.addEventListener('visibilitychange', onVisibilityChange);
-    window.addEventListener('velodesk:ticket-detail-changed', onTicketDetailChanged);
 
     return () => {
       cancelled = true;
+      requestSeq += 1;
       if (timer) window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      window.removeEventListener('velodesk:ticket-detail-changed', onTicketDetailChanged);
     };
   }, [activeTabId, patchTicket]);
 
@@ -832,6 +853,7 @@ export default function DeskV2Root() {
   }, [activeQueue, appliedSearch, activeSort, entrySortOldestFirst, openTicket, closeTicketTab, activeTabId, persistTabSession]);
 
   const selectMainTab = (tab) => {
+    persistTabSession(activeTabId);
     setMainTab(tab);
   };
 
@@ -1072,7 +1094,7 @@ export default function DeskV2Root() {
           hasPublicPayload || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
           'success',
         );
-        await syncTicketViews();
+        void syncTicketViews().catch(() => {});
         advanceAfterSaveIfEnabled(newId, plannedNextId, draftId);
         return newId;
       }
@@ -1094,8 +1116,8 @@ export default function DeskV2Root() {
 
       await commitTicketViaApi(ticket.id, {
         ...cockpitTicketToApi(prepared),
-        text: messagePayload,
-        internalText: internalNotePayload,
+        text: hasPublicPayload ? messagePayload : '',
+        internalText: internalNoteText ? internalNotePayload : '',
         author: getAgentName(),
         ...(attachmentUrls.length ? { attachments: attachmentUrls } : {}),
       });
@@ -1134,7 +1156,7 @@ export default function DeskV2Root() {
         hasPublicPayload || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
         'success',
       );
-      await syncTicketViews();
+      void syncTicketViews().catch(() => {});
       advanceAfterSaveIfEnabled(ticket.id, plannedNextId, savedListTicketId);
       return ticket.id;
     } catch (err) {
@@ -1874,7 +1896,8 @@ export default function DeskV2Root() {
       agentName: getAgentName(),
     });
     setComposeText(wrapped);
-  }, [ticket]);
+    persistComposeDraft({ composeText: wrapped });
+  }, [ticket, persistComposeDraft]);
 
   const showTableQueueMain = isTableQueueView && tableQueueBrowsing && !createOpen;
   const showTicketMain = Boolean(ticket) && !showTableQueueMain;
@@ -2021,7 +2044,7 @@ export default function DeskV2Root() {
                     client={client}
                     messages={waConvMsgs}
                     composeText={composeText}
-                    onComposeTextChange={setComposeText}
+                    onComposeTextChange={handleComposeTextChange}
                     onUseIaReply={handleUseIaReply}
                     onSend={handleSendWhatsAppMessage}
                     onSendInitial={handleSendWhatsAppInitial}
@@ -2072,8 +2095,8 @@ export default function DeskV2Root() {
                         composeAttachments={composeAttachments}
                         onComposeAttachmentsChange={setComposeAttachments}
                         onComposeModeChange={setComposeMode}
-                        onComposeTextChange={setComposeText}
-                        onInternalTextChange={setInternalText}
+                        onComposeTextChange={handleComposeTextChange}
+                        onInternalTextChange={handleInternalTextChange}
                         spellIgnoredWords={spellIgnoredWords}
                         onIgnoreSpellWord={handleIgnoreSpellWord}
                         onFlaggedErrorsChange={handleFlaggedErrorsChange}

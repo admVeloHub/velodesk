@@ -1,4 +1,4 @@
-/** ChamadoN1 v1.9.0 — campo fusao (vínculo estilo Ouvidoria) */
+/** ChamadoN1 v1.10.0 — tabulacao.canal (canal de contato real, persistido) */
 import mongoose, { Schema, Document, Types } from 'mongoose';
 import type { IChamadoWorkflowRequisicao } from '../config/workflowRequisicaoDefaults';
 
@@ -52,6 +52,7 @@ export interface ITabulacao {
   produto: string;
   motivo: string;
   detalhe: string;
+  canal: string;
   responsavel: string;
   atribuido: string;
 }
@@ -97,6 +98,7 @@ const TabulacaoSchema = new Schema<ITabulacao>(
     produto: { type: String, default: '' },
     motivo: { type: String, default: '' },
     detalhe: { type: String, default: '' },
+    canal: { type: String, default: '' },
     responsavel: { type: String, default: '' },
     atribuido: { type: String, default: '' },
   },

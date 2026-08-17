@@ -1,6 +1,6 @@
 /**
- * ComposeRichEditor v1.1.0 — suporte a readOnly (ticket fechado)
- * VERSION: v1.1.0 | DATE: 2026-07-29
+ * ComposeRichEditor v1.2.0 — não sobrescreve o DOM enquanto o agente está digitando
+ * VERSION: v1.2.0 | DATE: 2026-08-17
  */
 import React, {
   forwardRef,
@@ -90,14 +90,23 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
     if (!root) return;
     const normalized = value || '';
     if (normalized === lastHtmlRef.current) return;
-    if (document.activeElement === root) {
-      const plainCurrent = htmlToPlainText(readEditorHtml(root));
-      const plainNext = htmlToPlainText(normalized);
+
+    const currentHtml = readEditorHtml(root);
+    const plainCurrent = htmlToPlainText(currentHtml);
+    const plainNext = htmlToPlainText(normalized);
+    const focused = document.activeElement === root;
+
+    if (focused && normalized !== '') {
       if (plainCurrent === plainNext) {
         lastHtmlRef.current = normalized;
         return;
       }
+      // Pai atrasado em relação ao que já está no editor (re-render/poll).
+      if (plainCurrent.length >= plainNext.length) {
+        return;
+      }
     }
+
     setEditorHtml(root, normalized);
     lastHtmlRef.current = readEditorHtml(root);
   }, [value]);

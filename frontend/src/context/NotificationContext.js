@@ -1,6 +1,6 @@
 /**
- * NotificationContext v1.3.0 — sininho com painel + CTA telefonia/workflow
- * VERSION: v1.3.0 | DATE: 2026-08-12
+ * NotificationContext v1.4.0 — tipo 'caso_especial' aponta direto pro dash do órgão (sem workflow)
+ * VERSION: v1.4.0 | DATE: 2026-08-17
  */
 import React, {
   createContext,
@@ -16,21 +16,16 @@ import { useAuth } from './AuthContext';
 const NotificationContext = createContext(null);
 const TOAST_VISIBLE_MS = 2000;
 
-const ESPECIAL_ORGAO_BY_WORKFLOW_SLUG = {
-  'bacen-tratativa': 'bacen',
-  'procon-tratativa': 'procon',
-  'consumidor-gov-tratativa': 'consumidor-gov',
-  'reclame-aqui-tratativa': 'reclame-aqui',
-};
-
 function mapPersistedNotification(row) {
   return {
     id: `wf-${row._id}`,
     persistId: row._id,
     message: row.titulo ? `${row.titulo}: ${row.mensagem}` : row.mensagem,
-    type: row.workflowSlug === 'telephony-inbound' ? 'telephony-cta' : 'workflow-cta',
+    type: row.tipo === 'caso_especial'
+      ? 'caso-especial-cta'
+      : (row.workflowSlug === 'telephony-inbound' ? 'telephony-cta' : 'workflow-cta'),
     ticketId: row.ticketId ? String(row.ticketId) : '',
-    especialOrgao: ESPECIAL_ORGAO_BY_WORKFLOW_SLUG[row.workflowSlug] || '',
+    especialOrgao: row.tipo === 'caso_especial' ? (row.orgao || '') : '',
     protocolo: row.chamadoProtocolo,
     lida: row.lida,
     createdAt: row.createdAt,

@@ -1,4 +1,4 @@
-/** workflowNotificacao.service v1.0.0 — CTA persistido para sininho e Painel 360 */
+/** workflowNotificacao.service v1.1.0 — createCasoEspecialNotificacao (sininho sem workflow dedicado) */
 import { Types } from 'mongoose';
 import { getWorkflowNotificacaoModel, IWorkflowNotificacao } from '../models/WorkflowNotificacao';
 
@@ -15,6 +15,7 @@ export async function createWorkflowNotificacao(payload: {
 }): Promise<IWorkflowNotificacao> {
   const Model = getWorkflowNotificacaoModel();
   const doc = await Model.create({
+    tipo: 'workflow_cta',
     destinatarioEmail: String(payload.destinatarioEmail).trim().toLowerCase(),
     ticketId: new Types.ObjectId(payload.ticketId),
     chamadoProtocolo: payload.chamadoProtocolo || '',
@@ -23,6 +24,34 @@ export async function createWorkflowNotificacao(payload: {
     step: payload.step,
     passoId: payload.passoId ? new Types.ObjectId(payload.passoId) : null,
     titulo: payload.titulo || 'Ação necessária',
+    mensagem: payload.mensagem || '',
+    lida: false,
+  });
+  return doc.toObject() as IWorkflowNotificacao;
+}
+
+/**
+ * Notificação de sininho para item novo em canal especial (Bacen/Procon/Consumidor.gov/Reclame Aqui).
+ * Sem workflow dedicado: aponta direto para o item no dash do órgão (rota /especiais/:orgao/ticket/:id).
+ */
+export async function createCasoEspecialNotificacao(payload: {
+  destinatarioEmail: string;
+  ticketId: string;
+  chamadoProtocolo?: string;
+  orgao: string;
+  reclamacaoId?: string;
+  titulo: string;
+  mensagem: string;
+}): Promise<IWorkflowNotificacao> {
+  const Model = getWorkflowNotificacaoModel();
+  const doc = await Model.create({
+    tipo: 'caso_especial',
+    destinatarioEmail: String(payload.destinatarioEmail).trim().toLowerCase(),
+    ticketId: new Types.ObjectId(payload.ticketId),
+    chamadoProtocolo: payload.chamadoProtocolo || '',
+    orgao: payload.orgao,
+    reclamacaoId: payload.reclamacaoId ? new Types.ObjectId(payload.reclamacaoId) : null,
+    titulo: payload.titulo || 'Caso especial',
     mensagem: payload.mensagem || '',
     lida: false,
   });

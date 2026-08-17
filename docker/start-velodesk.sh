@@ -45,7 +45,7 @@ run_api() {
   cd /app/api
   while true; do
     echo "[start-velodesk] Iniciando API Node na porta ${API_PORT}..."
-    PORT="$API_PORT" NODE_ENV="${NODE_ENV:-production}" ENABLE_WHATSAPP="${ENABLE_WHATSAPP:-false}" \
+    PORT="$API_PORT" NODE_ENV="${NODE_ENV:-production}" \
       MONGO_URI="${MONGO_URI:-}" MONGODB_URI="${MONGODB_URI:-${MONGO_URI:-}}" MONGO_ENV="${MONGO_ENV:-}" \
       node dist/index.js || echo "[start-velodesk] API encerrou inesperadamente (codigo $?)"
     echo "[start-velodesk] Reiniciando API em 2s..."

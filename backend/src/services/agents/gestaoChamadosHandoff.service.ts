@@ -37,21 +37,6 @@ async function sendGestaoEmailAlert(
   return sent;
 }
 
-async function sendGestaoWhatsappAlert(message: string): Promise<boolean> {
-  if (!env.enableWhatsapp || !env.gestaoAlertWhatsapp) return false;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const whatsapp = require('../../whatsapp/whatsappModule.js');
-    if (typeof whatsapp.sendWhatsAppMessage === 'function') {
-      await whatsapp.sendWhatsAppMessage(env.gestaoAlertWhatsapp, message);
-      return true;
-    }
-  } catch (err) {
-    console.warn('[agent-gestao-handoff] WhatsApp indisponível:', (err as Error).message);
-  }
-  return false;
-}
-
 export async function executeGestaoHandoff(input: GestaoHandoffInput): Promise<GestaoHandoffResult> {
   try {
     const chamado = await ChamadoN1.findById(input.ticketId);
@@ -123,11 +108,6 @@ export async function executeGestaoHandoff(input: GestaoHandoffInput): Promise<G
     if (input.nivelCriticidade === 'critica' || input.nivelCriticidade === 'alta') {
       const emailSent = await sendGestaoEmailAlert(input.protocolo, resumo, input.nivelCriticidade);
       if (emailSent) notificacoes.push('email');
-    }
-    if (input.nivelCriticidade === 'critica') {
-      const waMsg = `[VeloDesk CRÍTICO] Protocolo ${input.protocolo}: ${resumo}`;
-      const waSent = await sendGestaoWhatsappAlert(waMsg);
-      if (waSent) notificacoes.push('whatsapp');
     }
     if (input.nivelCriticidade !== 'baixa') {
       notificacoes.push('workspace360_cta');

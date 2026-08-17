@@ -1,4 +1,4 @@
-/** funcaoPermissaoDefaults v1.2.0 — módulo preferencias.visualizar */
+/** funcaoPermissaoDefaults v1.3.0 — módulo acesso (Módulos de Acesso, visibilidade granular na barra retrátil) */
 
 export type PermissoesMap = Record<string, Record<string, boolean>>;
 
@@ -13,6 +13,31 @@ export interface FuncaoPermissaoSeed {
 }
 
 const P = (overrides: PermissoesMap): PermissoesMap => overrides;
+
+/**
+ * Módulos de Acesso — todo item de navegação da barra retrátil (frontend/src/config/profiles.js
+ * NAV_ITEMS), exceto 'preferencias' (sem override — visível para todos). Cada chave aqui é um
+ * boolean simples: true = a função vê esse módulo na barra. Substitui a antiga união de
+ * PROFILES[portal].nav (redundante com portal.* e causava módulos aparecendo/faltando fora de
+ * controle, ex.: canais especiais) por segmentação explícita, um módulo por vez.
+ */
+export const ACESSO_MODULO_IDS: string[] = [
+  'workspace',
+  'tickets',
+  'busca-tickets',
+  'atendimento-ia-telefonico',
+  'realtime',
+  'workflow-inbox',
+  'config',
+  'especiais-reclame-aqui',
+  'especiais-procon',
+  'especiais-consumidor-gov',
+  'especiais-bacen',
+  'especiais-processos',
+  'reports',
+  'especiais-canais',
+  'client-portal',
+];
 
 export const PERMISSION_CATALOG: Record<string, string[]> = {
   portal: ['agente', 'gestao', 'workflow', 'especiais'],
@@ -36,7 +61,15 @@ export const PERMISSION_CATALOG: Record<string, string[]> = {
     'procon_gerenciar',
     'consumidor_gov_gerenciar',
   ],
+  acesso: ACESSO_MODULO_IDS,
 };
+
+/** Todas as chaves de ACESSO_MODULO_IDS em `valor`, para montar overrides completos por função. */
+function buildAcesso(valor: boolean, overrides: Record<string, boolean> = {}): Record<string, boolean> {
+  const acesso: Record<string, boolean> = {};
+  for (const id of ACESSO_MODULO_IDS) acesso[id] = valor;
+  return { ...acesso, ...overrides };
+}
 
 const BASE_ATENDIMENTO = P({
   portal: { agente: true, gestao: false, workflow: false, especiais: false },
@@ -44,6 +77,7 @@ const BASE_ATENDIMENTO = P({
   workspace: { painel_360_proprio: true, painel_360_equipe: false },
   workflow: { avancar: true, aprovar: false, rejeitar: false },
   preferencias: { visualizar: true },
+  acesso: buildAcesso(false, { workspace: true, tickets: true, 'busca-tickets': true, 'atendimento-ia-telefonico': true }),
   config: {
     visualizar: false,
     formularios_criar: false,
@@ -107,6 +141,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
         automacoes_excluir: true,
         workflows_editar: false,
       },
+      acesso: { config: true },
       workflow: { aprovar: false, interromper: true },
     }),
   },
@@ -121,6 +156,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       portal: { especiais: true },
       tickets: { atuar_canal_especial: true },
       especiais: { reclame_aqui_gerenciar: true },
+      acesso: { 'especiais-reclame-aqui': true, 'especiais-processos': true },
     }),
   },
   {
@@ -134,6 +170,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       portal: { especiais: true },
       tickets: { atuar_canal_especial: true },
       especiais: { bacen_gerenciar: true },
+      acesso: { 'especiais-bacen': true, 'especiais-processos': true },
     }),
   },
   {
@@ -147,6 +184,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       portal: { especiais: true },
       tickets: { atuar_canal_especial: true },
       especiais: { procon_gerenciar: true },
+      acesso: { 'especiais-procon': true, 'especiais-processos': true },
     }),
   },
   {
@@ -160,6 +198,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       portal: { especiais: true },
       tickets: { atuar_canal_especial: true },
       especiais: { consumidor_gov_gerenciar: true },
+      acesso: { 'especiais-consumidor-gov': true, 'especiais-processos': true },
     }),
   },
   {
@@ -174,6 +213,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       workspace: { painel_360_proprio: true, painel_360_equipe: false },
       workflow: { avancar: true, aprovar: true, rejeitar: true },
       preferencias: { visualizar: false },
+      acesso: buildAcesso(false, { workspace: true, 'workflow-inbox': true, 'busca-tickets': true }),
       config: {
         visualizar: false,
         formularios_criar: false,
@@ -204,6 +244,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       workspace: { painel_360_proprio: true, painel_360_equipe: false },
       workflow: { avancar: true, aprovar: true, rejeitar: true },
       preferencias: { visualizar: false },
+      acesso: buildAcesso(false, { workspace: true, 'workflow-inbox': true, 'busca-tickets': true }),
       config: {
         visualizar: false,
         formularios_criar: false,
@@ -234,6 +275,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       workspace: { painel_360_proprio: true, painel_360_equipe: true },
       workflow: { avancar: true, aprovar: true, rejeitar: true, interromper: true },
       preferencias: { visualizar: true },
+      acesso: buildAcesso(true),
       config: {
         visualizar: true,
         formularios_criar: true,

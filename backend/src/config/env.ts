@@ -95,7 +95,6 @@ export const env = {
   popsSourceDir: (
     process.env.POPS_SOURCE_DIR || path.resolve(__dirname, '..', '..', 'source file', 'POPs')
   ).trim(),
-  enableWhatsapp: process.env.ENABLE_WHATSAPP !== 'false',
   twilioAccountSid: (process.env.TWILIO_ACCOUNT_SID || '').trim(),
   twilioAuthToken: (process.env.TWILIO_AUTH_TOKEN || '').trim(),
   /** Subconta Velodesk — prioridade para WhatsApp / Senders API */
@@ -239,16 +238,6 @@ export const env = {
   agentsAutonomyEnabled: process.env.AGENTS_AUTONOMY_ENABLED === 'true',
   /** Agente 4 — triagem silenciosa de casos especiais na entrada do ticket */
   agentCasosEspeciaisEnabled: process.env.AGENT_CASOS_ESPECIAIS_ENABLED === 'true',
-  casosEspeciaisAlertEmails: {
-    reclame_aqui: (process.env.CASOS_ESPECIAIS_ALERT_RECLAME_AQUI || '')
-      .split(',').map((item) => item.trim()).filter(Boolean),
-    procon: (process.env.CASOS_ESPECIAIS_ALERT_PROCON || '')
-      .split(',').map((item) => item.trim()).filter(Boolean),
-    bacen: (process.env.CASOS_ESPECIAIS_ALERT_BACEN || '')
-      .split(',').map((item) => item.trim()).filter(Boolean),
-    consumidor_gov: (process.env.CASOS_ESPECIAIS_ALERT_CONSUMIDOR_GOV || '')
-      .split(',').map((item) => item.trim()).filter(Boolean),
-  },
   agentAuditThresholdAuto: parseInt(process.env.AGENT_AUDIT_THRESHOLD_AUTO || '85', 10),
   agentAuditThresholdDesk: parseInt(process.env.AGENT_AUDIT_THRESHOLD_DESK || '70', 10),
   agentRevisionMaxAttempts: parseInt(process.env.AGENT_REVISION_MAX_ATTEMPTS || '2', 10),
@@ -262,7 +251,6 @@ export const env = {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean),
-  gestaoAlertWhatsapp: (process.env.GESTAO_ALERT_WHATSAPP || '').trim(),
   chamadoIaAnaliseEnabled: process.env.CHAMADO_IA_ANALISE_ENABLED !== 'false',
   chamadoIaAnaliseModel: (process.env.CHAMADO_IA_ANALISE_MODEL || 'gpt-5-mini').trim(),
   chamadoIaAnaliseIntervalMs: parseInt(process.env.CHAMADO_IA_ANALISE_INTERVAL_MS || '900000', 10),

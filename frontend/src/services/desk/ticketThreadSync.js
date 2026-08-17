@@ -1,6 +1,6 @@
 /**
- * ticketThreadSync v1.7.0 — chave de refresh IA sempre invalida por nota interna, mesmo com msg do cliente
- * VERSION: v1.7.0 | DATE: 2026-08-17
+ * ticketThreadSync v1.8.0 — poll também detecta nota interna persistida
+ * VERSION: v1.8.0 | DATE: 2026-08-17
  */
 
 function normalizeMsgText(value) {
@@ -66,6 +66,13 @@ export function hasPublicThreadChanged(prevTicket, nextTicket) {
   if (!prevTicket && !nextTicket) return false;
   if (!prevTicket || !nextTicket) return true;
   return buildPublicThreadFingerprint(prevTicket) !== buildPublicThreadFingerprint(nextTicket);
+}
+
+export function hasPersistedInternalNotesChanged(prevTicket, nextTicket) {
+  if (!prevTicket && !nextTicket) return false;
+  if (!prevTicket || !nextTicket) return true;
+  return buildPersistedInternalNotesFingerprint(prevTicket)
+    !== buildPersistedInternalNotesFingerprint(nextTicket);
 }
 
 function whatsAppMessagesFromTicket(ticket) {

@@ -53,7 +53,9 @@ function testRoutingPersistHook() {
   const routingPath = path.join(__dirname, '../src/services/agents/casosEspeciaisRouting.service.ts');
   const src = fs.readFileSync(routingPath, 'utf8');
   assert(src.includes('upsertFromChamado'), 'routing deve persistir reclamação');
-  assert(src.includes("'consumidor-gov-tratativa'"), 'CG workflow slug alinhado');
+  assert(!src.includes("'consumidor-gov-tratativa'"), 'sem workflow dedicado por órgão');
+  assert(src.includes('tryActivateWorkflowOnTabulation'), 'ticket segue elegível a workflow real via tabulação');
+  assert(src.includes('createCasoEspecialNotificacao'), 'notificação via sininho, não CTA de workflow');
 }
 
 function testTriggerReclamacaoGuard() {

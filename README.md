@@ -79,7 +79,6 @@ Scripts npm na raiz: `docker:build`, `docker:up`, `docker:up:detached`, `docker:
 | `JWT_SECRET` | Segredo JWT |
 | `GOOGLE_CLIENT_ID` | OAuth Google (login Desk) |
 | `VITE_VELOHUB_API_URL` | API VeloHub (VeloNews) |
-| `ENABLE_WHATSAPP` | `false` |
 
 Atlas → **Network Access** deve permitir Cloud Run (`0.0.0.0/0` ou VPC).
 
@@ -94,8 +93,6 @@ Build alternativo (dois serviços separados): `cloudbuild.yaml` (`velodesk-api` 
      --substitutions=_REGION=southamerica-east1,_REPOSITORY=velodesk
    ```
 2. Deploy **velodesk-api** e **velodesk-web** como serviços separados (ver `docker-compose.yml`).
-
-WhatsApp fica desabilitado no container por padrão (`ENABLE_WHATSAPP=false`).
 
 ## Repositório
 

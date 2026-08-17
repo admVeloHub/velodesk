@@ -11,7 +11,6 @@ const root = path.join(__dirname, '..');
 
 const copies = [
   ['src/config/loadFonteVelodeskEnv.cjs', 'dist/config/loadFonteVelodeskEnv.cjs'],
-  ['src/whatsapp/whatsappModule.js', 'dist/whatsapp/whatsappModule.js'],
 ];
 
 for (const [fromRel, toRel] of copies) {

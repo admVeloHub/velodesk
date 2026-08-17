@@ -1,4 +1,4 @@
-/** workflowConfigSeed v1.4.0 — remove workflows experimental escalonar-*; purge no seed */
+/** workflowConfigSeed v1.5.0 — desativa *-tratativa (casos especiais não usam workflow dedicado) */
 import { getGrupoResponsabilidadeModel } from '../models/GrupoResponsabilidade';
 import { getWorkflowDefinicaoModel, IWorkflowDefinicao } from '../models/WorkflowDefinicao';
 import { DEFAULT_GRUPOS, invalidateGrupoCache } from './grupoResponsabilidade.service';
@@ -48,8 +48,34 @@ async function purgeExperimentalEscalonarWorkflows(): Promise<void> {
   }
 }
 
+/**
+ * Casos especiais (Bacen/Procon/Consumidor.Gov/Reclame Aqui) não usam workflow dedicado por órgão:
+ * migrar o ticket para a collection chamados_reclamacoes do órgão já contextualiza o caso. O ticket
+ * segue elegível a qualquer workflow real (ex.: reembolso) cuja tabulação combine com o gatilho.
+ * Desativa (não apaga — histórico de tickets que já rodaram por aqui continua íntegro) os 4
+ * workflows "*-tratativa" que tinham gatilho por canal (Bacen/Procon/RA/Consumidor.Gov).
+ */
+const CASOS_ESPECIAIS_TRATATIVA_WORKFLOW_SLUGS = [
+  'reclame-aqui-tratativa',
+  'procon-tratativa',
+  'consumidor-gov-tratativa',
+  'bacen-tratativa',
+] as const;
+
+async function deactivateCasosEspeciaisTratativaWorkflows(): Promise<void> {
+  const Workflow = getWorkflowDefinicaoModel();
+  const result = await Workflow.updateMany(
+    { slug: { $in: [...CASOS_ESPECIAIS_TRATATIVA_WORKFLOW_SLUGS] }, ativo: { $ne: false } },
+    { $set: { ativo: false, updatedBy: 'seed' } },
+  );
+  if (result.modifiedCount) {
+    console.log(`Seed: ${result.modifiedCount} workflow(s) *-tratativa desativado(s) (casos especiais sem workflow dedicado)`);
+  }
+}
+
 export async function seedWorkflowConfig(): Promise<void> {
   await purgeExperimentalEscalonarWorkflows();
+  await deactivateCasosEspeciaisTratativaWorkflows();
 
   const Grupo = getGrupoResponsabilidadeModel();
   const grupoCount = await Grupo.countDocuments();
@@ -146,123 +172,6 @@ export async function seedWorkflowConfig(): Promise<void> {
     console.log('Seed: workflow reembolso-7dias criado');
   }
 
-  const raTratativaExists = await Workflow.findOne({ slug: 'reclame-aqui-tratativa' }).select('_id').lean();
-  if (!raTratativaExists) {
-    const doc = await Workflow.create({
-      slug: 'reclame-aqui-tratativa',
-      titulo: 'TRATATIVA RECLAME AQUI',
-      descricao: 'Fluxo de tratativa de reclamações publicadas no Reclame Aqui',
-      ordem: 5,
-      ativo: true,
-      gatilho: {
-        tipo: 'tabulacao',
-        criterios: [
-          { fonte: 'tabulacao', campo: 'canal', operador: 'equals', valor: 'Reclame Aqui' },
-        ],
-      },
-      passos: [
-        { ordem: 0, passo: { nome: 'Triagem N1', descricao: 'N1 analisa a reclamação RA.', icone: 'ti-circle-check', slaHoras: 4, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-        { ordem: 1, passo: { nome: 'Resposta pública RA', descricao: 'Publicar resposta no Reclame Aqui.', icone: 'ti-message-circle', slaHoras: 48, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-        { ordem: 2, passo: { nome: 'Aguardando avaliação', descricao: 'Aguardar avaliação do consumidor.', icone: 'ti-star', slaHoras: 72, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-      ],
-      updatedBy: 'seed',
-    });
-    const first = doc.passos?.[0];
-    if (first?._id) {
-      doc.passoInicialId = first._id;
-      await doc.save();
-    }
-    console.log('Seed: workflow reclame-aqui-tratativa criado');
-  }
-
-  const pcTratativaExists = await Workflow.findOne({ slug: 'procon-tratativa' }).select('_id').lean();
-  if (!pcTratativaExists) {
-    const doc = await Workflow.create({
-      slug: 'procon-tratativa',
-      titulo: 'TRATATIVA PROCON',
-      descricao: 'Fluxo de tratativa de demandas registradas no Procon',
-      ordem: 6,
-      ativo: true,
-      gatilho: {
-        tipo: 'tabulacao',
-        criterios: [
-          { fonte: 'tabulacao', campo: 'canal', operador: 'equals', valor: 'Procon' },
-        ],
-      },
-      passos: [
-        { ordem: 0, passo: { nome: 'Triagem N1', descricao: 'N1 analisa a demanda Procon.', icone: 'ti-circle-check', slaHoras: 8, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-        { ordem: 1, passo: { nome: 'Resposta formal', descricao: 'Elaborar resposta formal ao Procon.', icone: 'ti-file-text', slaHoras: 72, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-        { ordem: 2, passo: { nome: 'Encerramento', descricao: 'Encerrar demanda após tratativa.', icone: 'ti-check', slaHoras: 24, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-      ],
-      updatedBy: 'seed',
-    });
-    const first = doc.passos?.[0];
-    if (first?._id) {
-      doc.passoInicialId = first._id;
-      await doc.save();
-    }
-    console.log('Seed: workflow procon-tratativa criado');
-  }
-
-
-  const cgTratativaExists = await Workflow.findOne({ slug: 'consumidor-gov-tratativa' }).select('_id').lean();
-  if (!cgTratativaExists) {
-    const doc = await Workflow.create({
-      slug: 'consumidor-gov-tratativa',
-      titulo: 'TRATATIVA CONSUMIDOR.GOV',
-      descricao: 'Fluxo de tratativa de demandas registradas no Consumidor.Gov',
-      ordem: 7,
-      ativo: true,
-      gatilho: {
-        tipo: 'tabulacao',
-        criterios: [
-          { fonte: 'tabulacao', campo: 'canal', operador: 'equals', valor: 'Consumidor.Gov' },
-        ],
-      },
-      passos: [
-        { ordem: 0, passo: { nome: 'Triagem N1', descricao: 'N1 analisa a demanda Consumidor.Gov.', icone: 'ti-circle-check', slaHoras: 8, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-        { ordem: 1, passo: { nome: 'Resposta formal', descricao: 'Elaborar resposta formal no portal Consumidor.Gov.', icone: 'ti-file-text', slaHoras: 72, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-        { ordem: 2, passo: { nome: 'Encerramento', descricao: 'Encerrar demanda após tratativa.', icone: 'ti-check', slaHoras: 24, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-      ],
-      updatedBy: 'seed',
-    });
-    const first = doc.passos?.[0];
-    if (first?._id) {
-      doc.passoInicialId = first._id;
-      await doc.save();
-    }
-    console.log('Seed: workflow consumidor-gov-tratativa criado');
-  }
-
-  const bcTratativaExists = await Workflow.findOne({ slug: 'bacen-tratativa' }).select('_id').lean();
-  if (!bcTratativaExists) {
-    const doc = await Workflow.create({
-      slug: 'bacen-tratativa',
-      titulo: 'TRATATIVA BACEN',
-      descricao: 'Fluxo de tratativa de demandas registradas no Bacen',
-      ordem: 8,
-      ativo: true,
-      gatilho: {
-        tipo: 'tabulacao',
-        criterios: [
-          { fonte: 'tabulacao', campo: 'canal', operador: 'equals', valor: 'Bacen' },
-        ],
-      },
-      passos: [
-        { ordem: 0, passo: { nome: 'Triagem N1', descricao: 'N1 analisa a demanda Bacen.', icone: 'ti-circle-check', slaHoras: 8, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-        { ordem: 1, passo: { nome: 'Resposta formal', descricao: 'Elaborar resposta formal ao Bacen.', icone: 'ti-file-text', slaHoras: 72, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-        { ordem: 2, passo: { nome: 'Encerramento', descricao: 'Encerrar demanda após tratativa.', icone: 'ti-check', slaHoras: 24, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-      ],
-      updatedBy: 'seed',
-    });
-    const first = doc.passos?.[0];
-    if (first?._id) {
-      doc.passoInicialId = first._id;
-      await doc.save();
-    }
-    console.log('Seed: workflow bacen-tratativa criado');
-  }
-
   const escalonarSeeds = [
     {
       slug: 'escalonar-financeiro',
@@ -322,7 +231,7 @@ export async function seedWorkflowConfig(): Promise<void> {
     console.log(`Seed: workflow ${seed.slug} criado`);
   }
 
-  const repairSlugs = ['reembolso-7dias', 'reclame-aqui-tratativa', 'procon-tratativa', 'consumidor-gov-tratativa', 'bacen-tratativa', 'escalonar-financeiro', 'escalonar-produtos', 'escalonar-n2', 'escalonar-suporte'];
+  const repairSlugs = ['reembolso-7dias', 'escalonar-financeiro', 'escalonar-produtos', 'escalonar-n2', 'escalonar-suporte'];
   for (const slug of repairSlugs) {
     const doc = await Workflow.findOne({ slug });
     if (doc) await repairWorkflowPassos(doc);

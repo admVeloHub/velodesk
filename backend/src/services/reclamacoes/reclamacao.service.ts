@@ -1,4 +1,4 @@
-/** reclamacao.service v1.0.0 — persistência pós-validação Agente 4 em chamados_reclamacoes */
+/** reclamacao.service v1.1.0 — snapshot workflow (paridade chamados_n1.workflow) */
 import { Types, type Model } from 'mongoose';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
 import type { IReclamacao } from '../../models/reclamacoes/reclamacaoModels';
@@ -255,8 +255,31 @@ function buildReclamacaoPayload(
     workflowId: chamado.workflow?.workflowId ?? undefined,
     workflowSlug: ctx.workflowSlug ?? undefined,
     workflowAtivo: Boolean(chamado.workflow?.active),
+    workflow: buildReclamacaoWorkflowSnapshot(chamado),
     aberta: !terminal,
     meta: buildMetaForOrgao(orgao, meta),
+  };
+}
+
+function buildReclamacaoWorkflowSnapshot(chamado: IChamadoN1): IReclamacao['workflow'] {
+  const wf = chamado.workflow;
+  if (!wf) return undefined;
+  return {
+    active: Boolean(wf.active),
+    workflowId: wf.workflowId ?? null,
+    step: wf.step ?? 0,
+    passoId: wf.passoId ?? null,
+    startedAt: wf.startedAt ?? null,
+    completedAt: wf.completedAt ?? null,
+    pendingDecision: wf.pendingDecision ?? null,
+    requisicao: wf.requisicao
+      ? {
+        preenchidaEm: wf.requisicao.preenchidaEm,
+        preenchidaPor: wf.requisicao.preenchidaPor,
+        valores: wf.requisicao.valores,
+        comunicacaoWorkflow: wf.requisicao.comunicacaoWorkflow,
+      }
+      : undefined,
   };
 }
 
@@ -330,6 +353,7 @@ export async function syncFromChamado(chamado: IChamadoN1): Promise<IReclamacao 
     atendente: String(tab.responsavel ?? existing.atendente ?? '').trim() || undefined,
     workflowAtivo: Boolean(chamado.workflow?.active),
     workflowId: chamado.workflow?.workflowId ?? existing.workflowId,
+    workflow: buildReclamacaoWorkflowSnapshot(chamado) ?? existing.workflow,
     aberta: !terminal,
     statusCanal: String(
       meta.statusPc
@@ -432,6 +456,7 @@ export function reclamacaoToPortalDto(doc: IReclamacao): Record<string, unknown>
     atendente: doc.atendente,
     responsavel: doc.responsavel,
     workflowAtivo: doc.workflowAtivo,
+    workflow: doc.workflow,
     aberta: doc.aberta,
     inboxDedicada: doc.inboxDedicada,
     triagem: doc.triagem,

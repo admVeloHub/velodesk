@@ -52,7 +52,8 @@ export default function TicketSearchView() {
 
   const navAllowed = isNavAllowed('busca-tickets');
 
-  const handleSearch = useCallback(async () => {
+  const handleSearch = useCallback(async (event) => {
+    event?.preventDefault?.();
     const valid = (criterios || []).filter((row) => isCriterioRowValid(row));
     if (!valid.length) {
       showNotification?.('Informe ao menos um filtro com valor.', 'warning');
@@ -100,23 +101,25 @@ export default function TicketSearchView() {
   return (
     <div id="busca-tickets" className="page ticket-search-page eco-page active">
       <div className="eco-page-inner ticket-search-layout">
-        <header className="ticket-search-header">
-          <div>
-            <h1 className="ticket-search-header__title">Busca de Tickets</h1>
-          </div>
-          <div className="ticket-search-header__actions">
-            <button type="button" className="btn-secondary" onClick={handleClear} disabled={loading}>
-              Limpar
-            </button>
-            <button type="button" className="btn-primary" onClick={handleSearch} disabled={loading}>
-              {loading ? 'Buscando…' : 'Buscar'}
-            </button>
-          </div>
-        </header>
+        <form onSubmit={handleSearch}>
+          <header className="ticket-search-header">
+            <div>
+              <h1 className="ticket-search-header__title">Busca de Tickets</h1>
+            </div>
+            <div className="ticket-search-header__actions">
+              <button type="button" className="btn-secondary" onClick={handleClear} disabled={loading}>
+                Limpar
+              </button>
+              <button type="submit" className="btn-primary" disabled={loading}>
+                {loading ? 'Buscando…' : 'Buscar'}
+              </button>
+            </div>
+          </header>
 
-        <section className="ticket-search-panel" aria-label="Filtros de busca">
-          <TicketSearchCriteriaEditor criterios={criterios} onChange={setCriterios} />
-        </section>
+          <section className="ticket-search-panel" aria-label="Filtros de busca">
+            <TicketSearchCriteriaEditor criterios={criterios} onChange={setCriterios} />
+          </section>
+        </form>
 
         <section className="ticket-search-results" aria-label="Resultados da busca">
           <div className="ticket-search-results__head">

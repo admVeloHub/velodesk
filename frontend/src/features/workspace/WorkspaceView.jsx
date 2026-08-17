@@ -5,6 +5,7 @@
 import React, { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
+import { usePermissions } from '../../context/PermissionContext';
 import { computeAgent360View } from '../../services/workspace/deskData';
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 import Workspace360Header from './components/ws360/Workspace360Header';
@@ -13,17 +14,22 @@ import GestaoPanel from './GestaoPanel';
 import WorkflowPanel from './WorkflowPanel';
 import EspeciaisPanel from './EspeciaisPanel';
 
-function resolveWorkspacePanel(profileId) {
-  if (profileId === 'gestao') return GestaoPanel;
+/**
+ * Workflow/Especiais são portais próprios (roteamento por profileId). Dentro do Workspace 360
+ * "padrão" (Agente/Gestão), quem vê o painel de equipe é decidido pela permissão
+ * workspace.painel_360_equipe — não mais fixo em profileId === 'gestao'.
+ */
+function resolveWorkspacePanel(profileId, canSeeEquipe) {
   if (profileId === 'workflow') return WorkflowPanel;
   if (profileId === 'especiais') return EspeciaisPanel;
-  return AgentPanel;
+  return canSeeEquipe ? GestaoPanel : AgentPanel;
 }
 
 export default function WorkspaceView() {
   const { profileId } = useProfile();
+  const { can } = usePermissions();
   const { user, colaborador } = useAuth();
-  const Panel = resolveWorkspacePanel(profileId);
+  const Panel = resolveWorkspacePanel(profileId, can('workspace', 'painel_360_equipe'));
 
   const header = useMemo(() => {
     const view = computeAgent360View();

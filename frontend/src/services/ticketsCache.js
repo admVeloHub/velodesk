@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.12.1 — persistDraftTicket separa mensagem pública de anotação interna
- * VERSION: v1.12.1 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.13.0 — commit não espera recarregar as filas para devolver o detalhe
+ * VERSION: v1.13.0 | DATE: 2026-08-17 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -602,18 +602,20 @@ export async function commitTicketViaApi(ticketId, payload) {
     const prevTicket = findInColumns(apiId)?.ticket;
     const hadPendingWorkflow = hasPendingWorkflowPersist(prevTicket);
     await ticketsApi.commit(apiId, payload);
-    await loadBoxesFromApi();
-    if (hadPendingWorkflow && prevTicket) {
-      const entry = findInColumns(apiId);
-      if (entry?.ticket) {
-        entry.box.tickets[entry.index] = mergeApiTicketPreservingPendingWorkflow(
-          prevTicket,
-          entry.ticket,
-        );
-        persistColumnsToStorage(columns);
-      }
-    }
     const detailed = await loadTicketDetailFromApi(apiId);
+    void loadBoxesFromApi()
+      .then(() => {
+        if (!hadPendingWorkflow || !prevTicket) return;
+        const entry = findInColumns(apiId);
+        if (entry?.ticket) {
+          entry.box.tickets[entry.index] = mergeApiTicketPreservingPendingWorkflow(
+            prevTicket,
+            entry.ticket,
+          );
+          persistColumnsToStorage(columns);
+        }
+      })
+      .catch(() => {});
     return detailed || findInColumns(apiId)?.ticket;
   }
   return updateTicketViaApi(ticketId, () => apiTicketToCockpit(payload));
