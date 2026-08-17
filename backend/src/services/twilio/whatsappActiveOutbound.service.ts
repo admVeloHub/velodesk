@@ -1,4 +1,4 @@
-/** whatsappActiveOutbound.service v1.4.0 — template inicial: artigo masculino (o Velotax) */
+/** whatsappActiveOutbound.service v1.5.0 — anexos outbound via mediaUrl Twilio */
 import type { IChamadoN1 } from '../../models/ChamadoN1';
 import type { IClienteDados } from '../../models/Cliente';
 import { env } from '../../config/env';
@@ -12,9 +12,10 @@ import {
 } from './whatsappThread.service';
 import {
   sendWhatsAppTemplateMessage,
-  sendWhatsAppTextMessage,
+  sendWhatsAppSessionMessageBatch,
   type WhatsAppOutboundResult,
 } from './whatsappOutbound.service';
+import { buildWhatsAppOutboundMediaPublicUrlFromApiUrl } from './whatsappOutboundMedia.util';
 
 export const DEFAULT_DESK_INITIAL_TEMPLATE_TEXT = 'Estamos entrando em contato sobre sua solicitação.';
 
@@ -54,6 +55,16 @@ export interface SendWhatsAppForChamadoOptions {
   initialTemplate?: boolean;
   contentSid?: string;
   contentVariables?: Record<string, string>;
+  attachments?: string[];
+}
+
+function resolveAttachmentsForTwilio(apiUrls: string[] = []): string[] {
+  const resolved: string[] = [];
+  apiUrls.forEach((apiUrl) => {
+    const publicUrl = buildWhatsAppOutboundMediaPublicUrlFromApiUrl(String(apiUrl ?? '').trim());
+    if (publicUrl) resolved.push(publicUrl);
+  });
+  return resolved;
 }
 
 function truncate(value: string, max: number): string {
@@ -124,17 +135,34 @@ export async function sendWhatsAppForChamado(
     || (!options.forceSession && !sessionOpen);
 
   let rawText = String(options.text ?? '').trim();
-  if (!rawText && useTemplate) {
+  const attachmentUrls = resolveAttachmentsForTwilio(options.attachments);
+  if (!rawText && !attachmentUrls.length && useTemplate) {
     rawText = DEFAULT_DESK_INITIAL_TEMPLATE_TEXT;
   }
-  if (!rawText) {
-    return { sent: false, reason: 'Texto da mensagem é obrigatório', sessionOpen };
+  if (!rawText && !attachmentUrls.length) {
+    return { sent: false, reason: 'Texto ou anexo é obrigatório', sessionOpen };
+  }
+  if (attachmentUrls.length && useTemplate) {
+    return {
+      sent: false,
+      reason: 'Anexos só podem ser enviados após resposta do cliente (janela 24h)',
+      mode: 'template',
+      sessionOpen: false,
+    };
   }
 
   if (!useTemplate) {
-    const maskedText = applyWhatsAppSendMask(rawText, chamado);
-    const result = await sendWhatsAppTextMessage({ to: destination, body: maskedText });
+    const maskedText = rawText ? applyWhatsAppSendMask(rawText, chamado) : '';
+    const result = await sendWhatsAppSessionMessageBatch({
+      to: destination,
+      body: maskedText || undefined,
+      mediaUrls: attachmentUrls,
+    });
     return { ...result, mode: 'session', sessionOpen: true };
+  }
+
+  if (!rawText) {
+    return { sent: false, reason: 'Texto da mensagem é obrigatório', sessionOpen };
   }
 
   const contentSid = resolveWhatsAppDeskActiveContentSid(options.contentSid);

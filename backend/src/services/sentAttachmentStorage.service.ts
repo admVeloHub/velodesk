@@ -1,4 +1,4 @@
-/** sentAttachmentStorage v1.2.0 — attachmentGuard no upload do agente */
+/** sentAttachmentStorage v1.3.0 — meta p/ WhatsApp outbound + attachmentGuard na leitura */
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import path from 'path';
@@ -73,6 +73,32 @@ export function parseSentAttachmentStorageKeyFromApiUrl(apiUrl: string): string 
   } catch {
     return null;
   }
+}
+
+/** Valida anexo enviado pelo agente antes de repassar ao Twilio WhatsApp. */
+export async function resolveSentAttachmentSendMeta(apiUrl: string): Promise<{
+  contentType: string;
+  scanStatus: string;
+}> {
+  const storageKey = parseSentAttachmentStorageKeyFromApiUrl(apiUrl);
+  if (!storageKey) {
+    throw new Error('Anexo inválido');
+  }
+  const item = await readSentAttachmentBuffer(storageKey);
+  if (!item) {
+    throw new Error('Anexo não encontrado');
+  }
+  const guard = inspectAttachmentGuard(item.filename, item.contentType, item.buffer);
+  if (!guard.ok) {
+    throw new Error(guard.reason);
+  }
+  if (guard.scanStatus === 'pending') {
+    throw new Error('Anexo ainda em verificação de segurança. Aguarde ou envie imagem/áudio/vídeo.');
+  }
+  return {
+    contentType: guard.detectedMime,
+    scanStatus: guard.scanStatus,
+  };
 }
 
 export async function readSentAttachmentBuffer(

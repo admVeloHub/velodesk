@@ -1185,6 +1185,10 @@ export default function DeskV2Root() {
       return;
     }
 
+    const attachmentUrls = (composeAttachments || [])
+      .map((item) => String(item?.url || '').trim())
+      .filter(Boolean);
+
     waSendInProgressRef.current = true;
     setWaSendInProgress(true);
     try {
@@ -1193,6 +1197,7 @@ export default function DeskV2Root() {
         initialTemplate,
         waChatId: waChatId || undefined,
         author: getAgentName(),
+        attachments: attachmentUrls.length ? attachmentUrls : undefined,
       });
 
       if (result?.ticket) {
@@ -1215,6 +1220,7 @@ export default function DeskV2Root() {
 
       if (!initialTemplate) {
         setComposeText('');
+        setComposeAttachments([]);
       }
       setWaChatOpen(true);
       if (activeTabId) {
@@ -1224,6 +1230,7 @@ export default function DeskV2Root() {
           tabSessionsRef.current[sessionKey] = {
             ...session,
             composeText: initialTemplate ? session.composeText : '',
+            composeAttachments: initialTemplate ? session.composeAttachments : [],
             waChatOpen: true,
           };
         }
@@ -1258,7 +1265,8 @@ export default function DeskV2Root() {
     }
 
     const messageText = String(composeText || '').trim();
-    if (!messageText) return;
+    const hasAttachments = (composeAttachments || []).length > 0;
+    if (!messageText && !hasAttachments) return;
 
     await runWhatsAppSend({ text: messageText });
   };
@@ -2045,6 +2053,8 @@ export default function DeskV2Root() {
                     messages={waConvMsgs}
                     composeText={composeText}
                     onComposeTextChange={handleComposeTextChange}
+                    composeAttachments={composeAttachments}
+                    onComposeAttachmentsChange={setComposeAttachments}
                     onUseIaReply={handleUseIaReply}
                     onSend={handleSendWhatsAppMessage}
                     onSendInitial={handleSendWhatsAppInitial}

@@ -1,8 +1,11 @@
 /**
- * DeskWhatsAppChat v1.11.0 — chip verificando/bloqueado conforme scanStatus
- * VERSION: v1.11.0 | DATE: 2026-08-13
+ * DeskWhatsAppChat v1.13.0 — picker de emojis WhatsApp no compose
+ * VERSION: v1.13.0 | DATE: 2026-08-17
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { uploadsApi } from '../../../api/client';
+import { useNotifications } from '../../../context/NotificationContext';
+import WhatsAppEmojiPicker from './WhatsAppEmojiPicker';
 import {
   formatWaTime,
   formatWaDateSeparator,
@@ -239,12 +242,38 @@ function renderDeliveryChecks(msg) {
   );
 }
 
+function WaPendingAttachments({ items, onRemove, disabled = false }) {
+  if (!items?.length) return null;
+  return (
+    <ul className="crm-compose-pending-attachments wa-chat__pending-attachments" aria-label="Anexos pendentes">
+      {items.map((item) => (
+        <li key={item.url} className="crm-compose-pending-attachments__chip">
+          <i className="ti ti-paperclip" aria-hidden="true" />
+          <span className="crm-compose-pending-attachments__name" title={item.name}>{item.name}</span>
+          {!disabled ? (
+            <button
+              type="button"
+              className="crm-compose-pending-attachments__remove"
+              aria-label={`Remover anexo ${item.name}`}
+              onClick={() => onRemove(item.url)}
+            >
+              <i className="ti ti-x" aria-hidden="true" />
+            </button>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function DeskWhatsAppChat({
   ticket,
   client,
   messages,
   composeText,
   onComposeTextChange,
+  composeAttachments = [],
+  onComposeAttachmentsChange,
   onUseIaReply,
   onSend,
   onSendInitial,
@@ -259,13 +288,20 @@ export default function DeskWhatsAppChat({
   iaHasSuggestion = false,
   iaError = '',
 }) {
+  const { showNotification } = useNotifications();
   const [iaVisible, setIaVisible] = useState(true);
   const [transcriptionBusyId, setTranscriptionBusyId] = useState('');
+  const [attachUploading, setAttachUploading] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const emojiAnchorRef = useRef(null);
   const lastIaReplyRef = useRef('');
   const prevSendBusyRef = useRef(false);
   const chatMessages = messages || [];
   const dateIso = chatMessages[0]?.timestamp || ticket.createdAt;
+  const pendingAttachments = composeAttachments || [];
+  const hasPendingAttachments = pendingAttachments.length > 0;
 
   const composeEnabled = waUiState?.composeEnabled !== false;
   const needsInitial = Boolean(waUiState?.needsInitial);
@@ -323,7 +359,8 @@ export default function DeskWhatsAppChat({
   };
 
   const handleSend = async () => {
-    if (!composeEnabled || !composeText.trim() || sendBusy) return;
+    if (!composeEnabled || sendBusy) return;
+    if (!composeText.trim() && !hasPendingAttachments) return;
     const result = onSend?.();
     if (result && typeof result.then === 'function') {
       await result;
@@ -332,6 +369,103 @@ export default function DeskWhatsAppChat({
       inputRef.current?.focus();
     });
   };
+
+  useEffect(() => {
+    if (!emojiPickerOpen) return undefined;
+    const onPointerDown = (event) => {
+      if (emojiAnchorRef.current?.contains(event.target)) return;
+      setEmojiPickerOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [emojiPickerOpen]);
+
+  useEffect(() => {
+    setEmojiPickerOpen(false);
+  }, [ticket?.id]);
+
+  const insertEmoji = useCallback((emoji) => {
+    const input = inputRef.current;
+    const current = String(composeText || '');
+    if (!input) {
+      onComposeTextChange(current + emoji);
+      setEmojiPickerOpen(false);
+      return;
+    }
+    const start = input.selectionStart ?? current.length;
+    const end = input.selectionEnd ?? current.length;
+    const next = `${current.slice(0, start)}${emoji}${current.slice(end)}`;
+    onComposeTextChange(next);
+    const caret = start + emoji.length;
+    window.requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(caret, caret);
+    });
+    setEmojiPickerOpen(false);
+  }, [composeText, onComposeTextChange]);
+
+  const toggleEmojiPicker = useCallback(() => {
+    if (!composeEnabled || sendBusy || attachUploading) return;
+    setEmojiPickerOpen((open) => !open);
+  }, [attachUploading, composeEnabled, sendBusy]);
+
+  const handleAttachClick = useCallback(() => {
+    if (!composeEnabled || attachUploading || sendBusy) return;
+    fileInputRef.current?.click();
+  }, [attachUploading, composeEnabled, sendBusy]);
+
+  const handleRemoveAttachment = useCallback((url) => {
+    if (!onComposeAttachmentsChange) return;
+    onComposeAttachmentsChange(pendingAttachments.filter((item) => item.url !== url));
+  }, [onComposeAttachmentsChange, pendingAttachments]);
+
+  const handleAttachFiles = useCallback(async (files) => {
+    if (!onComposeAttachmentsChange || !composeEnabled || attachUploading || sendBusy) return;
+    const ticketKey = String(ticket?.id || ticket?._id || '').trim();
+    if (!ticketKey) {
+      showNotification('Salve o ticket antes de anexar arquivos.', 'warning');
+      return;
+    }
+    setAttachUploading(true);
+    try {
+      const result = await uploadsApi.uploadSent(ticketKey, files);
+      const uploaded = Array.isArray(result?.attachments) ? result.attachments : [];
+      const nextItems = uploaded.map((item, index) => ({
+        url: String(item?.url || result?.urls?.[index] || '').trim(),
+        name: String(item?.filename || files[index]?.name || 'Anexo').trim(),
+      })).filter((item) => item.url);
+      if (!nextItems.length) {
+        showNotification('Não foi possível enviar o anexo.', 'error');
+        return;
+      }
+      onComposeAttachmentsChange([...pendingAttachments, ...nextItems]);
+      showNotification(
+        nextItems.length === 1 ? 'Anexo adicionado.' : `${nextItems.length} anexos adicionados.`,
+        'success',
+      );
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Falha ao enviar anexo.';
+      showNotification(msg, 'error');
+    } finally {
+      setAttachUploading(false);
+    }
+  }, [
+    attachUploading,
+    composeEnabled,
+    onComposeAttachmentsChange,
+    pendingAttachments,
+    sendBusy,
+    showNotification,
+    ticket?._id,
+    ticket?.id,
+  ]);
+
+  const handleFileChange = useCallback((event) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!files.length) return;
+    void handleAttachFiles(files);
+  }, [handleAttachFiles]);
 
   const handleRequestTranscription = async (msg) => {
     if (!msg?.id || !onRequestAudioTranscription || transcriptionBusyId) return;
@@ -480,37 +614,74 @@ export default function DeskWhatsAppChat({
           </p>
         )}
         <div className="wa-chat__input-bar">
-          <button type="button" className="wa-chat__input-icon" aria-label="Emoji" disabled={!composeEnabled}>
-            <i className="far fa-smile" />
-          </button>
-          <input
-            ref={inputRef}
-            type="text"
-            className="wa-chat__input"
-            placeholder={composeEnabled ? 'Escreva uma mensagem...' : 'Disponível após resposta do cliente'}
-            spellCheck
-            lang="pt-BR"
-            autoCorrect="on"
-            autoCapitalize="sentences"
-            value={composeText}
-            disabled={!composeEnabled || sendBusy}
-            onChange={(e) => onComposeTextChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                void handleSend();
-              }
-            }}
-          />
-          <button type="button" className="wa-chat__input-icon" aria-label="Anexar" disabled={!composeEnabled}>
+          <div className="wa-chat__emoji-anchor" ref={emojiAnchorRef}>
+            <button
+              type="button"
+              className={'wa-chat__input-icon' + (emojiPickerOpen ? ' wa-chat__input-icon--active' : '')}
+              aria-label="Emoji"
+              aria-expanded={emojiPickerOpen}
+              title="Emojis"
+              disabled={!composeEnabled || sendBusy || attachUploading}
+              onClick={toggleEmojiPicker}
+            >
+              <i className="far fa-smile" />
+            </button>
+            {emojiPickerOpen ? (
+              <WhatsAppEmojiPicker onSelect={insertEmoji} />
+            ) : null}
+          </div>
+          <div className="wa-chat__input-wrap">
+            <WaPendingAttachments
+              items={pendingAttachments}
+              onRemove={handleRemoveAttachment}
+              disabled={!composeEnabled || sendBusy || attachUploading}
+            />
+            <input
+              ref={inputRef}
+              type="text"
+              className="wa-chat__input"
+              placeholder={composeEnabled ? 'Escreva uma mensagem...' : 'Disponível após resposta do cliente'}
+              spellCheck
+              lang="pt-BR"
+              autoCorrect="on"
+              autoCapitalize="sentences"
+              value={composeText}
+              disabled={!composeEnabled || sendBusy}
+              onChange={(e) => onComposeTextChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleSend();
+                }
+              }}
+            />
+          </div>
+          <button
+            type="button"
+            className="wa-chat__input-icon"
+            aria-label="Anexar"
+            title={attachUploading ? 'Enviando anexo…' : 'Anexar arquivo'}
+            disabled={!composeEnabled || sendBusy || attachUploading || !onComposeAttachmentsChange}
+            onClick={handleAttachClick}
+          >
             <i className="fas fa-paperclip" />
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="crm-compose-toolbar__file-input"
+            tabIndex={-1}
+            aria-hidden="true"
+            accept="image/png,image/jpeg,image/gif,image/webp,audio/*,video/mp4,video/webm,application/pdf"
+            onChange={handleFileChange}
+          />
         </div>
         <button
           type="button"
           className="wa-chat__send"
           aria-label="Enviar mensagem"
-          disabled={!composeEnabled || sendBusy || !composeText.trim()}
+          disabled={!composeEnabled || sendBusy || attachUploading || (!composeText.trim() && !hasPendingAttachments)}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => { void handleSend(); }}
         >

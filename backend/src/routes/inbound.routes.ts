@@ -1,5 +1,6 @@
-/** inbound.routes v1.8.0 — POST /api/inbound/tickets (App / Telefone / Agente IA) */
+/** inbound.routes v1.9.0 — GET outbound-media para Twilio buscar anexo do agente */
 import { Router, Request, Response } from 'express';
+import path from 'path';
 import multer from 'multer';
 import { env } from '../config/env';
 import { inboundAppAuthMiddleware, inboundEmailAuthMiddleware, inboundTelephonyAuthMiddleware } from '../middleware/inboundAuth';
@@ -34,6 +35,8 @@ import {
 import { isRealtimeSupabaseConfigured } from '../config/supabaseRealtime';
 import { processInboundTicket } from '../services/inbound-ticket/inboundTicket.service';
 import { ORIGIN_CANAL_CONFIG } from '../services/inbound-ticket/types';
+import { verifyWhatsAppOutboundMediaToken } from '../services/twilio/whatsappOutboundMedia.util';
+import { openSentAttachment } from '../services/sentAttachmentStorage.service';
 const router = Router();
 const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024, files: 10 },
@@ -167,6 +170,35 @@ router.get('/whatsapp/health', (req: Request, res: Response) => {
   const host = String(req.headers['x-forwarded-host'] ?? req.get('host') ?? 'localhost:8001');
   const baseUrl = `${proto}://${host}`;
   res.json(getWhatsAppInboundHealth(baseUrl));
+});
+
+/** URL pública temporária — Twilio baixa mídia outbound enviada pelo agente no Desk. */
+router.get('/whatsapp/outbound-media/:token', async (req: Request, res: Response) => {
+  const verified = verifyWhatsAppOutboundMediaToken(String(req.params.token ?? ''));
+  if (!verified) {
+    return res.status(404).json({ message: 'Mídia indisponível ou expirada' });
+  }
+  try {
+    const storageKey = verified.storageKey.replace(/\//g, '__');
+    const opened = await openSentAttachment(storageKey);
+    if (!opened) {
+      return res.status(404).json({ message: 'Anexo não encontrado' });
+    }
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (opened.contentType) res.setHeader('Content-Type', opened.contentType);
+    if (opened.source === 'disk' && opened.filePath) {
+      return res.sendFile(path.resolve(opened.filePath));
+    }
+    if (opened.stream) {
+      opened.stream.on('error', () => {
+        if (!res.headersSent) res.status(404).json({ message: 'Falha ao ler anexo' });
+      });
+      return opened.stream.pipe(res);
+    }
+    return res.status(404).json({ message: 'Anexo não encontrado' });
+  } catch {
+    return res.status(404).json({ message: 'Anexo não encontrado' });
+  }
 });
 
 /** WhatsApp Twilio — webhook inbound (registra mensagem; auto-reply só se TWILIO_WHATSAPP_AUTO_REPLY definido) */

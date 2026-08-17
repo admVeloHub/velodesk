@@ -675,7 +675,10 @@ export async function sendWhatsAppMessageViaApi(ticketId, payload) {
   const apiId = String(ticketId);
   const initialTemplate = payload?.initialTemplate === true;
   const text = String(payload?.text ?? '').trim();
-  if (!initialTemplate && !text) return null;
+  const attachments = Array.isArray(payload?.attachments)
+    ? payload.attachments.map((item) => String(item ?? '').trim()).filter(Boolean)
+    : [];
+  if (!initialTemplate && !text && !attachments.length) return null;
 
   if (isDraftTicket({ id: apiId })) {
     return {

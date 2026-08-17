@@ -1,13 +1,14 @@
 /**
- * useWorkspace360 v1.1.0 — Painel 360° alinhado ao perfil operacional
- * VERSION: v1.1.0 | DATE: 2026-07-15
+ * useWorkspace360 v1.2.0 — Painel 360° alinhado ao perfil operacional
+ * VERSION: v1.2.0 | DATE: 2026-08-17
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useProfile } from '../context/ProfileContext';
+import { usePermissions } from '../context/PermissionContext';
 import { fetchWorkspace360 } from '../services/workspace/workspace360Api';
 
-function buildQueryParams(profileId, reportParams) {
-  if (profileId === 'gestao') {
+function buildQueryParams(profileId, canSeeEquipe, reportParams) {
+  if (profileId === 'gestao' || canSeeEquipe) {
     return { profile: 'gestao', ...(reportParams || {}) };
   }
   if (profileId === 'agent' || profileId === 'especiais') {
@@ -19,6 +20,8 @@ function buildQueryParams(profileId, reportParams) {
 export function useWorkspace360(options = {}) {
   const { enabled = true, reportParams } = options;
   const { profileId } = useProfile();
+  const { can } = usePermissions();
+  const canSeeEquipe = can('workspace', 'painel_360_equipe');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,7 +31,7 @@ export function useWorkspace360(options = {}) {
     setLoading(true);
     setError(null);
     try {
-      const params = buildQueryParams(profileId, reportParams);
+      const params = buildQueryParams(profileId, canSeeEquipe, reportParams);
       const payload = await fetchWorkspace360(params);
       setData(payload);
       return payload;
@@ -39,7 +42,7 @@ export function useWorkspace360(options = {}) {
     } finally {
       setLoading(false);
     }
-  }, [enabled, profileId, reportParams]);
+  }, [enabled, profileId, canSeeEquipe, reportParams]);
 
   useEffect(() => {
     refresh();

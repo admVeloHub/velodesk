@@ -1,11 +1,12 @@
-/** workspace360.service v1.2.0 — pendente na seção workflow; warRoom por SLA crítico */
+/** workspace360.service v1.3.0 — queries filtradas + map list em lote (sem chamadoToTicketFull) */
 import mongoose from 'mongoose';
 import { ChamadoN1, IChamadoN1 } from '../models/ChamadoN1';
 import { User } from '../models/User';
 import type { AuthPayload } from '../middleware/auth';
 import {
+  buildChamadoMapContext,
   buildResponsavelCandidates,
-  chamadoToTicket,
+  chamadoToTicketListItem,
   currentStatus,
   isSlaBreached,
   meusChamadosResponsavelFilter,
@@ -19,6 +20,32 @@ const SLA_LIMIT_HOURS: Record<string, number> = {
 
 const SLA_TRACKED = new Set(['em-aberto', 'em-andamento']);
 const ACTIVE_STATUSES = new Set(['novo', 'em-aberto', 'em-andamento', 'pendente', 'em-espera']);
+const ACTIVE_STATUS_LIST = [...ACTIVE_STATUSES];
+
+/** Campos mínimos para KPIs, SLA, leaderboard e cards do painel — evita carregar documentos inteiros. */
+const PANEL_CHAMADO_SELECT =
+  'createdAt updatedAt chamadoTitulo tabulacao registro workflow cliente';
+
+function lastStatusInFilter(statuses: string[]): Record<string, unknown> {
+  return {
+    $expr: {
+      $in: [
+        { $ifNull: [{ $arrayElemAt: ['$registro.status', -1] }, 'novo'] },
+        statuses,
+      ],
+    },
+  };
+}
+
+function compareSlaPriority(a: IChamadoN1, b: IChamadoN1): number {
+  const prio: Record<string, number> = { critical: 0, warning: 1, ok: 2 };
+  return (prio[slaStatus(a)] ?? 9) - (prio[slaStatus(b)] ?? 9);
+}
+
+function panelClientLabel(chamado: IChamadoN1): string {
+  const tab = chamado.tabulacao?.[chamado.tabulacao.length - 1];
+  return String(tab?.motivo ?? chamado.chamadoTitulo ?? 'Cliente').trim() || 'Cliente';
+}
 
 const FINANCEIRO_KW = ['financeiro', 'cobrança', 'cobranca', 'fatura', 'inadimplência', 'inadimplencia'];
 const ESTORNO_KW = ['estorno', 'procon', 'devolução', 'devolucao'];
@@ -193,13 +220,54 @@ function escalationCategory(chamado: IChamadoN1): 'financeiro' | 'estorno' | nul
   return null;
 }
 
-async function loadAllChamados(): Promise<IChamadoN1[]> {
-  return ChamadoN1.find().sort({ updatedAt: -1 }).lean<IChamadoN1[]>();
+/** Supervisor: ativos + resolvidos no período (e semana anterior p/ leaderboard) + criados no período. */
+async function loadSupervisorChamados(from: Date, to: Date): Promise<IChamadoN1[]> {
+  const prevFrom = new Date(from.getTime() - 7 * 24 * 60 * 60 * 1000);
+  return ChamadoN1.find({
+    $or: [
+      lastStatusInFilter(ACTIVE_STATUS_LIST),
+      {
+        registro: {
+          $elemMatch: {
+            status: 'resolvido',
+            data: { $gte: prevFrom, $lte: to },
+          },
+        },
+      },
+      { createdAt: { $gte: from, $lte: to } },
+    ],
+  })
+    .select(PANEL_CHAMADO_SELECT)
+    .sort({ updatedAt: -1 })
+    .lean<IChamadoN1[]>();
 }
 
 async function loadAgentChamados(candidates: string[]): Promise<IChamadoN1[]> {
-  const filter = meusChamadosResponsavelFilter(candidates);
-  return ChamadoN1.find(filter).sort({ updatedAt: -1 }).lean<IChamadoN1[]>();
+  const baseFilter = meusChamadosResponsavelFilter(candidates);
+  const productionFrom = startOfDayInTz(new Date());
+  productionFrom.setDate(productionFrom.getDate() - 6);
+
+  return ChamadoN1.find({
+    $and: [
+      baseFilter,
+      {
+        $or: [
+          lastStatusInFilter(ACTIVE_STATUS_LIST),
+          {
+            registro: {
+              $elemMatch: {
+                status: 'resolvido',
+                data: { $gte: productionFrom },
+              },
+            },
+          },
+        ],
+      },
+    ],
+  })
+    .select(PANEL_CHAMADO_SELECT)
+    .sort({ updatedAt: -1 })
+    .lean<IChamadoN1[]>();
 }
 
 async function resolveDbUser(userId?: string) {
@@ -207,21 +275,35 @@ async function resolveDbUser(userId?: string) {
   return User.findById(userId).select('name email').lean();
 }
 
-async function enrichTicketForPanel(chamado: IChamadoN1, queueId: string) {
-  const remaining = slaRemainingMinutes(chamado);
-  const status = slaStatus(chamado);
-  const dto = await chamadoToTicket(chamado, queueId);
-  return {
-    ticket: {
-      ...dto,
-      id: chamado._id?.toString(),
-      slaRemaining: remaining,
-      slaStatus: status,
-      channel: inferChannel(chamado),
-    },
-    queueId,
-    sla: status,
-  };
+type PanelTicketEntry = {
+  ticket: Record<string, unknown>;
+  queueId: string;
+  sla: 'critical' | 'warning' | 'ok';
+};
+
+async function enrichTicketsForPanel(
+  chamados: IChamadoN1[],
+  queueIdFn: (chamado: IChamadoN1) => string = (chamado) => statusToQueueId(currentStatus(chamado)),
+): Promise<PanelTicketEntry[]> {
+  if (!chamados.length) return [];
+  const ctx = await buildChamadoMapContext(chamados, 'list');
+  return chamados.map((chamado) => {
+    const remaining = slaRemainingMinutes(chamado);
+    const status = slaStatus(chamado);
+    const queueId = queueIdFn(chamado);
+    const dto = chamadoToTicketListItem(chamado, queueId, ctx);
+    return {
+      ticket: {
+        ...dto,
+        id: chamado._id?.toString(),
+        slaRemaining: remaining,
+        slaStatus: status,
+        channel: inferChannel(chamado),
+      },
+      queueId,
+      sla: status,
+    };
+  });
 }
 
 function classifyAgentSection(chamado: IChamadoN1): 'action-now' | 'client-replied' | 'workflow' | null {
@@ -260,27 +342,28 @@ export async function buildAgent360Payload(authUser: AuthPayload) {
     tmaCount++;
   });
 
-  const buckets: Record<string, Awaited<ReturnType<typeof enrichTicketForPanel>>[]> = {
+  const bucketsRaw: Record<string, IChamadoN1[]> = {
     'action-now': [],
     'client-replied': [],
     workflow: [],
   };
 
-  await Promise.all(
-    active.map(async (c) => {
-      const section = classifyAgentSection(c);
-      if (!section) return;
-      const entry = await enrichTicketForPanel(c, statusToQueueId(currentStatus(c)));
-      buckets[section].push(entry);
-    })
-  );
-
-  Object.keys(buckets).forEach((key) => {
-    buckets[key].sort((a, b) => {
-      const prio: Record<string, number> = { critical: 0, warning: 1, ok: 2 };
-      return (prio[a.sla] ?? 9) - (prio[b.sla] ?? 9);
-    });
+  active.forEach((c) => {
+    const section = classifyAgentSection(c);
+    if (!section) return;
+    bucketsRaw[section].push(c);
   });
+
+  Object.keys(bucketsRaw).forEach((key) => {
+    bucketsRaw[key].sort(compareSlaPriority);
+  });
+
+  const buckets: Record<string, PanelTicketEntry[]> = {};
+  await Promise.all(
+    Object.keys(bucketsRaw).map(async (key) => {
+      buckets[key] = await enrichTicketsForPanel(bucketsRaw[key].slice(0, 5));
+    }),
+  );
 
   const productionMap = new Map<string, number>();
   for (let i = 6; i >= 0; i--) {
@@ -320,18 +403,17 @@ export async function buildAgent360Payload(authUser: AuthPayload) {
     pct: Math.round((day.value / maxProd) * 100),
   }));
 
-  const criticalEntry = [...buckets['action-now'], ...buckets.workflow, ...buckets['client-replied']]
-    .filter((e) => e.sla === 'critical')
-    .sort((a, b) => (a.ticket.slaRemaining ?? 999) - (b.ticket.slaRemaining ?? 999))[0];
+  const criticalChamado = active
+    .filter((c) => slaStatus(c) === 'critical')
+    .sort((a, b) => (slaRemainingMinutes(a) ?? 999) - (slaRemainingMinutes(b) ?? 999))[0];
 
   let alert = null;
-  if (criticalEntry) {
-    const t = criticalEntry.ticket as Record<string, unknown>;
+  if (criticalChamado) {
     alert = {
-      ticketId: String(t.id),
-      clientName: t.clientName || 'Cliente',
-      subject: String(t.title || 'Ticket').split('—')[0].trim() || t.title,
-      expiresIn: `${Math.max(0, (t.slaRemaining as number) ?? 0)} minutos`,
+      ticketId: String(criticalChamado._id),
+      clientName: panelClientLabel(criticalChamado),
+      subject: String(criticalChamado.chamadoTitulo || 'Ticket').split('—')[0].trim() || criticalChamado.chamadoTitulo,
+      expiresIn: `${Math.max(0, slaRemainingMinutes(criticalChamado) ?? 0)} minutos`,
     };
   }
 
@@ -343,8 +425,8 @@ export async function buildAgent360Payload(authUser: AuthPayload) {
 
   const sections = sectionDefs.map((def) => ({
     ...def,
-    count: buckets[def.id]?.length ?? 0,
-    entries: (buckets[def.id] ?? []).slice(0, 5),
+    count: bucketsRaw[def.id]?.length ?? 0,
+    entries: buckets[def.id] ?? [],
   }));
 
   return {
@@ -362,8 +444,8 @@ export async function buildAgent360Payload(authUser: AuthPayload) {
 }
 
 export async function buildSupervisor360Payload(authUser: AuthPayload, query: Workspace360Query = {}) {
-  const chamados = await loadAllChamados();
   const { from, to } = periodRange(query.period ?? '7d');
+  const chamados = await loadSupervisorChamados(from, to);
   const filtered = chamados.filter((c) => channelMatchesFilter(c, query.channel ?? 'all'));
 
   const active = filtered.filter((c) => ACTIVE_STATUSES.has(currentStatus(c)));
@@ -425,16 +507,22 @@ export async function buildSupervisor360Payload(authUser: AuthPayload, query: Wo
   /** Total de tickets ativos já fora do prazo de SLA, escalados ou não — usado no banner do card. */
   const slaCriticalCount = active.filter((c) => isSlaBreached(c)).length;
 
-  const escalatedGroupEntries = await Promise.all(
-    categories.map(async (cat) => ({
-      ...cat,
-      entries: await Promise.all(
-        (escalatedGroups[cat.id] ?? []).slice(0, 20).map((c) =>
-          enrichTicketForPanel(c, statusToQueueId(currentStatus(c)))
-        )
-      ),
-    }))
-  );
+  const escalatedToEnrich = new Map<string, IChamadoN1>();
+  categories.forEach((cat) => {
+    (escalatedGroups[cat.id] ?? []).slice(0, 20).forEach((c) => {
+      escalatedToEnrich.set(String(c._id), c);
+    });
+  });
+  const enrichedEscalated = await enrichTicketsForPanel([...escalatedToEnrich.values()]);
+  const enrichedById = new Map(enrichedEscalated.map((entry) => [String(entry.ticket.id), entry]));
+
+  const escalatedGroupEntries = categories.map((cat) => ({
+    ...cat,
+    entries: (escalatedGroups[cat.id] ?? [])
+      .slice(0, 20)
+      .map((c) => enrichedById.get(String(c._id)))
+      .filter((entry): entry is PanelTicketEntry => Boolean(entry)),
+  }));
 
   const channelIds = ['whatsapp', 'email', 'chat', 'instagram', 'portal'] as const;
   const channelVision = channelIds.map((id) => {
@@ -670,14 +758,16 @@ export async function getAgentInProgressTickets(agentKey: string) {
   const key = agentKey.trim().toLowerCase();
   if (!key) return [];
   const userByKey = await buildUserByKeyMap();
-  const chamados = await ChamadoN1.find().sort({ createdAt: 1 }).lean<IChamadoN1[]>();
+  const chamados = await ChamadoN1.find(lastStatusInFilter(['em-andamento']))
+    .select(PANEL_CHAMADO_SELECT)
+    .sort({ createdAt: 1 })
+    .lean<IChamadoN1[]>();
   const inProgress = chamados.filter((c) => {
-    if (currentStatus(c) !== 'em-andamento') return false;
     const rawResp = (c.tabulacao?.[c.tabulacao.length - 1]?.responsavel ?? '').trim();
     if (!rawResp) return false;
     return canonicalAgentKey(rawResp, userByKey) === key;
   });
-  return Promise.all(inProgress.map((c) => enrichTicketForPanel(c, 'em-andamento')));
+  return enrichTicketsForPanel(inProgress, () => 'em-andamento');
 }
 
 function buildReport(reportId: string, chamados: IChamadoN1[], query: Workspace360Query) {
@@ -852,7 +942,8 @@ function buildReportTeamRows(chamados: IChamadoN1[], from: Date, to: Date) {
 }
 
 export async function buildReportPayload(authUser: AuthPayload, query: Workspace360Query) {
-  const chamados = await loadAllChamados();
+  const { from, to } = periodRange(query.period ?? '7d');
+  const chamados = await loadSupervisorChamados(from, to);
   const filtered = chamados.filter((c) => channelMatchesFilter(c, query.channel ?? 'all'));
   const reportId = query.report ?? 'sla';
   return buildReport(reportId, filtered, query);

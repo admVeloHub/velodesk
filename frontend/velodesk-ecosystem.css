@@ -13073,6 +13073,84 @@ body.desk-v2-mode #aiChatbotModal {
     line-height: 1;
 }
 
+#especiais-reclame-aqui .wa-chat__input-icon--active , #especiais-procon .wa-chat__input-icon--active, #especiais-consumidor-gov .wa-chat__input-icon--active, #especiais-bacen .wa-chat__input-icon--active {
+    color: #008069;
+}
+
+#especiais-reclame-aqui .wa-chat__emoji-anchor , #especiais-procon .wa-chat__emoji-anchor, #especiais-consumidor-gov .wa-chat__emoji-anchor, #especiais-bacen .wa-chat__emoji-anchor {
+    position: relative;
+    flex-shrink: 0;
+}
+
+#especiais-reclame-aqui .wa-emoji-picker , #especiais-procon .wa-emoji-picker, #especiais-consumidor-gov .wa-emoji-picker, #especiais-bacen .wa-emoji-picker {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    z-index: 30;
+    width: min(320px, calc(100vw - 48px));
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(11, 20, 26, 0.18);
+    border: 1px solid rgba(11, 20, 26, 0.08);
+    overflow: hidden;
+}
+
+#especiais-reclame-aqui .wa-emoji-picker__tabs , #especiais-procon .wa-emoji-picker__tabs, #especiais-consumidor-gov .wa-emoji-picker__tabs, #especiais-bacen .wa-emoji-picker__tabs {
+    display: flex;
+    gap: 2px;
+    padding: 6px 8px;
+    border-bottom: 1px solid #e9edef;
+    background: #f0f2f5;
+}
+
+#especiais-reclame-aqui .wa-emoji-picker__tab , #especiais-procon .wa-emoji-picker__tab, #especiais-consumidor-gov .wa-emoji-picker__tab, #especiais-bacen .wa-emoji-picker__tab {
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+#especiais-reclame-aqui .wa-emoji-picker__tab--active , #especiais-procon .wa-emoji-picker__tab--active, #especiais-consumidor-gov .wa-emoji-picker__tab--active, #especiais-bacen .wa-emoji-picker__tab--active {
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(11, 20, 26, 0.12);
+}
+
+#especiais-reclame-aqui .wa-emoji-picker__grid , #especiais-procon .wa-emoji-picker__grid, #especiais-consumidor-gov .wa-emoji-picker__grid, #especiais-bacen .wa-emoji-picker__grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+    padding: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+#especiais-reclame-aqui .wa-emoji-picker__emoji , #especiais-procon .wa-emoji-picker__emoji, #especiais-consumidor-gov .wa-emoji-picker__emoji, #especiais-bacen .wa-emoji-picker__emoji {
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    width: 100%;
+    aspect-ratio: 1;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+#especiais-reclame-aqui .wa-emoji-picker__emoji:hover , #especiais-procon .wa-emoji-picker__emoji:hover, #especiais-consumidor-gov .wa-emoji-picker__emoji:hover, #especiais-bacen .wa-emoji-picker__emoji:hover {
+    background: #f0f2f5;
+}
+
+#especiais-reclame-aqui .wa-chat__input-wrap , #especiais-procon .wa-chat__input-wrap, #especiais-consumidor-gov .wa-chat__input-wrap, #especiais-bacen .wa-chat__input-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
 #especiais-reclame-aqui .wa-chat__input , #especiais-procon .wa-chat__input, #especiais-consumidor-gov .wa-chat__input, #especiais-bacen .wa-chat__input {
     flex: 1;
     border: none;

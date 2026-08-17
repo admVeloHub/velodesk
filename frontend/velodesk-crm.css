@@ -1,4 +1,4 @@
-﻿/* Velodesk CRM v1.16.0 - preview de anexos no Desk */
+﻿/* Velodesk CRM v1.17.0 - emoji picker WhatsApp no Desk */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -4461,6 +4461,89 @@
     padding: 2px;
     flex-shrink: 0;
     line-height: 1;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__input-icon:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__input-icon--active {
+    color: #008069;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__input-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__emoji-anchor {
+    position: relative;
+    flex-shrink: 0;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-emoji-picker {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    z-index: 30;
+    width: min(320px, calc(100vw - 48px));
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(11, 20, 26, 0.18);
+    border: 1px solid rgba(11, 20, 26, 0.08);
+    overflow: hidden;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-emoji-picker__tabs {
+    display: flex;
+    gap: 2px;
+    padding: 6px 8px;
+    border-bottom: 1px solid #e9edef;
+    background: #f0f2f5;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-emoji-picker__tab {
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-emoji-picker__tab--active {
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(11, 20, 26, 0.12);
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-emoji-picker__grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+    padding: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-emoji-picker__emoji {
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    width: 100%;
+    aspect-ratio: 1;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-emoji-picker__emoji:hover {
+    background: #f0f2f5;
 }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .wa-chat__input {

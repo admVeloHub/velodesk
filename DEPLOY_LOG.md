@@ -1,10 +1,31 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.83.0 | DATE: 2026-08-17 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.84.0 | DATE: 2026-08-17 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Painel 360 perf, WhatsApp anexo/emoji e mediaUrl Twilio
+
+- **Data/Hora**: 2026-08-17
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.84.0
+  - **Backend**: workspace360.service v1.3.0, whatsappActiveOutbound v1.5.0, whatsappOutbound v1.4.0, whatsappOutboundMedia v1.0.0, sentAttachmentStorage v1.3.0, inbound.routes v1.9.0, tickets.routes (WA anexos)
+  - **Frontend**: DeskWhatsAppChat v1.13.0, WhatsAppEmojiPicker v1.0.0, useWorkspace360 v1.2.0, ticketsCache, DeskV2Root, velodesk-crm.css v1.17.0
+- **Arquivos principais**:
+  - `backend/src/services/workspace360.service.ts` — queries filtradas + map list em lote (sem loadAllChamados / chamadoToTicketFull por ticket)
+  - `frontend/src/hooks/useWorkspace360.js` — perfil gestão quando `painel_360_equipe`
+  - `frontend/src/features/desk/components/DeskWhatsAppChat.jsx` — upload anexo, picker emoji, envio com mídia
+  - `backend/src/services/twilio/whatsappOutboundMedia.util.ts` + `GET /api/inbound/whatsapp/outbound-media/:token` — URL pública temporária para Twilio
+  - `backend/src/services/twilio/whatsappActiveOutbound.service.ts` — envio session com mediaUrl
+- **Descrição**: Acelera carregamento inicial do Painel 360 (gestão e agente). Habilita botão de anexo no chat WhatsApp (upload + envio Twilio) e picker de emojis no compose. Anexos só na janela 24h; PDF em quarentena bloqueado até scan.
+- **Status**: Push main
+
+---
 
 ### GitHub Push — Desk v2: compose, notas internas, presence e remoção Chat/WhatsApp legado
 

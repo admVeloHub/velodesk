@@ -59,6 +59,7 @@ import {
   type WhatsAppChamadoOutboundResult,
 } from '../services/twilio/whatsappActiveOutbound.service';
 import { requestWhatsAppAudioTranscription } from '../services/twilio/whatsappAudioTranscription.service';
+import { resolveSentAttachmentSendMeta } from '../services/sentAttachmentStorage.service';
 
 const router = Router();
 
@@ -405,7 +406,19 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
     : [];
 
   if (!initialTemplate && !text && !attachmentList.length) {
-    return res.status(400).json({ message: 'Texto da mensagem é obrigatório' });
+    return res.status(400).json({ message: 'Texto ou anexo é obrigatório' });
+  }
+
+  let mediaContentTypes: string[] = [];
+  let anexosScanStatus: string[] = [];
+  if (attachmentList.length) {
+    try {
+      const metas = await Promise.all(attachmentList.map((url: string) => resolveSentAttachmentSendMeta(url)));
+      mediaContentTypes = metas.map((item) => item.contentType);
+      anexosScanStatus = metas.map((item) => item.scanStatus);
+    } catch (err) {
+      return res.status(400).json({ message: (err as Error).message });
+    }
   }
 
   applyManualResponsavelClaim(chamado, req.user);
@@ -419,6 +432,8 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
       autor: String(req.user?.name ?? req.user?.email ?? '').trim() || undefined,
       texto: appendText,
       anexos: attachmentList,
+      mediaContentTypes,
+      anexosScanStatus,
       waChatId,
     });
   } catch (err) {
@@ -431,6 +446,7 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
     waChatId,
     initialTemplate,
     forceTemplate: initialTemplate || undefined,
+    attachments: attachmentList,
   });
   twilio = sendResult;
   if (sendResult.sent && sendResult.sid) {
