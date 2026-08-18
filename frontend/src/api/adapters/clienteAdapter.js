@@ -1,6 +1,6 @@
 /**
- * clienteAdapter v1.3.0 — merge ticket←clienteDoc + hydrateFromApi no lookup
- * VERSION: v1.3.0 | DATE: 2026-08-12
+ * clienteAdapter v1.4.0 — hydrate quando falta email ou telefone no cadastro
+ * VERSION: v1.4.0 | DATE: 2026-08-18
  */
 import { formatPhone, normalizeCpf, normalizePhone } from '../../services/desk/utils';
 
@@ -220,6 +220,8 @@ export function applyClienteDocToTicket(ticket, doc) {
 export function ticketNeedsContactHydration(ticket) {
   if (!ticket) return false;
   const lf = ticket.lateralForm || {};
-  const nome = String(lf.clienteNome || ticket.clientName || ticket.solicitante || '').trim();
-  return !nome;
+  const emails = normalizeListInput(lf.clienteEmail ?? ticket.clientEmail);
+  const phones = normalizeListInput(lf.clienteTelefone ?? ticket.clientPhone);
+  // Enriquece via GET /clients?hydrateFromApi=1 quando falta ao menos email ou telefone.
+  return emails.length === 0 || phones.length === 0;
 }

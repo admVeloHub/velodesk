@@ -854,6 +854,10 @@ body:has(.eco-prototype-banner) {
     background: rgba(22, 52, 255, 0.1);
     color: #1634FF;
 }
+.client360-workflow-icon--finished {
+    background: rgba(21, 162, 55, 0.14);
+    color: #15A237;
+}
 .client360-empty { text-align: center; color: #64748b; padding: 1rem !important; }
 .client360-analise { font-size: 0.9rem; color: #475569; margin: 0.85rem 0 1.15rem; line-height: 1.5; }
 .client360-section-title { margin: 1.25rem 0 0.65rem; font-size: 0.95rem; color: var(--eco-navy); }

@@ -1,5 +1,7 @@
 /**
  * ReclameAquiPanel — painel operacional Reclame Aqui
+ * VERSION: v1.1.0 | DATE: 2026-08-18
+ * — Toolbar usa busca dual n1 + reclamacoes
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,8 +13,10 @@ import {
   getReportSeries,
   groupReclamacoesByStatus,
   loadReclamacoes,
+  searchReclamacoesFromApi,
 } from '../../../services/especiais/reclameAquiStore';
 import { loadReclameAquiTicketsFromApi } from '../../../services/especiais/reclameAquiTicketService';
+import { useEspeciaisDualSearch } from '../shared/useEspeciaisDualSearch';
 import ReclameAquiTopBar from './ReclameAquiTopBar';
 import ReclameAquiPageHeader from './ReclameAquiPageHeader';
 import ReclameAquiToolbar from './ReclameAquiToolbar';
@@ -20,8 +24,7 @@ import ReclameAquiKpiRow from './ReclameAquiKpiRow';
 import ReclameAquiTableView from './ReclameAquiTableView';
 import ReclameAquiReportsView from './ReclameAquiReportsView';
 
-function loadViewState({ search, activeChips }) {
-  const items = loadReclamacoes({ search, activeChips, gestaoView: true });
+function buildView(items) {
   return {
     items,
     kpis: getReclameAquiKpis(items),
@@ -40,6 +43,13 @@ export default function ReclameAquiPanel() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [page, setPage] = useState(1);
   const [listVersion, setListVersion] = useState(0);
+
+  const searchFn = useCallback((q) => searchReclamacoesFromApi(q), []);
+  const { remoteItems, isRemoteSearch } = useEspeciaisDualSearch({
+    queueQuery: search,
+    listQuery: '',
+    searchFn,
+  });
 
   useEffect(() => {
     const refreshFromApi = () => {
@@ -60,10 +70,17 @@ export default function ReclameAquiPanel() {
     onImported: () => setListVersion((v) => v + 1),
   });
 
-  const view = useMemo(
-    () => loadViewState({ search, activeChips }),
-    [search, activeChips, listVersion],
-  );
+  const view = useMemo(() => {
+    if (isRemoteSearch && remoteItems) {
+      if (!activeChips.length) return buildView(remoteItems);
+      const chipIds = new Set(
+        loadReclamacoes({ search: '', activeChips, gestaoView: true })
+          .map((i) => String(i.id)),
+      );
+      return buildView(remoteItems.filter((i) => chipIds.has(String(i.id))));
+    }
+    return buildView(loadReclamacoes({ search: '', activeChips, gestaoView: true }));
+  }, [activeChips, listVersion, isRemoteSearch, remoteItems]);
 
   const footerText = getFooterSummary(view.items, selectedIds.length);
 

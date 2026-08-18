@@ -1,4 +1,4 @@
-/** workflowTicket.service v1.6.2 — bloqueia start sem cliente identificado (CPF) */
+/** workflowTicket.service v1.7.0 — workflowStatus finished + conclusão da última devolutiva */
 import { isAutomaticaStep, resolveAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
@@ -73,6 +73,7 @@ function ensureWorkflowState(chamado: IChamadoN1): IChamadoWorkflow {
   if (!chamado.workflow) {
     chamado.workflow = {
       active: false,
+      workflowStatus: null,
       workflowId: null,
       step: 0,
       passoId: null,
@@ -146,8 +147,10 @@ async function advanceToStep(
 
   if (nextStep >= passos.length) {
     wf.step = passos.length > 0 ? passos.length - 1 : 0;
+    wf.passoId = passos[wf.step]?._id as Types.ObjectId || null;
     wf.completedAt = new Date();
     wf.active = false;
+    wf.workflowStatus = 'finished';
     wf.pendingDecision = null;
     appendWorkflowRegistro(chamado, {
       autor,
@@ -205,6 +208,7 @@ export async function activateWorkflowForChamado(
   if (!passo) return false;
 
   wf.active = true;
+  wf.workflowStatus = 'active';
   wf.workflowId = definicao._id as Types.ObjectId;
   wf.step = initialStep;
   wf.passoId = (passo._id as Types.ObjectId) || null;
@@ -246,6 +250,9 @@ export async function tryActivateWorkflowOnTabulation(
 ): Promise<boolean> {
   const wf = chamado.workflow;
   if (wf?.active && wf.workflowId) return false;
+  // Conclusão permanece estável mesmo após reabertura/retabulação. Um novo
+  // workflow pode ser iniciado explicitamente pelo agente.
+  if (wf?.workflowStatus === 'finished') return false;
 
   const definicao = await resolveWorkflowForTicket(buildWorkflowTicketContextFromChamado(chamado));
   if (!definicao) return false;
@@ -617,6 +624,34 @@ export async function advanceWorkflowWithDecision(
   return advanceWorkflowManual(chamado, authUser);
 }
 
+/**
+ * Uma mensagem pública cumpre o último passo quando ele é uma devolutiva.
+ * Outros tipos de último passo continuam sendo concluídos pelo executor/botão
+ * de avanço correspondente, sem amarrar o encerramento geral a mensagens.
+ */
+export async function finishWorkflowAfterPublicReply(
+  chamado: IChamadoN1,
+  autor = 'Agente',
+): Promise<boolean> {
+  const wf = chamado.workflow;
+  if (!wf?.active || !wf.workflowId || wf.workflowStatus === 'finished') return false;
+
+  const definicao = await getWorkflowById(String(wf.workflowId));
+  if (!definicao) return false;
+
+  const passos = sortPassos(definicao);
+  const lastStepIndex = passos.length - 1;
+  if (lastStepIndex < 0 || (wf.step ?? 0) !== lastStepIndex) return false;
+
+  const lastPasso = passos[lastStepIndex];
+  if (!isDevolutivaPasso(lastPasso.passo?.nome || '')) return false;
+
+  await advanceToStep(chamado, definicao, passos.length, autor, {
+    trigger: 'devolutiva-publica-enviada',
+  });
+  return true;
+}
+
 /** Interrompe workflow ativo sem impedir novo start futuro (tabulação intacta). */
 export async function cancelWorkflowForChamado(
   chamado: IChamadoN1,
@@ -637,6 +672,7 @@ export async function cancelWorkflowForChamado(
     : null;
 
   wf.active = false;
+  wf.workflowStatus = null;
   wf.workflowId = null;
   wf.step = 0;
   wf.passoId = null;

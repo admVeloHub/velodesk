@@ -1,4 +1,4 @@
-/** chamado.mapper v2.11.0 — attachmentScanStatuses paralelo a attachments */
+/** chamado.mapper v2.12.0 — workflowStatus finished nos DTOs list/full */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -672,6 +672,7 @@ export interface TicketDto {
   lateralForm?: Record<string, unknown>;
   workflow?: {
     active?: boolean;
+    workflowStatus?: 'active' | 'finished' | null;
     workflowId?: string | null;
     step?: number;
     passoId?: string | null;
@@ -741,7 +742,9 @@ export async function buildChamadoMapContext(
   const clienteBatch = await batchLoadDadosForRefs(refs);
 
   const workflowIds = chamados
-    .filter((chamado) => chamado.workflow?.active && chamado.workflow.workflowId)
+    .filter((chamado) => (
+      chamado.workflow?.active || chamado.workflow?.workflowStatus === 'finished'
+    ) && chamado.workflow?.workflowId)
     .map((chamado) => String(chamado.workflow!.workflowId));
 
   const workflowById = mode === 'list'
@@ -1699,7 +1702,10 @@ async function chamadoToTicketFull(
   if (!cadastro) cadastro = legacyDadosFromRef(ref);
 
   let lateralWorkflow: Record<string, unknown> | undefined;
-  if (chamado.workflow?.active && chamado.workflow.workflowId) {
+  if (
+    (chamado.workflow?.active || chamado.workflow?.workflowStatus === 'finished')
+    && chamado.workflow.workflowId
+  ) {
     const definicao = await loadWorkflowDefForChamado(chamado);
     if (definicao) {
       lateralWorkflow = buildLateralWorkflowDto(chamado, definicao) ?? undefined;
@@ -1867,7 +1873,13 @@ function buildTicketDtoCore(
   }
 
   let lateralWorkflow: Record<string, unknown> | undefined = extras.lateralWorkflow;
-  if (!lateralWorkflow && chamado.workflow?.active && chamado.workflow.workflowId && listOnly && ctx) {
+  if (
+    !lateralWorkflow
+    && (chamado.workflow?.active || chamado.workflow?.workflowStatus === 'finished')
+    && chamado.workflow.workflowId
+    && listOnly
+    && ctx
+  ) {
     const definicao = ctx.workflowById.get(String(chamado.workflow.workflowId));
     if (definicao) {
       lateralWorkflow = buildLateralWorkflowListDto(chamado, definicao);
@@ -1925,9 +1937,11 @@ function buildTicketDtoCore(
     clientName,
     clientCPF: clientCpf,
     responsibleAgent: responsavel,
-    workflow: chamado.workflow?.active
+    workflow: chamado.workflow?.active || chamado.workflow?.workflowStatus === 'finished'
       ? {
         active: chamado.workflow.active,
+        workflowStatus: chamado.workflow.workflowStatus
+          ?? (chamado.workflow.active ? 'active' : null),
         workflowId: chamado.workflow.workflowId ? String(chamado.workflow.workflowId) : null,
         step: chamado.workflow.step ?? 0,
         passoId: chamado.workflow.passoId ? String(chamado.workflow.passoId) : null,

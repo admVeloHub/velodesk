@@ -1,12 +1,13 @@
 /**
- * workflowTeamQueues v1.3.0 — match por solicitacaoProdutos e passosResumo
- * VERSION: v1.3.0 | DATE: 2026-08-06
+ * workflowTeamQueues v1.4.1 — híbrido: completed (filas WF) + finished (badge agente)
+ * VERSION: v1.4.1 | DATE: 2026-08-18
  */
 import {
   getWorkflowProgress,
   getWorkflowTemplateForTicket,
   isTicketInWorkflow,
   isTicketWorkflowActive,
+  isTicketWorkflowFinished,
 } from '../desk/utils';
 import { ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import { resolveWorkflowTeamQueueForUser } from '../permissions/permissionService';
@@ -91,11 +92,17 @@ export function isWorkflowActive(ticket) {
   return progress.workflow?.status !== 'completed';
 }
 
+/**
+ * Console de aprovação / filas de workflow: tira da lista de trabalho
+ * tickets já resolvidos/cancelados/fechados ou com workflow concluído.
+ * Não usar para badge/steps do agente — use isTicketWorkflowFinished.
+ */
 export function isWorkflowTicketCompleted(ticket) {
   if (!ticket) return false;
   const workflow = ticket.workflow || ticket.lateralForm?.workflow || {};
   return Boolean(
-    workflow?.completedAt
+    workflow?.workflowStatus === 'finished'
+    || workflow?.completedAt
     || workflow?.status === 'completed'
     || ticket?.status === 'resolvido'
     || ticket?.status === 'cancelado'
@@ -213,6 +220,13 @@ const CLIENT360_WORKFLOW_ICON = {
 };
 
 export function getClient360WorkflowIconMeta(ticket) {
+  if (isTicketWorkflowFinished(ticket)) {
+    return {
+      icon: 'ti-check',
+      title: 'Workflow concluído',
+      modifier: 'finished',
+    };
+  }
   if (!isWorkflowActive(ticket)) return null;
   const teamId = resolveWorkflowTeamForTicket(ticket);
   return CLIENT360_WORKFLOW_ICON[teamId] || null;

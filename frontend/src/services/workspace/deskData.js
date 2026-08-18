@@ -1,11 +1,15 @@
 /**
  * Workspace — dados operacionais do painel 360°
- * VERSION: v2.5.0 | DATE: 2026-08-12
- * — Pendente nas seções; CSAT/TMA sem mock; warRoom alinhado
+ * VERSION: v2.5.1 | DATE: 2026-08-18
+ * — Workflows finished ficam fora das filas operacionais
  */
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { getAgentName } from '../clientDb';
-import { getSlaClass, isTicketInWorkflow, getWorkflowProgress } from '../desk/utils';
+import {
+  getSlaClass,
+  isTicketWorkflowActive,
+  getWorkflowProgress,
+} from '../desk/utils';
 import { MEUS_TICKETS_QUEUE_ID, MY_TICKETS_SECTION_CLIENTE_RESPONDEU } from '../desk/constants';
 import { ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import { getWorkflowInfoRequests, resolveDeskTicketIdForInfoRequest } from '../workflow/workflowInfoNotifications';
@@ -533,7 +537,7 @@ export function computeManagementStats() {
 export function computeWorkflow360View(teamId = null) {
   const teamMeta = teamId ? getWorkflowTeamQueueMeta(teamId) : null;
   const entries = getAllCockpitTickets().filter(({ ticket }) => {
-    if (!isTicketInWorkflow(ticket)) return false;
+    if (!isTicketWorkflowActive(ticket)) return false;
     if (teamId) return ticketMatchesWorkflowTeam(ticket, teamId);
     return true;
   });
@@ -656,7 +660,7 @@ export function computeWorkflow360ViewForUser(perm) {
   if (teamId) return computeWorkflow360View(teamId);
 
   const entries = getAllCockpitTickets().filter(({ ticket }) => {
-    if (!isTicketInWorkflow(ticket)) return false;
+    if (!isTicketWorkflowActive(ticket)) return false;
     return canActOnTicket(ticket, perm);
   });
 

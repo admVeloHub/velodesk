@@ -1,9 +1,13 @@
 /**
- * WorkflowProgressModal v1.0.0 — timeline vertical + interromper/avançar
- * VERSION: v1.0.0 | DATE: 2026-07-28
+ * WorkflowProgressModal v1.1.0 — confirmação visual de workflow concluído
+ * VERSION: v1.1.0 | DATE: 2026-08-18
  */
 import React, { useEffect, useMemo } from 'react';
-import { getWorkflowProgress, isTicketInWorkflow } from '../../../services/desk/utils';
+import {
+  getWorkflowProgress,
+  isTicketInWorkflow,
+  isTicketWorkflowFinished,
+} from '../../../services/desk/utils';
 import { getWorkflowStepSubtitle } from '../../../services/desk/workflowDefinitions';
 import { useWorkflowConfig } from '../../../context/WorkflowConfigContext';
 
@@ -43,6 +47,7 @@ export default function WorkflowProgressModal({
   if (!open || !progress) return null;
 
   const { template, stepsWithState } = progress;
+  const workflowFinished = isTicketWorkflowFinished(ticket);
 
   return (
     <div
@@ -98,6 +103,12 @@ export default function WorkflowProgressModal({
         </ol>
 
         <footer className="desk-workflow-modal__footer">
+          {workflowFinished ? (
+            <span className="desk-workflow-modal__finished">
+              <i className="ti ti-check" aria-hidden="true" />
+              Workflow concluído
+            </span>
+          ) : null}
           {canCancel ? (
             <button
               type="button"

@@ -1,4 +1,4 @@
-/** tickets.routes v1.20.0 — GET /:id?view=light (poll leve) + broadcast Realtime + boxes cacheadas */
+/** tickets.routes v1.21.0 — devolutiva pública conclui último passo do workflow */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -32,6 +32,7 @@ import {
   advanceWorkflowWithDecision,
   attachTeamSolicitationToChamado,
   cancelWorkflowForChamado,
+  finishWorkflowAfterPublicReply,
   setWorkflowPendingDecision,
   startWorkflowForChamado,
   WorkflowAdvanceError,
@@ -285,6 +286,18 @@ router.post('/:id/commit', authMiddleware, async (req, res: Response) => {
     applyManualResponsavelClaim(chamado, req.user);
     const commitResult = await commitChamadoFromAgent(chamado, req.body, req.user);
     applyManualResponsavelClaim(chamado, req.user);
+    if (commitResult.messageResult.public) {
+      const sentPublicContent = Boolean(
+        commitResult.publicText.trim()
+        || (commitResult.messageResult.public.attachments ?? []).length,
+      );
+      if (sentPublicContent) {
+        await finishWorkflowAfterPublicReply(
+          chamado,
+          req.user?.name || req.user?.email || 'Agente',
+        );
+      }
+    }
     await chamado.save();
 
     if (isFirstContextNote) {
@@ -364,6 +377,16 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
 
   if (!result.public && !result.internal) {
     return res.status(400).json({ message: 'Texto da mensagem ou anotação é obrigatório' });
+  }
+
+  const isAgentPublicReply = !isInternalOnly
+    && String(sender ?? 'me') !== 'them'
+    && Boolean(publicText.trim() || attachmentList.length);
+  if (isAgentPublicReply) {
+    await finishWorkflowAfterPublicReply(
+      chamado,
+      req.user?.name || req.user?.email || 'Agente',
+    );
   }
 
   await chamado.save();
@@ -492,6 +515,13 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
       appendResult.mensagem.deliveryStatus = 'failed';
       appendResult.mensagem.deliveryErrorMessage = sendResult.reason;
     }
+
+  if (sendResult.sent) {
+    await finishWorkflowAfterPublicReply(
+      chamado,
+      req.user?.name || req.user?.email || 'Agente',
+    );
+  }
 
   await chamado.save();
   void publishTicketEvent(chamado._id.toString(), 'whatsapp-outbound');

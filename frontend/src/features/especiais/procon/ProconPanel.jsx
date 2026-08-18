@@ -1,5 +1,7 @@
 /**
  * ProconPanel — painel operacional Procon
+ * VERSION: v1.1.0 | DATE: 2026-08-18
+ * — Toolbar usa busca dual n1 + reclamacoes
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,8 +13,10 @@ import {
   getReportSeries,
   groupDemandasByStatus,
   loadDemandas,
+  searchDemandasFromApi,
 } from '../../../services/especiais/proconStore';
 import { loadProconTicketsFromApi, ensurePcTicketForRespond } from '../../../services/especiais/proconTicketService';
+import { useEspeciaisDualSearch } from '../shared/useEspeciaisDualSearch';
 import ProconTopBar from './ProconTopBar';
 import ProconPageHeader from './ProconPageHeader';
 import ProconToolbar from './ProconToolbar';
@@ -20,8 +24,7 @@ import ProconKpiRow from './ProconKpiRow';
 import ProconTableView from './ProconTableView';
 import ProconReportsView from './ProconReportsView';
 
-function loadViewState({ search, activeChips }) {
-  const items = loadDemandas({ search, activeChips, gestaoView: true });
+function buildView(items) {
   return {
     items,
     kpis: getProconKpis(items),
@@ -42,6 +45,13 @@ export default function ProconPanel() {
   const [listVersion, setListVersion] = useState(0);
   const [respondingId, setRespondingId] = useState(null);
 
+  const searchFn = useCallback((q) => searchDemandasFromApi(q), []);
+  const { remoteItems, isRemoteSearch } = useEspeciaisDualSearch({
+    queueQuery: search,
+    listQuery: '',
+    searchFn,
+  });
+
   useEffect(() => {
     const refreshFromApi = () => {
       loadProconTicketsFromApi().catch(() => {});
@@ -58,10 +68,16 @@ export default function ProconPanel() {
 
   const { openNovaDemandaFlow, modals: demandaModals } = usePcNovaDemandaModals({ navigate });
 
-  const view = useMemo(
-    () => loadViewState({ search, activeChips }),
-    [search, activeChips, listVersion],
-  );
+  const view = useMemo(() => {
+    if (isRemoteSearch && remoteItems) {
+      if (!activeChips.length) return buildView(remoteItems);
+      const chipIds = new Set(
+        loadDemandas({ search: '', activeChips, gestaoView: true }).map((i) => String(i.id)),
+      );
+      return buildView(remoteItems.filter((i) => chipIds.has(String(i.id))));
+    }
+    return buildView(loadDemandas({ search: '', activeChips, gestaoView: true }));
+  }, [activeChips, listVersion, isRemoteSearch, remoteItems]);
 
   const footerText = getFooterSummary(view.items, selectedIds.length);
 

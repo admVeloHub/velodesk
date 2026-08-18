@@ -1,9 +1,13 @@
 /**
- * TicketWorkflowStepper v1.6.0 — headerStack track-only polido
- * VERSION: v1.6.0 | DATE: 2026-08-06
+ * TicketWorkflowStepper v1.7.0 — estado finished com todos os checks verdes
+ * VERSION: v1.7.0 | DATE: 2026-08-18
  */
 import React, { useMemo } from 'react';
-import { getWorkflowProgress, isTicketInWorkflow } from '../../../services/desk/utils';
+import {
+  getWorkflowProgress,
+  isTicketInWorkflow,
+  isTicketWorkflowFinished,
+} from '../../../services/desk/utils';
 import { getWorkflowStepSubtitle } from '../../../services/desk/workflowDefinitions';
 import { useWorkflowConfig } from '../../../context/WorkflowConfigContext';
 
@@ -38,6 +42,7 @@ export default function TicketWorkflowStepper({ ticket, onClick, clickable = fal
     [ticket, workflows],
   );
   const isHeaderStack = layout === 'headerStack';
+  const workflowFinished = isTicketWorkflowFinished(ticket);
 
   if (!isTicketInWorkflow(ticket)) return null;
 
@@ -129,7 +134,7 @@ export default function TicketWorkflowStepper({ ticket, onClick, clickable = fal
     return (
       <section
         className={buildStepperClassName({ layout, clickable })}
-        aria-label={`Workflow ativo: ${template.title}`}
+        aria-label={`Workflow ${workflowFinished ? 'concluído' : 'ativo'}: ${template.title}`}
         {...interactiveProps}
       >
         {track}
@@ -140,11 +145,14 @@ export default function TicketWorkflowStepper({ ticket, onClick, clickable = fal
   return (
     <section
       className={buildStepperClassName({ layout, clickable })}
-      aria-label={`Workflow ativo: ${template.title}`}
+      aria-label={`Workflow ${workflowFinished ? 'concluído' : 'ativo'}: ${template.title}`}
       {...interactiveProps}
     >
-      <p className="desk-workflow-stepper__eyebrow" title={`Workflow ativo: ${template.title}`}>
-        <i className="ti ti-arrows-exchange" aria-hidden="true" />
+      <p
+        className="desk-workflow-stepper__eyebrow"
+        title={`Workflow ${workflowFinished ? 'concluído' : 'ativo'}: ${template.title}`}
+      >
+        <i className={`ti ${workflowFinished ? 'ti-check' : 'ti-arrows-exchange'}`} aria-hidden="true" />
         <span className="desk-workflow-stepper__eyebrow-text">{template.title}</span>
       </p>
       {track}

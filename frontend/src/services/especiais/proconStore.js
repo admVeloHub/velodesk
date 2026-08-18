@@ -1,5 +1,5 @@
 /**
- * proconStore v1.1.0 — demandas Procon via API chamados_reclamacoes
+ * proconStore v1.2.0 — demandas Procon via API + busca dual n1/reclamacoes
  */
 import {
   PC_GROUPS,
@@ -87,6 +87,22 @@ export async function refreshDemandasFromApi() {
   memoryCache = items;
   writeAll(items);
   return items;
+}
+
+/** Busca em chamados_reclamacoes + chamados_n1; faz merge no cache local. */
+export async function searchDemandasFromApi(query) {
+  const q = String(query || '').trim();
+  if (!q) return [];
+  const data = await reclamacoesApi.search('procon', q, { limit: 100 });
+  const found = (data?.items ?? []).map(normalizeApiItem);
+  found.forEach((item) => {
+    try {
+      patchDemanda(item);
+    } catch {
+      // fail-soft
+    }
+  });
+  return found.map((item) => getDemandaById(item.id) || getDemandaByTicketId(item.ticketId) || item);
 }
 
 export function loadAllDemandas() {

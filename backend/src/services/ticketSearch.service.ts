@@ -1,7 +1,7 @@
 /**
  * Busca avançada de tickets — builder Mongo + escopo de permissão
- * VERSION: v1.2.0 | DATE: 2026-08-06
- * — desk-bar CPF: ignora visão meus-chamados (lookup direto por CPF)
+ * VERSION: v1.3.0 | DATE: 2026-08-18
+ * — histórico por CPF inclui chamados_reclamacoes
  */
 import mongoose from 'mongoose';
 import { ChamadoN1, type IChamadoN1 } from '../models/ChamadoN1';
@@ -29,6 +29,11 @@ import {
 } from './permission.service';
 import { resolveWorkflowDefinitionIdsForFuncoes } from './workflowDefinicao.service';
 import { excludeFusaoAbsorvidosFilter } from './ticketFusao.helpers';
+import {
+  findReclamacoesByCpf,
+  reclamacaoToHistoryTicketDto,
+} from './reclamacoes/reclamacao.service';
+import { isReclamacoesConnected } from '../config/database';
 
 export interface SearchCriterio {
   campo: string;
@@ -584,8 +589,88 @@ function digitsOnlyCpf(value: string): string {
   return String(value || '').replace(/\D/g, '');
 }
 
+function ticketSortUpdatedDesc(a: TicketDto, b: TicketDto): number {
+  const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+  const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+  return tb - ta;
+}
+
+/**
+ * Complementa o histórico Client360 com documentos de chamados_reclamacoes
+ * (e respectivos chamados_n1 referenciados que não entraram no filtro de CPF).
+ */
+async function mergeReclamacoesIntoCpfHistory(
+  cpf: string,
+  tickets: TicketDto[],
+  boxes: Awaited<ReturnType<typeof Box.find>>,
+  visibility?: Record<string, unknown> | null,
+): Promise<TicketDto[]> {
+  if (!isReclamacoesConnected()) return tickets;
+
+  let reclamacoes;
+  try {
+    reclamacoes = await findReclamacoesByCpf(cpf, BY_CPF_LIMIT);
+  } catch (err) {
+    console.warn('[ticket-search] falha ao consultar chamados_reclamacoes por CPF:', (err as Error).message);
+    return tickets;
+  }
+  if (!reclamacoes.length) return tickets;
+
+  const merged = [...tickets];
+  const seenIds = new Set(merged.map((t) => String(t._id)));
+  const seenProtocolos = new Set(
+    merged.map((t) => String(t.chamadoProtocolo || '').trim()).filter(Boolean),
+  );
+
+  const missingObjectIds = reclamacoes
+    .map((r) => r.chamadoId)
+    .filter((id) => id && !seenIds.has(String(id)))
+    .map((id) => String(id))
+    .filter((id, idx, arr) => mongoose.Types.ObjectId.isValid(id) && arr.indexOf(id) === idx)
+    .map((id) => new mongoose.Types.ObjectId(id));
+
+  if (missingObjectIds.length) {
+    const andClauses: Record<string, unknown>[] = [
+      { _id: { $in: missingObjectIds } },
+      excludeFusaoAbsorvidosFilter(),
+    ];
+    if (visibility) andClauses.push(visibility);
+
+    const extraChamados = await ChamadoN1.find({ $and: andClauses });
+    if (extraChamados.length) {
+      const ctx = await buildChamadoMapContext(extraChamados, 'list');
+      for (const chamado of extraChamados) {
+        const id = String(chamado._id);
+        if (seenIds.has(id)) continue;
+        const boxId = await resolveBoxIdForChamado(chamado, boxes as never);
+        merged.push(chamadoToTicketListItem(chamado, boxId, ctx));
+        seenIds.add(id);
+        const proto = String(chamado.chamadoProtocolo || '').trim();
+        if (proto) seenProtocolos.add(proto);
+      }
+    }
+  }
+
+  for (const rec of reclamacoes) {
+    const chamadoId = String(rec.chamadoId || '');
+    if (chamadoId && seenIds.has(chamadoId)) continue;
+    const protocolo = String(rec.chamadoProtocolo || '').trim();
+    if (protocolo && seenProtocolos.has(protocolo)) continue;
+
+    const synthetic = reclamacaoToHistoryTicketDto(rec) as unknown as TicketDto;
+    merged.push(synthetic);
+    if (chamadoId) seenIds.add(chamadoId);
+    else seenIds.add(String(rec._id));
+    if (protocolo) seenProtocolos.add(protocolo);
+  }
+
+  merged.sort(ticketSortUpdatedDesc);
+  return merged.slice(0, BY_CPF_LIMIT);
+}
+
 /**
  * Lista tickets do CPF no Mongo (histórico Client360), excluindo absorvidos da fusão.
+ * Inclui também ocorrências em chamados_reclamacoes.
  */
 export async function searchTicketsByCpf(
   authUser: AuthPayload,
@@ -628,12 +713,14 @@ export async function searchTicketsByCpf(
     tickets.push(chamadoToTicketListItem(chamado, boxId, ctx));
   }
 
-  return { tickets, total: tickets.length, cpf };
+  const merged = await mergeReclamacoesIntoCpfHistory(cpf, tickets, boxes, visibility);
+  return { tickets: merged, total: merged.length, cpf };
 }
 
 /**
  * Barra de busca do Desk — CPF/protocolo ignoram filtro de visão (ver_meus).
  * Retorna tickets do cliente sem restringir responsável/atribuído.
+ * Inclui também ocorrências em chamados_reclamacoes.
  */
 export async function searchTicketsByCpfDeskBar(
   _authUser: AuthPayload,
@@ -666,5 +753,6 @@ export async function searchTicketsByCpfDeskBar(
     tickets.push(chamadoToTicketListItem(chamado, boxId, ctx));
   }
 
-  return { tickets, total: tickets.length, cpf };
+  const merged = await mergeReclamacoesIntoCpfHistory(cpf, tickets, boxes, null);
+  return { tickets: merged, total: merged.length, cpf };
 }

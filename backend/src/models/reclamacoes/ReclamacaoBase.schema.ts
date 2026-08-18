@@ -1,4 +1,4 @@
-/** ReclamacaoBase.schema v1.1.0 — bloco workflow completo (paridade com chamados_n1.workflow) */
+/** ReclamacaoBase.schema v1.2.0 — workflowStatus no snapshot de workflow */
 import { Schema, Document, Types } from 'mongoose';
 import type { CasoEspecialOrgao } from '../../services/agents/casosEspeciais.types';
 
@@ -27,6 +27,7 @@ export interface IReclamacaoWorkflowRequisicao {
  */
 export interface IReclamacaoWorkflow {
   active: boolean;
+  workflowStatus?: 'active' | 'finished' | null;
   workflowId: Types.ObjectId | null;
   step: number;
   passoId: Types.ObjectId | null;
@@ -109,6 +110,7 @@ const ReclamacaoWorkflowRequisicaoSchema = new Schema<IReclamacaoWorkflowRequisi
 const ReclamacaoWorkflowSchema = new Schema<IReclamacaoWorkflow>(
   {
     active: { type: Boolean, default: false },
+    workflowStatus: { type: String, enum: ['active', 'finished'], default: null },
     workflowId: { type: Schema.Types.ObjectId, default: null },
     step: { type: Number, default: 0 },
     passoId: { type: Schema.Types.ObjectId, default: null },

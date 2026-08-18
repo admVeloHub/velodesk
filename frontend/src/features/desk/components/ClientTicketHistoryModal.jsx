@@ -1,7 +1,7 @@
 /**
  * ClientTicketHistoryModal — histórico Mongo por CPF + mesclagem multi-seleção
- * VERSION: v2.1.2 | DATE: 2026-08-04
- * — textos UI: mesclar / mesclagem / mesclado
+ * VERSION: v2.2.0 | DATE: 2026-08-18
+ * — histórico via by-cpf inclui chamados_n1 + chamados_reclamacoes
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';

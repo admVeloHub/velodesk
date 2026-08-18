@@ -1,15 +1,17 @@
 /**
  * ReclameAquiCrmRoot — shell CRM RA (fila + lista + ticket + sidebar)
+ * VERSION: v1.1.0 | DATE: 2026-08-18
+ * — Busca rápida dual (chamados_n1 + chamados_reclamacoes)
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useRaNovaReclamacaoModals } from '../../../hooks/useRaNovaReclamacaoModals';
 import { RA_GROUPS } from '../../../services/especiais/reclameAquiData';
-import { loadReclamacoes } from '../../../services/especiais/reclameAquiStore';
-import { matchesTicketCpfSearch } from '../../../services/especiais/especiaisCrmSearch';
+import { loadReclamacoes, searchReclamacoesFromApi } from '../../../services/especiais/reclameAquiStore';
 import { fetchRaTicketView, loadReclameAquiTicketsFromApi } from '../../../services/especiais/reclameAquiTicketService';
 import { useEspeciaisTicketCommit } from '../shared/useEspeciaisTicketCommit';
+import { useEspeciaisDualSearch } from '../shared/useEspeciaisDualSearch';
 import RaQueuePanel from './RaQueuePanel';
 import RaTicketList from './RaTicketList';
 import RaTicketMain from './RaTicketMain';
@@ -33,6 +35,13 @@ export default function ReclameAquiCrmRoot() {
   );
   const [listVersion, setListVersion] = useState(0);
   const syncedOnceRef = useRef(false);
+
+  const searchFn = useCallback((q) => searchReclamacoesFromApi(q), []);
+  const { remoteItems, isRemoteSearch } = useEspeciaisDualSearch({
+    queueQuery: appliedSearch,
+    listQuery: listSearchDraft,
+    searchFn,
+  });
 
   useEffect(() => {
     const refreshFromApi = () => {
@@ -66,23 +75,24 @@ export default function ReclameAquiCrmRoot() {
   const [internalText, setInternalText] = useState('');
   const [composeAttachments, setComposeAttachments] = useState([]);
 
-  const allItems = useMemo(
-    () => loadReclamacoes({ search: appliedSearch }),
-    [appliedSearch, listVersion],
-  );
+  const allItems = useMemo(() => {
+    if (isRemoteSearch && remoteItems) return remoteItems;
+    return loadReclamacoes({});
+  }, [isRemoteSearch, remoteItems, listVersion]);
 
   const groupCounts = useMemo(() => {
     const counts = {};
+    const base = isRemoteSearch && remoteItems ? remoteItems : loadReclamacoes({});
     RA_GROUPS.forEach((g) => {
-      counts[g.id] = allItems.filter((i) => i.groupKey === g.id).length;
+      counts[g.id] = base.filter((i) => i.groupKey === g.id).length;
     });
     return counts;
-  }, [allItems]);
+  }, [isRemoteSearch, remoteItems, listVersion]);
 
   const listItems = useMemo(() => {
     const listQuery = listSearchDraft.trim();
-    let items = listQuery
-      ? allItems.filter((i) => matchesTicketCpfSearch(i, listQuery, 'protocoloRa'))
+    let items = (listQuery || isRemoteSearch)
+      ? allItems
       : allItems.filter((i) => i.groupKey === activeGroup);
     if (activeSort === 'sla') {
       items = [...items].sort(
@@ -94,7 +104,7 @@ export default function ReclameAquiCrmRoot() {
       );
     }
     return items;
-  }, [allItems, activeGroup, activeSort, listSearchDraft]);
+  }, [allItems, activeGroup, activeSort, listSearchDraft, isRemoteSearch]);
 
   const reloadTicket = useCallback(async () => {
     if (!id) {
@@ -251,7 +261,7 @@ export default function ReclameAquiCrmRoot() {
         activeRaId={id}
         activeSort={activeSort}
         items={listItems}
-        searchActive={!!appliedSearch.trim()}
+        searchActive={!!appliedSearch.trim() || isRemoteSearch}
         listSearchQuery={listSearchDraft}
         collapsed={listCollapsed}
         onSelectItem={handleSelectItem}

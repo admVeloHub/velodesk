@@ -1,6 +1,6 @@
 /**
- * DeskTicketList v2.3.0 — busca automática CPF vs protocolo
- * VERSION: v2.3.0 | DATE: 2026-07-31
+ * DeskTicketList v2.4.0 — badge verde para workflow concluído
+ * VERSION: v2.4.0 | DATE: 2026-08-18
  */
 import React, { useEffect, useState } from 'react';
 import {
@@ -10,6 +10,7 @@ import {
   getTicketQueueEntryAt,
   getTicketTitle,
   isTicketInWorkflow,
+  isTicketWorkflowFinished,
   normalizeTicketForDeskV2,
 } from '../../../services/desk/utils';
 
@@ -167,6 +168,7 @@ export default function DeskTicketList({
           ) : entries.map(({ ticket: t }) => {
             normalizeTicketForDeskV2(t);
             const inWorkflow = isTicketInWorkflow(t);
+            const workflowFinished = isTicketWorkflowFinished(t);
             const isActive = String(t.id) === String(activeTicketId);
             const entryAt = getTicketQueueEntryAt(t);
             const slaCritical = getSlaClass(t) === 'critical';
@@ -203,7 +205,9 @@ export default function DeskTicketList({
                       {getTicketTitle(t)}
                     </span>
                     {inWorkflow ? (
-                      <span className="crm-tag crm-tag--workflow">Workflow</span>
+                      <span className={`crm-tag crm-tag--workflow${workflowFinished ? ' is-finished' : ''}`}>
+                        {workflowFinished ? 'Workflow concluído' : 'Workflow'}
+                      </span>
                     ) : null}
                   </div>
                 </div>

@@ -17548,6 +17548,10 @@ body.velodesk-dark .sidebar {
     background: #eff6ff;
     color: #1d4ed8;
 }
+.client360-workflow-badge--finished {
+    background: #ecfdf5;
+    color: #047857;
+}
 
 .client360-workflow-icon {
     display: inline-flex;
@@ -17568,6 +17572,10 @@ body.velodesk-dark .sidebar {
 .client360-workflow-icon--produtos {
     background: #eff6ff;
     color: #1d4ed8;
+}
+.client360-workflow-icon--finished {
+    background: #ecfdf5;
+    color: #047857;
 }
 
 .ticket-client-fusao-wrap {

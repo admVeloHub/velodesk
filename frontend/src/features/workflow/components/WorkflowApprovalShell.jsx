@@ -1,6 +1,6 @@
 /**
- * WorkflowApprovalShell v1.8.0 — interromper workflow (gestão/suporte)
- * VERSION: v1.8.0 | DATE: 2026-07-28
+ * WorkflowApprovalShell v1.8.1 — ações somente em workflow ativo
+ * VERSION: v1.8.1 | DATE: 2026-08-18
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -33,7 +33,7 @@ import {
   requestWorkflowInfo,
   resolveComunicacaoResumo,
 } from '../../../services/workflow/workflowDecisionHandlers';
-import { getWorkflowProgress, isTicketInWorkflow } from '../../../services/desk/utils';
+import { getWorkflowProgress, isTicketWorkflowActive } from '../../../services/desk/utils';
 import { resolveAutomaticaConfig } from '../../config/workflow/workflowConfigData';
 import { ticketsApi } from '../../../api/client';
 import WorkflowApprovalQueue from './WorkflowApprovalQueue';
@@ -158,7 +158,7 @@ export default function WorkflowApprovalShell() {
   const canManageWorkflow = useMemo(
     () => Boolean(
       selectedTicket
-      && isTicketInWorkflow(selectedTicket)
+      && isTicketWorkflowActive(selectedTicket)
       && canInterruptWorkflow(permsCtx?.permissions),
     ),
     [selectedTicket, permsCtx?.permissions],

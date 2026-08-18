@@ -1,4 +1,4 @@
-/** inboundTicket.service v1.0.0 — criação canônica de ticket inbound (App / Telefone / Agente IA) */
+/** inboundTicket.service v1.1.0 — clientPhone no cadastro + enriquecimento parcial via API */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
 import { applyAssignmentIfNeeded } from '../assignmentRouter.service';
@@ -90,9 +90,12 @@ async function resolveClienteRefs(
   const body: Record<string, unknown> = {
     clientName: payload.clientName,
     clientCPF: payload.clientCPF,
+    clientPhone: payload.clientPhone,
+    clientEmail: payload.clientEmail,
     lateralForm: {
       clienteNome: payload.clientName,
-      clienteEmail: payload.clientEmail ? [payload.clientEmail] : undefined,
+      ...(payload.clientEmail ? { clienteEmail: [payload.clientEmail] } : {}),
+      ...(payload.clientPhone ? { clienteTelefone: [payload.clientPhone] } : {}),
     },
   };
 
@@ -138,6 +141,9 @@ function buildTicketBody(
 
   if (payload.clientEmail) {
     lateralForm.clienteEmail = [payload.clientEmail];
+  }
+  if (payload.clientPhone) {
+    lateralForm.clienteTelefone = [payload.clientPhone];
   }
   if (payload.responsavel) {
     lateralForm.responsavel = payload.responsavel;

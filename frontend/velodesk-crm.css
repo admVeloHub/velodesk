@@ -1,4 +1,4 @@
-﻿/* Velodesk CRM v1.17.0 - emoji picker WhatsApp no Desk */
+﻿/* Velodesk CRM v1.18.0 - workflow concluído com badge verde */
 
 #velodeskDeskV2Root {
     position: fixed;
@@ -4836,6 +4836,28 @@
     font-size: var(--desk-fs-sm);
 }
 
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-compose-tab-shell.crm-compose-editor-zone--overlay-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-compose-tab-shell.crm-compose-editor-zone--overlay-footer .response-content {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-compose-tab-shell.crm-compose-editor-zone--overlay-footer.internal-form .crm-compose-bottom-bar--overlay {
+    padding-left: 0.65rem;
+    padding-right: 0.65rem;
+    background: #f8fafc;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-compose-bottom-bar__attach--layout-slot {
+    visibility: hidden;
+    pointer-events: none;
+}
+
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-compose-bottom-bar__attach {
     flex-shrink: 0;
     display: inline-flex;
@@ -8151,6 +8173,15 @@ body.desk-v2-mode #cockpitFocusContext {
     background: #f8fafc;
 }
 
+#velodeskDeskV2Root .desk-workflow-modal__finished {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #15A237;
+    font-size: var(--desk-fs-sm);
+    font-weight: 700;
+}
+
 #velodeskDeskV2Root .desk-workflow-modal__footer .desk-workflow-modal__btn-cancel,
 #velodeskDeskV2Root .desk-workflow-modal__footer .desk-workflow-modal__btn-advance {
     font-size: var(--desk-fs-sm);
@@ -8339,6 +8370,12 @@ body.desk-v2-mode #cockpitFocusContext {
     color: #000058;
     border: 1px solid rgba(22, 52, 255, 0.2);
     font-weight: 600;
+}
+
+#velodeskDeskV2Root .crm-tag--workflow.is-finished {
+    background: rgba(21, 162, 55, 0.12);
+    color: #15A237;
+    border-color: rgba(21, 162, 55, 0.35);
 }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-ticket-card.is-active .crm-tag--workflow {

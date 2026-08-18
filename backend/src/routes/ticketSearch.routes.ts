@@ -1,6 +1,7 @@
 /**
  * Rotas de busca avançada de tickets
- * VERSION: v1.2.0 | DATE: 2026-08-06
+ * VERSION: v1.3.0 | DATE: 2026-08-18
+ * — by-cpf / desk-bar incluem chamados_reclamacoes
  */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';

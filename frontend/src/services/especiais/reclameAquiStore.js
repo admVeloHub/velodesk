@@ -1,5 +1,5 @@
 /**
- * reclameAquiStore v1.1.0 — reclamações RA via API chamados_reclamacoes
+ * reclameAquiStore v1.2.0 — reclamações RA via API + busca dual n1/reclamacoes
  */
 import {
   RA_GROUPS,
@@ -87,6 +87,22 @@ export async function refreshReclamacoesFromApi() {
   memoryCache = items;
   writeAll(items);
   return items;
+}
+
+/** Busca em chamados_reclamacoes + chamados_n1; faz merge no cache local. */
+export async function searchReclamacoesFromApi(query) {
+  const q = String(query || '').trim();
+  if (!q) return [];
+  const data = await reclamacoesApi.search('reclame-aqui', q, { limit: 100 });
+  const found = (data?.items ?? []).map(normalizeApiItem);
+  found.forEach((item) => {
+    try {
+      patchReclamacao(item);
+    } catch {
+      // fail-soft: resultado da busca ainda é retornado
+    }
+  });
+  return found.map((item) => getReclamacaoById(item.id) || getReclamacaoByTicketId(item.ticketId) || item);
 }
 
 export function loadAllReclamacoes() {

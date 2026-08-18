@@ -1,4 +1,4 @@
-/** workflowConfigSeed v1.5.0 — desativa *-tratativa (casos especiais não usam workflow dedicado) */
+/** workflowConfigSeed v1.6.0 — sem seed de ENCAMINHAMENTO/escalonar (gestão manual) */
 import { getGrupoResponsabilidadeModel } from '../models/GrupoResponsabilidade';
 import { getWorkflowDefinicaoModel, IWorkflowDefinicao } from '../models/WorkflowDefinicao';
 import { DEFAULT_GRUPOS, invalidateGrupoCache } from './grupoResponsabilidade.service';
@@ -17,9 +17,8 @@ async function repairWorkflowPassos(doc: IWorkflowDefinicao): Promise<boolean> {
     if (first?._id && String(doc.passoInicialId || '') !== String(first._id)) {
       doc.passoInicialId = first._id;
       await doc.save();
-      return true;
     }
-    return false;
+    return true;
   }
 
   filtered.forEach((p, index) => {
@@ -29,23 +28,6 @@ async function repairWorkflowPassos(doc: IWorkflowDefinicao): Promise<boolean> {
   doc.passoInicialId = filtered[0]?._id ?? null;
   await doc.save();
   return true;
-}
-
-const EXPERIMENTAL_ESCALONAR_WORKFLOW_SLUGS = [
-  'escalonar-financeiro',
-  'escalonar-produtos',
-  'escalonar-n2',
-  'escalonar-suporte',
-] as const;
-
-async function purgeExperimentalEscalonarWorkflows(): Promise<void> {
-  const Workflow = getWorkflowDefinicaoModel();
-  const result = await Workflow.deleteMany({
-    slug: { $in: [...EXPERIMENTAL_ESCALONAR_WORKFLOW_SLUGS] },
-  });
-  if (result.deletedCount) {
-    console.log(`Purge: ${result.deletedCount} workflow(s) experimental escalonar-* removido(s)`);
-  }
 }
 
 /**
@@ -74,7 +56,6 @@ async function deactivateCasosEspeciaisTratativaWorkflows(): Promise<void> {
 }
 
 export async function seedWorkflowConfig(): Promise<void> {
-  await purgeExperimentalEscalonarWorkflows();
   await deactivateCasosEspeciaisTratativaWorkflows();
 
   const Grupo = getGrupoResponsabilidadeModel();
@@ -172,66 +153,10 @@ export async function seedWorkflowConfig(): Promise<void> {
     console.log('Seed: workflow reembolso-7dias criado');
   }
 
-  const escalonarSeeds = [
-    {
-      slug: 'escalonar-financeiro',
-      titulo: 'ENCAMINHAMENTO FINANCEIRO',
-      passos: [
-        { ordem: 0, passo: { nome: 'Triagem N1', descricao: 'N1 prepara encaminhamento financeiro.', slaHoras: 2, atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-        { ordem: 1, passo: { nome: 'Aprovação financeiro', descricao: '', slaHoras: 4, atribuicao: { tipo: 'grupo', grupoSlug: 'financeiro', colaborador: '' }, acao: { tipo: 'aprovacao', rotas: [{ variavel: 'approve', rotulo: 'Aprovar', proximoPassoId: null, statusTicket: 'em-andamento' }, { variavel: 'reject', rotulo: 'Reprovar', proximoPassoId: null, statusTicket: 'pendente' }, { variavel: 'request_info', rotulo: 'Pedir informação', proximoPassoId: null, statusTicket: 'pendente' }] } } },
-        { ordem: 2, passo: { nome: 'Estorno processado', descricao: '', slaHoras: 8, atribuicao: { tipo: 'grupo', grupoSlug: 'financeiro', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-        { ordem: 3, passo: { nome: 'Retorno ao cliente', descricao: '', slaHoras: 2, atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-      ],
-    },
-    {
-      slug: 'escalonar-produtos',
-      titulo: 'ENCAMINHAMENTO PRODUTOS',
-      passos: [
-        { ordem: 0, passo: { nome: 'Triagem N1', descricao: 'N1 prepara encaminhamento para produtos.', icone: 'ti-circle-check', slaHoras: 2, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-        { ordem: 1, passo: { nome: 'Análise produtos', descricao: '', icone: 'ti-package', slaHoras: 4, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'produtos', colaborador: '' }, acao: { tipo: 'aprovacao', rotas: [{ variavel: 'approve', rotulo: 'Aprovar', proximoPassoId: null, statusTicket: 'em-andamento' }, { variavel: 'reject', rotulo: 'Reprovar', proximoPassoId: null, statusTicket: 'pendente' }, { variavel: 'request_info', rotulo: 'Pedir informação', proximoPassoId: null, statusTicket: 'pendente' }] } } },
-        { ordem: 2, passo: { nome: 'Retorno ao cliente', descricao: '', icone: 'ti-device-desktop', slaHoras: 2, criterios: [], atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-      ],
-    },
-    {
-      slug: 'escalonar-n2',
-      titulo: 'ENCAMINHAMENTO N2',
-      passos: [
-        { ordem: 0, passo: { nome: 'Análise N2', descricao: 'N2 analisa o encaminhamento.', slaHoras: 4, atribuicao: { tipo: 'grupo', grupoSlug: 'n2', colaborador: '' }, acao: { tipo: 'aprovacao', rotas: [{ variavel: 'approve', rotulo: 'Aprovar', proximoPassoId: null, statusTicket: 'em-andamento' }, { variavel: 'reject', rotulo: 'Reprovar', proximoPassoId: null, statusTicket: 'pendente' }, { variavel: 'request_info', rotulo: 'Pedir informação', proximoPassoId: null, statusTicket: 'pendente' }] } } },
-        { ordem: 1, passo: { nome: 'Retorno ao cliente', descricao: '', slaHoras: 2, atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-      ],
-    },
-    {
-      slug: 'escalonar-suporte',
-      titulo: 'ENCAMINHAMENTO SUPORTE',
-      passos: [
-        { ordem: 0, passo: { nome: 'Diagnóstico suporte', descricao: 'Suporte técnico diagnostica o caso.', slaHoras: 4, atribuicao: { tipo: 'grupo', grupoSlug: 'suporte', colaborador: '' }, acao: { tipo: 'aprovacao', rotas: [{ variavel: 'approve', rotulo: 'Aprovar', proximoPassoId: null, statusTicket: 'em-andamento' }, { variavel: 'reject', rotulo: 'Reprovar', proximoPassoId: null, statusTicket: 'pendente' }, { variavel: 'request_info', rotulo: 'Pedir informação', proximoPassoId: null, statusTicket: 'pendente' }] } } },
-        { ordem: 1, passo: { nome: 'Retorno ao cliente', descricao: '', slaHoras: 2, atribuicao: { tipo: 'grupo', grupoSlug: 'n1', colaborador: '' }, acao: { tipo: 'manual', rotas: [] } } },
-      ],
-    },
-  ];
+  // ENCAMINHAMENTO / escalonar-* NÃO são mais seedados nem recriados no startup.
+  // Criação e remoção ficam a cargo do responsável da área (config de workflows).
 
-  for (const seed of escalonarSeeds) {
-    const exists = await Workflow.findOne({ slug: seed.slug }).select('_id').lean();
-    if (exists) continue;
-    const doc = await Workflow.create({
-      slug: seed.slug,
-      titulo: seed.titulo,
-      descricao: 'Fluxo de encaminhamento',
-      ordem: 10,
-      ativo: true,
-      gatilho: { tipo: 'tabulacao', criterios: [] },
-      passos: seed.passos,
-      updatedBy: 'seed',
-    });
-    const first = doc.passos?.[0];
-    if (first?._id) {
-      doc.passoInicialId = first._id;
-      await doc.save();
-    }
-    console.log(`Seed: workflow ${seed.slug} criado`);
-  }
-
-  const repairSlugs = ['reembolso-7dias', 'escalonar-financeiro', 'escalonar-produtos', 'escalonar-n2', 'escalonar-suporte'];
+  const repairSlugs = ['reembolso-7dias'];
   for (const slug of repairSlugs) {
     const doc = await Workflow.findOne({ slug });
     if (doc) await repairWorkflowPassos(doc);

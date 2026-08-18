@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.16.0 | DATE: 2026-08-17
- * — Aba Notas também lê anotacaoInterna do registro histórico
+ * VERSION: v3.17.0 | DATE: 2026-08-18
+ * — workflowStatus finished preserva progresso e presença visual
  */
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
 import { getDeskQueueDisplayCount, markTicketResolvedOptimistic } from './queueCounts';
@@ -532,7 +532,12 @@ function readTicketLateralWorkflow(ticket) {
   }
 
   const persisted = ticket?.workflow;
-  if (!persisted?.active && !persisted?.pendingPersist && !ticket?._pendingWorkflowStart) {
+  if (
+    !persisted?.active
+    && persisted?.workflowStatus !== 'finished'
+    && !persisted?.pendingPersist
+    && !ticket?._pendingWorkflowStart
+  ) {
     return lateral || null;
   }
 
@@ -565,7 +570,8 @@ function readTicketLateralWorkflow(ticket) {
     passoId: persisted?.passoId ?? lateral?.passoId,
     startedAt: persisted?.startedAt ?? lateral?.startedAt,
     completedAt: persisted?.completedAt ?? lateral?.completedAt,
-    status: persisted?.completedAt
+    workflowStatus: persisted?.workflowStatus ?? lateral?.workflowStatus,
+    status: persisted?.workflowStatus === 'finished' || persisted?.completedAt
       ? 'completed'
       : (lateral?.status || 'active'),
     pendingDecision: persisted?.pendingDecision ?? lateral?.pendingDecision ?? null,
@@ -582,19 +588,31 @@ function readTicketLateralWorkflow(ticket) {
   };
 }
 
+export function isTicketWorkflowFinished(ticket) {
+  const persisted = ticket?.workflow;
+  const lateral = readTicketLateralWorkflow(ticket);
+  return Boolean(
+    persisted?.workflowStatus === 'finished'
+    || lateral?.workflowStatus === 'finished',
+  );
+}
+
+/** Presença de workflow atual ou concluído — usado somente para indicação visual/histórico. */
 export function isTicketInWorkflow(ticket) {
   if (ticket?.workflow?.active) return true;
+  if (isTicketWorkflowFinished(ticket)) return true;
   if (ticket?.workflow?.pendingPersist) return true;
   if (ticket?._pendingWorkflowStart?.definicaoSlug) return true;
   return false;
 }
 
 export function isTicketWorkflowActive(ticket) {
-  if (!isTicketInWorkflow(ticket)) return false;
-  if (ticket?.workflow?.completedAt) return false;
+  if (isTicketWorkflowFinished(ticket)) return false;
+  if (ticket?.workflow?.active) return true;
+  if (ticket?.workflow?.pendingPersist) return true;
+  if (ticket?._pendingWorkflowStart?.definicaoSlug) return true;
   const wf = readTicketLateralWorkflow(ticket);
-  if (wf?.status === 'completed') return false;
-  return true;
+  return wf?.status === 'active';
 }
 
 export function getWorkflowTemplateForTicket(ticket) {
@@ -653,6 +671,7 @@ export function getWorkflowProgress(ticket) {
   if (!isTicketInWorkflow(ticket)) return null;
   const workflow = readTicketLateralWorkflow(ticket);
   if (!workflow) return null;
+  const workflowFinished = isTicketWorkflowFinished(ticket);
 
   let template = getWorkflowTemplateForTicket(ticket);
   if (!template?.steps?.length) {
@@ -676,7 +695,7 @@ export function getWorkflowProgress(ticket) {
 
   const stepsWithState = template.steps.map((step, index) => {
     let state = 'pending';
-    if (completedIds.has(step.id)) state = 'completed';
+    if (workflowFinished || completedIds.has(step.id)) state = 'completed';
     else if (step.id === currentStepId) state = 'active';
     else if (index < activeStepIndex) state = 'completed';
 

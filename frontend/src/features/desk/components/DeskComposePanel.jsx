@@ -1,6 +1,6 @@
 /**
- * DeskComposePanel v1.12.0 — compose público vs anotação interna por permissão
- * VERSION: v1.12.0 | DATE: 2026-08-07
+ * DeskComposePanel v1.13.1 — Enviar Nota substitui Revisor de Texto na aba interna
+ * VERSION: v1.13.1 | DATE: 2026-08-18
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { uploadsApi } from '../../../api/client';
@@ -164,6 +164,10 @@ function ComposeBottomBar({
   onAttachFiles,
   attachUploading = false,
   attachDisabled = false,
+  showSendInternalNote = false,
+  onSendInternalNote,
+  sendInternalNoteBusy = false,
+  sendInternalNoteDisabled = false,
   overlay = false,
 }) {
   const fileInputRef = useRef(null);
@@ -190,43 +194,74 @@ function ComposeBottomBar({
       aria-label="Ferramentas do compose"
     >
       {formatToolbar}
-      {showAiAssistant ? (
+      {showAiAssistant || showSendInternalNote ? (
         <>
           <span className="crm-compose-bottom-bar__sep" aria-hidden="true" />
           <div className="crm-compose-bottom-bar__tools">
-            <button
-              type="button"
-              className="btn-secondary crm-compose-bottom-bar__attach"
-              id="btnCrmAttachFile"
-              aria-label="Anexar arquivo"
-              title="Anexar arquivo"
-              disabled={attachDisabled || attachUploading}
-              onClick={handleAttachClick}
-            >
-              <i className="ti ti-paperclip" aria-hidden="true" />
-              <span className="crm-compose-bottom-bar__attach-label">
-                {attachUploading ? 'Enviando…' : 'Anexo'}
-              </span>
-            </button>
-            <button
-              type="button"
-              className="btn-secondary crm-compose-bottom-bar__ai"
-              id="btnCrmTextReviewer"
-              aria-label="Revisor de Texto"
-              disabled={attachDisabled}
-              onClick={onOpenRefinar}
-            >
-              <span className="crm-compose-bottom-bar__ai-label">Revisor de Texto</span>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              className="crm-compose-toolbar__file-input"
-              tabIndex={-1}
-              aria-hidden="true"
-              onChange={handleFileChange}
-            />
+            {showAiAssistant ? (
+              <>
+                <button
+                  type="button"
+                  className="btn-secondary crm-compose-bottom-bar__attach"
+                  id="btnCrmAttachFile"
+                  aria-label="Anexar arquivo"
+                  title="Anexar arquivo"
+                  disabled={attachDisabled || attachUploading}
+                  onClick={handleAttachClick}
+                >
+                  <i className="ti ti-paperclip" aria-hidden="true" />
+                  <span className="crm-compose-bottom-bar__attach-label">
+                    {attachUploading ? 'Enviando…' : 'Anexo'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary crm-compose-bottom-bar__ai"
+                  id="btnCrmTextReviewer"
+                  aria-label="Revisor de Texto"
+                  disabled={attachDisabled}
+                  onClick={onOpenRefinar}
+                >
+                  <span className="crm-compose-bottom-bar__ai-label">Revisor de Texto</span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="crm-compose-toolbar__file-input"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  onChange={handleFileChange}
+                />
+              </>
+            ) : null}
+            {showSendInternalNote ? (
+              <>
+                <button
+                  type="button"
+                  className="btn-secondary crm-compose-bottom-bar__attach crm-compose-bottom-bar__attach--layout-slot"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  disabled
+                >
+                  <i className="ti ti-paperclip" aria-hidden="true" />
+                  <span className="crm-compose-bottom-bar__attach-label">Anexo</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary crm-compose-bottom-bar__ai"
+                  id="btnCrmSendInternalNote"
+                  aria-label="Enviar Nota"
+                  title="Persistir anotação interna sem salvar tabulação"
+                  disabled={sendInternalNoteDisabled || sendInternalNoteBusy}
+                  onClick={onSendInternalNote}
+                >
+                  <span className="crm-compose-bottom-bar__ai-label">
+                    {sendInternalNoteBusy ? 'Enviando…' : 'Enviar Nota'}
+                  </span>
+                </button>
+              </>
+            ) : null}
           </div>
         </>
       ) : null}
@@ -245,9 +280,17 @@ function InternalNoteFields({
   attachDisabled = false,
   showNotification,
   readOnly = false,
+  onSendInternalNote,
+  sendInternalNoteBusy = false,
+  sendInternalNoteDisabled = false,
+  includeBottomBar = true,
+  overlayFooter = true,
+  editorRef: externalEditorRef,
+  onFormatStateChange,
 }) {
   const tid = String(ticketId);
-  const internalEditorRef = useRef(null);
+  const localEditorRef = useRef(null);
+  const internalEditorRef = externalEditorRef || localEditorRef;
   const internalPlainText = useMemo(() => htmlToPlainText(internalText), [internalText]);
 
   const handleInternalReplace = useCallback((startIndex, deleteCount, insertText) => {
@@ -268,6 +311,21 @@ function InternalNoteFields({
     richEditorRef: internalEditorRef,
     mode: 'rich',
   });
+  const internalFormatRef = useRef(internalFormat);
+  internalFormatRef.current = internalFormat;
+
+  const notifyInternalFormat = useCallback(() => {
+    onFormatStateChange?.(internalFormatRef.current);
+  }, [onFormatStateChange]);
+
+  useEffect(() => {
+    notifyInternalFormat();
+  }, [notifyInternalFormat]);
+
+  const handleInternalFormatStateChange = useCallback((state) => {
+    internalFormatRef.current?.handleFormatStateChange?.(state);
+    notifyInternalFormat();
+  }, [notifyInternalFormat]);
 
   const handleInternalAttachImage = useCallback((file) => {
     void attachImageToEditor(internalEditorRef, file, showNotification);
@@ -290,7 +348,10 @@ function InternalNoteFields({
   };
 
   return (
-    <div className="crm-compose-editor-zone crm-compose-editor-zone--overlay-footer response-form internal-form crm-notes-compose__form spell-compose-wrap">
+    <div className={
+      'crm-compose-editor-zone response-form internal-form crm-notes-compose__form spell-compose-wrap'
+      + (overlayFooter ? ' crm-compose-editor-zone--overlay-footer' : '')
+    }>
       <div className="crm-notes-compose__header">
         <i className="fas fa-lock" aria-hidden="true" />
         <span>Nota interna — não enviada ao cliente</span>
@@ -311,15 +372,20 @@ function InternalNoteFields({
         value={internalText}
         hasSpellErrors={spell.flaggedErrors.length > 0}
         readOnly={readOnly}
-        onFormatStateChange={internalFormat.handleFormatStateChange}
+        onFormatStateChange={handleInternalFormatStateChange}
         onChange={handleInternalChange}
         onKeyDown={handleInternalKeyDown}
         onBlur={spell.handleBlur}
         onSelect={spell.handleSelect}
         onClick={spell.handleClick}
       />
+      {includeBottomBar ? (
       <ComposeBottomBar
         overlay
+        showSendInternalNote={Boolean(onSendInternalNote) && !readOnly}
+        onSendInternalNote={onSendInternalNote}
+        sendInternalNoteBusy={sendInternalNoteBusy}
+        sendInternalNoteDisabled={sendInternalNoteDisabled}
         formatToolbar={(
           <ComposeFormatToolbar
             applyAction={internalFormat.applyAction}
@@ -331,6 +397,7 @@ function InternalNoteFields({
           />
         )}
       />
+      ) : null}
     </div>
   );
 }
@@ -353,9 +420,14 @@ export default function DeskComposePanel({
   internalComposeLocked = false,
   workflowTeamLabel = '',
   ticketReadOnly = false,
+  onSendInternalNote,
+  sendInternalNoteBusy = false,
 }) {
   const tid = String(ticketId);
   const publicEditorRef = useRef(null);
+  const internalEditorRef = useRef(null);
+  const [internalFormatState, setInternalFormatState] = useState(null);
+  const useSharedBottomBar = variant === 'full';
   const composePlainText = useMemo(() => htmlToPlainText(composeText), [composeText]);
   const { config: tabulationConfig } = useTabulation();
   const { user, colaborador } = useAuth();
@@ -368,6 +440,9 @@ export default function DeskComposePanel({
   const publicComposeLocked = Boolean(workflowLocked || ticketReadOnly);
   const internalLocked = Boolean(internalComposeLocked || ticketReadOnly);
   const publicLocked = publicComposeLocked;
+  const internalPlainText = useMemo(() => htmlToPlainText(internalText), [internalText]);
+  const sendInternalNoteDisabled = internalLocked || !internalPlainText.trim() || sendInternalNoteBusy;
+
   const internalPlaceholder = ticketReadOnly
     ? 'Ticket fechado — anotações indisponíveis'
     : workflowLocked
@@ -438,6 +513,14 @@ export default function DeskComposePanel({
     void attachImageToEditor(publicEditorRef, file, showNotification);
   }, [showNotification]);
 
+  const handleInternalAttachImage = useCallback((file) => {
+    void attachImageToEditor(internalEditorRef, file, showNotification);
+  }, [showNotification]);
+
+  const handleInternalFormatStateChange = useCallback((formatState) => {
+    setInternalFormatState(formatState);
+  }, []);
+
   const handleRemoveAttachment = useCallback((url) => {
     if (!onComposeAttachmentsChange) return;
     onComposeAttachmentsChange((composeAttachments || []).filter((item) => item.url !== url));
@@ -482,6 +565,40 @@ export default function DeskComposePanel({
     ticketReadOnly,
   ]);
 
+  const sharedBottomBar = useSharedBottomBar ? (
+    <ComposeBottomBar
+      overlay
+      showAiAssistant={composeMode === 'public' && !ticketReadOnly}
+      onOpenRefinar={ticketReadOnly ? undefined : handleOpenRefinar}
+      onAttachFiles={ticketReadOnly || publicLocked ? undefined : handleAttachFiles}
+      attachUploading={attachUploading}
+      attachDisabled={publicLocked || ticketReadOnly}
+      showSendInternalNote={composeMode === 'internal' && Boolean(onSendInternalNote) && !internalLocked}
+      onSendInternalNote={onSendInternalNote}
+      sendInternalNoteBusy={sendInternalNoteBusy}
+      sendInternalNoteDisabled={sendInternalNoteDisabled}
+      formatToolbar={composeMode === 'public' ? (
+        <ComposeFormatToolbar
+          applyAction={publicFormat.applyAction}
+          activeFormats={publicFormat.activeFormats}
+          variant="public"
+          embedded
+          onImageSelected={handlePublicAttachImage}
+          attachDisabled={publicLocked || ticketReadOnly}
+        />
+      ) : (
+        <ComposeFormatToolbar
+          applyAction={internalFormatState?.applyAction}
+          activeFormats={internalFormatState?.activeFormats}
+          variant="internal"
+          embedded
+          onImageSelected={handleInternalAttachImage}
+          attachDisabled={internalLocked}
+        />
+      )}
+    />
+  ) : null;
+
   return (
     <div className={
       'crm-ticket-compose'
@@ -513,10 +630,18 @@ export default function DeskComposePanel({
               </button>
             </div>
             ) : null}
+            <div className={
+              'crm-compose-tab-shell'
+              + (useSharedBottomBar ? ' crm-compose-editor-zone crm-compose-editor-zone--overlay-footer' : '')
+              + (useSharedBottomBar && composeMode === 'internal' ? ' internal-form' : '')
+            }>
             <div className="response-content octa-response-panel-body">
               {showPublic ? (
               <div className={'response-tab-content' + (variant === 'full' && composeMode !== 'public' ? '' : ' active')} id={'public-' + tid}>
-                <div className="crm-compose-editor-zone crm-compose-editor-zone--overlay-footer response-form spell-compose-wrap">
+                <div className={
+                  'crm-compose-editor-zone response-form spell-compose-wrap'
+                  + (useSharedBottomBar ? '' : ' crm-compose-editor-zone--overlay-footer')
+                }>
                   <SpellErrorsPanel
                     errors={spell.flaggedErrors}
                     onApplyFix={spell.applyErrorFix}
@@ -550,6 +675,7 @@ export default function DeskComposePanel({
                     onRemove={handleRemoveAttachment}
                     disabled={ticketReadOnly || publicLocked}
                   />
+                  {useSharedBottomBar ? null : (
                   <ComposeBottomBar
                     overlay
                     showAiAssistant={!ticketReadOnly}
@@ -568,6 +694,7 @@ export default function DeskComposePanel({
                       />
                     )}
                   />
+                  )}
                 </div>
                 <ComposeRefinarModal
                   open={refinarOpen}
@@ -590,9 +717,18 @@ export default function DeskComposePanel({
                   placeholder={internalPlaceholder}
                   showNotification={showNotification}
                   readOnly={internalLocked}
+                  onSendInternalNote={onSendInternalNote}
+                  sendInternalNoteBusy={sendInternalNoteBusy}
+                  sendInternalNoteDisabled={sendInternalNoteDisabled}
+                  includeBottomBar={!useSharedBottomBar}
+                  overlayFooter={!useSharedBottomBar}
+                  editorRef={useSharedBottomBar ? internalEditorRef : undefined}
+                  onFormatStateChange={useSharedBottomBar ? handleInternalFormatStateChange : undefined}
                 />
               </div>
               ) : null}
+              {sharedBottomBar}
+            </div>
             </div>
           </div>
         </div>

@@ -1,15 +1,17 @@
 /**
- * BacenCrmRoot — shell CRM RA (fila + lista + ticket + sidebar)
+ * BacenCrmRoot — shell CRM Bacen (fila + lista + ticket + sidebar)
+ * VERSION: v1.1.0 | DATE: 2026-08-18
+ * — Busca rápida dual (chamados_n1 + chamados_reclamacoes)
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useBcNovaDemandaModals } from '../../../hooks/useBcNovaDemandaModals';
 import { BC_GROUPS } from '../../../services/especiais/bacenData';
-import { loadDemandas } from '../../../services/especiais/bacenStore';
-import { matchesTicketCpfSearch } from '../../../services/especiais/especiaisCrmSearch';
+import { loadDemandas, searchDemandasFromApi } from '../../../services/especiais/bacenStore';
 import { fetchBcTicketView, loadBacenTicketsFromApi } from '../../../services/especiais/bacenTicketService';
 import { useEspeciaisTicketCommit } from '../shared/useEspeciaisTicketCommit';
+import { useEspeciaisDualSearch } from '../shared/useEspeciaisDualSearch';
 import BcQueuePanel from './BcQueuePanel';
 import BcTicketList from './BcTicketList';
 import BcTicketMain from './BcTicketMain';
@@ -33,6 +35,13 @@ export default function BacenCrmRoot() {
   );
   const [listVersion, setListVersion] = useState(0);
   const syncedOnceRef = useRef(false);
+
+  const searchFn = useCallback((q) => searchDemandasFromApi(q), []);
+  const { remoteItems, isRemoteSearch } = useEspeciaisDualSearch({
+    queueQuery: appliedSearch,
+    listQuery: listSearchDraft,
+    searchFn,
+  });
 
   useEffect(() => {
     const refreshFromApi = () => {
@@ -63,23 +72,24 @@ export default function BacenCrmRoot() {
   const [internalText, setInternalText] = useState('');
   const [composeAttachments, setComposeAttachments] = useState([]);
 
-  const allItems = useMemo(
-    () => loadDemandas({ search: appliedSearch }),
-    [appliedSearch, listVersion],
-  );
+  const allItems = useMemo(() => {
+    if (isRemoteSearch && remoteItems) return remoteItems;
+    return loadDemandas({});
+  }, [isRemoteSearch, remoteItems, listVersion]);
 
   const groupCounts = useMemo(() => {
     const counts = {};
+    const base = isRemoteSearch && remoteItems ? remoteItems : loadDemandas({});
     BC_GROUPS.forEach((g) => {
-      counts[g.id] = allItems.filter((i) => i.groupKey === g.id).length;
+      counts[g.id] = base.filter((i) => i.groupKey === g.id).length;
     });
     return counts;
-  }, [allItems]);
+  }, [isRemoteSearch, remoteItems, listVersion]);
 
   const listItems = useMemo(() => {
     const listQuery = listSearchDraft.trim();
-    let items = listQuery
-      ? allItems.filter((i) => matchesTicketCpfSearch(i, listQuery, 'protocoloBacen'))
+    let items = (listQuery || isRemoteSearch)
+      ? allItems
       : allItems.filter((i) => i.groupKey === activeGroup);
     if (activeSort === 'sla') {
       items = [...items].sort(
@@ -91,7 +101,7 @@ export default function BacenCrmRoot() {
       );
     }
     return items;
-  }, [allItems, activeGroup, activeSort, listSearchDraft]);
+  }, [allItems, activeGroup, activeSort, listSearchDraft, isRemoteSearch]);
 
   const reloadTicket = useCallback(async () => {
     if (!id) {
@@ -248,7 +258,7 @@ export default function BacenCrmRoot() {
         activeBcId={id}
         activeSort={activeSort}
         items={listItems}
-        searchActive={!!appliedSearch.trim()}
+        searchActive={!!appliedSearch.trim() || isRemoteSearch}
         listSearchQuery={listSearchDraft}
         collapsed={listCollapsed}
         onSelectItem={handleSelectItem}

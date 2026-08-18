@@ -1,6 +1,6 @@
 /**
- * workflowApprovalData v1.5.2 — valores via resolveRequisicaoValor
- * VERSION: v1.5.2 | DATE: 2026-07-24
+ * workflowApprovalData v1.5.3 — exclui finished das filas operacionais
+ * VERSION: v1.5.3 | DATE: 2026-08-18
  */
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { findCadastralRequestByTicketId } from '../cadastral/cadastralRequestStore';
@@ -12,7 +12,7 @@ import { getFinanceiroTipoLabel } from '../cadastral/solicitacoesFinanceiroData'
 import {
   getSlaClass,
   getWorkflowProgress,
-  isTicketInWorkflow,
+  isTicketWorkflowActive,
   getTicketProtocolLabel,
   getWorkflowTemplateForTicket,
 } from '../desk/utils';
@@ -916,7 +916,7 @@ function collectAssigneeWorkflowEntries() {
 
   getAllCockpitTickets().forEach((entry) => {
     const { ticket } = entry;
-    if (!isTicketInWorkflow(ticket)) return;
+    if (!isTicketWorkflowActive(ticket)) return;
     if (!canActOnTicket(ticket)) return;
     const progress = getWorkflowProgress(ticket);
     items.push({ entry, progress, queueItem: buildQueueItem(entry) });
@@ -1011,7 +1011,7 @@ function collectPendingEntries() {
 
   getAllCockpitTickets().forEach((entry) => {
     const { ticket } = entry;
-    if (!isTicketInWorkflow(ticket)) return;
+    if (!isTicketWorkflowActive(ticket)) return;
     if (!agentCanDecideTicket(ticket)) return;
     const progress = getWorkflowProgress(ticket);
     if (!ticketAwaitingDecision(ticket, progress)) return;

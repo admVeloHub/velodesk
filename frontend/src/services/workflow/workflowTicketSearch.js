@@ -1,5 +1,7 @@
 /**
  * workflowTicketSearch — busca por CPF ou ticket (painel Workflow 360°)
+ * VERSION: v1.1.0 | DATE: 2026-08-18
+ * — Workflow finished abre no Desk, fora da fila operacional
  */
 import { ticketsApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
@@ -9,7 +11,7 @@ import {
   getTicketColumns,
   saveTicketColumns,
 } from '../ticketsStorage';
-import { getTicketProtocolLabel, isTicketInWorkflow, normalizeCpf } from '../desk/utils';
+import { getTicketProtocolLabel, isTicketWorkflowActive, normalizeCpf } from '../desk/utils';
 import {
   getWorkflowTeamQueueMeta,
   resolveWorkflowTeamForTicket,
@@ -143,7 +145,7 @@ export async function searchTicketsByQuery(rawQuery) {
 }
 
 export function resolveOpenTarget(ticket, teamQueueId) {
-  if (!isTicketInWorkflow(ticket)) return 'desk';
+  if (!isTicketWorkflowActive(ticket)) return 'desk';
   if (teamQueueId && ticketMatchesWorkflowTeam(ticket, teamQueueId)) return 'workflow';
   if (!teamQueueId && resolveWorkflowTeamForTicket(ticket)) return 'workflow';
   return 'desk';
@@ -153,7 +155,7 @@ export function validateWorkflowTeamAccess(ticket, teamQueueId) {
   if (!teamQueueId) {
     return { allowed: true, target: resolveOpenTarget(ticket, teamQueueId) };
   }
-  if (!isTicketInWorkflow(ticket)) {
+  if (!isTicketWorkflowActive(ticket)) {
     return { allowed: true, target: 'desk' };
   }
   if (ticketMatchesWorkflowTeam(ticket, teamQueueId)) {

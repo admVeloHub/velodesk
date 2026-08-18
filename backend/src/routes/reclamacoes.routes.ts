@@ -1,8 +1,8 @@
-/** reclamacoes.routes v1.0.0 — API chamados_reclamacoes por órgão */
+/** reclamacoes.routes v1.1.0 — busca dual n1 + reclamacoes */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import type { AuthPayload } from '../middleware/auth';
-import { isReclamacoesConnected } from '../config/database';
+import { isMongoConnected, isReclamacoesConnected } from '../config/database';
 import {
   resolveUserPermissions,
   hasPermission,
@@ -14,6 +14,7 @@ import {
   parseReclamacaoOrgaoRoute,
   patchReclamacao,
   reclamacaoToPortalDto,
+  searchPortalByOrgao,
 } from '../services/reclamacoes/reclamacao.service';
 import type { CasoEspecialOrgao } from '../services/agents/casosEspeciais.types';
 import { createChamadoFromBody } from '../services/chamado.mapper';
@@ -116,6 +117,35 @@ router.get('/:orgao/by-ticket/:chamadoId', authMiddleware, async (req, res: Resp
     const status = (err as { status?: number }).status ?? 500;
     const message = err instanceof Error ? err.message : 'Erro ao buscar reclamação';
     return res.status(status).json({ message });
+  }
+});
+
+/** Busca rápida: chamados_reclamacoes + chamados_n1 (canal do órgão). */
+router.get('/:orgao/search', authMiddleware, async (req, res: Response) => {
+  if (!isReclamacoesConnected() && !isMongoConnected()) {
+    return res.status(503).json({ message: 'Bancos de reclamações/chamados indisponíveis' });
+  }
+
+  try {
+    const orgao = parseOrgaoParam(String(req.params.orgao));
+    await assertCanAccessOrgao(req.user!, orgao);
+
+    const q = String(req.query.q ?? req.query.search ?? '').trim();
+    if (!q) {
+      return res.status(400).json({ message: 'Informe q ou search', items: [], total: 0 });
+    }
+
+    const limit = parseInt(String(req.query.limit ?? '100'), 10) || 100;
+    const items = await searchPortalByOrgao(orgao, q, limit);
+    return res.json({
+      items,
+      total: items.length,
+      source: 'reclamacoes_dual_search',
+    });
+  } catch (err) {
+    const status = (err as { status?: number }).status ?? 500;
+    const message = err instanceof Error ? err.message : 'Erro na busca de reclamações';
+    return res.status(status).json({ message, items: [], total: 0 });
   }
 });
 

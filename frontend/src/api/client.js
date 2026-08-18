@@ -1,6 +1,6 @@
 /**
- * API client v1.25.0 — gestaoInsightsApi.painel (payload unificado da Gestão)
- * VERSION: v1.25.0 | DATE: 2026-08-18 | AUTHOR: VeloHub Development Team
+ * API client v1.26.0 — reclamacoesApi.search (dual n1 + reclamacoes)
+ * VERSION: v1.26.0 | DATE: 2026-08-18 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -345,6 +345,10 @@ export const ticketFusaoApi = {
 export const reclamacoesApi = {
   list: (orgao, params = {}) =>
     api.get(`/reclamacoes/${encodeURIComponent(orgao)}`, { params }).then((r) => r.data),
+  search: (orgao, q, params = {}) =>
+    api.get(`/reclamacoes/${encodeURIComponent(orgao)}/search`, {
+      params: { q, ...params },
+    }).then((r) => r.data),
   get: (orgao, id) =>
     api.get(`/reclamacoes/${encodeURIComponent(orgao)}/${encodeURIComponent(id)}`).then((r) => r.data),
   byTicket: (orgao, chamadoId) =>

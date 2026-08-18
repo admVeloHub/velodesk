@@ -1,4 +1,4 @@
-/** workflowDto.util v1.1.0 — lateral workflow inclui passosResumo para o stepper */
+/** workflowDto.util v1.2.0 — preserva snapshot visual de workflow finished */
 import { Types } from 'mongoose';
 import type { IChamadoN1, IChamadoWorkflow } from '../models/ChamadoN1';
 import type { IWorkflowDefinicao, IWorkflowPassoEnvelope } from '../models/WorkflowDefinicao';
@@ -29,7 +29,8 @@ export function buildLateralWorkflowDto(
   definicao: IWorkflowDefinicao,
 ): Record<string, unknown> | null {
   const wf = chamado.workflow;
-  if (!wf?.active || !wf.workflowId) return null;
+  const finished = wf?.workflowStatus === 'finished';
+  if ((!wf?.active && !finished) || !wf.workflowId) return null;
 
   const passos = sortPassos(definicao);
   const step = Math.min(Math.max(wf.step ?? 0, 0), Math.max(passos.length - 1, 0));
@@ -41,7 +42,7 @@ export function buildLateralWorkflowDto(
   const stepHistory = passos.map((p, index) => {
     const stepId = String(p._id);
     let status: 'completed' | 'active' | 'pending' | 'skipped' = 'pending';
-    if (wf.completedAt || index < step) status = 'completed';
+    if (finished || wf.completedAt || index < step) status = 'completed';
     else if (index === step && !wf.completedAt) status = 'active';
     return {
       stepId,
@@ -62,7 +63,8 @@ export function buildLateralWorkflowDto(
     step,
     startedAt,
     completedAt,
-    status: wf.completedAt ? 'completed' : 'active',
+    status: finished ? 'completed' : 'active',
+    workflowStatus: wf.workflowStatus ?? (wf.active ? 'active' : null),
     stepHistory,
     passosResumo: buildPassosResumo(definicao),
     pendingDecision: wf.pendingDecision ?? null,
@@ -83,6 +85,7 @@ function ensureWorkflowState(chamado: IChamadoN1): IChamadoWorkflow {
   if (!chamado.workflow) {
     chamado.workflow = {
       active: false,
+      workflowStatus: null,
       workflowId: null,
       step: 0,
       passoId: null,
@@ -108,7 +111,10 @@ export function syncLegacyWorkflowFromBody(
     : undefined;
 
   if (definicaoId) {
-    wf.active = true;
+    const finished = lateralWorkflow.workflowStatus === 'finished'
+      || lateralWorkflow.status === 'completed';
+    wf.active = !finished;
+    wf.workflowStatus = finished ? 'finished' : 'active';
     wf.workflowId = new Types.ObjectId(String(definicaoId));
     wf.step = step ?? 0;
     wf.startedAt = lateralWorkflow.startedAt ? new Date(String(lateralWorkflow.startedAt)) : new Date();

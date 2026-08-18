@@ -1,6 +1,6 @@
-/** reclamacao.service v1.1.0 — snapshot workflow (paridade chamados_n1.workflow) */
+/** reclamacao.service v1.3.1 — replica workflowStatus no snapshot de reclamações */
 import { Types, type Model } from 'mongoose';
-import type { IChamadoN1 } from '../../models/ChamadoN1';
+import { ChamadoN1, type IChamadoN1 } from '../../models/ChamadoN1';
 import type { IReclamacao } from '../../models/reclamacoes/reclamacaoModels';
 import {
   getReclamacaoBacenModel,
@@ -8,11 +8,23 @@ import {
   getReclamacaoProconModel,
   getReclamacaoReclameAquiModel,
 } from '../../models/reclamacoes/reclamacaoModels';
-import { currentStatus, findBacenFromChamado, findConsumidorGovFromChamado, findProconFromChamado, normalizeStatusValue, readTabulacaoSnapshot } from '../chamado.mapper';
+import {
+  bacenChannelMongoFilter,
+  consumidorGovChannelMongoFilter,
+  currentStatus,
+  findBacenFromChamado,
+  findConsumidorGovFromChamado,
+  findProconFromChamado,
+  normalizeStatusValue,
+  proconChannelMongoFilter,
+  readTabulacaoSnapshot,
+  reclameAquiChannelMongoFilter,
+} from '../chamado.mapper';
 import type {
   CasoEspecialOrgao,
   CasoEspecialTriagemPersisted,
 } from '../agents/casosEspeciais.types';
+import { isMongoConnected, isReclamacoesConnected } from '../../config/database';
 
 const AGENTE_VERSAO = 'casosEspeciaisAgent v1.0.0';
 
@@ -266,6 +278,7 @@ function buildReclamacaoWorkflowSnapshot(chamado: IChamadoN1): IReclamacao['work
   if (!wf) return undefined;
   return {
     active: Boolean(wf.active),
+    workflowStatus: wf.workflowStatus ?? (wf.active ? 'active' : null),
     workflowId: wf.workflowId ?? null,
     step: wf.step ?? 0,
     passoId: wf.passoId ?? null,
@@ -393,6 +406,207 @@ export async function listByOrgao(
     .exec();
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function channelMongoFilterForOrgao(orgao: CasoEspecialOrgao): Record<string, unknown> | null {
+  switch (orgao) {
+    case 'reclame_aqui':
+      return reclameAquiChannelMongoFilter();
+    case 'procon':
+      return proconChannelMongoFilter();
+    case 'bacen':
+      return bacenChannelMongoFilter();
+    case 'consumidor_gov':
+      return consumidorGovChannelMongoFilter();
+    default:
+      return null;
+  }
+}
+
+function buildReclamacaoTextSearchFilter(q: string, digits: string): Record<string, unknown> {
+  const re = new RegExp(escapeRegex(q), 'i');
+  const clauses: Record<string, unknown>[] = [
+    { chamadoProtocolo: re },
+    { protocoloExterno: re },
+    { idDemandaExterna: re },
+    { consumidor: re },
+    { assunto: re },
+    { descricao: re },
+    { atendente: re },
+    { responsavel: re },
+    { orgaoInstituicao: re },
+  ];
+  if (digits.length >= 3) {
+    const digitRe = new RegExp(escapeRegex(digits));
+    clauses.push({ cpf: digitRe });
+    clauses.push({ chamadoProtocolo: digitRe });
+    clauses.push({ protocoloExterno: digitRe });
+  }
+  return { $or: clauses };
+}
+
+function buildChamadoN1TextSearchFilter(q: string, digits: string): Record<string, unknown> {
+  const re = new RegExp(escapeRegex(q), 'i');
+  const clauses: Record<string, unknown>[] = [
+    { chamadoProtocolo: re },
+    { chamadoTitulo: re },
+    { 'cliente.clienteNome': re },
+    { 'cliente.clienteEmail': re },
+    { 'registro.metadados.protocoloRa': re },
+    { 'registro.metadados.protocoloProcon': re },
+    { 'registro.metadados.protocoloGov': re },
+    { 'registro.metadados.protocoloBacen': re },
+    { 'registro.metadados.reclameAqui.protocoloRa': re },
+    { 'registro.metadados.procon.protocoloProcon': re },
+    { 'registro.metadados.consumidorGov.protocoloGov': re },
+    { 'registro.metadados.bacen.protocoloBacen': re },
+    { 'registro.metadados.consumidor': re },
+    { 'registro.metadados.assunto': re },
+  ];
+  if (digits.length >= 3) {
+    const digitRe = new RegExp(escapeRegex(digits));
+    clauses.push({ 'cliente.clienteCpf': digitRe });
+    clauses.push({ chamadoProtocolo: digitRe });
+    clauses.push({ 'registro.metadados.cpf': digitRe });
+    clauses.push({ 'registro.metadados.reclameAqui.cpf': digitRe });
+    clauses.push({ 'registro.metadados.procon.cpf': digitRe });
+    clauses.push({ 'registro.metadados.consumidorGov.cpf': digitRe });
+    clauses.push({ 'registro.metadados.bacen.cpf': digitRe });
+  }
+  return { $or: clauses };
+}
+
+function chamadoToPortalDto(chamado: IChamadoN1, orgao: CasoEspecialOrgao): Record<string, unknown> {
+  const tab = readTabulacaoSnapshot(
+    chamado.tabulacao?.[chamado.tabulacao.length - 1] ?? chamado.tabulacao?.[0],
+  );
+  const meta = readCanalMeta(chamado);
+  const status = normalizeStatusKey(currentStatus(chamado));
+  const terminal = ['resolvido', 'fechado', 'cancelado'].includes(status);
+  const protocoloExterno = String(
+    meta.protocoloProcon
+    ?? meta.protocoloGov
+    ?? meta.protocoloRa
+    ?? meta.protocoloBacen
+    ?? '',
+  ).trim();
+  const consumidor = String(
+    meta.consumidor
+    ?? (chamado.cliente?.[0] as { clienteNome?: string } | undefined)?.clienteNome
+    ?? '',
+  ).trim();
+  const statusCanal = String(
+    meta.statusPc
+    ?? meta.statusGov
+    ?? meta.statusRa
+    ?? meta.statusBc
+    ?? meta.statusCanal
+    ?? defaultStatusForOrgao(orgao),
+  ).trim();
+
+  return {
+    id: String(chamado._id),
+    chamadoId: String(chamado._id),
+    ticketId: String(chamado._id),
+    chamadoProtocolo: String(chamado.chamadoProtocolo ?? '').trim(),
+    orgao,
+    consumidor,
+    iniciais: computeIniciais(consumidor),
+    cpf: readClientCpf(chamado, meta) || undefined,
+    email: Array.isArray(meta.email) ? (meta.email as string[]).map(String) : undefined,
+    telefoneWhatsapp: String(meta.telefoneWhatsapp ?? '').trim() || undefined,
+    assunto: String(meta.assunto ?? chamado.chamadoTitulo ?? tab.motivo ?? '').trim(),
+    descricao: String(
+      meta.descricao
+      ?? tab.detalhe
+      ?? chamado.registro?.[0]?.mensagemPublica
+      ?? '',
+    ).trim(),
+    produto: String(meta.produto ?? tab.produto ?? '').trim() || undefined,
+    tipo: String(meta.tipo ?? tab.tipoChamado ?? '').trim() || undefined,
+    motivo: String(meta.motivo ?? tab.motivo ?? '').trim() || undefined,
+    statusCanal,
+    statusPc: meta.statusPc ?? (orgao === 'procon' ? statusCanal : undefined),
+    statusGov: meta.statusGov ?? (orgao === 'consumidor_gov' ? statusCanal : undefined),
+    statusRa: meta.statusRa ?? (orgao === 'reclame_aqui' ? statusCanal : undefined),
+    statusBc: meta.statusBc ?? (orgao === 'bacen' ? statusCanal : undefined),
+    protocoloProcon: orgao === 'procon' ? protocoloExterno || undefined : undefined,
+    protocoloGov: orgao === 'consumidor_gov' ? protocoloExterno || undefined : undefined,
+    protocoloRa: orgao === 'reclame_aqui' ? protocoloExterno || undefined : undefined,
+    protocoloBacen: orgao === 'bacen' ? protocoloExterno || undefined : undefined,
+    idDemanda: String(meta.idDemanda ?? meta.idReclamacaoRa ?? '').trim() || undefined,
+    prazoLegal: meta.prazoLegal || meta.prazoRa || undefined,
+    prazoRa: meta.prazoRa || undefined,
+    slaPct: typeof meta.slaPct === 'number' ? meta.slaPct : undefined,
+    orgaoProcon: orgao === 'procon' ? String(meta.orgaoProcon ?? '').trim() || undefined : undefined,
+    orgaoGov: orgao === 'consumidor_gov' ? String(meta.orgaoGov ?? '').trim() || undefined : undefined,
+    cidade: String(meta.cidade ?? '').trim() || undefined,
+    uf: String(meta.uf ?? '').trim() || undefined,
+    atendente: String(tab.responsavel ?? '').trim() || undefined,
+    responsavel: String(tab.responsavel ?? '').trim() || undefined,
+    workflowAtivo: Boolean(chamado.workflow?.active),
+    workflow: buildReclamacaoWorkflowSnapshot(chamado),
+    aberta: !terminal,
+    inboxDedicada: Boolean(registroMetadados(chamado).inboxDedicada),
+    meta: buildMetaForOrgao(orgao, meta),
+    sourceDb: 'chamados_n1',
+    createdAt: (chamado as { createdAt?: Date }).createdAt,
+    updatedAt: (chamado as { updatedAt?: Date }).updatedAt,
+  };
+}
+
+/**
+ * Busca rápida do portal de órgãos: consulta `chamados_reclamacoes` (collection do órgão)
+ * e `chamados_n1` (filtro de canal), unificando por chamadoId.
+ */
+export async function searchPortalByOrgao(
+  orgao: CasoEspecialOrgao,
+  rawQuery: string,
+  limit = 100,
+): Promise<Record<string, unknown>[]> {
+  const q = String(rawQuery ?? '').trim();
+  if (!q || orgao === 'indefinido') return [];
+
+  const capped = Math.min(Math.max(limit, 1), 200);
+  const digits = q.replace(/\D/g, '');
+  const byChamadoId = new Map<string, Record<string, unknown>>();
+
+  const Model = resolveReclamacaoModel(orgao);
+  if (Model) {
+    const reclamacoes = await Model.find(buildReclamacaoTextSearchFilter(q, digits))
+      .sort({ updatedAt: -1 })
+      .limit(capped)
+      .exec();
+    for (const doc of reclamacoes) {
+      const dto = reclamacaoToPortalDto(doc);
+      dto.sourceDb = 'chamados_reclamacoes';
+      byChamadoId.set(String(doc.chamadoId), dto);
+    }
+  }
+
+  if (isMongoConnected()) {
+    const channelFilter = channelMongoFilterForOrgao(orgao);
+    if (channelFilter) {
+      const n1Hits = await ChamadoN1.find({
+        $and: [channelFilter, buildChamadoN1TextSearchFilter(q, digits)],
+      })
+        .sort({ updatedAt: -1 })
+        .limit(capped)
+        .exec();
+
+      for (const chamado of n1Hits) {
+        const key = String(chamado._id);
+        if (byChamadoId.has(key)) continue;
+        byChamadoId.set(key, chamadoToPortalDto(chamado, orgao));
+      }
+    }
+  }
+
+  return Array.from(byChamadoId.values()).slice(0, capped);
+}
+
 export async function findByIdOrgao(
   orgao: CasoEspecialOrgao,
   id: string,
@@ -504,4 +718,92 @@ export async function patchReclamacao(
   }
 
   return Model.findByIdAndUpdate(doc._id, { $set: allowed }, { new: true }).exec();
+}
+
+const ORGAO_CANAL_LABEL: Record<Exclude<CasoEspecialOrgao, 'indefinido'>, string> = {
+  reclame_aqui: 'Reclame Aqui',
+  procon: 'Procon',
+  bacen: 'Bacen',
+  consumidor_gov: 'Consumidor.Gov',
+};
+
+/**
+ * Lista reclamações de todos os órgãos com CPF correspondente (histórico Client360).
+ */
+export async function findReclamacoesByCpf(
+  cpfDigits: string,
+  limitPerOrgao = 200,
+): Promise<IReclamacao[]> {
+  if (!isReclamacoesConnected()) return [];
+  const cpf = String(cpfDigits || '').replace(/\D/g, '');
+  if (cpf.length < 11) return [];
+
+  const digitRe = new RegExp(escapeRegex(cpf));
+  const filter = {
+    $or: [
+      { cpf },
+      { cpf: digitRe },
+    ],
+  };
+  const capped = Math.min(Math.max(limitPerOrgao, 1), 500);
+  const models = [
+    getReclamacaoReclameAquiModel(),
+    getReclamacaoProconModel(),
+    getReclamacaoBacenModel(),
+    getReclamacaoConsumidorGovModel(),
+  ];
+
+  const batches = await Promise.all(
+    models.map((Model) => Model.find(filter).sort({ updatedAt: -1 }).limit(capped).exec()),
+  );
+  return batches.flat();
+}
+
+/**
+ * DTO mínimo compatível com a listagem do histórico do cliente (Client360)
+ * quando o chamado não está (ou não aparece) em chamados_n1.
+ */
+export function reclamacaoToHistoryTicketDto(doc: IReclamacao): Record<string, unknown> {
+  const orgao = doc.orgao === 'indefinido' ? 'reclame_aqui' : doc.orgao;
+  const canal = ORGAO_CANAL_LABEL[orgao] || 'Órgão';
+  const id = String(doc.chamadoId || doc._id);
+  const status = doc.aberta === false
+    ? 'resolvido'
+    : String(doc.statusCanal || 'em-andamento');
+
+  return {
+    _id: id,
+    id,
+    chamadoProtocolo: String(doc.chamadoProtocolo || doc.protocoloExterno || '').trim(),
+    chamadoTitulo: String(doc.assunto || '').trim() || `Demanda ${canal}`,
+    title: String(doc.assunto || '').trim() || `Demanda ${canal}`,
+    description: String(doc.descricao || '').trim() || undefined,
+    status,
+    priority: 'normal',
+    channel: canal,
+    source: `reclamacoes:${orgao}`,
+    clientName: String(doc.consumidor || '').trim() || undefined,
+    clientCPF: String(doc.cpf || '').replace(/\D/g, '') || undefined,
+    responsibleAgent: String(doc.responsavel || doc.atendente || '').trim() || undefined,
+    lateralForm: {
+      canal,
+      clienteCpf: String(doc.cpf || '').replace(/\D/g, '') || undefined,
+      clienteNome: String(doc.consumidor || '').trim() || undefined,
+      responsavel: String(doc.responsavel || doc.atendente || '').trim() || undefined,
+    },
+    workflow: doc.workflow
+      ? {
+        active: Boolean(doc.workflow.active),
+        workflowId: doc.workflow.workflowId ? String(doc.workflow.workflowId) : null,
+        step: doc.workflow.step ?? 0,
+        passoId: doc.workflow.passoId ? String(doc.workflow.passoId) : null,
+        startedAt: doc.workflow.startedAt ?? null,
+        completedAt: doc.workflow.completedAt ?? null,
+      }
+      : undefined,
+    listOnly: true,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+    fromReclamacoesDb: true,
+  };
 }

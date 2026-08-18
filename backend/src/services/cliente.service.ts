@@ -1,4 +1,4 @@
-/** cliente.service v1.6.0 — lookup CPF com fallback Customer Data API (overview) */
+/** cliente.service v1.7.0 — enriquecimento parcial de email/telefone via Customer Data API */
 import mongoose from 'mongoose';
 import { getClienteModel, ICliente, IClienteDados } from '../models/Cliente';
 import type { IClienteRef } from '../models/ChamadoN1';
@@ -60,8 +60,18 @@ function dadosFromBody(body: Record<string, unknown>): IClienteDados | null {
   const lateral = (body.lateralForm ?? {}) as Record<string, unknown>;
   const cpf = normalizeCpf(body.clientCPF ?? lateral.clienteCpf ?? lateral.cpf);
   const nome = String(body.clientName ?? lateral.clienteNome ?? '').trim();
-  const emailLista = normalizeStringList(lateral.clienteEmail);
-  const telLista = normalizeStringList(lateral.clienteTelefone);
+  const emailLista = [
+    ...new Set([
+      ...normalizeStringList(lateral.clienteEmail),
+      ...normalizeStringList(body.clientEmail),
+    ].filter(Boolean)),
+  ];
+  const telLista = [
+    ...new Set([
+      ...normalizeStringList(lateral.clienteTelefone),
+      ...normalizeStringList(body.clientPhone),
+    ].filter(Boolean)),
+  ];
   const whatsappRaw =
     lateral.clienteTelefoneWhatsapp
     ?? (lateral.clienteTelefone as { whatsapp?: unknown } | undefined)?.whatsapp
@@ -108,6 +118,16 @@ export async function findClienteByCpf(cpfRaw: unknown): Promise<ICliente | null
 
 export type ClienteLookupSource = 'cadastro_local' | 'api_velotax_created';
 
+function clienteDadosHasEmail(dados: IClienteDados | null | undefined): boolean {
+  return (dados?.clienteEmail?.lista ?? []).some((item) => String(item ?? '').trim().length > 0);
+}
+
+function clienteDadosHasPhone(dados: IClienteDados | null | undefined): boolean {
+  return (dados?.clienteTelefone?.lista ?? []).some(
+    (item) => normalizePhoneDigits(item).length >= 8,
+  );
+}
+
 function isOverviewCustomerFound(overview: ConsultaSnapshotResult): boolean {
   return overview.ok === true
     && overview.data != null
@@ -139,6 +159,78 @@ export function mapOverviewToClienteDados(
   };
 }
 
+/** Enriquece cadastro existente só nos campos de contato ausentes (≥1 email e ≥1 telefone = skip). */
+export async function enrichClienteContactFromApiIfNeeded(
+  cliente: ICliente,
+  cpfRaw: unknown,
+  protocolo = 'lookup',
+): Promise<{ cliente: ICliente; enriched: boolean }> {
+  const cpf = normalizeCpf(cpfRaw);
+  if (!cpf) return { cliente, enriched: false };
+
+  const dados = getPrimaryDados(cliente);
+  if (!dados) return { cliente, enriched: false };
+
+  const hasEmail = clienteDadosHasEmail(dados);
+  const hasPhone = clienteDadosHasPhone(dados);
+  if (hasEmail && hasPhone) return { cliente, enriched: false };
+
+  if (!isCustomerDataApiConfigured()) return { cliente, enriched: false };
+
+  try {
+    const overview = await fetchOverview(cpf, protocolo);
+    if (!isOverviewCustomerFound(overview)) return { cliente, enriched: false };
+
+    const fromApi = mapOverviewToClienteDados(
+      (overview.data || {}) as Record<string, unknown>,
+      cpf,
+    );
+
+    let changed = false;
+
+    if (!hasEmail && fromApi.clienteEmail.lista.length > 0) {
+      dados.clienteEmail = {
+        lista: fromApi.clienteEmail.lista,
+        ...(fromApi.clienteEmail.lista.length === 1
+          ? { resposta: fromApi.clienteEmail.lista[0] }
+          : {}),
+      };
+      changed = true;
+    }
+
+    if (!hasPhone && fromApi.clienteTelefone.lista.length > 0) {
+      dados.clienteTelefone = {
+        lista: fromApi.clienteTelefone.lista,
+        whatsapp: fromApi.clienteTelefone.lista.length === 1
+          ? fromApi.clienteTelefone.lista[0]
+          : '',
+      };
+      changed = true;
+    }
+
+    if (!String(dados.clienteNome ?? '').trim() && fromApi.clienteNome) {
+      dados.clienteNome = fromApi.clienteNome;
+      changed = true;
+    }
+
+    if (changed) {
+      await cliente.save();
+      console.info(
+        '[cliente] cadastro enriquecido cpf=***%s email=%s tel=%s',
+        cpf.slice(-4),
+        !hasEmail && fromApi.clienteEmail.lista.length > 0 ? 'sim' : 'nao',
+        !hasPhone && fromApi.clienteTelefone.lista.length > 0 ? 'sim' : 'nao',
+      );
+    }
+
+    return { cliente, enriched: changed };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[cliente] enriquecimento API cpf=***${cpf.slice(-4)} falhou:`, message);
+    return { cliente, enriched: false };
+  }
+}
+
 export async function findOrCreateClienteFromCpfLookup(
   cpfRaw: unknown,
   hydrateFromApi = true,
@@ -147,7 +239,13 @@ export async function findOrCreateClienteFromCpfLookup(
   if (!cpf) return { cliente: null };
 
   const existing = await findClienteByCpf(cpf);
-  if (existing) return { cliente: existing, source: 'cadastro_local' };
+  if (existing) {
+    if (hydrateFromApi) {
+      const { cliente: enriched } = await enrichClienteContactFromApiIfNeeded(existing, cpf, 'lookup');
+      return { cliente: enriched, source: 'cadastro_local' };
+    }
+    return { cliente: existing, source: 'cadastro_local' };
+  }
 
   if (!hydrateFromApi || !isCustomerDataApiConfigured()) {
     return { cliente: null };
@@ -165,7 +263,10 @@ export async function findOrCreateClienteFromCpfLookup(
     );
 
     const raced = await findClienteByCpf(cpf);
-    if (raced) return { cliente: raced, source: 'cadastro_local' };
+    if (raced) {
+      const { cliente: enriched } = await enrichClienteContactFromApiIfNeeded(raced, cpf, 'lookup');
+      return { cliente: enriched, source: 'cadastro_local' };
+    }
 
     const Cliente = getClienteModel();
     const created = await Cliente.create({
@@ -427,11 +528,24 @@ export async function resolveClienteRefFromBody(
   const hasContactData =
     body.clientName !== undefined ||
     body.clientCPF !== undefined ||
+    body.clientPhone !== undefined ||
+    body.clientEmail !== undefined ||
     lateral.clienteNome !== undefined ||
-    lateral.cpf !== undefined;
+    lateral.cpf !== undefined ||
+    lateral.clienteEmail !== undefined ||
+    lateral.clienteTelefone !== undefined;
 
-  if (!cliente && cpf && hasContactData) {
+  const payloadDados = dadosFromBody(body);
+  if (cliente && payloadDados) {
+    applyDadosToCliente(cliente, payloadDados);
+    await cliente.save();
+  } else if (!cliente && cpf && hasContactData) {
     cliente = await upsertClienteFromBody(body);
+  }
+
+  if (cliente && cpf) {
+    const { cliente: enriched } = await enrichClienteContactFromApiIfNeeded(cliente, cpf, 'lookup');
+    cliente = enriched;
   }
 
   if (!cliente && !cpf) {

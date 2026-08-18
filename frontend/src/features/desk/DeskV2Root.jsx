@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.33.1 | DATE: 2026-08-17
- * — Rascunho do compose persiste a cada tecla; poll ignora GET atrasado
+ * VERSION: v3.35.0 | DATE: 2026-08-18
+ * — Workflow finished permanece visível sem bloquear novo workflow
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -56,6 +56,7 @@ import {
   updateTicketInCache,
   loadTicketDetailFromApi,
   sendWhatsAppMessageViaApi,
+  sendInternalNote,
 } from '../../services/ticketsStorage';
 import { isDraftTicket, persistDraftTicket } from '../../services/ticketsCache';
 import { apiTicketToCockpit, cockpitTicketToApi } from '../../api/adapters/ticketAdapter';
@@ -261,8 +262,10 @@ export default function DeskV2Root() {
   const [workflowStartTemplate, setWorkflowStartTemplate] = useState(null);
   const pendingWorkflowTemplateRef = useRef(null);
   const commitInProgressRef = useRef(false);
+  const sendInternalNoteInProgressRef = useRef(false);
   const waSendInProgressRef = useRef(false);
   const [waSendInProgress, setWaSendInProgress] = useState(false);
+  const [sendInternalNoteBusy, setSendInternalNoteBusy] = useState(false);
   const openedTicketFromUrlRef = useRef(null);
 
   const syncUrlTicketParam = useCallback((ticketId) => {
@@ -1200,6 +1203,79 @@ export default function DeskV2Root() {
     }
   };
 
+  const handleSendInternalNote = async () => {
+    if (!ticket || !entry || sendInternalNoteInProgressRef.current || commitInProgressRef.current) return;
+    if (isTicketReadOnly(ticket)) {
+      showNotification('Ticket fechado — não aceita modificações.', 'warning');
+      return;
+    }
+
+    const internalNoteHtml = String(internalText || '').trim();
+    const internalNoteText = htmlToPlainText(internalNoteHtml).trim();
+    if (!internalNoteText) {
+      showNotification('Digite uma anotação interna antes de enviar.', 'warning');
+      return;
+    }
+
+    const deskPerms = permsCtx?.permissions;
+    if (!canSendInternalNoteOnTicket(ticket, deskPerms)) {
+      showNotification('Sem permissão para comentar neste ticket.', 'warning');
+      return;
+    }
+
+    sendInternalNoteInProgressRef.current = true;
+    setSendInternalNoteBusy(true);
+    try {
+      const author = getAgentName();
+
+      if (isDraftTicket(ticket)) {
+        const draftId = String(ticket.id);
+        const session = tabSessionsRef.current[draftId];
+        const persisted = await persistDraftTicket(ticket, {
+          internalText: internalNoteHtml,
+          author,
+        });
+        const newId = persisted.id || persisted._id;
+        delete tabSessionsRef.current[draftId];
+        if (session) {
+          tabSessionsRef.current[String(newId)] = {
+            ...session,
+            internalText: '',
+          };
+        }
+        replaceOpenTabId(draftId, newId, {
+          title: persisted.title || ticket.title,
+          clientName: persisted.clientName || ticket.clientName,
+          ticketLabel: getTicketProtocolLabel(persisted) || 'Rascunho',
+        });
+        patchTicket(newId, persisted);
+      } else {
+        const updated = await sendInternalNote(ticket.id, internalNoteHtml, author);
+        if (updated) patchTicket(ticket.id, updated);
+        if (activeTabId) {
+          const sessionKey = String(activeTabId);
+          const session = tabSessionsRef.current[sessionKey];
+          if (session) {
+            tabSessionsRef.current[sessionKey] = {
+              ...session,
+              internalText: '',
+            };
+          }
+        }
+      }
+
+      setInternalText('');
+      showNotification('Nota interna enviada.', 'success');
+      void syncTicketViews().catch(() => {});
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Erro ao enviar nota interna.';
+      showNotification(msg, 'error');
+    } finally {
+      sendInternalNoteInProgressRef.current = false;
+      setSendInternalNoteBusy(false);
+    }
+  };
+
   const resolveWhatsAppChatId = () => toWhatsAppChatIdDigits(
     client?.whatsappPhone
     || ticket?.lateralForm?.clienteTelefoneWhatsapp
@@ -1642,7 +1718,7 @@ export default function DeskV2Root() {
 
   const executeWorkflowStart = useCallback(async (payload) => {
     const template = pendingWorkflowTemplateRef.current || workflowStartTemplate;
-    if (!ticket || !template || startingWorkflow || isTicketInWorkflow(ticket)) return false;
+    if (!ticket || !template || startingWorkflow || isTicketWorkflowActive(ticket)) return false;
 
     const requisicaoValores = payload?.valores ?? payload;
     const solicitacaoProdutos = payload?.solicitacaoProdutos ?? null;
@@ -1750,7 +1826,7 @@ export default function DeskV2Root() {
   }, [comunicacaoBusy, showNotification, syncTicketViews, ticket]);
 
   const handleStartWorkflow = useCallback(() => {
-    if (!ticket || isDraftTicket(ticket) || startingWorkflow || isTicketInWorkflow(ticket)) return;
+    if (!ticket || isDraftTicket(ticket) || startingWorkflow || isTicketWorkflowActive(ticket)) return;
     if (isTicketReadOnly(ticket)) {
       showNotification('Ticket fechado — não aceita modificações.', 'warning');
       return;
@@ -1844,7 +1920,7 @@ export default function DeskV2Root() {
   })();
 
   const canManageWorkflow = useMemo(
-    () => Boolean(ticket && isTicketInWorkflow(ticket) && canInterruptWorkflow(permsCtx?.permissions)),
+    () => Boolean(ticket && isTicketWorkflowActive(ticket) && canInterruptWorkflow(permsCtx?.permissions)),
     [ticket, permsCtx?.permissions],
   );
 
@@ -2147,6 +2223,8 @@ export default function DeskV2Root() {
                         internalComposeLocked={!canInternalCompose || ticketReadOnly}
                         workflowTeamLabel={workflowProgress?.awaitingTeamLabel}
                         ticketReadOnly={ticketReadOnly}
+                        onSendInternalNote={canInternalCompose && !ticketReadOnly ? handleSendInternalNote : undefined}
+                        sendInternalNoteBusy={sendInternalNoteBusy}
                       />
                     </>
                   ) : mainTab === 'notas' ? (

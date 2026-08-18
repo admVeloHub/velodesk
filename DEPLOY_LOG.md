@@ -1,10 +1,32 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.85.0 | DATE: 2026-08-18 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.86.0 | DATE: 2026-08-18 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — workflowStatus finished, busca dual órgãos e histórico reclamações
+
+- **Data/Hora**: 2026-08-18
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.86.0
+  - **Backend**: ChamadoN1 v1.12.0 (workflowStatus), workflowTicket.service v1.7.0, workflowDto.util v1.2.0, chamado.mapper v2.12.0, reclamacao.service v1.3.1, ticketSearch.service v1.3.0, workflowConfigSeed v1.6.0, tickets.routes v1.21.0, reclamacoes.routes v1.1.0
+  - **Frontend**: utils v3.17.0, DeskTicketList v2.4.0, TicketWorkflowStepper v1.7.0, WorkflowProgressModal v1.1.0, workflowTeamQueues v1.4.1, useEspeciaisDualSearch v1.0.0, CRM RA/Procon/Bacen/CG (busca dual), ClientTicketHistoryModal v2.2.0
+- **Arquivos principais**:
+  - `workflowStatus` (`active` | `finished`) — conclusão persistente dos passos do workflow; badge verde e checks no agente
+  - `finishWorkflowAfterPublicReply` — última devolutiva concluída ao enviar mensagem pública (e-mail/WhatsApp)
+  - Busca rápida CRM órgãos em `chamados_n1` + `chamados_reclamacoes` (`GET /api/reclamacoes/:orgao/search`)
+  - Histórico por CPF inclui chamados de reclamações
+  - Removido seed de workflows `escalonar-*` (gestão manual)
+  - Merge híbrido com console de aprovação (filas WF mantêm exclusão de resolvidos)
+- **Descrição**: Persistência visual de workflow concluído para agentes, busca dual nos módulos especiais e histórico Client360 unificado, sem re-seed de workflows escalonar.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — performance Gestão/Painel 360: agregações MongoDB, cache, endpoint unificado e voz-cliente congelado
 
