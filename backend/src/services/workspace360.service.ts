@@ -1,4 +1,4 @@
-/** workspace360.service v1.3.0 — queries filtradas + map list em lote (sem chamadoToTicketFull) */
+/** workspace360.service v1.5.0 — P1: loadSupervisorChamados via agregação com registro enxuto (sem corpos de mensagem) */
 import mongoose from 'mongoose';
 import { ChamadoN1, IChamadoN1 } from '../models/ChamadoN1';
 import { User } from '../models/User';
@@ -22,9 +22,54 @@ const SLA_TRACKED = new Set(['em-aberto', 'em-andamento']);
 const ACTIVE_STATUSES = new Set(['novo', 'em-aberto', 'em-andamento', 'pendente', 'em-espera']);
 const ACTIVE_STATUS_LIST = [...ACTIVE_STATUSES];
 
-/** Campos mínimos para KPIs, SLA, leaderboard e cards do painel — evita carregar documentos inteiros. */
+/** Campos mínimos para KPIs, SLA, leaderboard e cards do painel — registro vem enxuto da agregação. */
 const PANEL_CHAMADO_SELECT =
   'createdAt updatedAt chamadoTitulo tabulacao registro workflow cliente';
+
+/** Projeta registro sem mensagens/anotações — preserva status, datas, metadados e flags de conteúdo. */
+const SLIM_REGISTRO_EXPR = {
+  $map: {
+    input: { $ifNull: ['$registro', []] },
+    as: 'r',
+    in: {
+      status: '$$r.status',
+      data: '$$r.data',
+      origin: '$$r.origin',
+      mensagemPublica: {
+        $let: {
+          vars: {
+            t: {
+              $trim: {
+                input: { $ifNull: ['$$r.mensagemPublica', ''] },
+              },
+            },
+          },
+          in: { $cond: [{ $gt: [{ $strLenCP: '$$t' }, 0] }, '1', ''] },
+        },
+      },
+      metadados: { $ifNull: ['$$r.metadados', {}] },
+      anexosMensagemPublica: { $ifNull: ['$$r.anexosMensagemPublica', []] },
+    },
+  },
+};
+
+function supervisorChamadosMatchFilter(from: Date, to: Date): Record<string, unknown> {
+  const prevFrom = new Date(from.getTime() - 7 * 24 * 60 * 60 * 1000);
+  return {
+    $or: [
+      lastStatusInFilter(ACTIVE_STATUS_LIST),
+      {
+        registro: {
+          $elemMatch: {
+            status: 'resolvido',
+            data: { $gte: prevFrom, $lte: to },
+          },
+        },
+      },
+      { createdAt: { $gte: from, $lte: to } },
+    ],
+  };
+}
 
 function lastStatusInFilter(statuses: string[]): Record<string, unknown> {
   return {
@@ -220,26 +265,27 @@ function escalationCategory(chamado: IChamadoN1): 'financeiro' | 'estorno' | nul
   return null;
 }
 
-/** Supervisor: ativos + resolvidos no período (e semana anterior p/ leaderboard) + criados no período. */
+/**
+ * Supervisor: uma agregação MongoDB devolve tickets com registro enxuto (~KB vs ~MB).
+ * O backend calcula KPIs/leaderboard/cards em memória sobre esse conjunto compacto.
+ */
 async function loadSupervisorChamados(from: Date, to: Date): Promise<IChamadoN1[]> {
-  const prevFrom = new Date(from.getTime() - 7 * 24 * 60 * 60 * 1000);
-  return ChamadoN1.find({
-    $or: [
-      lastStatusInFilter(ACTIVE_STATUS_LIST),
-      {
-        registro: {
-          $elemMatch: {
-            status: 'resolvido',
-            data: { $gte: prevFrom, $lte: to },
-          },
-        },
+  return ChamadoN1.aggregate([
+    { $match: supervisorChamadosMatchFilter(from, to) },
+    {
+      $project: {
+        _id: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        chamadoTitulo: 1,
+        tabulacao: 1,
+        workflow: 1,
+        cliente: 1,
+        registro: SLIM_REGISTRO_EXPR,
       },
-      { createdAt: { $gte: from, $lte: to } },
-    ],
-  })
-    .select(PANEL_CHAMADO_SELECT)
-    .sort({ updatedAt: -1 })
-    .lean<IChamadoN1[]>();
+    },
+    { $sort: { updatedAt: -1 } },
+  ]).allowDiskUse(true) as Promise<IChamadoN1[]>;
 }
 
 async function loadAgentChamados(candidates: string[]): Promise<IChamadoN1[]> {
@@ -443,7 +489,46 @@ export async function buildAgent360Payload(authUser: AuthPayload) {
   };
 }
 
+/**
+ * Payload de gestão é global (não depende do usuário — mesma visão de equipe para todo supervisor).
+ * Cache TTL curto colapsa múltiplas chamadas concorrentes/refreshes (o cálculo custa ~30s):
+ * o painel dispara workspace360 + leaderboard + refreshes, e vários supervisores compartilham o dado.
+ */
+const SUPERVISOR_PAYLOAD_TTL_MS = 30_000;
+type SupervisorPayload = Awaited<ReturnType<typeof computeSupervisor360Payload>>;
+const supervisorPayloadCache = new Map<string, { at: number; promise: Promise<SupervisorPayload> }>();
+
+function supervisorCacheKey(query: Workspace360Query): string {
+  return JSON.stringify({
+    period: query.period ?? '7d',
+    channel: query.channel ?? 'all',
+    team: query.team ?? null,
+    report: query.report ?? null,
+    lbP: query.leaderboardPeriod ?? null,
+    lbF: query.leaderboardFrom ?? null,
+    lbT: query.leaderboardTo ?? null,
+  });
+}
+
 export async function buildSupervisor360Payload(authUser: AuthPayload, query: Workspace360Query = {}) {
+  const key = supervisorCacheKey(query);
+  const now = Date.now();
+  const cached = supervisorPayloadCache.get(key);
+  if (cached && now - cached.at < SUPERVISOR_PAYLOAD_TTL_MS) {
+    return cached.promise;
+  }
+  // Guarda a promise (não só o valor) para coalescer chamadas concorrentes no mesmo cálculo.
+  const promise = computeSupervisor360Payload(authUser, query);
+  supervisorPayloadCache.set(key, { at: now, promise });
+  try {
+    return await promise;
+  } catch (err) {
+    supervisorPayloadCache.delete(key);
+    throw err;
+  }
+}
+
+async function computeSupervisor360Payload(authUser: AuthPayload, query: Workspace360Query = {}) {
   const { from, to } = periodRange(query.period ?? '7d');
   const chamados = await loadSupervisorChamados(from, to);
   const filtered = chamados.filter((c) => channelMatchesFilter(c, query.channel ?? 'all'));

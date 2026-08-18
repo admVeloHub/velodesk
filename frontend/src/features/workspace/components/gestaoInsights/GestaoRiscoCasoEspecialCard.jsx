@@ -1,7 +1,6 @@
 /**
- * GestaoRiscoCasoEspecialCard v1.0.0 — alerta precoce de IA: menção a caso grave em tickets
- * comuns (Bacen/Procon/Reclame Aqui/ação judicial), ainda não escalonados formalmente.
- * DATE: 2026-07-23 | AUTHOR: VeloHub Development Team
+ * GestaoRiscoCasoEspecialCard v1.1.0 — alerta IA; suporta slice do GET /gestao-insights/painel
+ * VERSION: v1.1.0 | DATE: 2026-08-18
  */
 import React, { useEffect, useState } from 'react';
 import { gestaoInsightsApi } from '../../../../api/client';
@@ -19,20 +18,22 @@ function accentForTipo(tipo) {
   return TIPO_ACCENT[String(tipo || '').trim().toLowerCase()] || 'navy';
 }
 
-export default function GestaoRiscoCasoEspecialCard({ onOpenTicket }) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function GestaoRiscoCasoEspecialCard({ onOpenTicket, painelData, painelLoading }) {
+  const managedByPainel = painelData !== undefined || painelLoading !== undefined;
+  const [localItems, setLocalItems] = useState([]);
+  const [localLoading, setLocalLoading] = useState(!managedByPainel);
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
+    if (managedByPainel) return undefined;
     let active = true;
-    setLoading(true);
+    setLocalLoading(true);
     gestaoInsightsApi
       .riscoCasosEspeciais({ limit: 10 })
       .then((result) => {
         if (active) {
-          setItems(result?.items ?? []);
+          setLocalItems(result?.items ?? []);
           setError(null);
         }
       })
@@ -40,12 +41,15 @@ export default function GestaoRiscoCasoEspecialCard({ onOpenTicket }) {
         if (active) setError('Não foi possível carregar o alerta de IA.');
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setLocalLoading(false);
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [managedByPainel]);
+
+  const items = managedByPainel ? (painelData?.items ?? []) : localItems;
+  const loading = managedByPainel ? Boolean(painelLoading) : localLoading;
 
   const count = items.length;
 

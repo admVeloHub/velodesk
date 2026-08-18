@@ -1,6 +1,10 @@
 /**
- * chamadoIaAnaliseAgent.service v1.1.0 — ciclo periódico de análise IA (tickets + Letícia IA)
+ * chamadoIaAnaliseAgent.service v1.2.0 — ciclo periódico de análise IA (tickets + Letícia IA)
+ * O batch de telefonia é opt-in (TELEPHONY_IA_BATCH_ENABLED): cada ligação já é classificada
+ * na chegada (telephonyInbound). A re-varredura periódica fazia sort pesado em telephony_calls
+ * (Sort exceeded memory limit) e ficou desligada por padrão.
  */
+import { env } from '../../config/env';
 import { runChamadoIaAnaliseCycle } from '../chamadoIaAnalise.service';
 import { runTelephonyIaAnaliseCycle } from '../telephonyIaAnalise.service';
 import { mapOpenAiErrorMessage } from './openaiAgent.util';
@@ -12,10 +16,11 @@ export async function runChamadoIaAnaliseAgentCycle(): Promise<{
   error?: string;
 }> {
   try {
-    const [tickets, telephony] = await Promise.all([
-      runChamadoIaAnaliseCycle(),
-      runTelephonyIaAnaliseCycle(),
-    ]);
+    const tickets = await runChamadoIaAnaliseCycle();
+    const telephony = env.telephonyIaBatchEnabled
+      ? await runTelephonyIaAnaliseCycle()
+      : { candidatos: 0, classificados: 0 };
+
     if (tickets.candidatos > 0 || telephony.candidatos > 0) {
       console.info('[agent-chamado-ia-analise] ciclo concluído', {
         candidatos: tickets.candidatos,

@@ -1,4 +1,4 @@
-/** gestaoInsights.routes v1.1.0 — cards analíticos da Gestão (volume, motivos, casos especiais) */
+/** gestaoInsights.routes v1.2.0 — cards analíticos + GET /painel unificado; voz-cliente congelado */
 import { Router, Request, Response, NextFunction } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { isMongoConnected } from '../config/database';
@@ -11,11 +11,15 @@ import {
   getVolumeSummary,
   GestaoInsightsQuery,
 } from '../services/gestaoInsights.service';
+import { getGestaoInsightsPainel } from '../services/gestaoInsightsPainel.service';
 import {
-  getCustomerVoiceInsights,
-  getCustomerVoiceTickets,
   getRiscosCasoEspecial,
 } from '../services/chamadoIaAnalise.service';
+
+const VOZ_CLIENTE_FROZEN = {
+  message: 'Visão do cliente por IA em desenvolvimento',
+  frozen: true,
+};
 
 const router = Router();
 
@@ -38,6 +42,19 @@ function requireSupervisorInProduction(req: Request, res: Response, next: NextFu
 }
 
 router.use(authMiddleware, requireSupervisorInProduction);
+
+router.get('/painel', async (req: Request, res: Response) => {
+  if (!isMongoConnected()) {
+    return res.status(503).json({ message: 'Banco de chamados indisponível' });
+  }
+  try {
+    const result = await getGestaoInsightsPainel(parseQuery(req));
+    return res.json(result);
+  } catch (err) {
+    console.error('[gestao-insights] GET /painel falhou:', err);
+    return res.status(500).json({ message: 'Erro ao carregar painel analítico da gestão' });
+  }
+});
 
 router.get('/volume', async (req: Request, res: Response) => {
   if (!isMongoConnected()) {
@@ -117,28 +134,13 @@ router.get('/risco-casos-especiais', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/voz-cliente', async (req: Request, res: Response) => {
-  try {
-    return res.json(await getCustomerVoiceInsights(parseQuery(req)));
-  } catch (err) {
-    console.error('[gestao-insights] GET /voz-cliente falhou:', err);
-    return res.status(500).json({ message: 'Erro ao carregar a visão do cliente por IA' });
-  }
+/** Congelado — card em desenvolvimento; evita consulta pesada em chamados_n1.registro. */
+router.get('/voz-cliente', (_req: Request, res: Response) => {
+  return res.status(503).json(VOZ_CLIENTE_FROZEN);
 });
 
-router.get('/voz-cliente/tickets', async (req: Request, res: Response) => {
-  try {
-    const result = await getCustomerVoiceTickets({
-      query: parseQuery(req),
-      motivo: typeof req.query.motivo === 'string' ? req.query.motivo : undefined,
-      sentimento: typeof req.query.sentimento === 'string' ? req.query.sentimento : undefined,
-      limit: parseInt(String(req.query.limit ?? '100'), 10) || 100,
-    });
-    return res.json({ items: result });
-  } catch (err) {
-    console.error('[gestao-insights] GET /voz-cliente/tickets falhou:', err);
-    return res.status(500).json({ message: 'Erro ao carregar tickets da visão do cliente' });
-  }
+router.get('/voz-cliente/tickets', (_req: Request, res: Response) => {
+  return res.status(503).json({ ...VOZ_CLIENTE_FROZEN, items: [] });
 });
 
 export default router;

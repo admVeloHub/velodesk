@@ -1,7 +1,6 @@
 /**
- * GestaoCasosEspeciaisCard v2.0.0 — tiles compactos de casos especiais (Bacen/Procon/Consumidor.gov/Reclame Aqui)
- * Cada tile mostra o total do mês atual e é um gateway para a página de detalhe do órgão/canal.
- * DATE: 2026-07-22 | AUTHOR: VeloHub Development Team
+ * GestaoCasosEspeciaisCard v2.1.0 — tiles compactos; suporta slice do GET /gestao-insights/painel
+ * VERSION: v2.1.0 | DATE: 2026-08-18
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -16,30 +15,34 @@ const ORGAO_ICONS = {
   reclameAqui: 'ti-message-report',
 };
 
-export default function GestaoCasosEspeciaisCard() {
+export default function GestaoCasosEspeciaisCard({ painelData, painelLoading }) {
   const navigate = useNavigate();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const managedByPainel = painelData !== undefined || painelLoading !== undefined;
+  const [localData, setLocalData] = useState(null);
+  const [localLoading, setLocalLoading] = useState(!managedByPainel);
 
   useEffect(() => {
+    if (managedByPainel) return undefined;
     let active = true;
-    setLoading(true);
+    setLocalLoading(true);
     gestaoInsightsApi
       .casosEspeciais({ period: 'mes' })
       .then((result) => {
-        if (active) setData(result);
+        if (active) setLocalData(result);
       })
       .catch(() => {
-        if (active) setData(null);
+        if (active) setLocalData(null);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setLocalLoading(false);
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [managedByPainel]);
 
+  const data = managedByPainel ? painelData : localData;
+  const loading = managedByPainel ? Boolean(painelLoading) : localLoading;
   const items = data?.items ?? [];
 
   return (

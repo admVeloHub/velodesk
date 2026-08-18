@@ -252,6 +252,9 @@ export const env = {
     .map((item) => item.trim())
     .filter(Boolean),
   chamadoIaAnaliseEnabled: process.env.CHAMADO_IA_ANALISE_ENABLED !== 'false',
+  /** Batch periódico de re-varredura da IA de telefonia (sort pesado em telephony_calls).
+   * Desativado por padrão: cada ligação já é classificada na chegada (telephonyInbound). */
+  telephonyIaBatchEnabled: process.env.TELEPHONY_IA_BATCH_ENABLED === 'true',
   chamadoIaAnaliseModel: (process.env.CHAMADO_IA_ANALISE_MODEL || 'gpt-5-mini').trim(),
   chamadoIaAnaliseIntervalMs: parseInt(process.env.CHAMADO_IA_ANALISE_INTERVAL_MS || '900000', 10),
   chamadoIaAnaliseMaxPerCycle: parseInt(process.env.CHAMADO_IA_ANALISE_MAX_PER_CYCLE || '60', 10),
@@ -315,5 +318,12 @@ export const env = {
   /** Presence de ticket (quem está olhando/tem aberto) — Supabase Realtime via JWT custom (HS256) */
   ticketPresenceJwtSecret: (process.env.PRESENCE_REALTIME_JWT_SECRET || '').trim(),
   ticketPresenceTokenTtlSec: parseInt(process.env.PRESENCE_REALTIME_TOKEN_TTL_SEC || '600', 10),
+  /**
+   * Eventos de ticket (nova mensagem/mudança) publicados em canal Supabase Realtime (broadcast
+   * público, só o id do ticket — sem conteúdo). Reaproveita o projeto de presence. Se URL/anon key
+   * ausentes, o publisher vira no-op e o polling (leve) segue como mecanismo confiável.
+   */
+  ticketEventsRealtimeUrl: (process.env.PRESENCE_REALTIME_URL || '').trim().replace(/\/+$/, ''),
+  ticketEventsRealtimeApiKey: (process.env.PRESENCE_REALTIME_ANON_KEY || '').trim(),
 };
 

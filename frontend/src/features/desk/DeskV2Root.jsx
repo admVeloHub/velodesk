@@ -49,6 +49,7 @@ import {
   resolveTicketSnapshotForWorkflowFlush,
 } from '../../services/desk/pendingWorkflowStart';
 import { wrapComposerOpeningForTicket } from '../../services/desk/clientMessageEnvelope';
+import { subscribeToTicketEvents } from '../../services/desk/ticketEventsRealtime';
 import {
   findTicketEntry,
   commitTicketViaApi,
@@ -130,6 +131,27 @@ function ticketNeedsDetailLoad(ticket) {
     || (ticket.registroHistorico?.length || 0) > 0;
   // Sem thread no cache — buscar detalhe (ticket "novo" no servidor pode já ter msg do cliente)
   return !hasContent;
+}
+
+/**
+ * Mescla a resposta LEVE do polling (view=light) sobre o ticket completo já carregado:
+ * atualiza apenas as threads/histórico/status e PRESERVA os campos ricos do painel
+ * (cadastro, workflow, Reclame Aqui/Procon, lateralForm, workflow pendente…), que a resposta
+ * leve não recomputa. Spread de `prev` primeiro garante a preservação inclusive do pending workflow.
+ */
+function mergeLightThreadIntoTicket(prev, light) {
+  if (!light) return prev;
+  return {
+    ...prev,
+    messages: light.messages ?? prev.messages,
+    internalNotes: light.internalNotes ?? prev.internalNotes,
+    registroHistorico: light.registroHistorico ?? prev.registroHistorico,
+    status: light.status ?? prev.status,
+    updatedAt: light.updatedAt ?? prev.updatedAt,
+    queueEntryAt: light.queueEntryAt ?? prev.queueEntryAt,
+    _detailLoaded: true,
+    listOnly: false,
+  };
 }
 
 const agentDebugMsgCount = createPlatformTraceCounter();
@@ -538,25 +560,27 @@ export default function DeskV2Root() {
       inFlight = true;
       const seq = ++requestSeq;
       try {
-        const raw = await ticketsApi.get(ticketId);
+        // O poll só cuida das threads: o detalhe completo (cadastro/workflow) é carregado uma vez
+        // pelo efeito de detalhe. Enquanto não houver detalhe, deixa aquele efeito assumir.
+        const preTicket = findTicketEntry(ticketId)?.ticket;
+        if (!preTicket || ticketNeedsDetailLoad(preTicket)) return;
+
+        const raw = await ticketsApi.getLight(ticketId);
         if (cancelled || seq !== requestSeq) return;
-        if (raw?.listOnly === true) return;
-        const full = apiTicketToCockpit(raw);
-        if (!full?.id && !full?._id) return;
-        full.listOnly = false;
-        full._detailLoaded = true;
+        const light = apiTicketToCockpit(raw);
+        if (!light?.id && !light?._id) return;
 
         const prevEntry = findTicketEntry(ticketId);
         const prevTicket = prevEntry?.ticket;
-        const merged = prevTicket
-          ? mergeApiTicketPreservingPendingWorkflow(prevTicket, full)
-          : full;
+        // Estado pode ter mudado durante a requisição; se perdeu o detalhe, não sobrescreve.
+        if (!prevTicket || ticketNeedsDetailLoad(prevTicket)) return;
+
+        const merged = mergeLightThreadIntoTicket(prevTicket, light);
         const threadChanged = hasPublicThreadChanged(prevTicket, merged);
         const waThreadChanged = hasWhatsAppThreadChanged(prevTicket, merged);
         const internalNotesChanged = hasPersistedInternalNotesChanged(prevTicket, merged);
-        const detailFilled = ticketNeedsDetailLoad(prevTicket) && !ticketNeedsDetailLoad(merged);
 
-        if (threadChanged || waThreadChanged || internalNotesChanged || detailFilled) {
+        if (threadChanged || waThreadChanged || internalNotesChanged) {
           const msgs = merged?.messages?.length ?? 0;
           const prevMsgs = prevTicket?.messages?.length;
           const last = merged?.messages?.[msgs - 1];
@@ -566,7 +590,6 @@ export default function DeskV2Root() {
             para: msgs,
             ultimaOrigem: last?.origin || last?.sender || null,
             waThreadChanged,
-            detailFilled,
             patch: !cancelled && !commitInProgressRef.current,
           });
         }
@@ -575,7 +598,7 @@ export default function DeskV2Root() {
           !cancelled
           && seq === requestSeq
           && !commitInProgressRef.current
-          && (threadChanged || waThreadChanged || internalNotesChanged || detailFilled)
+          && (threadChanged || waThreadChanged || internalNotesChanged)
         ) {
           patchTicket(ticketId, merged);
         }
@@ -616,11 +639,20 @@ export default function DeskV2Root() {
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
 
+    // Realtime (opcional): ao receber um "ping" do ticket aberto, antecipa o refresh leve.
+    // O timer acima segue como fallback confiável mesmo sem Realtime configurado.
+    const unsubscribeTicketEvents = subscribeToTicketEvents((payload) => {
+      if (cancelled) return;
+      if (String(payload?.ticketId || '') !== ticketId) return;
+      void syncDetail();
+    });
+
     return () => {
       cancelled = true;
       requestSeq += 1;
       if (timer) window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      unsubscribeTicketEvents();
     };
   }, [activeTabId, patchTicket]);
 

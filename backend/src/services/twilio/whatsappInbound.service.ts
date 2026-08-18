@@ -1,8 +1,9 @@
-/** whatsappInbound.service v1.6.0 — anexosScanStatus no inbound */
+/** whatsappInbound.service v1.7.0 — broadcast Realtime (ping) ao anexar mensagem inbound */
 import twilio from 'twilio';
 import { env } from '../../config/env';
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../../models/ChamadoIaAnalise';
+import { publishTicketEvent } from '../realtime/ticketEventsBroadcast.service';
 import { shouldSpawnNewTicketOnInbound } from '../chamado.mapper';
 import {
   getTwilioActiveAccountSid,
@@ -145,6 +146,7 @@ export async function processInboundWhatsAppMessage(payload: TwilioWhatsAppWebho
   });
 
   await chamado.save();
+  void publishTicketEvent(chamado._id.toString(), 'whatsapp-inbound');
   await ChamadoIaAnalise.updateOne(
     { chamadoId: chamado._id, origem: { $ne: 'manual' } },
     { $set: { needsReanalysis: true } },

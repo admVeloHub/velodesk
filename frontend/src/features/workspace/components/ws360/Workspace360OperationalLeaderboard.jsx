@@ -1,7 +1,8 @@
 /**
  * Leaderboard operacional — painel supervisor
- * VERSION: v5.1.0 | DATE: 2026-08-12
- * — Oculta filtros turno/canal quando o payload não traz esses campos
+ * VERSION: v5.2.0 | DATE: 2026-08-18
+ * — Reaproveita o leaderboard já incluído no payload principal (período padrão "mês"),
+ *   eliminando o 2º GET /workspace360 pesado; só busca quando o período muda do padrão.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -20,7 +21,7 @@ function trendClass(trend) {
   return trend === 'down' ? 'ws360-leaderboard__trend--down' : 'ws360-leaderboard__trend--up';
 }
 
-export default function Workspace360OperationalLeaderboard({ onOpenTicket }) {
+export default function Workspace360OperationalLeaderboard({ onOpenTicket, initialLeaderboard }) {
   const [shift, setShift] = useState('all');
   const [channel, setChannel] = useState('all');
   const [period, setPeriod] = useState({ period: 'mes' });
@@ -32,6 +33,22 @@ export default function Workspace360OperationalLeaderboard({ onOpenTicket }) {
 
   useEffect(() => {
     let active = true;
+    // Período padrão ("mês"): o leaderboard já vem no payload principal (data.leaderboard),
+    // então não disparamos a 2ª chamada pesada — só reaproveitamos.
+    const isDefaultPeriod = period.period === 'mes' && !period.from && !period.to;
+    if (isDefaultPeriod) {
+      if (initialLeaderboard) {
+        setEntries(initialLeaderboard);
+        setError('');
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+      return () => {
+        active = false;
+      };
+    }
+
     setLoading(true);
     setError('');
     fetchWorkspace360Leaderboard({ period: period.period, from: period.from, to: period.to })
@@ -47,7 +64,7 @@ export default function Workspace360OperationalLeaderboard({ onOpenTicket }) {
     return () => {
       active = false;
     };
-  }, [period.period, period.from, period.to]);
+  }, [period.period, period.from, period.to, initialLeaderboard]);
 
   const ranking = entries?.ranking || [];
   const showShiftFilter = ranking.some((row) => row?.shift != null && String(row.shift).trim() !== '');

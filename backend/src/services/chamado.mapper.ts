@@ -1719,6 +1719,30 @@ async function chamadoToTicketFull(
   });
 }
 
+/**
+ * Versão "leve" para o polling do Desk: monta as threads (pública, WhatsApp, notas internas)
+ * e o histórico — que é o que muda com frequência — SEM as buscas de I/O do detalhe completo
+ * (cadastro no banco e definição do workflow). Os campos ricos são derivados apenas do próprio
+ * documento (ref embutida + registro), então o front mescla só as threads e preserva o painel.
+ */
+export async function chamadoToTicketLight(
+  chamado: IChamadoN1,
+  boxId?: string,
+): Promise<TicketDto> {
+  const ref = chamado.cliente?.[0] as LegacyClienteEmbed | undefined;
+  const cadastro = legacyDadosFromRef(ref);
+  const lateralWorkflow = findLatestWorkflowFromRegistro(chamado) ?? undefined;
+
+  return buildTicketDtoCore(chamado, boxId, undefined, {
+    cadastro,
+    lateralWorkflow,
+    persistedApproval: findLatestApprovalFromRegistro(chamado) ?? undefined,
+    reclameAqui: findReclameAquiFromChamado(chamado),
+    procon: findProconFromChamado(chamado),
+    consumidorGov: findConsumidorGovFromChamado(chamado),
+  });
+}
+
 function resolveTicketPriorityFromChamado(chamado: IChamadoN1): string {
   for (const reg of chamado.registro ?? []) {
     const mailPriority = String(reg.metadados?.mailPriority ?? '').trim().toLowerCase();

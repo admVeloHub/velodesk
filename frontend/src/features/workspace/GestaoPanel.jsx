@@ -1,12 +1,14 @@
 /**
  * Painel 360° — Gestão
- * VERSION: v3.6.0 | DATE: 2026-08-12
- * — KPIs supervisor + visão por canal montados a partir do payload 360
+ * VERSION: v3.8.0 | DATE: 2026-08-18
+ * — GET /gestao-insights/painel unificado para cards analíticos (P3)
+ * — voz-cliente congelado (em desenvolvimento)
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { buildSupervisor360View, computeSupervisor360View, mapEntryToRow } from '../../services/workspace/deskData';
 import { useWorkspace360 } from '../../hooks/useWorkspace360';
+import { useGestaoInsightsPainel } from '../../hooks/useGestaoInsightsPainel';
 import { useNotifications } from '../../context/NotificationContext';
 import { useTickets } from '../../context/TicketsContext';
 import Workspace360EscalatedCases from './components/ws360/Workspace360EscalatedCases';
@@ -30,10 +32,14 @@ export default function GestaoPanel() {
   const navigate = useNavigate();
   const { showNotification } = useNotifications();
   const { openTicket, refreshTickets } = useTickets();
-  const { data, loading, error, refresh } = useWorkspace360();
+  // Pede o leaderboard já no payload principal (período padrão "mês") para o card reaproveitar
+  // sem uma segunda chamada. Memoizado para não recriar o refresh do hook a cada render.
+  const wsReportParams = useMemo(() => ({ leaderboardPeriod: 'mes' }), []);
+  const { data, loading, error, refresh } = useWorkspace360({ reportParams: wsReportParams });
   const [escalatedListOpen, setEscalatedListOpen] = useState(false);
   const [redistributeOpen, setRedistributeOpen] = useState(false);
   const [insightsPeriod, setInsightsPeriod] = useState({ period: 'mes' });
+  const { data: insightsPainel, loading: insightsLoading } = useGestaoInsightsPainel(insightsPeriod);
 
   const view = useMemo(() => {
     if (data) return buildSupervisor360View(data);
@@ -114,7 +120,12 @@ export default function GestaoPanel() {
 
       <div className="gestao-insights-stack">
         <div className="gestao-insights-row gestao-insights-row--summary">
-          <GestaoVolumeStatsCard period={insightsPeriod} onOpenTicket={handleOpenEscalatedTicket} />
+          <GestaoVolumeStatsCard
+            period={insightsPeriod}
+            onOpenTicket={handleOpenEscalatedTicket}
+            painelData={insightsPainel?.resumo}
+            painelLoading={insightsLoading}
+          />
           <Workspace360EscalatedCases
             escalated={view.escalated}
             onViewAll={() => setEscalatedListOpen(true)}
@@ -133,27 +144,42 @@ export default function GestaoPanel() {
         ) : null}
 
         <div className="gestao-insights-row gestao-insights-row--chart">
-          <GestaoVolumeCard period={insightsPeriod} />
-          <GestaoMotivosCard period={insightsPeriod} />
+          <GestaoVolumeCard
+            period={insightsPeriod}
+            painelVolume={insightsPainel?.volume}
+            painelLoading={insightsLoading}
+          />
+          <GestaoMotivosCard
+            period={insightsPeriod}
+            painelData={insightsPainel?.motivos}
+            painelLoading={insightsLoading}
+          />
         </div>
 
         <div className="gestao-tiles-row">
-          <GestaoCasosEspeciaisCard />
+          <GestaoCasosEspeciaisCard
+            painelData={insightsPainel?.casosEspeciais}
+            painelLoading={insightsLoading}
+          />
           <AiUsageCostCard />
         </div>
 
         <div className="gestao-insights-row gestao-insights-row--risco">
-          <GestaoCustomerVoiceCard
-            period={insightsPeriod}
+          <GestaoCustomerVoiceCard />
+          <GestaoRiscoCasoEspecialCard
             onOpenTicket={handleOpenEscalatedTicket}
+            painelData={insightsPainel?.risco}
+            painelLoading={insightsLoading}
           />
-          <GestaoRiscoCasoEspecialCard onOpenTicket={handleOpenEscalatedTicket} />
           <GestaoAdherenceCard />
         </div>
       </div>
 
       <div className="ws-grid-2">
-        <Workspace360OperationalLeaderboard onOpenTicket={handleOpenEscalatedTicket} />
+        <Workspace360OperationalLeaderboard
+          onOpenTicket={handleOpenEscalatedTicket}
+          initialLeaderboard={data?.leaderboard}
+        />
       </div>
       <Workspace360SupervisorReports />
 

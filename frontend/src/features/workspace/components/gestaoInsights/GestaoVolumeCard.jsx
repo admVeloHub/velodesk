@@ -1,6 +1,6 @@
 /**
- * GestaoVolumeCard v1.0.0 — volume diário de tickets (abertos/encerrados) + nota média
- * DATE: 2026-07-17 | AUTHOR: VeloHub Development Team
+ * GestaoVolumeCard v1.1.0 — volume diário; reaproveita painel quando granularidade=dia
+ * VERSION: v1.1.0 | DATE: 2026-08-18
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Chart } from 'react-chartjs-2';
@@ -56,13 +56,22 @@ const valueLabelsPlugin = {
   },
 };
 
-export default function GestaoVolumeCard({ period }) {
+export default function GestaoVolumeCard({ period, painelVolume, painelLoading }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [granularity, setGranularity] = useState('dia');
 
+  const canUsePainelVolume = granularity === 'dia' && (painelVolume !== undefined || painelLoading !== undefined);
+
   useEffect(() => {
+    if (canUsePainelVolume) {
+      if (painelVolume !== undefined) setData(painelVolume);
+      setLoading(Boolean(painelLoading));
+      setError('');
+      return undefined;
+    }
+
     let active = true;
     setLoading(true);
     setError('');
@@ -80,7 +89,7 @@ export default function GestaoVolumeCard({ period }) {
     return () => {
       active = false;
     };
-  }, [period.period, period.from, period.to, granularity]);
+  }, [period.period, period.from, period.to, granularity, canUsePainelVolume, painelVolume, painelLoading]);
 
   const chartData = useMemo(() => {
     const series = data?.series ?? [];

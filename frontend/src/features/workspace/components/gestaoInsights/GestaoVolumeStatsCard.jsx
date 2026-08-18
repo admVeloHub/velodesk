@@ -1,12 +1,12 @@
 /**
- * GestaoVolumeStatsCard v1.0.0 — card com os totais do período (sem o gráfico)
- * DATE: 2026-07-20 | AUTHOR: VeloHub Development Team
+ * GestaoVolumeStatsCard v1.1.0 — repassa slice do painel unificado
+ * VERSION: v1.1.0 | DATE: 2026-08-18
  */
 import React from 'react';
 import GestaoVolumeStats from './GestaoVolumeStats';
 import './gestaoInsights.css';
 
-export default function GestaoVolumeStatsCard({ period, onOpenTicket }) {
+export default function GestaoVolumeStatsCard({ period, onOpenTicket, painelData, painelLoading }) {
   return (
     <section className="ws-panel gestao-insight-card gestao-volume-stats-card gestao-volume-stats-card--compact">
       <header className="gestao-insight-card__head gestao-insight-card__head--compact">
@@ -18,7 +18,12 @@ export default function GestaoVolumeStatsCard({ period, onOpenTicket }) {
         </h4>
       </header>
 
-      <GestaoVolumeStats period={period} onOpenTicket={onOpenTicket} />
+      <GestaoVolumeStats
+        period={period}
+        onOpenTicket={onOpenTicket}
+        painelData={painelData}
+        painelLoading={painelLoading}
+      />
     </section>
   );
 }

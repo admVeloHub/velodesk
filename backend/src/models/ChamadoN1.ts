@@ -1,4 +1,4 @@
-/** ChamadoN1 v1.10.0 — tabulacao.canal (canal de contato real, persistido) */
+/** ChamadoN1 v1.11.0 — índices createdAt e registro.data para acelerar os cards de Gestão */
 import mongoose, { Schema, Document, Types } from 'mongoose';
 import type { IChamadoWorkflowRequisicao } from '../config/workflowRequisicaoDefaults';
 
@@ -207,5 +207,10 @@ const ChamadoN1Schema = new Schema<IChamadoN1>(
 
 ChamadoN1Schema.index({ chamadoProtocolo: 1 }, { unique: true, sparse: true, name: 'chamadoProtocolo_1' });
 ChamadoN1Schema.index({ 'cliente.clienteCpf': 1 }, { name: 'cliente_clienteCpf_1' });
+// Aceleram os cards de Gestão (volume/resumo/voz-cliente/casos-especiais), que filtram por
+// data de criação e por datas de eventos do histórico. Sem estes índices, cada card fazia
+// varredura completa de coleção (15-19s em produção).
+ChamadoN1Schema.index({ createdAt: 1 }, { name: 'createdAt_1' });
+ChamadoN1Schema.index({ 'registro.data': 1 }, { name: 'registro_data_1' });
 
 export const ChamadoN1 = mongoose.model<IChamadoN1>('ChamadoN1', ChamadoN1Schema);

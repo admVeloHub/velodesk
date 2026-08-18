@@ -1,34 +1,39 @@
 /**
- * GestaoVolumeStats v1.0.0 — totais do período (abertos/novo/em aberto) + ticket em aberto mais antigo
- * DATE: 2026-07-20 | AUTHOR: VeloHub Development Team
+ * GestaoVolumeStats v1.1.0 — totais do período; suporta slice do GET /gestao-insights/painel
+ * VERSION: v1.1.0 | DATE: 2026-08-18
  */
 import React, { useEffect, useState } from 'react';
 import { gestaoInsightsApi } from '../../../../api/client';
 import './gestaoInsights.css';
 
-export default function GestaoVolumeStats({ period, onOpenTicket }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(false);
+export default function GestaoVolumeStats({ period, onOpenTicket, painelData, painelLoading }) {
+  const managedByPainel = painelData !== undefined || painelLoading !== undefined;
+  const [localData, setLocalData] = useState(null);
+  const [localLoading, setLocalLoading] = useState(!managedByPainel);
 
   useEffect(() => {
+    if (managedByPainel) return undefined;
     let active = true;
-    setLoading(true);
+    setLocalLoading(true);
     gestaoInsightsApi
       .resumo({ period: period.period, from: period.from, to: period.to })
       .then((result) => {
-        if (active) setData(result);
+        if (active) setLocalData(result);
       })
       .catch(() => {
-        if (active) setData(null);
+        if (active) setLocalData(null);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setLocalLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [period.period, period.from, period.to]);
+  }, [period.period, period.from, period.to, managedByPainel]);
+
+  const data = managedByPainel ? painelData : localData;
+  const loading = managedByPainel ? Boolean(painelLoading) : localLoading;
+  const [expanded, setExpanded] = useState(false);
 
   const oldest = data?.oldestAbertos ?? [];
   const oldestFirst = oldest[0];

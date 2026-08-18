@@ -89,6 +89,33 @@
     white-space: nowrap;
 }
 
+.gestao-customer-voice--frozen {
+    opacity: 0.92;
+}
+
+.gestao-customer-voice__dev-badge {
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(100, 116, 139, 0.15);
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.gestao-customer-voice__frozen-body {
+    padding: 1rem 0 0.25rem;
+}
+
+.gestao-customer-voice__frozen-text {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
 .gestao-customer-voice__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));

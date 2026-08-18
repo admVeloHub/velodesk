@@ -1,6 +1,6 @@
 /**
- * API client v1.24.0 — clientsApi.getByCpf hydrateFromApi
- * VERSION: v1.24.0 | DATE: 2026-08-12 | AUTHOR: VeloHub Development Team
+ * API client v1.25.0 — gestaoInsightsApi.painel (payload unificado da Gestão)
+ * VERSION: v1.25.0 | DATE: 2026-08-18 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -104,6 +104,17 @@ export const ticketsApi = {
     }
     return r.data;
   }),
+  // Versão leve para o polling do Desk: só threads/histórico atualizados, sem I/O de detalhe.
+  getLight: (id) => api.get(`/tickets/${id}`, {
+    headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+    params: { view: 'light', _: Date.now() },
+    validateStatus: (status) => status >= 200 && status < 300,
+  }).then((r) => {
+    if (!r.data || (typeof r.data === 'object' && !r.data._id && !r.data.id)) {
+      throw new Error('Resposta vazia ao carregar ticket (light)');
+    }
+    return r.data;
+  }),
   create: (data) => api.post('/tickets', data).then((r) => r.data),
   update: (id, data) => api.put(`/tickets/${id}`, data).then((r) => r.data),
   commit: (id, data) => api.post(`/tickets/${id}/commit`, data).then((r) => r.data),
@@ -173,6 +184,8 @@ export const workspace360Api = {
 };
 
 export const gestaoInsightsApi = {
+  /** Payload unificado dos cards analíticos (resumo, volume dia, motivos, casos especiais, risco). */
+  painel: (params) => api.get('/gestao-insights/painel', { params }).then((r) => r.data),
   volume: (params) => api.get('/gestao-insights/volume', { params }).then((r) => r.data),
   resumo: (params) => api.get('/gestao-insights/resumo', { params }).then((r) => r.data),
   motivos: (params) => api.get('/gestao-insights/motivos', { params }).then((r) => r.data),

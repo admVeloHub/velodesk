@@ -1,9 +1,9 @@
-/** boxes.routes v1.8.0 — GET /boxes/queue-counts (contadores reais, independente da listagem) */
+/** boxes.routes v1.9.0 — lista de boxes via cache TTL curto (getCachedBoxes) */
 import { Router, Response } from 'express';
 import mongoose from 'mongoose';
 import { authMiddleware } from '../middleware/auth';
 import { isMongoConnected } from '../config/database';
-import { Box } from '../models/Box';
+import { getCachedBoxes } from '../services/boxesCache.service';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { User } from '../models/User';
 import {
@@ -163,9 +163,9 @@ router.get('/queue-counts', authMiddleware, async (req, res: Response) => {
         responsavelCandidates,
       );
     } else {
-      const boxes = await Box.find().sort({ order: 1 });
+      const boxes = await getCachedBoxes();
       const columns = boxes.map((box) => ({
-        id: box.id,
+        id: String(box._id),
         name: box.name,
         order: box.order,
         status: statusFromBoxName(box.name),
@@ -211,9 +211,9 @@ router.get('/', authMiddleware, async (req, res: Response) => {
       return res.json(result);
     }
 
-    const boxes = await Box.find().sort({ order: 1 });
+    const boxes = await getCachedBoxes();
     const columns = boxes.map((box) => ({
-      id: box.id,
+      id: String(box._id),
       name: box.name,
       order: box.order,
       status: statusFromBoxName(box.name),

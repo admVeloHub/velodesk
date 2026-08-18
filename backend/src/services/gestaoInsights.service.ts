@@ -1,6 +1,8 @@
 /**
- * gestaoInsights.service v1.0.0 — cards analíticos da Gestão
+ * gestaoInsights.service v1.1.0 — cards analíticos da Gestão
  * Volume diário (abertos/encerrados) + nota média, top motivos por produto e casos especiais.
+ * v1.1.0: volume/resumo/motivos movidos para agregação no MongoDB (mesma semântica dos
+ * helpers JS abaixo) + índices createdAt/registro.data — elimina varredura de coleção.
  */
 import { ChamadoN1, IChamadoN1 } from '../models/ChamadoN1';
 import {
@@ -11,7 +13,75 @@ import {
 } from './chamado.mapper';
 
 const TZ = 'America/Sao_Paulo';
-const TERMINAL_STATUSES = new Set(['resolvido', 'cancelado', 'fechado']);
+const TERMINAL_STATUS_LIST = ['resolvido', 'cancelado', 'fechado'];
+const TERMINAL_STATUSES = new Set(TERMINAL_STATUS_LIST);
+
+/**
+ * Expressões de agregação que espelham EXATAMENTE os helpers JS abaixo, para permitir
+ * mover as contagens/somatórios para o MongoDB sem alterar os números entregues:
+ * - `resolvedAtExpr`  === getResolvedAt (último registro terminal, na ordem do array)
+ * - `firstResponseExpr` === getFirstAgentResponseAt (1ª resposta pública do atendente)
+ * - `lastStatusExpr`  === lastStatus (status do último registro, '' ou vazio => 'novo')
+ */
+const resolvedAtExpr = {
+  $reduce: {
+    input: { $ifNull: ['$registro', []] },
+    initialValue: null,
+    in: {
+      $cond: [
+        { $in: ['$$this.status', TERMINAL_STATUS_LIST] },
+        '$$this.data',
+        '$$value',
+      ],
+    },
+  },
+};
+
+const firstResponseExpr = {
+  $reduce: {
+    input: { $ifNull: ['$registro', []] },
+    initialValue: null,
+    in: {
+      $cond: [
+        { $ne: ['$$value', null] },
+        '$$value',
+        {
+          $cond: [
+            {
+              $and: [
+                { $eq: ['$$this.origin', 'agente'] },
+                { $ne: [{ $trim: { input: { $ifNull: ['$$this.mensagemPublica', ''] } } }, ''] },
+              ],
+            },
+            '$$this.data',
+            null,
+          ],
+        },
+      ],
+    },
+  },
+};
+
+const lastStatusExpr = {
+  $let: {
+    vars: {
+      // $ifNull externo coage "missing" (array vazio => arrayElemAt sem resultado) para null.
+      s: { $ifNull: [{ $arrayElemAt: [{ $ifNull: ['$registro.status', []] }, -1] }, null] },
+    },
+    in: {
+      $cond: [
+        { $or: [{ $eq: ['$$s', null] }, { $eq: ['$$s', ''] }] },
+        'novo',
+        '$$s',
+      ],
+    },
+  },
+};
+
+/** dayKey (YYYY-MM-DD no fuso da Gestão) para uma expressão de data em agregação. */
+function dayKeyExpr(dateExpr: unknown) {
+  return { $dateToString: { format: '%Y-%m-%d', date: dateExpr, timezone: TZ } };
+}
 
 export interface GestaoInsightsQuery {
   period?: string;
@@ -281,27 +351,27 @@ export async function getVolumeSeries(
   const abertosMap = new Map<string, number>(keys.map((k) => [k, 0]));
   const encerradosMap = new Map<string, number>(keys.map((k) => [k, 0]));
 
-  const chamados = await ChamadoN1.find({
-    $or: [
-      { createdAt: { $gte: range.start, $lte: range.end } },
-      { 'registro.data': { $gte: range.start, $lte: range.end } },
-    ],
-  })
-    .select('createdAt registro')
-    .lean<IChamadoN1[]>();
+  // Contagens feitas no MongoDB (índices createdAt / registro.data), sem transferir os
+  // arrays `registro` de todos os chamados do período. Mantém a mesma semântica do JS:
+  // abertos = por dia de createdAt; encerrados = por dia do último registro terminal.
+  const [abertosRows, encerradosRows] = await Promise.all([
+    ChamadoN1.aggregate<{ _id: string; n: number }>([
+      { $match: { createdAt: { $gte: range.start, $lte: range.end } } },
+      { $group: { _id: dayKeyExpr('$createdAt'), n: { $sum: 1 } } },
+    ]),
+    ChamadoN1.aggregate<{ _id: string; n: number }>([
+      { $match: { 'registro.data': { $gte: range.start, $lte: range.end } } },
+      { $addFields: { __resolvedAt: resolvedAtExpr } },
+      { $match: { __resolvedAt: { $gte: range.start, $lte: range.end } } },
+      { $group: { _id: dayKeyExpr('$__resolvedAt'), n: { $sum: 1 } } },
+    ]),
+  ]);
 
-  chamados.forEach((chamado) => {
-    const createdAt = chamado.createdAt ? new Date(chamado.createdAt) : null;
-    if (createdAt && createdAt >= range.start && createdAt <= range.end) {
-      const key = dayKey(createdAt);
-      if (abertosMap.has(key)) abertosMap.set(key, (abertosMap.get(key) ?? 0) + 1);
-    }
-
-    const resolvedAt = getResolvedAt(chamado);
-    if (resolvedAt && resolvedAt >= range.start && resolvedAt <= range.end) {
-      const key = dayKey(resolvedAt);
-      if (encerradosMap.has(key)) encerradosMap.set(key, (encerradosMap.get(key) ?? 0) + 1);
-    }
+  abertosRows.forEach((row) => {
+    if (abertosMap.has(row._id)) abertosMap.set(row._id, row.n);
+  });
+  encerradosRows.forEach((row) => {
+    if (encerradosMap.has(row._id)) encerradosMap.set(row._id, row.n);
   });
 
   const dailySeries: VolumeSeriesDay[] = keys.map((key) => ({
@@ -371,42 +441,55 @@ export interface VolumeSummaryResult {
 export async function getVolumeSummary(query: GestaoInsightsQuery = {}): Promise<VolumeSummaryResult> {
   const range = resolvePeriodRange(query);
 
-  const chamadosNoPeriodo = await ChamadoN1.find({
-    createdAt: { $gte: range.start, $lte: range.end },
-  })
-    .select('createdAt registro.status')
-    .lean<IChamadoN1[]>();
+  // Totais por último status (createdAt no período) + TMA/TME dos resolvidos no período,
+  // ambos calculados no MongoDB para não trafegar os arrays `registro`. Semântica idêntica
+  // aos helpers JS (lastStatus / getResolvedAt / getFirstAgentResponseAt).
+  const [statusAgg, tempoAgg] = await Promise.all([
+    ChamadoN1.aggregate<{ total: number; novo: number; emAberto: number }>([
+      { $match: { createdAt: { $gte: range.start, $lte: range.end } } },
+      { $addFields: { __lastStatus: lastStatusExpr } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          novo: { $sum: { $cond: [{ $eq: ['$__lastStatus', 'novo'] }, 1, 0] } },
+          emAberto: { $sum: { $cond: [{ $in: ['$__lastStatus', EM_ABERTO_STATUSES] }, 1, 0] } },
+        },
+      },
+    ]),
+    ChamadoN1.aggregate<{ tmaSum: number; tmaN: number; tmeSum: number; tmeN: number }>([
+      { $match: { 'registro.data': { $gte: range.start, $lte: range.end } } },
+      { $addFields: { __resolvedAt: resolvedAtExpr, __firstResp: firstResponseExpr } },
+      { $match: { __resolvedAt: { $gte: range.start, $lte: range.end } } },
+      { $addFields: { __createdEff: { $ifNull: ['$createdAt', '$__resolvedAt'] } } },
+      {
+        $group: {
+          _id: null,
+          tmaSum: { $sum: { $subtract: ['$__resolvedAt', '$__createdEff'] } },
+          tmaN: { $sum: 1 },
+          tmeSum: {
+            $sum: {
+              $cond: [
+                { $ne: ['$__firstResp', null] },
+                { $subtract: ['$__firstResp', '$__createdEff'] },
+                0,
+              ],
+            },
+          },
+          tmeN: { $sum: { $cond: [{ $ne: ['$__firstResp', null] }, 1, 0] } },
+        },
+      },
+    ]),
+  ]);
 
-  let totalNovo = 0;
-  let totalEmAberto = 0;
-  chamadosNoPeriodo.forEach((chamado) => {
-    const status = lastStatus(chamado);
-    if (status === 'novo') totalNovo++;
-    if (EM_ABERTO_STATUSES.includes(status)) totalEmAberto++;
-  });
+  const totalAbertos = statusAgg[0]?.total ?? 0;
+  const totalNovo = statusAgg[0]?.novo ?? 0;
+  const totalEmAberto = statusAgg[0]?.emAberto ?? 0;
 
-  const resolvidosNoPeriodo = await ChamadoN1.find({
-    'registro.data': { $gte: range.start, $lte: range.end },
-  })
-    .select('createdAt registro')
-    .lean<IChamadoN1[]>();
-
-  let tmaSumMs = 0;
-  let tmaN = 0;
-  let tmeSumMs = 0;
-  let tmeN = 0;
-  resolvidosNoPeriodo.forEach((chamado) => {
-    const resolvedAt = getResolvedAt(chamado);
-    if (!resolvedAt || resolvedAt < range.start || resolvedAt > range.end) return;
-    const createdAt = chamado.createdAt ? new Date(chamado.createdAt) : resolvedAt;
-    tmaSumMs += resolvedAt.getTime() - createdAt.getTime();
-    tmaN++;
-    const firstResponseAt = getFirstAgentResponseAt(chamado);
-    if (firstResponseAt) {
-      tmeSumMs += firstResponseAt.getTime() - createdAt.getTime();
-      tmeN++;
-    }
-  });
+  const tmaSumMs = tempoAgg[0]?.tmaSum ?? 0;
+  const tmaN = tempoAgg[0]?.tmaN ?? 0;
+  const tmeSumMs = tempoAgg[0]?.tmeSum ?? 0;
+  const tmeN = tempoAgg[0]?.tmeN ?? 0;
 
   const oldestDocs = await ChamadoN1.find(lastStatusInFilter(EM_ABERTO_STATUSES))
     .sort({ createdAt: 1 })
@@ -432,7 +515,7 @@ export async function getVolumeSummary(query: GestaoInsightsQuery = {}): Promise
 
   return {
     range: { start: range.start.toISOString(), end: range.end.toISOString() },
-    totalAbertos: chamadosNoPeriodo.length,
+    totalAbertos,
     totalNovo,
     totalEmAberto,
     oldestAbertos,
@@ -461,29 +544,30 @@ export async function getTopMotivosPorProduto(
 ): Promise<TopMotivosResult> {
   const range = resolvePeriodRange(query);
 
-  const chamados = await ChamadoN1.find({
-    createdAt: { $gte: range.start, $lte: range.end },
-  })
-    .select('createdAt tabulacao')
-    .lean<IChamadoN1[]>();
+  // Consolida no MongoDB pela última tabulação de cada chamado (mesma regra do JS:
+  // produto/motivo com trim; ignora vazios). Total = soma das entradas qualificadas.
+  const rows = await ChamadoN1.aggregate<{ _id: { produto: string; motivo: string }; count: number }>([
+    { $match: { createdAt: { $gte: range.start, $lte: range.end } } },
+    { $addFields: { __tab: { $arrayElemAt: [{ $ifNull: ['$tabulacao', []] }, -1] } } },
+    {
+      $addFields: {
+        __produto: { $trim: { input: { $ifNull: ['$__tab.produto', ''] } } },
+        __motivo: { $trim: { input: { $ifNull: ['$__tab.motivo', ''] } } },
+      },
+    },
+    { $match: { __produto: { $ne: '' }, __motivo: { $ne: '' } } },
+    { $group: { _id: { produto: '$__produto', motivo: '$__motivo' }, count: { $sum: 1 } } },
+  ]);
 
   const counts = new Map<string, TopMotivoEntry>();
   let total = 0;
 
-  chamados.forEach((chamado) => {
-    const tab = chamado.tabulacao?.[chamado.tabulacao.length - 1];
-    const produto = String(tab?.produto ?? '').trim();
-    const motivo = String(tab?.motivo ?? '').trim();
+  rows.forEach((row) => {
+    const produto = String(row._id.produto ?? '').trim();
+    const motivo = String(row._id.motivo ?? '').trim();
     if (!produto || !motivo) return;
-
-    total++;
-    const key = `${produto}::${motivo}`;
-    const existing = counts.get(key);
-    if (existing) {
-      existing.count++;
-    } else {
-      counts.set(key, { produto, motivo, count: 1, pct: 0 });
-    }
+    total += row.count;
+    counts.set(`${produto}::${motivo}`, { produto, motivo, count: row.count, pct: 0 });
   });
 
   const items = [...counts.values()]

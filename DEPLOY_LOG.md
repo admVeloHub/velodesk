@@ -1,10 +1,33 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.84.0 | DATE: 2026-08-17 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.85.0 | DATE: 2026-08-18 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — performance Gestão/Painel 360: agregações MongoDB, cache, endpoint unificado e voz-cliente congelado
+
+- **Data/Hora**: 2026-08-18
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.85.0
+  - **Backend**: env v1.39.0 (telephonyIaBatchEnabled, ticketEventsRealtime), ChamadoN1 v1.11.0 (índices), gestaoInsights.service (agregações), workspace360.service (agregação slim registro + cache TTL), gestaoInsightsPainel.service v1.0.0, boxesCache.service v1.0.0, ticketEventsBroadcast.service v1.0.0, chamado.mapper (view=light), boxes.routes v1.9.0, gestaoInsights.routes (painel + voz-cliente 503), tickets.routes (light + publishTicketEvent)
+  - **Frontend**: useGestaoInsightsPainel v1.0.0, ticketEventsRealtime v1.0.0, GestaoPanel, GestaoCustomerVoiceCard (congelado), cards gestaoInsights (painelData), DeskV2Root (poll light + realtime), Workspace360OperationalLeaderboard (leaderboard inline)
+- **Arquivos principais**:
+  - `backend/src/services/workspace360.service.ts` — agregação MongoDB com `$project` enxuto de `registro`; KPIs/leaderboard em memória; cache TTL 30s
+  - `backend/src/services/gestaoInsights.service.ts` — volume/resumo/motivos via `$aggregate` (paridade validada em `test-gestao-insights-parity.ts`)
+  - `backend/src/services/gestaoInsightsPainel.service.ts` + `GET /api/gestao-insights/painel` — payload unificado dos cards analíticos
+  - `backend/src/config/env.ts` — `TELEPHONY_IA_BATCH_ENABLED` default false; config Supabase Realtime para eventos de ticket
+  - `GET /api/tickets/:id?view=light` + `ticketEventsBroadcast.service.ts` — polling leve e push Supabase como fallback
+  - `backend/src/services/boxesCache.service.ts` — cache TTL 15s em `Box.find`
+  - `GET /api/gestao-insights/voz-cliente` — congelado (503); card frontend com badge "Em desenvolvimento"
+- **Descrição**: Reduz latência crítica do dashboard de Gestão: elimina varreduras completas de `registro`, consolida múltiplos GETs de insights em um endpoint, pausa batch redundante de IA de telefonia, adiciona cache curto e polling leve no Desk. Card voz-cliente desativado até refatoração de performance.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — Painel 360 perf, WhatsApp anexo/emoji e mediaUrl Twilio
 

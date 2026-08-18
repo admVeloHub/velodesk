@@ -1,4 +1,4 @@
-/** tickets.routes v1.18.0 — dispara pipeline do Agente 1 na criação manual e na 1ª nota interna sem contexto do cliente */
+/** tickets.routes v1.20.0 — GET /:id?view=light (poll leve) + broadcast Realtime + boxes cacheadas */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -15,6 +15,7 @@ import {
   ChamadoClosedError,
   ChamadoCommitValidationError,
   chamadoToTicket,
+  chamadoToTicketLight,
   commitChamadoFromAgent,
   createChamadoFromBody,
   lastStatusFilter,
@@ -23,6 +24,8 @@ import {
 } from '../services/chamado.mapper';
 import { TabulacaoValidationError } from '../services/tabulation.service';
 import { notifyAgentReplyAsync, notifyChamadoCreatedAsync } from '../services/emailNotification.service';
+import { publishTicketEvent } from '../services/realtime/ticketEventsBroadcast.service';
+import { getCachedBoxes } from '../services/boxesCache.service';
 import { runInboundAgentPipeline, runInboundPostCreateHooks } from '../services/agents/inboundAgentPipeline.service';
 import {
   advanceWorkflowManual,
@@ -64,7 +67,8 @@ import { resolveSentAttachmentSendMeta } from '../services/sentAttachmentStorage
 const router = Router();
 
 async function loadBoxes() {
-  return Box.find().sort({ order: 1 });
+  // Cache TTL curto — boxes mudam raramente e são resolvidas muitas vezes por requisição.
+  return getCachedBoxes();
 }
 
 function handleTicketMutationError(err: unknown, res: Response): boolean {
@@ -145,7 +149,14 @@ router.get('/:id', authMiddleware, async (req, res: Response) => {
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
   const boxes = await loadBoxes();
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  const boxId = await resolveBoxIdForChamado(chamado, boxes);
+  // view=light: usado pelo polling do Desk — devolve as threads/histórico atualizados sem
+  // as buscas de I/O do detalhe completo (cadastro/workflow). Marca `light: true`.
+  if (String(req.query.view ?? '') === 'light') {
+    const lightDto = await chamadoToTicketLight(chamado, boxId);
+    return res.json({ ...lightDto, light: true });
+  }
+  res.json(await chamadoToTicket(chamado, boxId));
 });
 
 router.post('/', authMiddleware, async (req, res: Response) => {
@@ -302,6 +313,7 @@ router.post('/:id/commit', authMiddleware, async (req, res: Response) => {
     }
 
     const boxes = await loadBoxes();
+    void publishTicketEvent(chamado._id.toString(), 'commit');
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
   } catch (err) {
     if (handleTicketMutationError(err, res)) return;
@@ -379,6 +391,7 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
     await chamado.save();
   }
 
+  void publishTicketEvent(chamado._id.toString(), 'message');
   res.status(201).json({
     ...(result.public ?? result.internal),
     publicMessage: result.public,
@@ -481,6 +494,7 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
     }
 
   await chamado.save();
+  void publishTicketEvent(chamado._id.toString(), 'whatsapp-outbound');
 
   const boxes = await loadBoxes();
   const ticket = await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes));

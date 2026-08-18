@@ -1,35 +1,40 @@
 /**
- * GestaoMotivosCard v1.0.0 — top motivos de acionamento por produto (consolidado da tabulação)
- * DATE: 2026-07-17 | AUTHOR: VeloHub Development Team
+ * GestaoMotivosCard v1.1.0 — top motivos; suporta slice do GET /gestao-insights/painel
+ * VERSION: v1.1.0 | DATE: 2026-08-18
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { gestaoInsightsApi } from '../../../../api/client';
 import './gestaoInsights.css';
 
-export default function GestaoMotivosCard({ period }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function GestaoMotivosCard({ period, painelData, painelLoading }) {
+  const managedByPainel = painelData !== undefined || painelLoading !== undefined;
+  const [localData, setLocalData] = useState(null);
+  const [localLoading, setLocalLoading] = useState(!managedByPainel);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (managedByPainel) return undefined;
     let active = true;
-    setLoading(true);
+    setLocalLoading(true);
     setError('');
     gestaoInsightsApi
       .motivos({ period: period.period, from: period.from, to: period.to, limit: 10 })
       .then((result) => {
-        if (active) setData(result);
+        if (active) setLocalData(result);
       })
       .catch(() => {
         if (active) setError('Não foi possível carregar os motivos de acionamento.');
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setLocalLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [period.period, period.from, period.to]);
+  }, [period.period, period.from, period.to, managedByPainel]);
+
+  const data = managedByPainel ? painelData : localData;
+  const loading = managedByPainel ? Boolean(painelLoading) : localLoading;
 
   const items = data?.items ?? [];
   const maxCount = useMemo(
