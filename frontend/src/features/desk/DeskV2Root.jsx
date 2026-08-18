@@ -87,7 +87,7 @@ import ClientTicketHistoryModal from './components/ClientTicketHistoryModal';
 import TicketFusaoStatusControls from './components/TicketFusaoStatusControls';
 import DeskConversation from './components/DeskConversation';
 import TicketWorkflowInfoRequestCallout from './components/TicketWorkflowInfoRequestCallout';
-import { markWorkflowInfoRequestsReadForTicket } from '../../services/workflow/workflowInfoNotifications';
+import { markWorkflowInfoRequestsReadForTicket, resolveWorkflowInfoRequest } from '../../services/workflow/workflowInfoNotifications';
 import DeskWhatsAppChat from './components/DeskWhatsAppChat';
 import DeskComposePanel from './components/DeskComposePanel';
 import DeskInternalNotesPanel from './components/DeskInternalNotesPanel';
@@ -679,9 +679,9 @@ export default function DeskV2Root() {
     if (tableQueueBrowsing) return;
     if (suppressAutoSelectRef.current && !activeTabId) return;
     if (openTabs.length === 0) return;
-    if (activeTabId && findTicketEntry(activeTabId)) return;
-    const last = openTabs[openTabs.length - 1];
-    if (last) setActiveTabId(last.id);
+      if (activeTabId && findTicketEntry(activeTabId)) return;
+      const last = openTabs[openTabs.length - 1];
+      if (last) setActiveTabId(last.id);
   }, [activeTabId, refreshKey, entries.length, openTabs, setActiveTabId, tableQueueBrowsing]);
 
   useEffect(() => {
@@ -1450,8 +1450,8 @@ export default function DeskV2Root() {
     }
     for (const email of emailList) {
       if (!isValidEmailFormat(email)) {
-        showNotification('Informe um e-mail válido (ex.: nome@dominio.com).', 'error');
-        throw new Error('E-mail inválido');
+      showNotification('Informe um e-mail válido (ex.: nome@dominio.com).', 'error');
+      throw new Error('E-mail inválido');
       }
     }
     if (phoneList.length > 1 && !whatsappPhone) {
@@ -1609,7 +1609,7 @@ export default function DeskV2Root() {
     if (ticket && !isDraftTicket(ticket)) {
       try {
         await updateTicketInCache(ticket.id, (t) => applyRightFieldsToTicket(t, next));
-        syncTicketViews();
+    syncTicketViews();
       } catch {
         showNotification('Tabulação aplicada nos campos, mas não foi possível salvar no ticket.', 'warning');
         return;
@@ -1737,6 +1737,7 @@ export default function DeskV2Root() {
     setComunicacaoBusy(true);
     try {
       const updated = await replyWorkflowComunicacao(ticket.id || ticket._id, message);
+      resolveWorkflowInfoRequest(ticket);
       await syncTicketViews();
       showNotification('Resposta enviada ao time do workflow.', 'success');
       return updated;
@@ -1957,26 +1958,26 @@ export default function DeskV2Root() {
       />
 
       {!isTableQueueView ? (
-        <DeskTicketList
-          queueStatuses={queueStatuses}
-          activeTicketId={activeTabId}
-          activeSort={activeSort}
-          entries={entries}
-          searchActive={!!appliedSearch.trim()}
+      <DeskTicketList
+        queueStatuses={queueStatuses}
+        activeTicketId={activeTabId}
+        activeSort={activeSort}
+        entries={entries}
+        searchActive={!!appliedSearch.trim()}
           searchQuery={searchDraft}
-          collapsed={listCollapsed}
+        collapsed={listCollapsed}
           onSearchChange={handleSearchChange}
           onSearchSubmit={handleSearchSubmit}
-          onSelectTicket={selectTicket}
-          onSortChange={setActiveSort}
+        onSelectTicket={selectTicket}
+        onSortChange={setActiveSort}
           entrySortOldestFirst={entrySortOldestFirst}
           onToggleEntrySort={() => setEntrySortOldestFirst((v) => !v)}
-          onCollapse={() => handleListCollapse(true)}
-          onExpand={() => handleListCollapse(false)}
-          onReload={reload}
-          refreshing={ticketsLoading}
+        onCollapse={() => handleListCollapse(true)}
+        onExpand={() => handleListCollapse(false)}
+        onReload={reload}
+        refreshing={ticketsLoading}
           showSkeleton={ticketsLoading && entries.length === 0 && !appliedSearch.trim()}
-        />
+      />
       ) : null}
 
       <main className={'crm-main-content' + (createOpen ? ' crm-main-content--create' : '') + (showTableQueueMain ? ' crm-main-content--table-queue' : '')} id="crmMainContent">
@@ -1988,10 +1989,10 @@ export default function DeskV2Root() {
         ) : (
           <>
             {showOpenTabsBar ? (
-              <DeskTicketTabsBar
-                onSelectTab={activateTicketTab}
-                onCloseTab={closeTicketTabHandler}
-              />
+            <DeskTicketTabsBar
+              onSelectTab={activateTicketTab}
+              onCloseTab={closeTicketTabHandler}
+            />
             ) : null}
             {showTableQueueMain && isMyTicketsQueue ? (
               <DeskMyTicketsTable
@@ -2015,7 +2016,7 @@ export default function DeskV2Root() {
               <div className="crm-empty-state" id="crmEmptyMain">Selecione um ticket na lista ao lado</div>
             ) : (
               <div className="crm-ticket-view desk-crm-ticket-scope">
-                <DeskClientProfileBar
+            <DeskClientProfileBar
               ticket={ticket}
               client={client}
               hydratingContact={hydratingContact}
@@ -2030,20 +2031,20 @@ export default function DeskV2Root() {
             />
             <nav className="tabs-top" aria-label="Navegação do ticket">
               <div className="tabs-top__tabs">
-                <button
-                  type="button"
-                  className={'tab-btn' + (mainTab === 'conversa' ? ' is-active' : '')}
-                  onClick={() => selectMainTab('conversa')}
-                >
-                  <i className="ti ti-message-2" /> Conversa
-                </button>
-                <button
-                  type="button"
-                  className={'tab-btn' + (mainTab === 'notas' ? ' is-active' : '')}
-                  onClick={() => selectMainTab('notas')}
-                >
-                  <i className="ti ti-file-text" /> Notas
-                </button>
+              <button
+                type="button"
+                className={'tab-btn' + (mainTab === 'conversa' ? ' is-active' : '')}
+                onClick={() => selectMainTab('conversa')}
+              >
+                <i className="ti ti-message-2" /> Conversa
+              </button>
+              <button
+                type="button"
+                className={'tab-btn' + (mainTab === 'notas' ? ' is-active' : '')}
+                onClick={() => selectMainTab('notas')}
+              >
+                <i className="ti ti-file-text" /> Notas
+              </button>
                 <button
                   type="button"
                   className={'tab-btn' + (mainTab === 'eventos' ? ' is-active' : '')}

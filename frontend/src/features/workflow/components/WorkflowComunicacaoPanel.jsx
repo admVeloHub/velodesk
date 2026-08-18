@@ -39,9 +39,20 @@ export default function WorkflowComunicacaoPanel({
   const [thread, setThread] = useState([]);
   const [sending, setSending] = useState(false);
   const [loadingThread, setLoadingThread] = useState(false);
+  const [awaitingSignalDismissed, setAwaitingSignalDismissed] = useState(false);
   const listRef = useRef(null);
   const textareaRef = useRef(null);
   const ticketId = ticket?.id || ticket?._id;
+
+  const lastMessage = thread[thread.length - 1];
+  const lastMessageKey = lastMessage ? `${lastMessage.data || ''}|${lastMessage.mensagem || ''}` : '';
+  // Última mensagem sem prefixo "WF:" = enviada pelo responsável do ticket, aguardando resposta do time de workflow.
+  const awaitingWorkflowReply = Boolean(lastMessage) && !String(lastMessage.autor || '').startsWith('WF:');
+  const showAwaitingSignal = awaitingWorkflowReply && !awaitingSignalDismissed;
+
+  useEffect(() => {
+    setAwaitingSignalDismissed(false);
+  }, [lastMessageKey]);
 
   useEffect(() => {
     if (!ticketId) return undefined;
@@ -113,10 +124,19 @@ export default function WorkflowComunicacaoPanel({
   };
 
   return (
-    <aside className="wf-approval-comunicacao-panel" aria-label="Comunicação com responsável">
+    <aside
+      className={'wf-approval-comunicacao-panel' + (showAwaitingSignal ? ' is-awaiting-reply' : '')}
+      aria-label="Comunicação com responsável"
+    >
       <header className="wf-approval-comunicacao-panel__head">
         <h3>Comunicação</h3>
         <p>com {responsibleAgent || 'responsável do ticket'}</p>
+        {showAwaitingSignal ? (
+          <p className="wf-approval-comunicacao-panel__awaiting-badge">
+            <i className="ti ti-clock" aria-hidden="true" />
+            Aguardando resposta do agente de workflow
+          </p>
+        ) : null}
       </header>
 
       <div className="wf-approval-comunicacao-panel__thread" ref={listRef}>
@@ -155,6 +175,7 @@ export default function WorkflowComunicacaoPanel({
           disabled={locked}
           placeholder="Escreva para o responsável do ticket…"
           onChange={(e) => setMessage(e.target.value)}
+          onFocus={() => setAwaitingSignalDismissed(true)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();

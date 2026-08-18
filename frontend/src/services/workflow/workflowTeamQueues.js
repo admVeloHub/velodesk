@@ -91,9 +91,22 @@ export function isWorkflowActive(ticket) {
   return progress.workflow?.status !== 'completed';
 }
 
+export function isWorkflowTicketCompleted(ticket) {
+  if (!ticket) return false;
+  const workflow = ticket.workflow || ticket.lateralForm?.workflow || {};
+  return Boolean(
+    workflow?.completedAt
+    || workflow?.status === 'completed'
+    || ticket?.status === 'resolvido'
+    || ticket?.status === 'finalizado'
+    || ticket?.status === 'fechado'
+  );
+}
+
 export function ticketMatchesWorkflowTeam(ticket, teamId) {
   const team = normalizeTeamSlug(teamId);
-  if (!team || !isWorkflowActive(ticket)) return false;
+  const isCompleted = isWorkflowTicketCompleted(ticket);
+  if (!team || (!isWorkflowActive(ticket) && !isCompleted)) return false;
 
   const lf = ticket.lateralForm || {};
   const wf = lf.workflow || {};

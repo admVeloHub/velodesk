@@ -6872,17 +6872,11 @@ body.desk-v2-mode #aiChatbotModal {
     align-items: center;
     justify-content: space-between;
     width: 100%;
+    margin: 0;
     padding: 8px 0;
-    border: none;
-    background: transparent;
     font-size: 0.85rem;
     font-weight: 600;
     color: #374151;
-    cursor: pointer;
-}
-
-.wf-approval-essentials__accordion-toggle:hover {
-    color: #1634FF;
 }
 
 .wf-approval-essentials__requisicao-list {
@@ -6924,10 +6918,28 @@ body.desk-v2-mode #aiChatbotModal {
     overflow: hidden;
 }
 
+.wf-approval-comunicacao-panel.is-awaiting-reply {
+    border-color: #F59E0B;
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.25);
+}
+
 .wf-approval-comunicacao-panel__head {
     padding: 12px 14px 10px;
     border-bottom: 1px solid #f3f4f6;
     flex-shrink: 0;
+}
+
+.wf-approval-comunicacao-panel__awaiting-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin: 8px 0 0;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #FEF3C7;
+    color: #92400E;
+    font-size: 0.7rem;
+    font-weight: 700;
 }
 
 .wf-approval-comunicacao-panel__head h3 {

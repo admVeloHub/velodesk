@@ -90,6 +90,16 @@ export default function Sidebar() {
       navigate(path);
       return;
     }
+    if (item.id === 'workflow-finalizados') {
+      const mainContent = document.querySelector('.main-content');
+      if (mainContent) {
+        mainContent.classList.remove('tickets-active');
+        mainContent.style.background = 'transparent';
+      }
+      window.syncMainSidebarNav?.('workflow-finalizados');
+      navigate('/workflow?view=finalizados');
+      return;
+    }
     if (typeof window.navigateToPage === 'function' && item.id !== 'workflow-inbox') {
       window.navigateToPage(item.id);
       return;
@@ -107,7 +117,14 @@ export default function Sidebar() {
 
   const isActive = (item) => {
     const path = item.id === 'tickets' ? '/tickets' : item.path;
-    return location.pathname === path || location.pathname.startsWith(path + '/');
+    if (item.id === 'workflow-finalizados') {
+      return location.pathname === '/workflow' && new URLSearchParams(location.search).get('view') === 'finalizados';
+    }
+    if (item.id === 'workflow-inbox') {
+      return location.pathname === '/workflow' && !new URLSearchParams(location.search).get('view');
+    }
+    const basePath = path.split('?')[0];
+    return location.pathname === basePath || location.pathname.startsWith(basePath + '/');
   };
 
   const wrapClass = [

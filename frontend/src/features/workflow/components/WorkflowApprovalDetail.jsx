@@ -106,11 +106,7 @@ export default function WorkflowApprovalDetail({
 
             <p className="wf-approval-detail__meta wf-approval-detail__meta--compact">
 
-              {detail.essentials?.protocol ? `#${detail.essentials.protocol}` : null}
-
-              {detail.essentials?.protocol && detail.metaLine ? ' · ' : null}
-
-              {detail.metaLine}
+              {detail.metaLine || (detail.essentials?.protocol ? `Ticket #${detail.essentials.protocol}` : null)}
 
             </p>
 

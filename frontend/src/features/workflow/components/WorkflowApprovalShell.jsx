@@ -24,6 +24,7 @@ import {
   getWorkflowTeamQueueMeta,
   ticketMatchesWorkflowTeam,
   resolveWorkflowTeamForTicket,
+  isWorkflowTicketCompleted,
 } from '../../../services/workflow/workflowTeamQueues';
 import {
   approveWorkflowDecision,
@@ -70,6 +71,7 @@ export default function WorkflowApprovalShell() {
     [teamQueueId],
   );
   const queueView = searchParams.get('view');
+  const normalizedQueueView = queueView === 'finalizados' ? 'finalizados' : queueView === 'respondidos' ? 'respondidos' : null;
 
   useEffect(() => {
     const onDemoChange = () => setDemoRevision((v) => v + 1);
@@ -127,17 +129,17 @@ export default function WorkflowApprovalShell() {
     }
     const data = teamQueueId
       ? computeWorkflowTeamQueue(teamQueueId, {
-        view: queueView === 'respondidos' ? 'respondidos' : null,
+        view: normalizedQueueView,
       })
       : computeWorkflowAssigneeQueue();
     deskLog.workflow('fila calculada', {
       teamQueueId,
-      queueView,
+      queueView: normalizedQueueView,
       pending: data.summary?.pendingCount,
       fila: data.queue?.length,
     });
     return data;
-  }, [hasWorkflowAccess, teamQueueId, queueView, refreshKey, demoRevision, workflowDefinitions, workflowConfigLoading]);
+  }, [hasWorkflowAccess, teamQueueId, normalizedQueueView, refreshKey, demoRevision, workflowDefinitions, workflowConfigLoading]);
 
   const detail = useMemo(
     () => (selectedId && hasWorkflowAccess ? getWorkflowApprovalDetail(selectedId, teamQueueId) : null),
@@ -259,21 +261,21 @@ export default function WorkflowApprovalShell() {
   }, [navigate]);
 
   const runAction = useCallback(async (actionFn, successMsg, args = []) => {
-    if (!selectedId || busy) return false;
+    if (!selectedId || busy) return { ok: false, result: null };
     setBusy(true);
     try {
-      await actionFn(selectedId, ...args);
+      const result = await actionFn(selectedId, ...args);
       await refreshTickets();
       setDetailRevision((v) => v + 1);
       showNotification(successMsg, 'success');
-      return true;
+      return { ok: true, result };
     } catch (err) {
       deskLog.error('WORKFLOW', 'ação falhou', {
         ticketId: selectedId,
         message: err?.response?.data?.message || err?.message,
       });
       showNotification(err?.response?.data?.message || 'Não foi possível concluir a ação.', 'error');
-      return false;
+      return { ok: false, result: null };
     } finally {
       setBusy(false);
     }
@@ -288,10 +290,23 @@ export default function WorkflowApprovalShell() {
     [runAction],
   );
 
-  const handleFeito = useCallback(
-    () => runAction(approveWorkflowDecision, 'Alteração concluída e workflow avançado.'),
-    [runAction],
-  );
+  const handleFeito = useCallback(async () => {
+    const { ok, result } = await runAction(
+      approveWorkflowDecision,
+      'Solicitação finalizada — cliente notificado e ticket movido para Resolvido.',
+      [{ finalizeProdutos: true }],
+    );
+    if (!ok) return;
+    const finalized = isWorkflowTicketCompleted(result);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (finalized) {
+        next.set('view', 'finalizados');
+      }
+      next.delete('ticket');
+      return next;
+    }, { replace: true });
+  }, [runAction, setSearchParams]);
 
   const handleReject = useCallback(
     () => runAction(rejectWorkflowDecision, 'Solicitação reprovada.'),

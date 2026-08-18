@@ -3,11 +3,13 @@
  * VERSION: v1.2.0 | DATE: 2026-08-05
  */
 import React, { useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { hasWorkflowPortalAccess } from '../../services/permissions/permissionService';
 import WorkflowApprovalShell from './components/WorkflowApprovalShell';
 
 export default function WorkflowPage() {
+  const location = useLocation();
+
   useEffect(() => {
     const mainContent = document.querySelector('.main-content');
     if (!mainContent) return undefined;
@@ -19,7 +21,10 @@ export default function WorkflowPage() {
     mainContent.style.minHeight = '0';
     mainContent.style.overflow = 'hidden';
     mainContent.style.padding = '0';
-    window.syncMainSidebarNav?.('workflow-inbox');
+
+    const params = new URLSearchParams(location.search);
+    const activePage = params.get('view') === 'finalizados' ? 'workflow-finalizados' : 'workflow-inbox';
+    window.syncMainSidebarNav?.(activePage);
 
     return () => {
       mainContent.style.display = '';

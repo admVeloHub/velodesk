@@ -37,10 +37,50 @@ export async function approveWorkflowDecision(ticketId, options = {}) {
   const apiTicket = await ticketsApi.advanceWorkflow(ticketId, { decision: 'approve' });
   const ticket = await persistTicketFromApi(ticketId, apiTicket);
 
-  const isProdutosFinalize = Boolean(options.selectedActions?.length);
-  if (!isProdutosFinalize || !ticket) return ticket;
+  // A API omite `workflow` inteiro quando o backend o marca como inativo (concluído),
+  // então `completedAt` nunca vem preenchido — `workflow.active` é o único sinal confiável
+  // de que o workflow ainda tem etapas pendentes (ex.: "Retorno ao cliente" após produtos).
+  const stillActive = Boolean(apiTicket?.workflow?.active);
+  let finalTicket = ticket;
 
-  const clientText = buildProdutosConclusaoClientMessage(ticket);
+  if (!stillActive) {
+    const completedAt = apiTicket?.workflow?.completedAt
+      || apiTicket?.lateralForm?.workflow?.completedAt
+      || new Date().toISOString();
+
+    finalTicket = (await updateTicketInCache(ticketId, (t) => {
+      if (!t) return t;
+      const next = { ...t };
+      const workflow = next.workflow || {};
+      const lateralWorkflow = next.lateralForm?.workflow || {};
+      next.workflow = {
+        ...workflow,
+        active: false,
+        completedAt,
+        status: 'completed',
+        stepHistory: workflow.stepHistory || lateralWorkflow.stepHistory || [],
+      };
+      next.lateralForm = {
+        ...next.lateralForm,
+        workflow: {
+          ...lateralWorkflow,
+          active: false,
+          completedAt,
+          status: 'completed',
+          stepHistory: lateralWorkflow.stepHistory || workflow.stepHistory || [],
+        },
+      };
+      next.status = 'resolvido';
+      return next;
+    })) || finalTicket;
+  }
+
+  // "Feito" do time de produtos sempre encerra o workflow (ver advanceWorkflowProdutosQueueDecision
+  // no backend) — quando realmente concluído, notifica o cliente e move o ticket para Resolvido.
+  const isProdutosFinalize = options.finalizeProdutos === true && !stillActive;
+  if (!isProdutosFinalize || !finalTicket) return finalTicket;
+
+  const clientText = buildProdutosConclusaoClientMessage(finalTicket);
   await sendTicketMessage(ticketId, clientText, getAgentName() || 'Operador Produtos');
 
   const entry = findTicketEntry(ticketId);
@@ -52,12 +92,12 @@ export async function approveWorkflowDecision(ticketId, options = {}) {
     });
   }
 
-  const solic = ticket.lateralForm?.solicitacaoProdutos;
+  const solic = finalTicket.lateralForm?.solicitacaoProdutos;
   if (solic?.id) {
     markSolicitacaoFeita(solic.id);
   }
 
-  return ticket;
+  return finalTicket;
 }
 
 export async function rejectWorkflowDecision(ticketId) {

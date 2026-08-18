@@ -28,10 +28,10 @@ function requireMongoUri(): string {
     return '';
   }
 
-  const hint = envFileResult?.envPath
-    ? `Verifique MONGODB_URI em ${envFileResult.envPath}`
-    : 'Crie backend/.env a partir de backend/.env.example';
-  throw new Error(`MONGODB_URI ausente — ${hint}`);
+  console.warn(
+    '[env] MONGODB_URI ausente em desenvolvimento — o backend tentará MongoDB em memória local.'
+  );
+  return '';
 }
 
 export const envFile = envFileResult as {

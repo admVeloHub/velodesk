@@ -1,7 +1,7 @@
 /**
  * WorkflowApprovalEssentials — ficha limpa do detalhe /workflow
  */
-import React, { useState } from 'react';
+import React from 'react';
 import WorkflowApprovalAttachments from './WorkflowApprovalAttachments';
 
 function EssentialRow({ label, value, children }) {
@@ -15,8 +15,6 @@ function EssentialRow({ label, value, children }) {
 }
 
 export default function WorkflowApprovalEssentials({ essentials, slaLabel }) {
-  const [requisicaoOpen, setRequisicaoOpen] = useState(false);
-
   if (!essentials) return null;
 
   const {
@@ -91,25 +89,17 @@ export default function WorkflowApprovalEssentials({ essentials, slaLabel }) {
 
       {requisicaoFields.length ? (
         <div className="wf-approval-essentials__accordion">
-          <button
-            type="button"
-            className="wf-approval-essentials__accordion-toggle"
-            aria-expanded={requisicaoOpen}
-            onClick={() => setRequisicaoOpen((v) => !v)}
-          >
+          <p className="wf-approval-essentials__accordion-toggle">
             <span>Dados da requisição</span>
-            <i className={`ti ti-chevron-${requisicaoOpen ? 'up' : 'down'}`} aria-hidden="true" />
-          </button>
-          {requisicaoOpen ? (
-            <ul className="wf-approval-essentials__requisicao-list">
-              {requisicaoFields.map((field) => (
-                <li key={field.label}>
-                  <span>{field.label}</span>
-                  <strong>{field.value}</strong>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          </p>
+          <ul className="wf-approval-essentials__requisicao-list">
+            {requisicaoFields.map((field) => (
+              <li key={field.label}>
+                <span>{field.label}</span>
+                <strong>{field.value}</strong>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
     </section>

@@ -41,7 +41,7 @@ export const PROFILES = {
     icon: 'fa-diagram-project',
     color: '#1694FF',
     desc: 'Fluxos operacionais entre times e acompanhamento de etapas',
-    nav: ['workspace', 'workflow-inbox', 'busca-tickets'],
+    nav: ['workspace', 'workflow-inbox', 'busca-tickets', 'workflow-finalizados'],
     defaultPage: 'workflow-inbox',
   },
   especiais: {
@@ -83,6 +83,13 @@ export const NAV_ITEMS = [
     label: 'Busca de Tickets',
     icon: 'ti-search',
     tooltip: 'Busca avançada de tickets',
+  },
+  {
+    id: 'workflow-finalizados',
+    path: '/workflow?view=finalizados',
+    label: 'Finalizados',
+    icon: 'ti-checks',
+    tooltip: 'Solicitações concluídas do workflow',
   },
   {
     id: 'especiais-reclame-aqui',

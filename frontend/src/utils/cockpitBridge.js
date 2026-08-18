@@ -17,6 +17,7 @@ const PAGE_ROUTES = {
   'especiais-bacen': '/especiais/bacen',
   'especiais-processos': '/especiais/processos',
   'workflow-inbox': '/workflow',
+  'workflow-finalizados': '/workflow?view=finalizados',
   reports: '/reports',
   config: '/config',
   'analytics-ia': '/analytics-ia',

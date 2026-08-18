@@ -9,7 +9,7 @@ import { DeskStatusCommitButton } from './DeskComposePanel';
 import ProcessosPopover from './ProcessosPopover';
 import { DESK_THERMOMETER_UI_ENABLED } from '../../../services/desk/constants';
 import { isTicketWorkflowActive } from '../../../services/desk/utils';
-import { ticketHasComunicacaoWorkflow } from '../../../services/workflow/workflowDecisionHandlers';
+import { resolveComunicacaoResumo, ticketHasComunicacaoWorkflow } from '../../../services/workflow/workflowDecisionHandlers';
 
 const CANAL_OPTIONS_FALLBACK = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
 const TIPO_OPTIONS_FALLBACK = ['Reclamação', 'Solicitação', 'Dúvida', 'Informação'];
@@ -109,6 +109,8 @@ export default function DeskRightPanel({
   const showThermoUi = DESK_THERMOMETER_UI_ENABLED;
   const showStartWorkflow = canStartWorkflow && !inWorkflow && !ticketReadOnly;
   const showReplyWorkflow = inWorkflow && ticketHasComunicacaoWorkflow(ticket) && typeof onReplyWorkflowRequest === 'function';
+  // Última mensagem enviada pelo time de workflow ("WF:") = ainda não respondida pelo agente responsável.
+  const hasUnreadWorkflowMessage = showReplyWorkflow && resolveComunicacaoResumo(ticket)?.ultimaOrigem === 'workflow';
 
   return (
     <aside className="crm-right-panel" id="crmRightPanel">
@@ -257,12 +259,22 @@ export default function DeskRightPanel({
             {showReplyWorkflow ? (
               <button
                 type="button"
-                className={'container-secondary rp-tabulation-actions__btn rp-tabulation-actions__btn--reply-wf' + (replyWorkflowBusy ? ' is-active' : '')}
+                className={
+                  'container-secondary rp-tabulation-actions__btn rp-tabulation-actions__btn--reply-wf'
+                  + (replyWorkflowBusy ? ' is-active' : '')
+                  + (hasUnreadWorkflowMessage ? ' is-unread' : '')
+                }
                 id="btnReplyWorkflowRequest"
                 disabled={replyWorkflowBusy}
                 onClick={onReplyWorkflowRequest}
               >
+                {hasUnreadWorkflowMessage ? (
+                  <span className="rp-tabulation-actions__unread-dot" aria-hidden="true" />
+                ) : null}
                 Responder Solicitação
+                {hasUnreadWorkflowMessage ? (
+                  <span className="sr-only"> (nova mensagem do workflow aguardando resposta)</span>
+                ) : null}
               </button>
             ) : null}
           </div>

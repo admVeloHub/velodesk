@@ -6152,6 +6152,45 @@
     cursor: not-allowed;
 }
 
+#velodeskDeskV2Root .rp-tabulation-actions__btn--reply-wf.is-unread {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-color: #DC2626;
+    color: #DC2626;
+}
+
+#velodeskDeskV2Root .rp-tabulation-actions__btn--reply-wf.is-unread:hover:not(:disabled) {
+    background: rgba(220, 38, 38, 0.08);
+}
+
+#velodeskDeskV2Root .rp-tabulation-actions__unread-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #DC2626;
+    flex-shrink: 0;
+    animation: rpUnreadDotPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes rpUnreadDotPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* Processos drawer ? portal fixed ? esquerda do painel direito */
 .ia-processos-drawer {
     position: relative;

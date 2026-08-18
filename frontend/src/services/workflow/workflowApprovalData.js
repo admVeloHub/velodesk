@@ -26,6 +26,7 @@ import { ticketAwaitingProdutosComunicacaoReview } from './workflowDecisionHandl
 import {
   getWorkflowTeamQueueMeta,
   isTeamStepActive,
+  isWorkflowTicketCompleted,
   ticketMatchesWorkflowTeam,
   WORKFLOW_TEAM_QUEUES,
 } from './workflowTeamQueues';
@@ -1037,10 +1038,16 @@ function countApprovedToday() {
 export function computeWorkflowTeamQueue(teamId, options = {}) {
   const meta = getWorkflowTeamQueueMeta(teamId);
   const label = meta?.name || teamId;
-  const respondidosView = options.view === 'respondidos';
+  const finalizedView = options.view === 'finalizados' || options.view === 'respondidos';
   let entries = sortTeamQueueEntries(collectTeamWorkflowEntries(teamId), teamId);
-  if (respondidosView) {
-    entries = entries.filter(({ entry }) => ticketAwaitingProdutosComunicacaoReview(entry.ticket));
+  if (!finalizedView) {
+    entries = entries.filter(({ entry }) => !isWorkflowTicketCompleted(entry.ticket));
+  } else {
+    entries = entries.filter(({ entry }) => {
+      const comp = isWorkflowTicketCompleted(entry.ticket);
+      const progress = getWorkflowProgress(entry.ticket);
+      return comp || progress?.workflow?.status === 'completed' || ticketAwaitingProdutosComunicacaoReview(entry.ticket);
+    });
   }
   let slaCritical = 0;
   let awaitingDecisionCount = 0;
@@ -1052,7 +1059,7 @@ export function computeWorkflowTeamQueue(teamId, options = {}) {
 
   return {
     teamId,
-    queueLabel: respondidosView ? `${label} · Respondidos` : label,
+    queueLabel: finalizedView ? `${label} · Finalizados` : label,
     queue: entries.map((item) => item.queueItem),
     summary: {
       pendingCount: entries.length,
@@ -1061,7 +1068,7 @@ export function computeWorkflowTeamQueue(teamId, options = {}) {
       slaCriticalCount: slaCritical,
     },
     entries,
-    view: respondidosView ? 'respondidos' : null,
+    view: finalizedView ? 'finalizados' : null,
   };
 }
 

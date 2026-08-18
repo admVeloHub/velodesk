@@ -562,7 +562,9 @@ async function advanceWorkflowProdutosQueueDecision(
     metadados: { workflowDecision: 'approve' },
   });
   wf.pendingDecision = null;
-  await advanceToStep(chamado, definicao, produtosStepIdx + 1, autor, {
+  // "Feito" em produtos encerra o workflow — o agente é notificado automaticamente
+  // pelo frontend, então nenhuma etapa manual (ex.: "Retorno ao cliente") é necessária depois.
+  await advanceToStep(chamado, definicao, sortPassos(definicao).length, autor, {
     trigger: 'produtos-queue-feito',
     decision: 'approve',
   });
