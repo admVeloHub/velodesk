@@ -25,11 +25,13 @@ import {
   ticketMatchesWorkflowTeam,
   resolveWorkflowTeamForTicket,
   isWorkflowTicketCompleted,
+  isTicketClosedByAgent,
 } from '../../../services/workflow/workflowTeamQueues';
 import {
   approveWorkflowDecision,
   rejectWorkflowDecision,
   requestWorkflowInfo,
+  resolveComunicacaoResumo,
 } from '../../../services/workflow/workflowDecisionHandlers';
 import { getWorkflowProgress, isTicketInWorkflow } from '../../../services/desk/utils';
 import { resolveAutomaticaConfig } from '../../config/workflow/workflowConfigData';
@@ -308,10 +310,31 @@ export default function WorkflowApprovalShell() {
     }, { replace: true });
   }, [runAction, setSearchParams]);
 
-  const handleReject = useCallback(
-    () => runAction(rejectWorkflowDecision, 'Solicitação reprovada.'),
-    [runAction],
-  );
+  const handleReject = useCallback(async () => {
+    const ticket = selectedId ? findTicketEntry(selectedId)?.ticket : null;
+    if (!isTicketClosedByAgent(ticket)) {
+      const ultimaOrigem = resolveComunicacaoResumo(ticket)?.ultimaOrigem;
+      if (ultimaOrigem !== 'workflow') {
+        showNotification(
+          'Envie uma comunicação ao responsável do ticket antes de reprovar.',
+          'warning',
+        );
+        return;
+      }
+    }
+
+    const { ok, result } = await runAction(rejectWorkflowDecision, 'Solicitação reprovada.');
+    if (!ok) return;
+    const finalized = isWorkflowTicketCompleted(result);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (finalized) {
+        next.set('view', 'finalizados');
+      }
+      next.delete('ticket');
+      return next;
+    }, { replace: true });
+  }, [runAction, setSearchParams, selectedId, showNotification]);
 
   const handleRequestInfoSubmit = useCallback(async (message) => {
     if (!selectedId || busy) return null;

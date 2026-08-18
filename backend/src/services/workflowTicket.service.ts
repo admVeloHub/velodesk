@@ -7,6 +7,7 @@ import type { IWorkflowDefinicao, IWorkflowPassoEnvelope } from '../models/Workf
 import {
   currentStatus,
   isClientIdentifiedOnChamado,
+  MERGE_TERMINAL_STATUSES,
   readTabulacaoSnapshot,
 } from './chamado.mapper';
 import { getWorkflowById, getWorkflowBySlug, resolveWorkflowForTicket } from './workflowDefinicao.service';
@@ -546,13 +547,41 @@ async function advanceWorkflowProdutosQueueDecision(
   wf.pendingDecision = decision;
 
   if (decision === 'reject') {
+    const ticketJaEncerrado = (MERGE_TERMINAL_STATUSES as readonly string[]).includes(currentStatus(chamado));
+
+    if (!ticketJaEncerrado) {
+      const ultimaOrigem = chamado.workflow?.requisicao?.comunicacaoResumo?.ultimaOrigem;
+      if (ultimaOrigem !== 'workflow') {
+        throw new WorkflowAdvanceError(
+          'Envie uma comunicação ao responsável do ticket antes de reprovar.',
+          400,
+        );
+      }
+    }
+
+    appendWorkflowRegistro(chamado, {
+      autor,
+      alteracoes: [{ workflowDecision: 'reject' }],
+      metadados: { workflowDecision: 'reject' },
+    });
+    wf.pendingDecision = null;
+
+    if (ticketJaEncerrado) {
+      // Ticket já encerrado pelo agente responsável — reprovar aqui apenas conclui o
+      // workflow (não precisa de "Retorno ao cliente" nem de nova comunicação).
+      await advanceToStep(chamado, definicao, sortPassos(definicao).length, autor, {
+        trigger: 'produtos-queue-reject-encerrado',
+        decision: 'reject',
+      });
+      return chamado;
+    }
+
     const devolutivaIdx = resolveDevolutivaStepIndex(definicao);
     await advanceToStep(chamado, definicao, devolutivaIdx, autor, {
       trigger: 'decision-reject',
       skipped: devolutivaIdx > produtosStepIdx + 1,
       decision: 'reject',
     });
-    wf.pendingDecision = null;
     return chamado;
   }
 

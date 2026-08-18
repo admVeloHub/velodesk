@@ -103,7 +103,42 @@ export async function approveWorkflowDecision(ticketId, options = {}) {
 export async function rejectWorkflowDecision(ticketId) {
   deskLog.workflow('reject → API', { ticketId });
   const apiTicket = await ticketsApi.advanceWorkflow(ticketId, { decision: 'reject' });
-  return persistTicketFromApi(ticketId, apiTicket);
+  const ticket = await persistTicketFromApi(ticketId, apiTicket);
+
+  // Reprovar só conclui o workflow quando o ticket já estava encerrado pelo agente
+  // responsável (ver advanceWorkflowProdutosQueueDecision no backend) — nesse caso o
+  // status do ticket permanece o que o agente definiu (resolvido/cancelado/fechado).
+  const stillActive = Boolean(apiTicket?.workflow?.active);
+  if (stillActive) return ticket;
+
+  const completedAt = apiTicket?.workflow?.completedAt
+    || apiTicket?.lateralForm?.workflow?.completedAt
+    || new Date().toISOString();
+
+  return (await updateTicketInCache(ticketId, (t) => {
+    if (!t) return t;
+    const next = { ...t };
+    const workflow = next.workflow || {};
+    const lateralWorkflow = next.lateralForm?.workflow || {};
+    next.workflow = {
+      ...workflow,
+      active: false,
+      completedAt,
+      status: 'completed',
+      stepHistory: workflow.stepHistory || lateralWorkflow.stepHistory || [],
+    };
+    next.lateralForm = {
+      ...next.lateralForm,
+      workflow: {
+        ...lateralWorkflow,
+        active: false,
+        completedAt,
+        status: 'completed',
+        stepHistory: lateralWorkflow.stepHistory || workflow.stepHistory || [],
+      },
+    };
+    return next;
+  })) || ticket;
 }
 
 export async function requestWorkflowInfo(ticketId, message = '', origem = 'workflow') {

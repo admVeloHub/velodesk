@@ -7,7 +7,11 @@ export default function WorkflowApprovalQueueItem({ item, active, onSelect }) {
     <li>
       <button
         type="button"
-        className={'wf-approval-queue-item' + (active ? ' is-active' : '')}
+        className={
+          'wf-approval-queue-item'
+          + (active ? ' is-active' : '')
+          + (item.awaitingComunicacaoReply ? ' is-awaiting-reply' : '')
+        }
         onClick={onSelect}
       >
         <div className="wf-approval-queue-item__top">
@@ -22,6 +26,12 @@ export default function WorkflowApprovalQueueItem({ item, active, onSelect }) {
             <i className={item.channel.icon} aria-hidden="true" />
             {item.channel.label}
           </span>
+          {item.awaitingComunicacaoReply ? (
+            <span className="wf-approval-badge wf-approval-badge--comunicacao">
+              <i className="ti ti-message-circle" aria-hidden="true" />
+              Aguardando resposta
+            </span>
+          ) : null}
           {item.urgencyBadge?.tone === 'critical' ? (
             <span className="wf-approval-badge wf-approval-badge--critical">{item.urgencyBadge.text}</span>
           ) : (

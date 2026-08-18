@@ -123,6 +123,12 @@ export default function Sidebar() {
     if (item.id === 'workflow-inbox') {
       return location.pathname === '/workflow' && !new URLSearchParams(location.search).get('view');
     }
+    if (item.id === 'tickets-resolvidos') {
+      return location.pathname === '/tickets' && new URLSearchParams(location.search).get('queue') === 'resolvidos';
+    }
+    if (item.id === 'tickets') {
+      return location.pathname === '/tickets' && new URLSearchParams(location.search).get('queue') !== 'resolvidos';
+    }
     const basePath = path.split('?')[0];
     return location.pathname === basePath || location.pathname.startsWith(basePath + '/');
   };

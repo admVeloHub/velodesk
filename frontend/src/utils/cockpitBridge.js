@@ -5,6 +5,7 @@
 const PAGE_ROUTES = {
   workspace: '/workspace',
   tickets: '/tickets?desk=v2',
+  'tickets-resolvidos': '/tickets?desk=v2&queue=resolvidos',
   'busca-tickets': '/busca-tickets',
   preferencias: '/preferencias',
   'atendimento-ia-telefonico': '/atendimento-ia-telefonico',
@@ -64,7 +65,7 @@ export function installCockpitBridge(navigate, showNotification, ticketActions =
 
     const mainContent = document.querySelector('.main-content');
     if (mainContent) {
-      if (page === 'tickets') {
+      if (page === 'tickets' || page === 'tickets-resolvidos') {
         mainContent.style.background = 'transparent';
         mainContent.classList.add('tickets-active');
       } else if (isEspeciaisPageId(page)) {

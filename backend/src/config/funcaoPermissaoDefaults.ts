@@ -37,6 +37,7 @@ export const ACESSO_MODULO_IDS: string[] = [
   'reports',
   'especiais-canais',
   'client-portal',
+  'tickets-resolvidos',
 ];
 
 export const PERMISSION_CATALOG: Record<string, string[]> = {
@@ -213,7 +214,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       workspace: { painel_360_proprio: true, painel_360_equipe: false },
       workflow: { avancar: true, aprovar: true, rejeitar: true },
       preferencias: { visualizar: false },
-      acesso: buildAcesso(false, { workspace: true, 'workflow-inbox': true, 'busca-tickets': true }),
+      acesso: buildAcesso(false, { workspace: true, 'workflow-inbox': true, 'busca-tickets': true, 'tickets-resolvidos': true }),
       config: {
         visualizar: false,
         formularios_criar: false,
@@ -244,7 +245,7 @@ export const DEFAULT_FUNCOES_PERMISSOES: FuncaoPermissaoSeed[] = [
       workspace: { painel_360_proprio: true, painel_360_equipe: false },
       workflow: { avancar: true, aprovar: true, rejeitar: true },
       preferencias: { visualizar: false },
-      acesso: buildAcesso(false, { workspace: true, 'workflow-inbox': true, 'busca-tickets': true }),
+      acesso: buildAcesso(false, { workspace: true, 'workflow-inbox': true, 'busca-tickets': true, 'tickets-resolvidos': true }),
       config: {
         visualizar: false,
         formularios_criar: false,

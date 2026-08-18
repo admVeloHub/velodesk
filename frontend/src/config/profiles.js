@@ -133,6 +133,13 @@ export const NAV_ITEMS = [
     icon: 'ti-adjustments',
     tooltip: 'Preferências do agente',
   },
+  {
+    id: 'tickets-resolvidos',
+    path: '/tickets?desk=v2&queue=resolvidos',
+    label: 'Finalizados',
+    icon: 'ti-checks',
+    tooltip: 'Fila de tickets finalizados (Resolvidos)',
+  },
   { id: 'config', path: '/config', label: 'Configurações', icon: 'ti-settings', tooltip: 'Configurações' },
   { id: 'reports', path: '/reports', label: 'Relatórios', icon: 'ti-chart-bar', tooltip: 'Relatórios' },
   { id: 'especiais-canais', path: '/especiais', label: 'Canais Especiais', icon: 'ti-star', tooltip: 'Canais Especiais' },

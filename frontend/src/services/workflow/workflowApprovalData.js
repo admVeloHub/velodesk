@@ -712,6 +712,7 @@ function buildQueueItem(entry, teamId = null) {
       awaitingDecision: false,
       teamStepActive: false,
       queueStatus: 'aguardando',
+      awaitingComunicacaoReply: ticketAwaitingProdutosComunicacaoReview(ticket),
     };
   }
 
@@ -760,6 +761,7 @@ function buildQueueItem(entry, teamId = null) {
       : teamStepActive
         ? 'etapa-ativa'
         : 'aguardando',
+    awaitingComunicacaoReply: ticketAwaitingProdutosComunicacaoReview(ticket),
   };
 }
 

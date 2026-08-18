@@ -6352,6 +6352,11 @@ body.desk-v2-mode #aiChatbotModal {
     box-shadow: none;
 }
 
+.wf-approval-queue-item.is-awaiting-reply {
+    border-left-color: #7C3AED;
+    box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.15);
+}
+
 .wf-approval-queue-item__top {
     display: flex;
     justify-content: space-between;
@@ -6417,6 +6422,16 @@ body.desk-v2-mode #aiChatbotModal {
 .wf-approval-badge--critical {
     background: #FEE2E2;
     color: #991B1B;
+}
+
+.wf-approval-badge--comunicacao {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #EDE9FE;
+    color: #6D28D9;
+    text-transform: none;
+    letter-spacing: normal;
 }
 
 .wf-approval-detail {

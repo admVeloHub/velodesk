@@ -98,9 +98,16 @@ export function isWorkflowTicketCompleted(ticket) {
     workflow?.completedAt
     || workflow?.status === 'completed'
     || ticket?.status === 'resolvido'
+    || ticket?.status === 'cancelado'
     || ticket?.status === 'finalizado'
     || ticket?.status === 'fechado'
   );
+}
+
+/** Ticket já encerrado pelo agente responsável (fora do fluxo de workflow). */
+export function isTicketClosedByAgent(ticket) {
+  const status = String(ticket?.status || '').trim().toLowerCase();
+  return status === 'resolvido' || status === 'cancelado' || status === 'fechado';
 }
 
 export function ticketMatchesWorkflowTeam(ticket, teamId) {
