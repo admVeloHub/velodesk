@@ -126,6 +126,8 @@ function callListItem(doc: ITelephonyCall) {
     rotaAtendida: extractDataCollectedValue(dataCollected, 'rota_atendida'),
     chamadoRegistrado: extractDataCollectedValue(dataCollected, 'chamado_octadesk_registrado'),
     recadosStatus: extractDataCollectedValue(dataCollected, 'recados_operacionais_status'),
+    csatNota: extractDataCollectedValue(dataCollected, 'csat_nota'),
+    csatComentario: extractDataCollectedValue(dataCollected, 'csat_comentario'),
   };
 }
 
@@ -148,6 +150,7 @@ export async function listTelephonyCalls(query: TelephonyCallsQuery = {}) {
 
 /** Linha do export (XLSX) — horário, resumo e transcrição completa de cada ligação do período filtrado. */
 function callExportRow(doc: ITelephonyCall) {
+  const dataCollected = doc.dataCollected as Record<string, unknown> | undefined;
   return {
     id: String(doc._id),
     startedAt: doc.startedAt?.toISOString() ?? null,
@@ -160,6 +163,8 @@ function callExportRow(doc: ITelephonyCall) {
     agentName: doc.agentName ?? null,
     summary: doc.summary ?? '',
     transcript: doc.transcript ?? '',
+    csatNota: extractDataCollectedValue(dataCollected, 'csat_nota'),
+    csatComentario: extractDataCollectedValue(dataCollected, 'csat_comentario'),
   };
 }
 
@@ -167,9 +172,12 @@ const EXPORT_MAX_ROWS = 10000;
 
 export async function exportTelephonyCalls(query: TelephonyCallsQuery = {}) {
   const filter = buildDateFilter(query);
+  // Ordena apenas por endedAt (único campo indexado) para permitir sort via índice
+  // e evitar estourar o limite de memória do MongoDB em períodos com muitas ligações.
   const rows = await TelephonyCall
     .find(filter)
-    .sort({ endedAt: -1, createdAt: -1 })
+    .sort({ endedAt: -1 })
+    .allowDiskUse(true)
     .limit(EXPORT_MAX_ROWS)
     .lean();
   return rows.map((row) => callExportRow(row as unknown as ITelephonyCall));
@@ -219,7 +227,7 @@ export async function getTelephonyCallsStats(query: TelephonyCallsQuery = {}) {
   const filter = buildDateFilter(query);
   const todayStart = startOfDay(new Date());
   const todayEnd = endOfDay(new Date());
-  const [total, withCpf, today, converted] = await Promise.all([
+  const [total, withCpf, today, converted, csatAgg] = await Promise.all([
     TelephonyCall.countDocuments(filter),
     TelephonyCall.countDocuments({ ...filter, clientCpf: { $ne: '' } }),
     TelephonyCall.countDocuments({
@@ -227,8 +235,26 @@ export async function getTelephonyCallsStats(query: TelephonyCallsQuery = {}) {
       endedAt: { $gte: todayStart, $lte: todayEnd },
     }),
     TelephonyCall.countDocuments({ ...filter, isConverted: true }),
+    TelephonyCall.aggregate([
+      { $match: { ...filter, 'dataCollected.csat_nota.value': { $exists: true, $ne: null } } },
+      {
+        $group: {
+          _id: null,
+          avgNota: { $avg: { $toDouble: '$dataCollected.csat_nota.value' } },
+          count: { $sum: 1 },
+        },
+      },
+    ]),
   ]);
-  return { total, withCpf, today, converted };
+  const csat = csatAgg[0] ?? null;
+  return {
+    total,
+    withCpf,
+    today,
+    converted,
+    csatAvgNota: csat ? Math.round(csat.avgNota * 10) / 10 : null,
+    csatCount: csat ? csat.count : 0,
+  };
 }
 
 export function getTelephonyIntegrationInfo(baseUrl: string) {

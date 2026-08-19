@@ -63,6 +63,18 @@ const ENUM_LABELS = {
     antecipacao_2026: 'Antecipação IRPF 2026',
     solicitacao_atendimento: 'Solicitação de atendimento',
   },
+  csat_motivo_nao_coletado: {
+    nota_nao_informada: 'Nota não informada',
+    comentario_nao_informado: 'Comentário não informado',
+    pesquisa_recusada: 'Pesquisa recusada',
+    pesquisa_interrompida: 'Pesquisa interrompida',
+    nova_demanda_antes_da_pesquisa: 'Nova demanda antes da pesquisa',
+    nova_demanda_durante_pesquisa: 'Nova demanda durante a pesquisa',
+    recusou: 'Recusou',
+    desligou_antes_de_responder: 'Desligou antes de responder',
+    sem_resposta: 'Sem resposta',
+    nao_oferecida: 'Não oferecida',
+  },
 };
 
 const FIELD_GROUPS = [
@@ -211,6 +223,26 @@ export function buildDataCollectedSections(dataCollected) {
   }
 
   return sections;
+}
+
+export function buildCsatSummary(dataCollected) {
+  if (!dataCollected || typeof dataCollected !== 'object') return null;
+
+  const participou = extractEntry(dataCollected.csat_participou).value;
+  const notaRaw = extractEntry(dataCollected.csat_nota).value;
+  const comentario = extractEntry(dataCollected.csat_comentario).value;
+  const motivo = extractEntry(dataCollected.csat_motivo_nao_coletado).value;
+
+  if (participou == null && notaRaw == null && !comentario && !motivo) return null;
+
+  const nota = notaRaw != null && Number.isFinite(Number(notaRaw)) ? Number(notaRaw) : null;
+
+  return {
+    participou,
+    nota,
+    comentario: comentario || null,
+    motivoNaoColetadoLabel: motivo ? translateEnum('csat_motivo_nao_coletado', motivo) : null,
+  };
 }
 
 export function desfechoLabel(value) {

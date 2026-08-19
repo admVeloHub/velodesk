@@ -89,6 +89,13 @@
   color: var(--eco-navy, #000058);
 }
 
+.telephony-kpis small {
+  display: block;
+  color: #64748b;
+  font-size: 0.7rem;
+  margin-top: 0.15rem;
+}
+
 .telephony-table-wrap {
   overflow: auto;
   border: 1px solid rgba(0, 0, 88, 0.08);
@@ -313,6 +320,15 @@
   color: #C4291F;
 }
 
+.telephony-table__csat-comment {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 240px;
+  cursor: help;
+}
+
 .telephony-table td small {
   display: block;
   color: #64748b;
@@ -441,6 +457,44 @@
   margin-top: 0.25rem;
   color: #64748b;
   font-size: 0.72rem;
+}
+
+.telephony-csat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.telephony-csat__score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.telephony-csat__score-label {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.telephony-csat__score-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--eco-navy, #000058);
+}
+
+.telephony-csat__stars {
+  color: #FCC200;
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+}
+
+.telephony-csat__comment {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--eco-navy, #000058);
+  white-space: pre-wrap;
 }
 
 .telephony-empty-inline {
