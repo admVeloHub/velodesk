@@ -1,4 +1,4 @@
-/** permission.service v1.8.0 — bypass Configurações por conta (lucas.gravina@velotax.com.br) */
+/** permission.service v1.9.0 — atuação exige responsável/atribuição real; claim explícito */
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { findColaboradorByEmail } from './colaboradoresCadastro.service';
@@ -17,6 +17,7 @@ import {
   normalizeStatusValue,
   readTabulacaoSnapshot,
 } from './chamado.mapper';
+import { sanitizeResponsavel } from './responsavel.util';
 import {
   CANAL_ORIGEM_BY_FUNCAO,
   derivePortalVisivelFromPermissoes,
@@ -29,6 +30,7 @@ import {
   resolvePrimaryFuncao,
 } from '../utils/normalizeFuncao';
 import { getWorkflowById, workflowDefinitionMatchesFuncao } from './workflowDefinicao.service';
+import { provisionalResponsavelFromAuth } from './assignmentRouter.service';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
 
@@ -209,14 +211,10 @@ function matchesResponsavel(
   candidates: string[],
 ): boolean {
   const tab = readTicketTabulacao(chamado);
-  const responsavel = normalizeText(tab.responsavel);
-  if (!responsavel) {
-    const status = normalizeText(
-      chamado.registro?.[chamado.registro.length - 1]?.status || 'novo',
-    );
-    return status === 'novo';
-  }
-  return candidates.some((c) => c === responsavel);
+  const responsavel = sanitizeResponsavel(tab.responsavel);
+  if (!responsavel) return false;
+  const normalizedResp = normalizeText(responsavel);
+  return candidates.some((c) => normalizeText(c) === normalizedResp);
 }
 
 function matchesAtribuidoFuncao(
@@ -324,7 +322,8 @@ function matchesWorkflowScope(
   resolved: ResolvedUserPermissions,
   chamado: IChamadoN1,
 ): boolean {
-  return matchesAtribuidoAnyUserFuncao(resolved, chamado);
+  return matchesAtribuidoAnyUserFuncao(resolved, chamado)
+    || matchesAtribuidoColaborador(resolved, chamado);
 }
 
 function matchesAtribuidoColaborador(
@@ -352,8 +351,7 @@ export function matchesWorkflowStepAssignee(
   const atribuido = normalizeAtribuidoValue(tab.atribuido).toLowerCase();
 
   if (!atribuido) {
-    return matchesResponsavel(chamado, resolved.responsavelCandidates)
-      && hasPermission(resolved.permissoes, 'tickets', 'atuar_responsavel');
+    return false;
   }
 
   if (atribuido.startsWith('funcao:')) {
@@ -383,6 +381,36 @@ function bodyHasInternalPayload(body: Record<string, unknown>): boolean {
     ? body.internalAttachments.map((item) => String(item ?? '').trim()).filter(Boolean)
     : [];
   return internalAttachments.length > 0;
+}
+
+function bodyHasTabulationChangeExceptResponsavel(
+  body: Record<string, unknown>,
+  chamado: IChamadoN1,
+): boolean {
+  const targetStatus = body.status != null && String(body.status).trim()
+    ? normalizeStatusValue(body.status)
+    : currentStatus(chamado);
+  if (targetStatus !== normalizeStatusValue(currentStatus(chamado))) return true;
+
+  const currentTab = readTicketTabulacao(chamado);
+  const bodyLf = body.lateralForm;
+  if (bodyLf && typeof bodyLf === 'object' && !Array.isArray(bodyLf)) {
+    const tabFields = [
+      'tipoChamado',
+      'classificacaoTipo',
+      'produto',
+      'motivo',
+      'detalhe',
+      'atribuido',
+    ] as const;
+    for (const key of tabFields) {
+      const next = String((bodyLf as Record<string, unknown>)[key] ?? '').trim();
+      const prev = String((currentTab as unknown as Record<string, unknown>)[key] ?? '').trim();
+      if (next !== prev) return true;
+    }
+  }
+
+  return false;
 }
 
 function bodyHasTabulationOrStatusChange(
@@ -634,6 +662,59 @@ export async function canWorkflowComunicacao(
     return true;
   }
   return false;
+}
+
+/** Assumir ticket sem responsável real — exige atuar_responsavel; não rouba ticket de outro agente. */
+export function canClaimTicketResponsavel(
+  resolved: ResolvedUserPermissions,
+  chamado: IChamadoN1,
+): boolean {
+  if (!hasPermission(resolved.permissoes, 'tickets', 'atuar_responsavel')) return false;
+  if (hasPermission(resolved.permissoes, 'tickets', 'ver_todos')) return true;
+
+  const tab = readTicketTabulacao(chamado);
+  const existing = sanitizeResponsavel(tab.responsavel);
+  if (existing) {
+    const normalized = normalizeText(existing);
+    return resolved.responsavelCandidates.some((c) => normalizeText(c) === normalized);
+  }
+
+  if (normalizeText(currentStatus(chamado)) !== 'novo') return false;
+
+  const atribuido = normalizeAtribuidoValue(tab.atribuido).toLowerCase();
+  if (!atribuido) return true;
+
+  if (atribuido.startsWith('funcao:')) {
+    return hasPermission(resolved.permissoes, 'tickets', 'atuar_atribuido')
+      && matchesAtribuidoAnyUserFuncao(resolved, chamado);
+  }
+
+  if (atribuido.startsWith('grupo:')) return false;
+
+  return matchesAtribuidoColaborador(resolved, chamado);
+}
+
+/** PUT que apenas define o responsável como o agente logado (Assumir Ticket). */
+export function isResponsavelSelfClaimBody(
+  body: Record<string, unknown>,
+  authUser: AuthPayload,
+  chamado: IChamadoN1,
+): boolean {
+  if (bodyHasPublicPayload(body) || bodyHasInternalPayload(body)) return false;
+  if (bodyHasTabulationChangeExceptResponsavel(body, chamado)) return false;
+
+  const bodyLf = body.lateralForm && typeof body.lateralForm === 'object' && !Array.isArray(body.lateralForm)
+    ? (body.lateralForm as Record<string, unknown>)
+    : {};
+  const nextResp = sanitizeResponsavel(
+    String(body.responsibleAgent ?? bodyLf.responsavel ?? ''),
+  );
+  const authResp = provisionalResponsavelFromAuth(authUser);
+  if (!nextResp || !authResp) return false;
+  if (normalizeText(nextResp) !== normalizeText(authResp)) return false;
+
+  const current = sanitizeResponsavel(readTicketTabulacao(chamado).responsavel);
+  return normalizeText(nextResp) !== normalizeText(current);
 }
 
 export async function assertCanActOnTicket(

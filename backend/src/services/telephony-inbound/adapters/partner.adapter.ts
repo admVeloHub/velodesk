@@ -1,9 +1,9 @@
 /**
- * partner.adapter v1.1.0 — normaliza payload da parceira para TelephonyCallInput
- * Suporta Contact Tel (snake_case) e formato legado simplificado.
+ * partner.adapter v1.2.0 — datas externas parseadas como horário civil BRT
  */
 import { isContactTelPayload, parseContactTelPayload } from './contact-tel.adapter';
 import type { TelephonyCallInput } from '../types';
+import { parseExternalTimestampToDate } from '../../dates/brDateTime.util';
 
 function pickString(body: Record<string, unknown>, keys: string[]): string {
   for (const key of keys) {
@@ -17,8 +17,8 @@ function pickDate(body: Record<string, unknown>, keys: string[]): Date | undefin
   for (const key of keys) {
     const value = body[key];
     if (!value) continue;
-    const date = new Date(String(value));
-    if (!Number.isNaN(date.getTime())) return date;
+    const date = parseExternalTimestampToDate(value);
+    if (date) return date;
   }
   return undefined;
 }

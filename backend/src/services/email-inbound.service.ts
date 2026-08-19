@@ -1,4 +1,5 @@
-/** email-inbound.service v1.16.0 — Bacen RDR structured inbound; scanStatus opcional em emailAttachments */
+/** email-inbound.service v1.17.0 — prazo legal em horário civil BRT (-03:00) */
+import { addBrCivilDaysIso } from './dates/brDateTime.util';
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
@@ -161,10 +162,7 @@ export async function findChamadoByBacenIdDemanda(idDemanda: string) {
 }
 
 function addDaysIso(iso: string, days: number): string {
-  const date = new Date(iso);
-  date.setDate(date.getDate() + days);
-  date.setHours(18, 0, 0, 0);
-  return date.toISOString();
+  return addBrCivilDaysIso(iso, days, { hour: 18, minute: 0 });
 }
 
 export async function findChamadoByEmailMessageId(messageId: string) {

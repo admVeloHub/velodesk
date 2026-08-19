@@ -1,9 +1,8 @@
 /**
- * hugmeImportService — parse e importação em lote de planilhas Hugme (Reclame Aqui)
+ * hugmeImportService v1.2.0 — import assíncrono com poll do lote
  */
 import * as XLSX from 'xlsx';
 import { reclameAquiHugmeApi } from '../../api/client';
-import { loadAllReclamacoes } from './reclameAquiStore';
 
 /** Aliases de colunas — export Hugme "Base Completa" (Relatório de Tickets) */
 export const HUGME_COLUMN_MAP = {
@@ -20,8 +19,15 @@ export const HUGME_COLUMN_MAP = {
   assunto: ['titulo', 'título', 'assunto'],
   descricao: ['texto da reclamacao', 'texto da reclamação', 'descricao', 'descrição'],
   consideracaoConsumidor: ['consideracao consumidor', 'consideração consumidor'],
-  idReclamacaoRa: ['id hugme', 'id ra'],
-  protocoloRa: ['id origem', 'protocolo', 'protocolo ra'],
+  idOrigem: [
+    'id origem',
+    'id da origem',
+    'de origem',
+    'id da reclamacao',
+    'id reclamacao',
+    'id da reclamação',
+  ],
+  idHugme: ['id hugme'],
   dataReclamacao: ['data reclamacao', 'data reclamação', 'data da reclamacao', 'data da reclamação'],
   dataResposta: ['data de resposta', 'data da resposta'],
   produto: ['produto ra', 'produto', 'produto/servico', 'produto/serviço'],
@@ -55,6 +61,19 @@ function normalizeCpf(value) {
 function cellToString(value) {
   if (value == null || value === '') return '';
   if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (Number.isInteger(value) || Math.abs(value) >= 1e10) {
+      return String(Math.trunc(value));
+    }
+  }
+  return String(value).trim();
+}
+
+function cellToIdString(value) {
+  if (value == null || value === '') return '';
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(Math.trunc(value));
+  }
   return String(value).trim();
 }
 
@@ -109,8 +128,9 @@ export function detectHugmeHeaderRow(matrix, scanLimit = 25) {
     const hasNome = normalized.includes('nome');
     const hasCpf = normalized.includes('cpf/cnpj');
     const hasIdHugme = normalized.includes('id hugme');
+    const hasIdOrigem = normalized.includes('id origem') || normalized.includes('id da origem');
     const hasTitulo = normalized.includes('titulo') || normalized.includes('título');
-    if (hasNome && hasCpf && (hasIdHugme || hasTitulo)) {
+    if (hasNome && hasCpf && (hasIdHugme || hasIdOrigem || hasTitulo)) {
       return i;
     }
   }
@@ -126,19 +146,10 @@ function isMetadataRow(row) {
 
 function isDataRow(row, headerIndex) {
   if (isEmptyRow(row) || isMetadataRow(row)) return false;
-  const idOrigem = headerIndex.protocoloRa != null ? cellToString(row[headerIndex.protocoloRa]) : '';
-  const idHugme = headerIndex.idReclamacaoRa != null ? cellToString(row[headerIndex.idReclamacaoRa]) : '';
+  const idOrigem = headerIndex.idOrigem != null ? cellToIdString(row[headerIndex.idOrigem]) : '';
+  const idHugme = headerIndex.idHugme != null ? cellToIdString(row[headerIndex.idHugme]) : '';
   const nome = headerIndex.consumidor != null ? cellToString(row[headerIndex.consumidor]) : '';
   return Boolean(idOrigem || idHugme || nome);
-}
-
-function buildMotivo(row, headerIndex) {
-  const parts = [
-    getFieldFromRow(row, headerIndex, 'motivoRa'),
-    getFieldFromRow(row, headerIndex, 'categoriaRa'),
-    getFieldFromRow(row, headerIndex, 'problemaRa'),
-  ].filter(Boolean);
-  return parts.length ? parts.join(' — ') : undefined;
 }
 
 function buildDescricao(row, headerIndex) {
@@ -157,7 +168,6 @@ function mapStatusRaFromHugme(label) {
   }
   if (value === 'respondido') return 'respondida';
   if (value.includes('avaliado')) return 'aguard-avaliacao';
-  if (value.includes('workflow')) return 'workflow-ativo';
   return undefined;
 }
 
@@ -167,13 +177,19 @@ function getFieldFromRow(row, headerIndex, field) {
   return cellToString(row[idx]);
 }
 
+function getIdFromRow(row, headerIndex, field) {
+  const idx = headerIndex[field];
+  if (idx == null) return '';
+  return cellToIdString(row[idx]);
+}
+
 export function mapRowToReclamacao(row, headerIndex, rowIndex) {
   const consumidor = getFieldFromRow(row, headerIndex, 'consumidor')
     || getFieldFromRow(row, headerIndex, 'nomeSocial');
   const assunto = getFieldFromRow(row, headerIndex, 'assunto');
   const descricao = buildDescricao(row, headerIndex);
-  const idReclamacaoRa = getFieldFromRow(row, headerIndex, 'idReclamacaoRa');
-  const idOrigem = getFieldFromRow(row, headerIndex, 'protocoloRa');
+  const idHugme = getIdFromRow(row, headerIndex, 'idHugme');
+  const idOrigem = getIdFromRow(row, headerIndex, 'idOrigem');
   const cpfRaw = getFieldFromRow(row, headerIndex, 'cpf');
   const dataReclamacao = parseExcelDate(
     headerIndex.dataReclamacao != null ? row[headerIndex.dataReclamacao] : '',
@@ -189,16 +205,21 @@ export function mapRowToReclamacao(row, headerIndex, rowIndex) {
     telefoneWhatsapp: getFieldFromRow(row, headerIndex, 'telefoneWhatsapp'),
     assunto,
     descricao: descricao || assunto,
-    idReclamacaoRa: idReclamacaoRa || idOrigem,
-    protocoloRa: idOrigem ? `RA-ORIG-${idOrigem}` : '',
+    idReclamacaoRa: idOrigem,
+    protocoloRa: idOrigem,
     dataReclamacao: dataReclamacao || undefined,
     produto: getFieldFromRow(row, headerIndex, 'produto') || undefined,
-    tipo: getFieldFromRow(row, headerIndex, 'origem') || 'Reclamação',
-    motivo: buildMotivo(row, headerIndex),
+    tipo: undefined,
+    motivo: '',
     respostaPublica: getFieldFromRow(row, headerIndex, 'respostaPublica') || undefined,
     statusRa,
+    passivelNota: false,
     hugmeMeta: {
       idOrigem: idOrigem || undefined,
+      idHugme: idHugme || undefined,
+      hugmeMotivoRa: getFieldFromRow(row, headerIndex, 'motivoRa') || undefined,
+      hugmeCategoriaRa: getFieldFromRow(row, headerIndex, 'categoriaRa') || undefined,
+      hugmeProblemaRa: getFieldFromRow(row, headerIndex, 'problemaRa') || undefined,
       statusHugme: getFieldFromRow(row, headerIndex, 'statusHugme') || undefined,
       statusRaLabel: statusRaLabel || undefined,
       nota: getFieldFromRow(row, headerIndex, 'nota') || undefined,
@@ -212,42 +233,25 @@ function isEmptyRow(row) {
   return !row.some((cell) => cellToString(cell));
 }
 
-function collectExistingKeys() {
-  const items = loadAllReclamacoes();
-  const ids = new Set();
-  const protocols = new Set();
-  items.forEach((item) => {
-    const idRa = String(item.idReclamacaoRa || '').trim().toLowerCase();
-    const proto = String(item.protocoloRa || '').trim().toLowerCase();
-    if (idRa) ids.add(idRa);
-    if (proto) protocols.add(proto);
-  });
-  return { ids, protocols };
-}
-
-export function validateHugmeRow(form, existingKeys) {
+export function validateHugmeRow(form, seenIdOrigem) {
   const errors = [];
+  const idOrigem = String(form.idReclamacaoRa || form.hugmeMeta?.idOrigem || '').trim();
+
+  if (!idOrigem) errors.push('Id Origem obrigatório');
   if (!form.consumidor?.trim()) errors.push('Consumidor obrigatório');
   if (!form.assunto?.trim() && !form.descricao?.trim()) {
     errors.push('Assunto ou descrição obrigatório');
   }
 
-  const idKey = String(form.idReclamacaoRa || '').trim().toLowerCase();
-  const protoKey = String(form.protocoloRa || '').trim().toLowerCase();
-
-  if (idKey && existingKeys.ids.has(idKey)) {
-    return { status: 'duplicate', errors: ['ID RA já cadastrado'], form };
+  const idKey = idOrigem.toLowerCase();
+  if (idKey && seenIdOrigem.has(idKey)) {
+    return { status: 'duplicate', errors: ['Id Origem duplicado no arquivo'], form };
   }
-  if (protoKey && existingKeys.protocols.has(protoKey)) {
-    return { status: 'duplicate', errors: ['Protocolo RA já cadastrado'], form };
-  }
+  if (idKey) seenIdOrigem.add(idKey);
 
   if (errors.length) {
     return { status: 'invalid', errors, form };
   }
-
-  if (idKey) existingKeys.ids.add(idKey);
-  if (protoKey) existingKeys.protocols.add(protoKey);
 
   return { status: 'valid', errors: [], form };
 }
@@ -255,9 +259,12 @@ export function validateHugmeRow(form, existingKeys) {
 export function prepareHugmeImport(rawRows, headers, { headerRowIndex = 0 } = {}) {
   const headerIndex = buildHeaderIndex(headers);
   const dataRows = rawRows.filter((row) => isDataRow(row, headerIndex));
-  const existingKeys = collectExistingKeys();
+  const seenIdOrigem = new Set();
   const missingColumns = [];
 
+  if (headerIndex.idOrigem == null) {
+    missingColumns.push('Id Origem');
+  }
   if (headerIndex.consumidor == null && headerIndex.nomeSocial == null) {
     missingColumns.push('Nome');
   }
@@ -267,7 +274,7 @@ export function prepareHugmeImport(rawRows, headers, { headerRowIndex = 0 } = {}
 
   const rows = dataRows.map((row, index) => {
     const form = mapRowToReclamacao(row, headerIndex, headerRowIndex + index + 2);
-    const result = validateHugmeRow(form, existingKeys);
+    const result = validateHugmeRow(form, seenIdOrigem);
     return {
       rowIndex: headerRowIndex + index + 2,
       form: result.form,
@@ -324,18 +331,190 @@ function delay(ms) {
 
 export async function importHugmeFileViaApi(file, modo = 'incremental') {
   const result = await reclameAquiHugmeApi.import(file, modo);
+  return mapHugmeImportStart(result);
+}
+
+const HUGME_JOB_STORAGE_KEY = 'velodesk_hugme_import_batch';
+const HUGME_POLL_MS = 800;
+
+let activeHugmeJob = null;
+let hugmePollTimer = null;
+const hugmeJobListeners = new Set();
+const notifiedHugmeBatches = new Set();
+
+function emitHugmeJob() {
+  const snapshot = getActiveHugmeImportJob();
+  hugmeJobListeners.forEach((listener) => {
+    try {
+      listener(snapshot);
+    } catch {
+      // listener fail-soft
+    }
+  });
+}
+
+function persistHugmeJobId(batchId) {
+  try {
+    if (batchId) sessionStorage.setItem(HUGME_JOB_STORAGE_KEY, batchId);
+    else sessionStorage.removeItem(HUGME_JOB_STORAGE_KEY);
+  } catch {
+    // sessionStorage indisponível
+  }
+}
+
+function readStoredHugmeJobId() {
+  try {
+    return sessionStorage.getItem(HUGME_JOB_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function mapHugmeImportStart(result) {
+  const stats = result?.stats || {};
+  const skipped = stats.skipped ?? 0;
+  const total = Math.max(0, (stats.total ?? 0) - skipped);
+  const current = (stats.inserted ?? 0) + (stats.updated ?? 0) + (stats.failed ?? 0);
   return {
     batchId: result.batchId,
     modo: result.modo,
-    created: result.stats?.ticketsCreated ?? 0,
-    stored: (result.stats?.inserted ?? 0) + (result.stats?.updated ?? 0),
-    inserted: result.stats?.inserted ?? 0,
-    updated: result.stats?.updated ?? 0,
-    skipped: result.stats?.skipped ?? 0,
-    failed: result.stats?.failed ?? 0,
-    stats: result.stats,
+    created: stats.ticketsCreated ?? 0,
+    stored: (stats.inserted ?? 0) + (stats.updated ?? 0),
+    inserted: stats.inserted ?? 0,
+    updated: stats.updated ?? 0,
+    skipped,
+    failed: stats.failed ?? 0,
+    stats,
     errors: result.errors || [],
+    running: result.running === true,
+    current,
+    total,
   };
+}
+
+function mapHugmeBatchToJob(batch, previous = {}) {
+  const skipped = batch?.skipped ?? previous.skipped ?? 0;
+  const validTotal = Math.max(0, (batch?.total ?? previous.totalRaw ?? 0) - skipped);
+  const current = (batch?.inserted ?? 0) + (batch?.updated ?? 0) + (batch?.failed ?? 0);
+  const running = batch?.running === true;
+  return {
+    ...previous,
+    batchId: batch?.batchId || previous.batchId,
+    created: batch?.ticketsCreated ?? 0,
+    stored: (batch?.inserted ?? 0) + (batch?.updated ?? 0),
+    inserted: batch?.inserted ?? 0,
+    updated: batch?.updated ?? 0,
+    skipped,
+    failed: batch?.failed ?? 0,
+    errors: batch?.errors || previous.errors || [],
+    running,
+    current,
+    total: validTotal || previous.total || 0,
+    totalRaw: batch?.total ?? previous.totalRaw ?? 0,
+    done: !running,
+  };
+}
+
+function stopHugmePoll() {
+  if (hugmePollTimer) {
+    clearInterval(hugmePollTimer);
+    hugmePollTimer = null;
+  }
+}
+
+function finishHugmeJob(job) {
+  stopHugmePoll();
+  persistHugmeJobId('');
+  activeHugmeJob = { ...job, running: false, done: true };
+  if (job?.batchId && !notifiedHugmeBatches.has(job.batchId)) {
+    notifiedHugmeBatches.add(job.batchId);
+    activeHugmeJob.justFinished = true;
+    try {
+      window.dispatchEvent(new CustomEvent('velodesk:ra-sync'));
+    } catch {
+      // window indisponível
+    }
+  }
+  emitHugmeJob();
+  if (activeHugmeJob) activeHugmeJob.justFinished = false;
+}
+
+async function pollHugmeJobOnce() {
+  if (!activeHugmeJob?.batchId) return;
+  try {
+    const batch = await reclameAquiHugmeApi.getBatch(activeHugmeJob.batchId);
+    activeHugmeJob = mapHugmeBatchToJob(batch, activeHugmeJob);
+    emitHugmeJob();
+    if (!activeHugmeJob.running) finishHugmeJob(activeHugmeJob);
+  } catch (err) {
+    const status = err?.response?.status;
+    if (status === 404) {
+      finishHugmeJob({ ...activeHugmeJob, running: false, done: true, failed: activeHugmeJob.failed || 1 });
+    }
+  }
+}
+
+function startHugmePoll() {
+  stopHugmePoll();
+  hugmePollTimer = setInterval(() => {
+    pollHugmeJobOnce();
+  }, HUGME_POLL_MS);
+  void pollHugmeJobOnce();
+}
+
+export function getActiveHugmeImportJob() {
+  return activeHugmeJob;
+}
+
+export function subscribeHugmeImportJob(listener) {
+  hugmeJobListeners.add(listener);
+  if (activeHugmeJob) listener(activeHugmeJob);
+  return () => hugmeJobListeners.delete(listener);
+}
+
+export function resumeHugmeImportJobIfAny() {
+  if (activeHugmeJob?.running && hugmePollTimer) return activeHugmeJob;
+  const batchId = activeHugmeJob?.batchId || readStoredHugmeJobId();
+  if (!batchId) return null;
+  if (!activeHugmeJob) {
+    activeHugmeJob = {
+      batchId,
+      running: true,
+      done: false,
+      current: 0,
+      total: 0,
+      created: 0,
+      stored: 0,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      errors: [],
+    };
+  }
+  persistHugmeJobId(batchId);
+  startHugmePoll();
+  return activeHugmeJob;
+}
+
+export async function startHugmeImportJob(file, modo = 'incremental') {
+  if (activeHugmeJob?.running) {
+    throw new Error('Já existe uma importação em andamento.');
+  }
+  const started = mapHugmeImportStart(await reclameAquiHugmeApi.import(file, modo));
+  activeHugmeJob = {
+    ...started,
+    done: !started.running,
+    justFinished: false,
+  };
+  persistHugmeJobId(started.batchId);
+  emitHugmeJob();
+  if (!started.running) {
+    finishHugmeJob(activeHugmeJob);
+    return activeHugmeJob;
+  }
+  startHugmePoll();
+  return activeHugmeJob;
 }
 
 /** @deprecated use importHugmeFileViaApi — importação local linha a linha */

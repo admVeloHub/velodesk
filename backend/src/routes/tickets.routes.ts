@@ -1,4 +1,4 @@
-/** tickets.routes v1.21.0 — devolutiva pública conclui último passo do workflow */
+/** tickets.routes v1.22.0 — claim de responsável (Assumir Ticket) com permissão dedicada */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -14,11 +14,14 @@ import {
   assertChamadoModifiable,
   ChamadoClosedError,
   ChamadoCommitValidationError,
+  assertResponsavelForTerminalStatus,
   chamadoToTicket,
   chamadoToTicketLight,
   commitChamadoFromAgent,
   createChamadoFromBody,
+  currentStatus,
   lastStatusFilter,
+  normalizeStatusValue,
   resolveBoxIdForChamado,
   statusFromBoxName,
 } from '../services/chamado.mapper';
@@ -47,7 +50,10 @@ import {
   assertCanInterruptWorkflow,
   assertCanPostTicketMessage,
   assertCanWorkflowComunicacao,
+  canClaimTicketResponsavel,
+  isResponsavelSelfClaimBody,
   PermissionDeniedError,
+  resolveUserPermissions,
 } from '../services/permission.service';
 import {
   mergeTicketInto,
@@ -206,7 +212,15 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
 
   try {
     assertChamadoModifiable(chamado);
-    await assertCanActOnTicket(req.user!, chamado);
+    const isClaim = isResponsavelSelfClaimBody(req.body, req.user!, chamado);
+    if (isClaim) {
+      const resolved = await resolveUserPermissions(req.user!);
+      if (!canClaimTicketResponsavel(resolved, chamado)) {
+        throw new PermissionDeniedError('Sem permissão para assumir este ticket');
+      }
+    } else {
+      await assertCanActOnTicket(req.user!, chamado);
+    }
   } catch (err) {
     if (handleTicketMutationError(err, res)) return;
     throw err;
@@ -222,6 +236,9 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
   }
 
   try {
+    if (req.body.status != null && String(req.body.status).trim()) {
+      assertResponsavelForTerminalStatus(chamado, String(req.body.status));
+    }
     applyManualResponsavelClaim(chamado, req.user);
     await applyBodyToChamado(chamado, req.body, req.user);
     applyManualResponsavelClaim(chamado, req.user);
@@ -283,6 +300,12 @@ router.post('/:id/commit', authMiddleware, async (req, res: Response) => {
     && !(chamado.registro || []).some((r) => String(r.anotacaoInterna || '').trim());
 
   try {
+    const targetStatus = req.body.status != null && String(req.body.status).trim()
+      ? normalizeStatusValue(req.body.status)
+      : currentStatus(chamado);
+    if (targetStatus !== normalizeStatusValue(currentStatus(chamado))) {
+      assertResponsavelForTerminalStatus(chamado, targetStatus);
+    }
     applyManualResponsavelClaim(chamado, req.user);
     const commitResult = await commitChamadoFromAgent(chamado, req.body, req.user);
     applyManualResponsavelClaim(chamado, req.user);

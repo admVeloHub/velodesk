@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.13.0 — commit não espera recarregar as filas para devolver o detalhe
- * VERSION: v1.13.0 | DATE: 2026-08-17 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.14.0 — nota interna: patch otimista sem GET detalhe completo
+ * VERSION: v1.14.0 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -276,7 +276,8 @@ function mergePreservedDetails(prevCols, nextCols) {
     });
   });
   if (!preserved.size) return nextCols;
-  return nextCols.map((box) => ({
+
+  const merged = nextCols.map((box) => ({
     ...box,
     tickets: (box.tickets || []).map((ticket) => {
       const id = String(ticket.id || ticket._id);
@@ -318,6 +319,25 @@ function mergePreservedDetails(prevCols, nextCols) {
       };
     }),
   }));
+
+  const presentIds = new Set();
+  merged.forEach((box) => {
+    (box.tickets || []).forEach((ticket) => {
+      presentIds.add(String(ticket.id || ticket._id));
+    });
+  });
+
+  preserved.forEach((ticket, id) => {
+    if (presentIds.has(id)) return;
+    const boxId = resolveBoxIdForTicketStatus(ticket.status);
+    const box = merged.find((col) => col.id === boxId) || merged[0];
+    if (!box) return;
+    if (!box.tickets) box.tickets = [];
+    box.tickets.unshift(ticket);
+    presentIds.add(id);
+  });
+
+  return merged;
 }
 
 function persistColumnsToStorage(cols, userEmail = '') {
@@ -621,11 +641,160 @@ export async function commitTicketViaApi(ticketId, payload) {
   return updateTicketViaApi(ticketId, () => apiTicketToCockpit(payload));
 }
 
+function dispatchTicketDetailChanged(ticketId) {
+  try {
+    window.dispatchEvent(new CustomEvent('velodesk:ticket-detail-changed', {
+      detail: { ticketId: String(ticketId) },
+    }));
+  } catch {
+    /* ignore */
+  }
+}
+
+function cockpitMessageFromApiDto(dto) {
+  if (!dto) return null;
+  const isInternal = dto.type === 'internal';
+  const rawTime = dto.timestamp || dto.time || new Date();
+  const timestamp = rawTime instanceof Date ? rawTime.toISOString() : String(rawTime);
+  return {
+    ...dto,
+    id: String(dto.id || `${Date.now()}-${isInternal ? 'int' : 'pub'}`),
+    text: String(dto.text || ''),
+    sender: dto.sender || (isInternal ? 'me' : 'them'),
+    origin: dto.origin || (isInternal ? 'agente' : 'cliente'),
+    author: dto.author || '',
+    type: isInternal ? 'internal' : (dto.type || 'agent'),
+    timestamp,
+    time: timestamp,
+    attachments: Array.isArray(dto.attachments) ? dto.attachments.filter(Boolean) : [],
+    fromClient: !isInternal && (dto.origin === 'cliente' || dto.sender === 'them'),
+  };
+}
+
+/** Mescla view=light sobre ticket em cache (threads + responsável/status). */
+function mergeLightTicketIntoCached(prev, light) {
+  if (!light || !prev) return prev;
+  const lf = light.lateralForm || {};
+  return {
+    ...prev,
+    messages: light.messages ?? prev.messages,
+    internalNotes: light.internalNotes ?? prev.internalNotes,
+    registroHistorico: light.registroHistorico ?? prev.registroHistorico,
+    status: light.status ?? prev.status,
+    updatedAt: light.updatedAt ?? prev.updatedAt,
+    queueEntryAt: light.queueEntryAt ?? prev.queueEntryAt,
+    responsibleAgent: light.responsibleAgent ?? prev.responsibleAgent,
+    lateralForm: {
+      ...(prev.lateralForm || {}),
+      ...(lf.responsavel ? { responsavel: lf.responsavel } : {}),
+    },
+    _detailLoaded: true,
+    listOnly: false,
+  };
+}
+
+function applyAddMessageResponseToTicket(ticket, response) {
+  if (!ticket || !response) return ticket;
+  const internalDto = response.internalNote
+    || (response.type === 'internal' ? response : null);
+  const publicDto = response.publicMessage
+    || (response.type && response.type !== 'internal' ? response : null);
+
+  if (!internalDto && !publicDto) return ticket;
+
+  const next = { ...ticket };
+  next.updatedAt = new Date().toISOString();
+
+  if (internalDto) {
+    const note = cockpitMessageFromApiDto(internalDto);
+    const notes = [...(next.internalNotes || [])];
+    if (!notes.some((n) => String(n.id) === String(note.id))) {
+      notes.push(note);
+    }
+    next.internalNotes = notes;
+
+    const hist = [...(next.registroHistorico || next.registroAlteracoes || [])];
+    const regIdx = note.registroIndex ?? hist.length;
+    const histId = `${regIdx}-reg`;
+    if (!hist.some((h) => String(h.id) === histId || (
+      h.registroIndex === regIdx && String(h.anotacaoInterna || '') === note.text
+    ))) {
+      hist.push({
+        id: histId,
+        registroIndex: regIdx,
+        time: note.timestamp,
+        timestamp: note.timestamp,
+        origin: 'agente',
+        autor: note.author,
+        anotacaoInterna: note.text,
+        status: next.status || 'novo',
+      });
+    }
+    next.registroHistorico = hist;
+  }
+
+  if (publicDto) {
+    const msg = cockpitMessageFromApiDto(publicDto);
+    const messages = [...(next.messages || [])];
+    if (!messages.some((m) => String(m.id) === String(msg.id))) {
+      messages.push(msg);
+    }
+    next.messages = messages;
+  }
+
+  return next;
+}
+
+/** Sincroniza threads/responsável em background — não bloqueia UI. */
+export function refreshTicketLightFromApi(ticketId) {
+  const apiId = String(ticketId);
+  if (!useApi || isDraftTicket({ id: apiId })) return Promise.resolve(null);
+  return ticketsApi.getLight(apiId)
+    .then((raw) => {
+      const entry = findInColumns(apiId);
+      if (!entry?.ticket) return null;
+      const light = apiTicketToCockpit(raw);
+      const merged = mergeLightTicketIntoCached(entry.ticket, light);
+      patchTicketInCache(apiId, merged);
+      dispatchTicketDetailChanged(apiId);
+      return merged;
+    })
+    .catch((err) => {
+      deskLog.error('TICKETS', 'refreshTicketLightFromApi → falhou', {
+        ticketId: apiId,
+        message: err?.response?.data?.message || err?.message,
+      });
+      return null;
+    });
+}
+
 export async function addMessageViaApi(ticketId, payload) {
   const apiId = String(ticketId);
   if (useApi && !isDraftTicket({ id: apiId })) {
     assertApiReady('enviar mensagem');
-    await ticketsApi.addMessage(apiId, payload);
+    const isInternalOnly = Boolean(payload.internal);
+    const response = await ticketsApi.addMessage(apiId, payload);
+
+    const entry = findInColumns(apiId);
+    const prevTicket = entry?.ticket;
+    if (prevTicket) {
+      const patched = applyAddMessageResponseToTicket(prevTicket, response);
+      patchTicketInCache(apiId, patched);
+      dispatchTicketDetailChanged(apiId);
+      void refreshTicketLightFromApi(apiId);
+      return patched;
+    }
+
+    if (isInternalOnly) {
+      const light = await ticketsApi.getLight(apiId);
+      const full = apiTicketToCockpit(light);
+      full.listOnly = false;
+      full._detailLoaded = true;
+      insertTicketIntoColumnsIfMissing(full);
+      dispatchTicketDetailChanged(apiId);
+      return full;
+    }
+
     await loadBoxesFromApi();
     const detailed = await loadTicketDetailFromApi(apiId);
     return detailed || findInColumns(apiId)?.ticket;
@@ -797,18 +966,11 @@ export async function persistDraftTicket(ticket, messageOptions = {}) {
 
   const created = await ticketsApi.create(payload);
   const persisted = apiTicketToCockpit(created);
+  persisted.listOnly = false;
+  persisted._detailLoaded = true;
   removeTicketFromColumns(draftId);
-  await loadBoxesFromApi();
-  const entry = findInColumns(persisted.id || persisted._id);
-  if (!entry) {
-    const cols = ensureDefaultColumns();
-    const box = cols.find((c) => c.id === 'novos') || cols[0];
-    if (box) {
-      if (!box.tickets) box.tickets = [];
-      box.tickets.unshift(persisted);
-      columns = cols;
-    }
-  }
+  insertTicketIntoColumnsIfMissing(persisted);
+  void loadBoxesFromApi().catch(() => {});
   return persisted;
 }
 

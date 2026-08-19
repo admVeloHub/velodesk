@@ -1,6 +1,6 @@
 /**
- * attachmentPreview v1.1.0 — mensagens 423/403 de scan
- * VERSION: v1.1.0 | DATE: 2026-08-13
+ * attachmentPreview v1.2.0 — coleta de anexos do ticket para console /workflow
+ * VERSION: v1.2.0 | DATE: 2026-08-19
  */
 
 const OFFICE_MIME = new Set([
@@ -133,4 +133,47 @@ export function downloadObjectUrl(objectUrl, filename) {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
+}
+
+function isBrandInlineAttachmentUrl(url) {
+  const label = attachmentLabelFromUrl(url).toLowerCase();
+  return label.includes('simbolo_velotax')
+    || label.includes('velodesk-brand')
+    || /^logo\.(png|jpe?g|gif|webp)$/i.test(label);
+}
+
+function pushMessageAttachments(result, seen, message) {
+  if (!message) return;
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  const scanStatuses = Array.isArray(message.attachmentScanStatuses)
+    ? message.attachmentScanStatuses
+    : [];
+  const contentTypes = Array.isArray(message.mediaContentTypes)
+    ? message.mediaContentTypes
+    : [];
+
+  attachments.forEach((raw, index) => {
+    const url = String(raw || '').trim();
+    if (!url || seen.has(url) || isBrandInlineAttachmentUrl(url)) return;
+    seen.add(url);
+    result.push({
+      url,
+      label: attachmentLabelFromUrl(url),
+      scanStatus: String(scanStatuses[index] || '').trim().toLowerCase(),
+      contentType: String(contentTypes[index] || '').trim(),
+    });
+  });
+}
+
+/** Anexos únicos das mensagens públicas e notas internas do ticket. */
+export function collectTicketAttachments(ticket) {
+  if (!ticket) return [];
+
+  const seen = new Set();
+  const result = [];
+
+  (ticket.messages || []).forEach((message) => pushMessageAttachments(result, seen, message));
+  (ticket.internalNotes || []).forEach((note) => pushMessageAttachments(result, seen, note));
+
+  return result;
 }

@@ -1,10 +1,11 @@
 /**
- * permissionService v1.7.0 — compose público vs comentário interno em workflow
- * VERSION: v1.7.0 | DATE: 2026-08-07
+ * permissionService v1.9.0 — canActOnTicket alinhado ao backend (sanitizeResponsavel)
+ * VERSION: v1.9.0 | DATE: 2026-08-18
  */
 import api from '../../api/client';
 import { normalizeProfileId } from '../../config/profiles';
 import { isWorkflowTeamQueueId } from '../workflow/workflowTeamQueues';
+import { sanitizeResponsavel } from '../tabulationConfig';
 
 const STORAGE_KEY = 'velodesk_permissions';
 
@@ -289,8 +290,16 @@ function matchesWorkflowDefinitionTeam(ticket, perm) {
   return userFuncaoSlugs(perm).includes(team);
 }
 
+function matchesAtribuidoColaborador(ticket, perm) {
+  const raw = normalizeAtribuido(ticket?.lateralForm?.atribuido);
+  if (!raw || raw.startsWith('funcao:') || raw.startsWith('grupo:')) return false;
+  const candidates = buildResponsavelCandidatesFromSession();
+  return candidates.includes(raw);
+}
+
 function matchesWorkflowScope(ticket, perm) {
   return matchesAtribuidoAnyUserFuncao(ticket, perm)
+    || matchesAtribuidoColaborador(ticket, perm)
     || matchesWorkflowDefinitionTeam(ticket, perm);
 }
 
@@ -306,15 +315,21 @@ export function canActOnTicket(ticket, perm = readCachedPermissions()) {
     }
   }
 
-  const responsavel = normalizeText(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
+  const responsavel = sanitizeResponsavel(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
   const candidates = buildResponsavelCandidatesFromSession();
-  const status = normalizeText(ticket?.status || '');
 
-  if (!responsavel && status === 'novo') {
-    return hasPermission(permissoes, 'tickets', 'atuar_responsavel');
+  if (!responsavel) {
+    if (
+      hasPermission(permissoes, 'tickets', 'atuar_atribuido')
+      && matchesWorkflowScope(ticket, perm)
+    ) {
+      return true;
+    }
+    return false;
   }
 
-  if (candidates.includes(responsavel) && hasPermission(permissoes, 'tickets', 'atuar_responsavel')) {
+  const normalizedResp = normalizeText(responsavel);
+  if (candidates.some((c) => c === normalizedResp) && hasPermission(permissoes, 'tickets', 'atuar_responsavel')) {
     return true;
   }
 

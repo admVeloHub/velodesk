@@ -1,4 +1,4 @@
-/** tabulationOpcoes.service v1.0.1 — normaliza _id em subdocumentos legados */
+/** tabulationOpcoes.service v1.1.0 — motivos por órgão + seed RA */
 import { Types } from 'mongoose';
 import {
   getTabulacaoOpcoesModel,
@@ -101,7 +101,58 @@ async function getOrCreateDoc(categoria: TabulacaoOpcoesCategoria): Promise<ITab
   return doc;
 }
 
+export const MOTIVO_RECLAME_AQUI_SEED = [
+  'Reativação cadastral',
+  'Alteração cadastral',
+  'Abatimento de Juros',
+  'Valor mínimo para contratação',
+  'Limite baixo do pix',
+  'Portabilidade Pix',
+  'Em cobrança',
+  'Cancelamento até 7 dias',
+  'Cancelamento sup. 7 dias',
+  'Erro Gov',
+  'Não Elegível a crédito',
+  'Alega Fraude',
+  'Desativado',
+  'Dívida Prescrita',
+  'Dúvidas Gerais',
+  'Encerramento conta App',
+  'Encerramento conta Celcoin',
+  'Erro app',
+  'Liberação chave pix',
+  'Juros Abusivo',
+  'Quitação do contrato',
+  'Quitação automática sem chave pix',
+];
+
+const ORGAO_MOTIVO_CATEGORIAS: TabulacaoOpcoesCategoria[] = [
+  TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI,
+  TABULACAO_OPCOES_CATEGORIAS.MOTIVO_PROCON,
+  TABULACAO_OPCOES_CATEGORIAS.MOTIVO_CONSUMIDOR_GOV,
+  TABULACAO_OPCOES_CATEGORIAS.MOTIVO_BACEN,
+];
+
+export async function ensureOrgaoMotivoCategorias(): Promise<void> {
+  for (const categoria of ORGAO_MOTIVO_CATEGORIAS) {
+    const doc = await getOrCreateDoc(categoria);
+    if (
+      categoria === TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI
+      && (!doc.opcoes || doc.opcoes.length === 0)
+    ) {
+      doc.opcoes = MOTIVO_RECLAME_AQUI_SEED.map((valor, ordem) => ({
+        valor,
+        ordem,
+        ativo: true,
+      })) as ITabulacaoOpcaoItem[];
+      doc.updatedBy = 'seed';
+      await doc.save();
+    }
+  }
+}
+
 export async function listOpcoes(includeInactive = true): Promise<TabulacaoOpcoesDto[]> {
+  await ensureOrgaoMotivoCategorias();
   const Model = getTabulacaoOpcoesModel();
   const docs = await Model.find({}).sort({ categoria: 1 });
   for (const doc of docs) {
@@ -121,6 +172,7 @@ export async function getOpcoesByCategoria(
   includeInactive = true
 ): Promise<TabulacaoOpcoesDto | null> {
   const categoria = assertCategoria(categoriaInput);
+  await ensureOrgaoMotivoCategorias();
   const Model = getTabulacaoOpcoesModel();
   const doc = await Model.findOne({ categoria });
   if (!doc) return null;
@@ -254,5 +306,21 @@ export const DEFAULT_TABULACAO_OPCOES: Array<{
       { valor: 'E-mail', ordem: 2, ativo: true },
       { valor: 'Portal', ordem: 3, ativo: true },
     ],
+  },
+  {
+    categoria: TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI,
+    opcoes: MOTIVO_RECLAME_AQUI_SEED.map((valor, ordem) => ({ valor, ordem, ativo: true })),
+  },
+  {
+    categoria: TABULACAO_OPCOES_CATEGORIAS.MOTIVO_PROCON,
+    opcoes: [],
+  },
+  {
+    categoria: TABULACAO_OPCOES_CATEGORIAS.MOTIVO_CONSUMIDOR_GOV,
+    opcoes: [],
+  },
+  {
+    categoria: TABULACAO_OPCOES_CATEGORIAS.MOTIVO_BACEN,
+    opcoes: [],
   },
 ];

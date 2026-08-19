@@ -6863,6 +6863,71 @@ body.desk-v2-mode #aiChatbotModal {
     margin-bottom: 8px;
 }
 
+.wf-approval-ticket-attachments__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.wf-approval-ticket-attachments__item {
+    margin: 0;
+}
+
+.wf-approval-ticket-attachments__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    margin: 0;
+    padding: 6px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #f9fafb;
+    color: #1634FF;
+    font-size: 0.84rem;
+    font-weight: 500;
+    line-height: 1.35;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.wf-approval-ticket-attachments__link:hover:not(:disabled) {
+    background: #eef2ff;
+    border-color: #c7d2fe;
+}
+
+.wf-approval-ticket-attachments__link:disabled {
+    cursor: default;
+    opacity: 0.85;
+}
+
+.wf-approval-ticket-attachments__link--pending {
+    color: #6b7280;
+}
+
+.wf-approval-ticket-attachments__link--error {
+    color: #b91c1c;
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
+.wf-approval-ticket-attachments__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wf-approval-ticket-attachments__error {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.78rem;
+    color: #b91c1c;
+}
+
 .wf-approval-produtos-attachments--compact {
     border: none;
     padding: 0;
@@ -11116,6 +11181,7 @@ body.desk-v2-mode #aiChatbotModal {
 
 .ra-hugme-progress__bar {
     height: 100%;
+    min-width: 0;
     background: linear-gradient(90deg, #1634FF, #000058);
     border-radius: 999px;
     transition: width 0.2s ease;

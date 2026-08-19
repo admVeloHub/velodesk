@@ -1,5 +1,6 @@
-/** parseBacenRdrEmail v1.0.0 — parser e-mail estruturado PRIORIZAR - BACEN/ RDR */
+/** parseBacenRdrEmail v1.1.0 — datas BR com offset -03:00 explícito */
 import type { InboundEmailPayload } from './types';
+import { parseBrCivilDateTimeToIso } from '../dates/brDateTime.util';
 
 export const BACEN_RDR_PRIORITY_SUBJECT_PATTERN = /PRIORIZAR\s*-\s*BACEN\s*\/?\s*RDR/i;
 
@@ -65,18 +66,7 @@ function parseEnderecoLocalidade(endereco: string): { cidade: string; uf: string
 }
 
 function parseBrDateTime(value: string): string | undefined {
-  const match = String(value ?? '').match(
-    /(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/,
-  );
-  if (!match) return undefined;
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const year = Number(match[3]);
-  const hour = match[4] != null ? Number(match[4]) : 12;
-  const minute = match[5] != null ? Number(match[5]) : 0;
-  const date = new Date(year, month - 1, day, hour, minute, 0, 0);
-  if (Number.isNaN(date.getTime())) return undefined;
-  return date.toISOString();
+  return parseBrCivilDateTimeToIso(value);
 }
 
 function extractField(text: string, labels: string[]): string {

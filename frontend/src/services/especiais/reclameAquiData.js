@@ -1,5 +1,6 @@
 /**
- * reclameAquiData — constantes do canal Reclame Aqui
+ * reclameAquiData v1.1.0 — constantes RA sem workflow e sem motivos hardcoded
+ * VERSION: v1.1.0 | DATE: 2026-08-19
  */
 export const RA_TABS = [
   { id: 'tabela', label: 'Tabela', icon: 'ti-table' },
@@ -17,7 +18,6 @@ export const RA_FILTER_CHIPS = [
   { id: 'nao-respondidas', label: 'Não respondidas' },
   { id: 'abertas', label: 'Abertas' },
   { id: 'passivel-nota', label: 'Passível de nota' },
-  { id: 'workflow-ativo', label: 'Workflow ativo' },
   { id: 'vencendo-hoje', label: 'Vencendo hoje' },
   { id: 'finalizadas', label: 'Finalizadas' },
 ];
@@ -61,16 +61,6 @@ export const RA_TIPOS = [
   'Solicitação',
   'Elogio',
   'Dúvida',
-];
-
-export const RA_MOTIVOS = [
-  'Lentidão / Instabilidade',
-  'Cobrança indevida',
-  'Cancelamento',
-  'Entrega / Prazo',
-  'Atendimento',
-  'Produto diferente do anunciado',
-  'Outros',
 ];
 
 export const RA_WHATSAPP_DEFAULT_MSG =

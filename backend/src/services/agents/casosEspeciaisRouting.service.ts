@@ -1,6 +1,6 @@
 /**
- * casosEspeciaisRouting.service v1.2.0 — sem workflow dedicado por órgão; notificação via sininho
- * VERSION: v1.2.0 | DATE: 2026-08-17
+ * casosEspeciaisRouting.service v1.3.0 — RA sem workflow; upsert RA não é fail-soft
+ * VERSION: v1.3.0 | DATE: 2026-08-19
  */
 import { Types } from 'mongoose';
 import type { IChamadoN1, ITabulacao } from '../../models/ChamadoN1';
@@ -105,7 +105,7 @@ function updateTabulacaoCanal(chamado: IChamadoN1, config: CasoEspecialOrgaoConf
   const next: ITabulacao = {
     ...last,
     tipoChamado: last.tipoChamado || 'Reclamação',
-    motivo: last.motivo || config.canalLabel,
+    motivo: config.orgao === 'reclame_aqui' ? (last.motivo || '') : (last.motivo || config.canalLabel),
     detalhe: last.detalhe || `Demanda ${config.canalLabel}`,
     canal: config.canalLabel,
   };
@@ -198,10 +198,10 @@ export async function routeCasoEspecialFormal(
       source: 'casos-especiais',
     });
 
-    // Sem workflow dedicado ao órgão: a migração para a collection do canal já contextualiza
-    // o caso. O ticket segue elegível a qualquer workflow real cuja tabulação combine com o
-    // gatilho — mesmo mecanismo de qualquer outro ticket (tryActivateWorkflowOnTabulation).
-    const workflowActivated = await tryActivateWorkflowOnTabulation(chamado, getAgentNomeOficial(4));
+    // Sem workflow dedicado ao órgão. Reclame Aqui não aciona workflow na tabulação.
+    const workflowActivated = config.orgao === 'reclame_aqui'
+      ? false
+      : await tryActivateWorkflowOnTabulation(chamado, getAgentNomeOficial(4));
 
     const responsavel = String(
       chamado.tabulacao?.[chamado.tabulacao.length - 1]?.responsavel ?? '',
@@ -243,6 +243,14 @@ export async function routeCasoEspecialFormal(
       origemEntrada: routeCtx.origemEntrada || 'casos-especiais',
       inboxDedicada: readInboxDedicadaHint(chamado),
     });
+
+    if (config.orgao === 'reclame_aqui' && !reclamacaoDoc) {
+      return {
+        success: false,
+        error: 'Falha ao persistir reclamação Reclame Aqui',
+        workflowActivated,
+      };
+    }
 
     const notificacoes = await notifyTeam({
       chamado,

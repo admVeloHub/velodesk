@@ -1,5 +1,6 @@
-/** parseConsumidorGovEmail v1.0.0 — parser e-mail estruturado PRIORIZAR - CGOV */
+/** parseConsumidorGovEmail v1.1.0 — datas BR com offset -03:00 explícito */
 import type { InboundEmailPayload } from './types';
+import { parseBrSlashDateToIso } from '../dates/brDateTime.util';
 
 export const CGOV_PRIORITY_SUBJECT_PATTERN = /PRIORIZAR\s*-\s*CGOV/i;
 
@@ -51,22 +52,7 @@ function parseLocalidade(value: string): { cidade: string; uf: string } {
 }
 
 function parseBrDate(value: string, endOfDay = false): string | undefined {
-  const match = String(value ?? '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
-  if (!match) return undefined;
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const year = Number(match[3]);
-  const date = new Date(
-    year,
-    month - 1,
-    day,
-    endOfDay ? 23 : 12,
-    endOfDay ? 59 : 0,
-    endOfDay ? 59 : 0,
-    endOfDay ? 999 : 0,
-  );
-  if (Number.isNaN(date.getTime())) return undefined;
-  return date.toISOString();
+  return parseBrSlashDateToIso(value, endOfDay);
 }
 
 function extractField(text: string, labels: string[]): string {

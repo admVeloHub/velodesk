@@ -1,6 +1,6 @@
 /**
- * agentOrchestrator.service v1.1.0 — wrapComposerOpening no envio autônomo
- * VERSION: v1.1.0 | DATE: 2026-08-10
+ * agentOrchestrator.service v1.2.0 — agentSuggestion via updateOne evita race scanStatus
+ * VERSION: v1.2.0 | DATE: 2026-08-18
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -66,20 +66,24 @@ async function persistAgentSuggestion(
   chamado: IChamadoN1,
   result: PipelineResult,
 ): Promise<void> {
-  const lastReg = chamado.registro?.[chamado.registro.length - 1];
-  if (lastReg) {
-    lastReg.metadados = {
-      ...(lastReg.metadados || {}),
-      agentSuggestion: {
-        respostaSugerida: result.respostaSugerida,
-        tabulacao: result.tabulacao,
-        auditScore: result.auditScore,
-        auditDecisao: result.auditDecisao,
-        at: new Date().toISOString(),
+  if (!chamado._id) return;
+  const fresh = await ChamadoN1.findById(chamado._id);
+  if (!fresh?.registro?.length) return;
+  const lastIdx = fresh.registro.length - 1;
+  await ChamadoN1.updateOne(
+    { _id: fresh._id },
+    {
+      $set: {
+        [`registro.${lastIdx}.metadados.agentSuggestion`]: {
+          respostaSugerida: result.respostaSugerida,
+          tabulacao: result.tabulacao,
+          auditScore: result.auditScore,
+          auditDecisao: result.auditDecisao,
+          at: new Date().toISOString(),
+        },
       },
-    };
-    await chamado.save();
-  }
+    },
+  );
 }
 
 async function sendAutonomousReply(

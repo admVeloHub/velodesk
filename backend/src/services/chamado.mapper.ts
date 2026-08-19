@@ -1,4 +1,4 @@
-/** chamado.mapper v2.12.0 — workflowStatus finished nos DTOs list/full */
+/** chamado.mapper v2.12.1 — export findReclameAquiFromChamado */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -19,7 +19,7 @@ import { buildComunicacaoResumo } from './workflowRequisicao.service';
 import type { IChamadoWorkflowComunicacaoResumo } from '../config/workflowRequisicaoDefaults';
 import { getWorkflowsByIds } from './workflowDefinicao.service';
 import { extractEmailReplyContent } from './emailReplyContent.util';
-import { sanitizeResponsavel, inferResponsavelFromAgentRegistro } from './responsavel.util';
+import { sanitizeResponsavel, inferResponsavelFromAgentRegistro, isRealResponsavel } from './responsavel.util';
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { filterRealAttachmentUrls } from './attachmentFilter.util';
 import { excludeFusaoAbsorvidosFilter, serializeFusaoDto } from './ticketFusao.helpers';
@@ -450,7 +450,7 @@ function readReclameAquiFromBody(body: Record<string, unknown>): Record<string, 
   return null;
 }
 
-function findReclameAquiFromChamado(chamado: IChamadoN1): Record<string, unknown> | null {
+export function findReclameAquiFromChamado(chamado: IChamadoN1): Record<string, unknown> | null {
   for (const reg of chamado.registro ?? []) {
     const meta = registroMetadados(reg);
     if (String(meta.source ?? '').toLowerCase() === 'reclame-aqui') {
@@ -1418,6 +1418,24 @@ export class ChamadoCommitValidationError extends Error {
   }
 }
 
+const TERMINAL_STATUSES_REQUIRING_RESPONSAVEL = new Set(['resolvido', 'cancelado', 'fechado']);
+
+/** Proibido encerrar ticket sem responsável real — independente de override/perfil. */
+export function assertResponsavelForTerminalStatus(
+  chamado: IChamadoN1,
+  targetStatus: string,
+): void {
+  const normalized = normalizeStatusValue(targetStatus);
+  if (!TERMINAL_STATUSES_REQUIRING_RESPONSAVEL.has(normalized)) return;
+  const tab = chamado.tabulacao?.[chamado.tabulacao.length - 1] ?? chamado.tabulacao?.[0];
+  if (!isRealResponsavel(sanitizeResponsavel(tab?.responsavel))) {
+    throw new ChamadoCommitValidationError(
+      'Atribua um responsável real ao ticket antes de encerrá-lo.',
+      400,
+    );
+  }
+}
+
 export interface CommitChamadoFromAgentResult {
   messageResult: AppendRegistroResult;
   publicText: string;
@@ -1459,6 +1477,7 @@ export async function commitChamadoFromAgent(
 
   if (targetStatus !== current) {
     await assertTabulacaoForStatus(chamado.tabulacao[0], targetStatus);
+    assertResponsavelForTerminalStatus(chamado, targetStatus);
   }
 
   const { alteracoes, workflowMeta } = buildAlteracoesFromPending(pendingChanges);
@@ -1517,6 +1536,7 @@ export async function applyBodyToChamado(
 
   if (pendingChanges.status) {
     await assertTabulacaoForStatus(chamado.tabulacao[0], targetStatus);
+    assertResponsavelForTerminalStatus(chamado, targetStatus);
   }
 
   if (Object.keys(pendingChanges).length) {

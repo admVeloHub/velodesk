@@ -1,14 +1,13 @@
 /**
- * ReclameAquiCrmRoot — shell CRM RA (fila + lista + ticket + sidebar)
- * VERSION: v1.1.0 | DATE: 2026-08-18
- * — Busca rápida dual (chamados_n1 + chamados_reclamacoes)
+ * ReclameAquiCrmRoot v1.2.0 — lista paginada 50
+ * VERSION: v1.2.0 | DATE: 2026-08-19
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useRaNovaReclamacaoModals } from '../../../hooks/useRaNovaReclamacaoModals';
 import { RA_GROUPS } from '../../../services/especiais/reclameAquiData';
-import { loadReclamacoes, searchReclamacoesFromApi } from '../../../services/especiais/reclameAquiStore';
+import { loadReclamacoes, searchReclamacoesFromApi, RA_LIST_PAGE_SIZE } from '../../../services/especiais/reclameAquiStore';
 import { fetchRaTicketView, loadReclameAquiTicketsFromApi } from '../../../services/especiais/reclameAquiTicketService';
 import { useEspeciaisTicketCommit } from '../shared/useEspeciaisTicketCommit';
 import { useEspeciaisDualSearch } from '../shared/useEspeciaisDualSearch';
@@ -34,6 +33,7 @@ export default function ReclameAquiCrmRoot() {
     () => localStorage.getItem('velodeskRaListCollapsed') === '1',
   );
   const [listVersion, setListVersion] = useState(0);
+  const [listPage, setListPage] = useState(1);
   const syncedOnceRef = useRef(false);
 
   const searchFn = useCallback((q) => searchReclamacoesFromApi(q), []);
@@ -105,6 +105,14 @@ export default function ReclameAquiCrmRoot() {
     }
     return items;
   }, [allItems, activeGroup, activeSort, listSearchDraft, isRemoteSearch]);
+
+  const listTotalPages = Math.max(1, Math.ceil(listItems.length / RA_LIST_PAGE_SIZE));
+  const safeListPage = Math.min(listPage, listTotalPages);
+  const pagedListItems = listItems.slice((safeListPage - 1) * RA_LIST_PAGE_SIZE, safeListPage * RA_LIST_PAGE_SIZE);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [activeGroup, listSearchDraft, isRemoteSearch]);
 
   const reloadTicket = useCallback(async () => {
     if (!id) {
@@ -260,10 +268,14 @@ export default function ReclameAquiCrmRoot() {
         activeGroup={activeGroup}
         activeRaId={id}
         activeSort={activeSort}
-        items={listItems}
+        items={pagedListItems}
         searchActive={!!appliedSearch.trim() || isRemoteSearch}
         listSearchQuery={listSearchDraft}
         collapsed={listCollapsed}
+        page={safeListPage}
+        totalPages={listTotalPages}
+        totalCount={listItems.length}
+        onPageChange={setListPage}
         onSelectItem={handleSelectItem}
         onSortChange={setActiveSort}
         onListSearchChange={setListSearchDraft}

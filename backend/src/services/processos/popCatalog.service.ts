@@ -1,6 +1,6 @@
 /**
- * popCatalog.service v1.0.0 — catálogo de POPs (.docx) por produto, para o quadro de Processos
- * VERSION: v1.0.0 | DATE: 2026-08-14 | AUTHOR: VeloHub Development Team
+ * popCatalog.service v1.4.0 — seções via h1/h2 nos resumos POPs; completo só PDF
+ * VERSION: v1.4.0 | DATE: 2026-08-19
  *
  * Lê "backend/source file/POPs/<produto>/<pop>.docx" e converte cada POP num JSON estruturado
  * (cabeçalho, seções, tabelas e imagens), em vez de reproduzir o texto corrido do Word.
@@ -51,6 +51,13 @@ export interface PopDetail {
   campos: { label: string; valor: string }[];
   images: PopImageRef[];
   sections: PopSection[];
+  completoDisponivel?: boolean;
+}
+
+export interface PopCompletoFile {
+  fileName: string;
+  contentType: string;
+  buffer: Buffer;
 }
 
 interface CacheEntry {
@@ -60,6 +67,7 @@ interface CacheEntry {
 }
 
 const DOCX_EXT = /\.docx$/i;
+const PDF_EXT = /\.pdf$/i;
 const cache = new Map<string, CacheEntry>();
 
 function slugify(input: string): string {
@@ -74,6 +82,10 @@ function slugify(input: string): string {
 
 function isRealDocxFile(fileName: string): boolean {
   return DOCX_EXT.test(fileName) && !fileName.startsWith('~$');
+}
+
+function isRealPdfFile(fileName: string): boolean {
+  return PDF_EXT.test(fileName) && !fileName.startsWith('~$');
 }
 
 /** Lista os produtos disponíveis (uma pasta = um produto). Exclui pastas de arquivo/legado ("OLD"). */
@@ -92,13 +104,16 @@ export function listProdutos(): { slug: string; label: string }[] {
     .map(({ slug, label }) => ({ slug, label }));
 }
 
-function resolveProdutoDir(produtoSlug: string): string | null {
-  const root = env.popsSourceDir;
+function resolveProdutoDirInRoot(root: string, produtoSlug: string): string | null {
   if (!fs.existsSync(root)) return null;
   const match = fs.readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .find((entry) => slugify(entry.name.replace(/^pop\s+/i, '').trim()) === produtoSlug);
   return match ? path.join(root, match.name) : null;
+}
+
+function resolveProdutoDir(produtoSlug: string): string | null {
+  return resolveProdutoDirInRoot(env.popsSourceDir, produtoSlug);
 }
 
 function resolvePopFile(produtoSlug: string, popId: string): string | null {
@@ -108,6 +123,137 @@ function resolvePopFile(produtoSlug: string, popId: string): string | null {
     .filter((entry) => entry.isFile() && isRealDocxFile(entry.name))
     .find((entry) => slugify(entry.name.replace(DOCX_EXT, '')) === popId);
   return match ? path.join(dir, match.name) : null;
+}
+
+function extractPopCodePrefix(popId: string, summaryPath: string | null): string | null {
+  const fromId = popId.match(/^(pop-[a-z0-9]+-\d+)/i);
+  if (fromId) return fromId[1].toLowerCase();
+
+  if (!summaryPath) return null;
+  const fromFile = path.basename(summaryPath, '.docx').match(/^(pop-[a-z0-9]+-\d+)/i);
+  return fromFile ? fromFile[1].toLowerCase() : null;
+}
+
+function extractPopSeries(codePrefix: string | null): string | null {
+  if (!codePrefix) return null;
+  const match = codePrefix.match(/^(pop-[a-z0-9]+)/i);
+  return match ? match[1].toLowerCase() : null;
+}
+
+function extractPopTopicSlug(popId: string, summaryPath: string | null): string {
+  const popIdWithoutResumo = popId.replace(/-resumo$/i, '');
+  const codePrefix = extractPopCodePrefix(popId, summaryPath);
+  if (codePrefix) {
+    const escaped = codePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const topic = popIdWithoutResumo.replace(new RegExp(`^${escaped}-?`), '');
+    if (topic) return topic;
+  }
+  return popIdWithoutResumo;
+}
+
+/** Pasta do PDF completo — pode diferir da pasta do resumo (ex.: AS em Antecipação Salário). */
+function resolveCompletoProdutoDir(produtoSlug: string, popId: string, summaryPath: string | null): string | null {
+  const series = extractPopSeries(extractPopCodePrefix(popId, summaryPath));
+  const seriesFolderSlugs: Record<string, string[]> = {
+    'pop-ir26': ['antecipacao-2026'],
+    'pop-as': ['antecipacao-salario'],
+    'pop-ep': ['emprestimo-pessoal'],
+    'pop-cad': ['cadastro'],
+    'pop-cup': ['cupons'],
+    'pop-fin': ['encaminhamento-financeiro'],
+    'pop-idq': ['indique-e-ganhe'],
+    'pop-liq': ['liquidacao-antecipada'],
+  };
+
+  if (series && seriesFolderSlugs[series]) {
+    for (const slug of seriesFolderSlugs[series]) {
+      const dir = resolveProdutoDirInRoot(env.popsCompletoSourceDir, slug);
+      if (dir) return dir;
+    }
+  }
+
+  return resolveProdutoDirInRoot(env.popsCompletoSourceDir, produtoSlug);
+}
+
+function matchPdfByTopicSlug(dir: string, topicSlug: string): string | null {
+  const pdfs = fs.readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && isRealPdfFile(entry.name));
+
+  const exact = pdfs.find((entry) => slugify(entry.name.replace(PDF_EXT, '')) === topicSlug);
+  if (exact) return path.join(dir, exact.name);
+
+  const bySuffix = pdfs.find((entry) => {
+    const pdfSlug = slugify(entry.name.replace(PDF_EXT, ''));
+    return topicSlug === pdfSlug
+      || topicSlug.endsWith(`-${pdfSlug}`)
+      || pdfSlug.endsWith(topicSlug);
+  });
+  if (bySuffix) return path.join(dir, bySuffix.name);
+
+  const topicWords = topicSlug.split('-').filter((word) => word.length > 2);
+  let bestName: string | null = null;
+  let bestScore = 0;
+  for (const entry of pdfs) {
+    const pdfSlug = slugify(entry.name.replace(PDF_EXT, ''));
+    const pdfWords = pdfSlug.split('-').filter((word) => word.length > 2);
+    const overlap = topicWords.filter((word) => pdfWords.includes(word)).length;
+    if (overlap > bestScore) {
+      bestScore = overlap;
+      bestName = entry.name;
+    }
+  }
+  if (bestName && bestScore >= Math.min(2, Math.max(1, topicWords.length))) {
+    return path.join(dir, bestName);
+  }
+
+  return null;
+}
+
+function findPopCompletoInDir(
+  dir: string,
+  popId: string,
+  summaryPath: string | null,
+): string | null {
+  const topicSlug = extractPopTopicSlug(popId, summaryPath);
+  const byTopic = matchPdfByTopicSlug(dir, topicSlug);
+  if (byTopic) return byTopic;
+
+  const codePrefix = extractPopCodePrefix(popId, summaryPath);
+  if (codePrefix) {
+    const byCode = fs.readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && isRealPdfFile(entry.name))
+      .find((entry) => entry.name.toLowerCase().startsWith(codePrefix));
+    if (byCode) return path.join(dir, byCode.name);
+  }
+
+  return null;
+}
+
+function findPopCompletoByTopicInRoot(root: string, topicSlug: string): string | null {
+  if (!fs.existsSync(root)) return null;
+
+  for (const produtoEntry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!produtoEntry.isDirectory()) continue;
+    const dir = path.join(root, produtoEntry.name);
+    const match = matchPdfByTopicSlug(dir, topicSlug);
+    if (match) return match;
+  }
+
+  return null;
+}
+
+/** Localiza o .pdf completo espelhando o POP resumo (pasta POP Completo). */
+export function resolvePopCompletoFile(produtoSlug: string, popId: string): string | null {
+  const summaryPath = resolvePopFile(produtoSlug, popId);
+  const topicSlug = extractPopTopicSlug(popId, summaryPath);
+  const dir = resolveCompletoProdutoDir(produtoSlug, popId, summaryPath);
+
+  if (dir) {
+    const inTargetProduct = findPopCompletoInDir(dir, popId, summaryPath);
+    if (inTargetProduct) return inTargetProduct;
+  }
+
+  return findPopCompletoByTopicInRoot(env.popsCompletoSourceDir, topicSlug);
 }
 
 /** Lista os POPs (.docx) de um produto, com metadados leves (parse cacheado). */
@@ -147,7 +293,24 @@ export async function getPop(produtoSlug: string, popId: string): Promise<PopDet
   const absPath = resolvePopFile(produtoSlug, popId);
   if (!absPath) return null;
   const { detail } = await getOrParse(absPath);
-  return detail;
+  return {
+    ...detail,
+    completoDisponivel: Boolean(resolvePopCompletoFile(produtoSlug, popId)),
+  };
+}
+
+export async function getPopCompleto(
+  produtoSlug: string,
+  popId: string,
+): Promise<PopCompletoFile | null> {
+  const absPath = resolvePopCompletoFile(produtoSlug, popId);
+  if (!absPath) return null;
+  const fileName = path.basename(absPath);
+  return {
+    fileName,
+    contentType: 'application/pdf',
+    buffer: fs.readFileSync(absPath),
+  };
 }
 
 export async function getPopImage(
@@ -223,9 +386,11 @@ async function extractMediaImages(absPath: string): Promise<{
 }
 
 function matchSectionHeader(text: string): { numero: string; titulo: string } | null {
-  const m = text.trim().match(/^(\d{1,2}(?:\.\d{1,2})?)\.\s*([A-ZÀ-Ü0-9ºª°()/\- ]{3,90})$/);
+  const m = text.trim().match(/^(\d{1,2}(?:\.\d{1,2})?)\.\s*(.+)$/);
   if (!m) return null;
-  return { numero: m[1], titulo: m[2].trim() };
+  const titulo = m[2].trim();
+  if (titulo.length < 2) return null;
+  return { numero: m[1], titulo };
 }
 
 /**
@@ -398,14 +563,12 @@ async function parsePopDocx(absPath: string): Promise<Omit<CacheEntry, 'mtimeMs'
   for (const el of children) {
     const tag = (el as any).tagName;
 
-    // A maioria dos POPs usa <p> como título de seção, mas alguns (ex.: POP-IR26-003) colocam
-    // o título dentro de uma tabela de 1x1 célula só para dar destaque visual — trata os dois.
     let asSectionHeader: { numero: string; titulo: string } | null = null;
     let rows: string[][] | null = null;
     if (tag === 'table') {
       rows = tableRows($, el);
       if (rows.length === 1 && rows[0].length === 1) asSectionHeader = matchSectionHeader(rows[0][0]);
-    } else if (tag === 'p') {
+    } else if (/^h[1-6]$/.test(tag) || tag === 'p') {
       const text = $(el).text().replace(/\s+/g, ' ').trim();
       if (text) asSectionHeader = matchSectionHeader(text);
     }
@@ -448,6 +611,9 @@ async function parsePopDocx(absPath: string): Promise<Omit<CacheEntry, 'mtimeMs'
   if (!header.codigo) {
     const fileMatch = path.basename(absPath).match(/^(POP(?:-[A-Z0-9]+)+-\d+)/i);
     if (fileMatch) header.codigo = fileMatch[1].toUpperCase();
+  }
+  if (!header.titulo && sections.length > 0) {
+    header.titulo = path.basename(absPath, '.docx');
   }
 
   const detail: PopDetail = {

@@ -1,12 +1,11 @@
 /**
  * reclameAquiTicketService — bridge Reclame Aqui ↔ API tickets
- * VERSION: v1.1.0 | DATE: 2026-08-12
- * — isReclameAquiChannelTicket para exclusão do Desk Agente
+ * VERSION: v1.2.0 | DATE: 2026-08-19
+ * — cadastro sem workflow; upsert reclamação obrigatório
  */
 import { ticketsApi, reclamacoesApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
 import { getAgentName } from '../clientDb';
-import { createWorkflowState, getWorkflowTemplateById } from '../desk/workflowEngine';
 import { RA_STATUS } from './reclameAquiData';
 import {
   buildRegistroDefaults,
@@ -17,21 +16,20 @@ import {
   refreshReclamacoesFromApi,
 } from './reclameAquiStore';
 
-const RA_WORKFLOW_SLUG = 'reclame-aqui-tratativa';
-
 function normalizeCpf(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
 function buildReclameAquiMeta(form) {
   const defaults = buildRegistroDefaults(form);
+  const idOrigem = String(defaults.idReclamacaoRa || defaults.protocoloRa || '').trim();
   return {
-    protocoloRa: defaults.protocoloRa,
-    idReclamacaoRa: defaults.idReclamacaoRa || defaults.protocoloRa,
+    protocoloRa: idOrigem,
+    idReclamacaoRa: idOrigem,
     statusRa: RA_STATUS.NAO_RESPONDIDA,
-    prazoRa: defaults.prazoRa,
+    prazoRa: defaults.prazoRa || undefined,
     dataReclamacao: defaults.dataReclamacao,
-    passivelNota: defaults.passivelNota,
+    passivelNota: Boolean(defaults.passivelNota),
     assunto: defaults.assunto,
     descricao: defaults.descricao,
     consumidor: defaults.consumidor,
@@ -43,7 +41,7 @@ function buildReclameAquiMeta(form) {
   };
 }
 
-export function buildTicketPayloadFromReclamacao(form, workflow = null) {
+export function buildTicketPayloadFromReclamacao(form) {
   const meta = buildReclameAquiMeta(form);
   const cpf = normalizeCpf(form.cpf);
   const author = getAgentName();
@@ -61,7 +59,7 @@ export function buildTicketPayloadFromReclamacao(form, workflow = null) {
       classificacaoTipo: form.tipo || 'Reclamação',
       tipoChamado: form.tipo || 'Reclamação',
       produto: form.produto || '',
-      motivo: form.motivo || form.assunto || '',
+      motivo: '',
       detalhe: 'Reclamação Reclame Aqui',
       canal: 'Reclame Aqui',
       responsavel: author,
@@ -71,76 +69,29 @@ export function buildTicketPayloadFromReclamacao(form, workflow = null) {
       clienteTelefone: form.telefoneWhatsapp ? [form.telefoneWhatsapp] : [],
       clienteEmail: form.email ? [form.email] : [],
       reclameAqui: meta,
-      workflow: workflow || undefined,
     },
   };
 }
 
-function buildFallbackRaWorkflow() {
-  const now = new Date().toISOString();
-  const author = getAgentName() || 'sistema';
-  return {
-    templateId: RA_WORKFLOW_SLUG,
-    definicaoSlug: RA_WORKFLOW_SLUG,
-    title: 'TRATATIVA RECLAME AQUI',
-    currentStepId: 'ra-triagem',
-    step: 0,
-    startedAt: now,
-    stepHistory: [{
-      stepId: 'ra-triagem',
-      status: 'active',
-      at: now,
-      by: author,
-      trigger: 'reclame-aqui-register',
-    }],
-    status: 'active',
-    systemMessageInjected: false,
-  };
-}
-
-export function buildRaWorkflowState() {
-  const template = getWorkflowTemplateById(RA_WORKFLOW_SLUG);
-  if (template) {
-    return createWorkflowState(template, {
-      by: getAgentName() || 'sistema',
-      trigger: 'reclame-aqui-register',
-    });
-  }
-  return buildFallbackRaWorkflow();
-}
-
-export async function createTicketFromReclamacao(form, workflow) {
-  const payload = buildTicketPayloadFromReclamacao(form, workflow);
+export async function createTicketFromReclamacao(form) {
+  const payload = buildTicketPayloadFromReclamacao(form);
   const created = await ticketsApi.create(payload);
   return apiTicketToCockpit(created);
 }
 
-export async function activateRaWorkflow(ticketId, form) {
-  const workflow = buildRaWorkflowState();
-  const author = getAgentName();
-  const updated = await ticketsApi.update(ticketId, {
-    author,
-    lateralForm: {
-      workflow,
-      canal: 'Reclame Aqui',
-      reclameAqui: buildReclameAquiMeta(form),
-    },
-  });
-  return apiTicketToCockpit(updated);
-}
-
 export async function registerReclamacaoAndCreateTicket(form) {
-  const workflow = buildRaWorkflowState();
-  const payload = buildTicketPayloadFromReclamacao(form, workflow);
+  const idOrigem = String(form.idReclamacaoRa || form.protocoloRa || '').trim();
+  if (!idOrigem) {
+    throw new Error('Informe o ID da reclamação (Id Origem)');
+  }
+
+  const payload = buildTicketPayloadFromReclamacao({ ...form, idReclamacaoRa: idOrigem, protocoloRa: idOrigem });
   const created = await ticketsApi.create(payload);
   const ticket = apiTicketToCockpit(created);
   const ticketId = String(ticket.id || ticket._id);
 
-  try {
-    await reclamacoesApi.create('reclame-aqui', { chamadoId: ticketId });
-  } catch (err) {
-    console.warn('reclameAquiTicketService: triagem reclamação fail-soft', err?.message || err);
-  }
+  const reclamacao = await reclamacoesApi.create('reclame-aqui', { chamadoId: ticketId });
+  const reclamacaoId = reclamacao?.id || reclamacao?.reclamacao?.id;
 
   const publicText = String(form.respostaPublica || '').trim();
   if (publicText) {
@@ -153,10 +104,11 @@ export async function registerReclamacaoAndCreateTicket(form) {
 
   const raItem = registerReclamacao({
     ...form,
+    id: reclamacaoId,
+    idReclamacaoRa: idOrigem,
+    protocoloRa: idOrigem,
     ticketId,
     chamadoProtocolo: ticket.chamadoProtocolo,
-    workflowAtivo: true,
-    workflow: 'Tratativa RA',
     statusRa: RA_STATUS.NAO_RESPONDIDA,
   });
 

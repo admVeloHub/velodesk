@@ -16,6 +16,7 @@ import {
   shouldOpenPreviewModal,
 } from '../../../services/desk/attachmentPreview';
 import DeskAttachmentPreviewModal from './DeskAttachmentPreviewModal';
+import { formatDateTimeBr } from '../../../utils/dateTimeBr';
 
 const AUDIT_MIN_DISPLAY = 70;
 const AUDIT_HIGH_GREEN = 90;
@@ -153,14 +154,8 @@ function MessageBubbleText({ text, attachments, scanStatuses }) {
 }
 
 function formatWaBalloonTime(timestamp) {
-  const ts = new Date(timestamp || 0);
-  if (Number.isNaN(ts.getTime()) || !timestamp) return '';
-  return ts.toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  if (!timestamp) return '';
+  return formatDateTimeBr(timestamp, { year: false });
 }
 
 function WhatsAppPresenceBalloon({ msg, onOpen }) {

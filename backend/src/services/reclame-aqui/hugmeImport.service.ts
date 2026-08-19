@@ -1,4 +1,4 @@
-/** hugmeImport.service v1.0.0 — upsert base Hugme + tickets incrementais */
+/** hugmeImport.service v1.2.0 — lote em background; progresso persistido a cada ticket */
 import { randomUUID } from 'crypto';
 import type { IReclameAquiHugmeRegistro, HugmeOrigemImportacao } from '../../models/reclamacoes/ReclameAquiHugmeRegistro.schema';
 import {
@@ -10,7 +10,10 @@ import {
   type HugmeParseResult,
   type ParsedHugmeRow,
 } from './hugmeSpreadsheet.service';
-import { createRaTicketFromHugmeRegistro } from './reclameAquiTicketCreate.service';
+import {
+  parsedRowToRaTicketSource,
+  upsertRaTicketFromSource,
+} from './reclameAquiTicketCreate.service';
 
 export interface HugmeImportOptions {
   modo: HugmeOrigemImportacao;
@@ -69,7 +72,7 @@ function buildRegistroPayload(
     descricao: row.descricao,
     produto: row.produto ?? '',
     tipo: row.tipo ?? 'Reclamação',
-    motivo: row.motivo ?? '',
+    motivo: row.hugmeMotivoRa ?? row.motivo ?? '',
     nota: row.nota ?? '',
     statusRa: row.statusRa ?? '',
     statusHugme: row.statusHugme ?? '',
@@ -125,29 +128,132 @@ function registroToPortalDto(doc: IReclameAquiHugmeRegistro) {
 
 export { registroToPortalDto };
 
-export async function importHugmeBuffer(
+export type HugmeImportStats = HugmeImportResult['stats'];
+
+export interface HugmeImportStarted {
+  batchId: string;
+  parse: HugmeParseResult;
+  stats: HugmeImportStats;
+  rows: HugmeImportRowResult[];
+  errors: HugmeImportResult['errors'];
+  options: HugmeImportOptions;
+  now: Date;
+}
+
+export interface HugmeImportBatchView {
+  batchId: string;
+  modo: HugmeOrigemImportacao;
+  fileName: string;
+  total: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
+  ticketsCreated: number;
+  failed: number;
+  processed: number;
+  running: boolean;
+  importedAt: Date;
+  importedBy?: string;
+  errors?: Array<{ rowIndex: number; idOrigem?: string; message: string }>;
+}
+
+let hugmeImportInProcess = false;
+
+export function computeHugmeProcessed(stats: Pick<HugmeImportStats, 'inserted' | 'updated' | 'skipped' | 'failed'>): number {
+  return stats.inserted + stats.updated + stats.skipped + stats.failed;
+}
+
+export function isHugmeBatchRunning(stats: Pick<HugmeImportStats, 'total' | 'inserted' | 'updated' | 'skipped' | 'failed'>): boolean {
+  return computeHugmeProcessed(stats) < stats.total;
+}
+
+function mapHugmeBatch(
+  batch: {
+    batchId: string;
+    modo: HugmeOrigemImportacao;
+    fileName?: string;
+    total?: number;
+    inserted?: number;
+    updated?: number;
+    skipped?: number;
+    ticketsCreated?: number;
+    failed?: number;
+    importedAt: Date;
+    importedBy?: string;
+    batchErrors?: Array<{ rowIndex: number; idOrigem?: string; message: string }>;
+  },
+  includeErrors = false,
+): HugmeImportBatchView {
+  const stats = {
+    total: batch.total || 0,
+    inserted: batch.inserted || 0,
+    updated: batch.updated || 0,
+    skipped: batch.skipped || 0,
+    ticketsCreated: batch.ticketsCreated || 0,
+    failed: batch.failed || 0,
+  };
+  const processed = computeHugmeProcessed(stats);
+  return {
+    batchId: batch.batchId,
+    modo: batch.modo,
+    fileName: batch.fileName || '',
+    ...stats,
+    processed,
+    running: processed < stats.total,
+    importedAt: batch.importedAt,
+    importedBy: batch.importedBy,
+    ...(includeErrors ? { errors: (batch.batchErrors || []).slice(0, 100) } : {}),
+  };
+}
+
+async function persistHugmeBatchProgress(
+  batchId: string,
+  stats: HugmeImportStats,
+  errors: HugmeImportResult['errors'],
+): Promise<void> {
+  await getReclameAquiHugmeImportBatchModel().updateOne(
+    { batchId },
+    {
+      $set: {
+        inserted: stats.inserted,
+        updated: stats.updated,
+        skipped: stats.skipped,
+        ticketsCreated: stats.ticketsCreated,
+        failed: stats.failed,
+        batchErrors: errors.slice(0, 500),
+      },
+    },
+  ).exec();
+}
+
+export async function beginHugmeImport(
   buffer: Buffer,
   options: HugmeImportOptions,
-): Promise<HugmeImportResult> {
-  const batchId = options.batchId || randomUUID();
-  const now = new Date();
-  const parse = parseHugmeBuffer(buffer);
-  const RegistroModel = getReclameAquiHugmeRegistroModel();
-  const BatchModel = getReclameAquiHugmeImportBatchModel();
+): Promise<HugmeImportStarted> {
+  if (hugmeImportInProcess) {
+    throw Object.assign(new Error('Já existe uma importação Hugme em andamento.'), { status: 409 });
+  }
+  hugmeImportInProcess = true;
 
-  const stats = {
-    total: parse.rows.length,
-    inserted: 0,
-    updated: 0,
-    skipped: 0,
-    ticketsCreated: 0,
-    failed: 0,
-  };
-  const rows: HugmeImportRowResult[] = [];
-  const errors: Array<{ rowIndex: number; idOrigem?: string; message: string }> = [];
+  try {
+    const batchId = options.batchId || randomUUID();
+    const now = new Date();
+    const parse = parseHugmeBuffer(buffer);
+    const BatchModel = getReclameAquiHugmeImportBatchModel();
 
-  for (const row of parse.rows) {
-    if (row.status !== 'valid') {
+    const stats: HugmeImportStats = {
+      total: parse.rows.length,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      ticketsCreated: 0,
+      failed: 0,
+    };
+    const rows: HugmeImportRowResult[] = [];
+    const errors: HugmeImportResult['errors'] = [];
+
+    for (const row of parse.rows) {
+      if (row.status === 'valid') continue;
       stats.skipped += 1;
       rows.push({
         rowIndex: row.rowIndex,
@@ -160,91 +266,159 @@ export async function importHugmeBuffer(
         idOrigem: row.idOrigem,
         message: row.errors.join('; ') || row.status,
       });
-      continue;
     }
 
-    try {
-      const existing = await RegistroModel.findOne({ idOrigem: row.idOrigem.trim() }).exec();
-      const payload = buildRegistroPayload(row, options.modo, batchId, now);
+    await BatchModel.create({
+      batchId,
+      modo: options.modo,
+      fileName: options.fileName || '',
+      total: stats.total,
+      inserted: stats.inserted,
+      updated: stats.updated,
+      skipped: stats.skipped,
+      ticketsCreated: stats.ticketsCreated,
+      failed: stats.failed,
+      batchErrors: errors.slice(0, 500),
+      importedAt: now,
+      importedBy: options.importedBy || '',
+    });
 
-      let doc: IReclameAquiHugmeRegistro;
-      let action: 'inserted' | 'updated';
+    console.info('[hugme-import] início', {
+      batchId,
+      fileName: options.fileName || '',
+      total: parse.rows.length,
+      valid: parse.rows.length - stats.skipped,
+    });
 
-      if (existing) {
-        existing.set({
-          ...payload,
-          colunasOriginais: mergeColunasOriginais(
-            existing.colunasOriginais as Record<string, string>,
-            row.colunasOriginais,
-          ),
-          cabecalhos: row.cabecalhos.length ? row.cabecalhos : existing.cabecalhos,
-        });
-        doc = await existing.save();
-        action = 'updated';
-        stats.updated += 1;
-      } else {
-        doc = await RegistroModel.create({
-          ...payload,
-          primeiroImportEm: now,
-        });
-        action = 'inserted';
-        stats.inserted += 1;
-      }
+    return {
+      batchId,
+      parse,
+      stats,
+      rows,
+      errors,
+      options: { ...options, batchId },
+      now,
+    };
+  } catch (err) {
+    hugmeImportInProcess = false;
+    throw err;
+  }
+}
 
-      let ticketCreated = false;
-      let chamadoId: string | undefined;
+export async function runHugmeImportLoop(started: HugmeImportStarted): Promise<HugmeImportResult> {
+  const { batchId, parse, stats, rows, errors, now } = started;
+  const options = started.options;
+  const RegistroModel = getReclameAquiHugmeRegistroModel();
+  const validRows = parse.rows.filter((row) => row.status === 'valid');
+  const validTotal = validRows.length;
+  let processedValid = 0;
 
-      if (options.modo === 'incremental' && !doc.chamadoId) {
-        const ticketResult = await createRaTicketFromHugmeRegistro(
-          doc,
+  try {
+    for (const row of validRows) {
+      try {
+        const existing = await RegistroModel.findOne({ idOrigem: row.idOrigem.trim() }).exec();
+        const payload = buildRegistroPayload(row, options.modo, batchId, now);
+
+        let doc: IReclameAquiHugmeRegistro;
+        let action: 'inserted' | 'updated';
+
+        if (existing) {
+          existing.set({
+            ...payload,
+            colunasOriginais: mergeColunasOriginais(
+              existing.colunasOriginais as Record<string, string>,
+              row.colunasOriginais,
+            ),
+            cabecalhos: row.cabecalhos.length ? row.cabecalhos : existing.cabecalhos,
+          });
+          doc = await existing.save();
+          action = 'updated';
+          stats.updated += 1;
+        } else {
+          doc = await RegistroModel.create({
+            ...payload,
+            primeiroImportEm: now,
+          });
+          action = 'inserted';
+          stats.inserted += 1;
+        }
+
+        let ticketCreated = false;
+        let chamadoId: string | undefined;
+
+        const ticketResult = await upsertRaTicketFromSource(
+          parsedRowToRaTicketSource(row),
           options.importedBy || 'sistema',
+          'hugme-import',
         );
         doc.chamadoId = ticketResult.chamadoId;
         doc.chamadoProtocolo = ticketResult.chamadoProtocolo;
-        doc.reclamacaoId = ticketResult.reclamacaoId ?? null;
-        doc.ticketCriadoEm = now;
+        doc.reclamacaoId = ticketResult.reclamacaoId;
+        if (!ticketResult.updated) {
+          doc.ticketCriadoEm = now;
+          ticketCreated = true;
+          stats.ticketsCreated += 1;
+        }
         await doc.save();
-        ticketCreated = true;
         chamadoId = ticketResult.chamadoId.toString();
-        stats.ticketsCreated += 1;
+
+        processedValid += 1;
+        await persistHugmeBatchProgress(batchId, stats, errors).catch(() => undefined);
+        if (processedValid === 1 || processedValid % 25 === 0 || processedValid === validTotal) {
+          console.info('[hugme-import] progresso', {
+            batchId,
+            processed: processedValid,
+            valid: validTotal,
+            ticketsCreated: stats.ticketsCreated,
+            failed: stats.failed,
+          });
+        }
+
+        rows.push({
+          rowIndex: row.rowIndex,
+          idOrigem: row.idOrigem,
+          action,
+          ticketCreated,
+          chamadoId,
+        });
+      } catch (err) {
+        stats.failed += 1;
+        processedValid += 1;
+        const message = err instanceof Error ? err.message : 'Erro ao importar linha';
+        rows.push({
+          rowIndex: row.rowIndex,
+          idOrigem: row.idOrigem,
+          action: 'failed',
+          errors: [message],
+        });
+        errors.push({ rowIndex: row.rowIndex, idOrigem: row.idOrigem, message });
+        await persistHugmeBatchProgress(batchId, stats, errors).catch(() => undefined);
       }
-
-      rows.push({
-        rowIndex: row.rowIndex,
-        idOrigem: row.idOrigem,
-        action,
-        ticketCreated,
-        chamadoId,
-      });
-    } catch (err) {
-      stats.failed += 1;
-      const message = err instanceof Error ? err.message : 'Erro ao importar linha';
-      rows.push({
-        rowIndex: row.rowIndex,
-        idOrigem: row.idOrigem,
-        action: 'failed',
-        errors: [message],
-      });
-      errors.push({ rowIndex: row.rowIndex, idOrigem: row.idOrigem, message });
     }
+
+    await persistHugmeBatchProgress(batchId, stats, errors);
+    console.info('[hugme-import] fim', { batchId, stats });
+    return { batchId, parse, stats, rows, errors };
+  } catch (err) {
+    const remaining = Math.max(0, stats.total - computeHugmeProcessed(stats));
+    if (remaining > 0) stats.failed += remaining;
+    errors.push({
+      rowIndex: 0,
+      message: err instanceof Error ? err.message : 'Falha no lote Hugme',
+    });
+    await persistHugmeBatchProgress(batchId, stats, errors).catch(() => undefined);
+    throw err;
+  } finally {
+    hugmeImportInProcess = false;
   }
+}
 
-  await BatchModel.create({
-    batchId,
-    modo: options.modo,
-    fileName: options.fileName || '',
-    total: stats.total,
-    inserted: stats.inserted,
-    updated: stats.updated,
-    skipped: stats.skipped,
-    ticketsCreated: stats.ticketsCreated,
-    failed: stats.failed,
-    batchErrors: errors.slice(0, 500),
-    importedAt: now,
-    importedBy: options.importedBy || '',
-  });
-
-  return { batchId, parse, stats, rows, errors };
+export async function importHugmeBuffer(
+  buffer: Buffer,
+  options: HugmeImportOptions,
+): Promise<HugmeImportResult> {
+  const started = await beginHugmeImport(buffer, options);
+  return runHugmeImportLoop(started);
 }
 
 export interface HugmeRegistroListFilters {
@@ -307,6 +481,13 @@ export async function getHugmeImportStats() {
   };
 }
 
+export async function getHugmeImportBatch(batchId: string): Promise<HugmeImportBatchView | null> {
+  const batch = await getReclameAquiHugmeImportBatchModel()
+    .findOne({ batchId: String(batchId).trim() })
+    .exec();
+  return batch ? mapHugmeBatch(batch, true) : null;
+}
+
 export async function listHugmeImportBatches(limit = 50) {
   const items = await getReclameAquiHugmeImportBatchModel()
     .find({})
@@ -314,19 +495,7 @@ export async function listHugmeImportBatches(limit = 50) {
     .limit(Math.min(limit, 200))
     .exec();
 
-  return items.map((batch) => ({
-    batchId: batch.batchId,
-    modo: batch.modo,
-    fileName: batch.fileName,
-    total: batch.total,
-    inserted: batch.inserted,
-    updated: batch.updated,
-    skipped: batch.skipped,
-    ticketsCreated: batch.ticketsCreated,
-    failed: batch.failed,
-    importedAt: batch.importedAt,
-    importedBy: batch.importedBy,
-  }));
+  return items.map((batch) => mapHugmeBatch(batch, false));
 }
 
 export async function findHugmeRegistroDocByIdOrigem(idOrigem: string) {

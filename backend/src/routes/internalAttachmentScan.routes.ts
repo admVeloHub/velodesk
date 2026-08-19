@@ -1,4 +1,4 @@
-/** internalAttachmentScan.routes v1.0.0 — callback do scanner ClamAV */
+/** internalAttachmentScan.routes v1.0.1 — callback do scanner ClamAV (updateOne atômico) */
 import { Router, type Request, type Response } from 'express';
 import { env } from '../config/env';
 import { applyAttachmentScanResult } from '../services/attachmentScanCallback.service';

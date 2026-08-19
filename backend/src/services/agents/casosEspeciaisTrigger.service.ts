@@ -1,6 +1,6 @@
 /**
- * casosEspeciaisTrigger.service v1.1.0 — guard reclamação persistida + contexto roteamento
- * VERSION: v1.1.0 | DATE: 2026-08-07
+ * casosEspeciaisTrigger.service v1.2.0 — reload antes do save evita sobrescrever scanStatus
+ * VERSION: v1.2.0 | DATE: 2026-08-18
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -44,6 +44,21 @@ function buildPersistedTriagem(
   };
 }
 
+async function reloadChamadoForSave(chamado: IChamadoN1): Promise<IChamadoN1> {
+  if (!chamado._id) return chamado;
+  return (await ChamadoN1.findById(chamado._id)) ?? chamado;
+}
+
+async function saveChamadoWithFreshMutation(
+  chamado: IChamadoN1,
+  mutate: (doc: IChamadoN1) => void,
+): Promise<IChamadoN1> {
+  const fresh = await reloadChamadoForSave(chamado);
+  mutate(fresh);
+  await fresh.save();
+  return fresh;
+}
+
 async function applyTriagemOutcome(
   chamado: IChamadoN1,
   triagem: CasoEspecialTriagemPersisted,
@@ -51,8 +66,9 @@ async function applyTriagemOutcome(
   context: CasosEspeciaisTriggerContext,
 ): Promise<CasosEspeciaisTriggerResult> {
   if (triagem.classificacao === 'caso_formal_real') {
+    const fresh = await reloadChamadoForSave(chamado);
     const routed = await routeCasoEspecialFormal(
-      chamado,
+      fresh,
       { ...triagem, signals },
       { origemEntrada: context.source },
     );
@@ -63,17 +79,18 @@ async function applyTriagemOutcome(
   }
 
   if (triagem.classificacao === 'ameaca_vazia') {
-    persistCasosEspeciaisTriagemOnly(chamado, {
-      ...triagem,
-      handoffGestao: true,
-      skipAgentPipeline: true,
+    const saved = await saveChamadoWithFreshMutation(chamado, (doc) => {
+      persistCasosEspeciaisTriagemOnly(doc, {
+        ...triagem,
+        handoffGestao: true,
+        skipAgentPipeline: true,
+      });
     });
-    await chamado.save();
 
-    if (chamado._id && chamado.chamadoProtocolo) {
+    if (saved._id && saved.chamadoProtocolo) {
       await executeGestaoHandoff({
-        ticketId: chamado._id.toString(),
-        protocolo: chamado.chamadoProtocolo,
+        ticketId: saved._id.toString(),
+        protocolo: saved.chamadoProtocolo,
         nivelCriticidade: 'alta',
         palavrasCriticas: signals.filter((s) => s.startsWith('keyword:')).map((s) => s.replace('keyword:', '')),
         categoriaAtendimento: 'Ameaça regulatória (sem registro formal)',
@@ -83,8 +100,9 @@ async function applyTriagemOutcome(
     return { ran: true, action: 'handoff_gestao' };
   }
 
-  persistCasosEspeciaisTriagemOnly(chamado, triagem, { skipAgentPipeline: false });
-  await chamado.save();
+  await saveChamadoWithFreshMutation(chamado, (doc) => {
+    persistCasosEspeciaisTriagemOnly(doc, triagem, { skipAgentPipeline: false });
+  });
   return { ran: true, action: 'falso_positivo' };
 }
 

@@ -1,8 +1,16 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.17.0 | DATE: 2026-08-18
- * — workflowStatus finished preserva progresso e presença visual
+ * VERSION: v3.18.0 | DATE: 2026-08-18
+ * — formatters de data/hora em America/Sao_Paulo
  */
+import {
+  formatDateBr,
+  formatDateTimeBr,
+  formatMsgMetaBr,
+  formatTimeBr,
+  isSameBrDay,
+  parseApiInstant,
+} from '../../utils/dateTimeBr';
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
 import { getDeskQueueDisplayCount, markTicketResolvedOptimistic } from './queueCounts';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
@@ -225,38 +233,34 @@ export function isValidEmailFormat(value) {
 }
 
 export function formatMsgMeta(iso, author) {
-  if (!iso) return author || '';
-  const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR') + ' às ' +
-    d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) +
-    (author ? ' · ' + author : '');
+  return formatMsgMetaBr(iso, author);
 }
 
 export function formatWaTime(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return formatTimeBr(iso);
 }
 
 export function formatWaDateSeparator(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const d = parseApiInstant(iso);
+  if (!d) return '';
+  return d.toLocaleDateString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 }
 
 export function formatTicketDate(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) +
-    ' · ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `${formatDateBr(iso, { year: false })} · ${formatTimeBr(iso)}`;
 }
 
 /** Hora curta para card da lista (ex.: 14:56). */
 export function formatTicketListTime(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return formatTimeBr(iso);
 }
 
 /** Badge de canal para card da lista branca. */
@@ -329,10 +333,10 @@ export function getTicketQueueEntryAt(ticket) {
 /** Formato curto para coluna Finalização (ex.: 21 Jan). */
 export function formatResolvedDateShort(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  const day = d.toLocaleDateString('pt-BR', { day: 'numeric' });
-  const monthRaw = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+  const d = parseApiInstant(iso);
+  if (!d) return '—';
+  const day = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: 'numeric' });
+  const monthRaw = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', month: 'short' }).replace('.', '');
   const month = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1);
   return `${day} ${month}`;
 }
@@ -1876,34 +1880,21 @@ export function clientHasOtherActiveTickets(cpf, _clientName, excludeTicketId) {
 }
 
 function isSameDay(isoA, isoB) {
-  const a = new Date(isoA);
-  const b = new Date(isoB);
-  return a.getFullYear() === b.getFullYear()
-    && a.getMonth() === b.getMonth()
-    && a.getDate() === b.getDate();
+  return isSameBrDay(isoA, isoB);
 }
 
 export function formatInternalNoteTimestamp(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const time = formatTimeBr(iso);
+  if (time === '—') return '—';
   if (isSameDay(iso, new Date().toISOString())) return `hoje · ${time}`;
-  const date = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  const date = formatDateBr(iso, { year: false });
   return `${date} · ${time}`;
 }
 
 export function formatRegistroOccurrenceTimestamp(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  const date = d.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-  const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  return `${date} · ${time}`;
+  return `${formatDateBr(iso)} · ${formatTimeBr(iso)}`;
 }
 
 const ALTERACAO_FIELD_LABELS = {

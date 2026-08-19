@@ -1,7 +1,13 @@
-/** processos.routes v1.0.0 — catálogo de POPs (.docx) por produto, para o quadro de Processos */
+/** processos.routes v1.3.0 — visualização PDF do POP completo em nova aba */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
-import { getPop, getPopImage, listPops, listProdutos } from '../services/processos/popCatalog.service';
+import {
+  getPop,
+  getPopCompleto,
+  getPopImage,
+  listPops,
+  listProdutos,
+} from '../services/processos/popCatalog.service';
 
 const router = Router();
 
@@ -34,6 +40,24 @@ router.get('/produtos/:produto/pops/:pop', authMiddleware, async (req: Request, 
     res.status(500).json({ message: 'Não foi possível carregar o POP.' });
   }
 });
+
+router.get(
+  '/produtos/:produto/pops/:pop/completo/visualizar',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const file = await getPopCompleto(String(req.params.produto), String(req.params.pop));
+      if (!file) return res.status(404).json({ message: 'POP completo não encontrado.' });
+      res.set('Content-Type', file.contentType);
+      res.set('Content-Disposition', `inline; filename="${encodeURIComponent(file.fileName)}"`);
+      res.set('Cache-Control', 'private, max-age=3600');
+      res.send(file.buffer);
+    } catch (err) {
+      console.error('[processos] GET .../completo/visualizar:', err);
+      res.status(500).json({ message: 'Não foi possível visualizar o POP completo.' });
+    }
+  },
+);
 
 router.get(
   '/produtos/:produto/pops/:pop/imagens/:imagem',

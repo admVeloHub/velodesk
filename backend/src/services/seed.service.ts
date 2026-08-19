@@ -1,4 +1,4 @@
-/** seed.service v1.7.2 — purge WF-TEST e permissões legadas escalonar */
+/** seed.service v1.8.0 — seed motivos por órgão (RA) */
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { getClienteModel } from '../models/Cliente';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
@@ -7,6 +7,7 @@ import {
   DEFAULT_TABULACAO_PRODUTOS,
   invalidateTabulationCache,
 } from './tabulation.service';
+import { ensureOrgaoMotivoCategorias } from './tabulationOpcoes.service';
 import { seedWorkflowConfig } from './workflowConfigSeed.service';
 import { seedFuncoesPermissoes, invalidateFuncaoPermissaoCache } from './funcaoPermissao.service';
 import { migrateGrupoToFuncao } from './migrateGrupoToFuncao.service';
@@ -113,5 +114,6 @@ async function seedTabulationConfig() {
     console.log(`Seed: ${DEFAULT_TABULACAO_PRODUTOS.length} produto(s) de tabulação criados`);
   }
 
+  await ensureOrgaoMotivoCategorias();
   invalidateTabulationCache();
 }

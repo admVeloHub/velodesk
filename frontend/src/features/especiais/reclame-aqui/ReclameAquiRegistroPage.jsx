@@ -1,11 +1,13 @@
 /**
- * ReclameAquiRegistroPage — formulário de registro / resposta RA
+ * ReclameAquiRegistroPage v1.1.0 — ID editável, motivos do órgão, sem workflow
+ * VERSION: v1.1.0 | DATE: 2026-08-19
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationContext';
+import { tabulationApi } from '../../../api/client';
+import { TABULACAO_OPCOES_CATEGORIAS } from '../../../services/tabulationConfig';
 import {
-  RA_MOTIVOS,
   RA_PRODUTOS,
   RA_TIPOS,
   formatSlaRestante,
@@ -19,6 +21,14 @@ import {
 import { registerReclamacaoAndCreateTicket } from '../../../services/especiais/reclameAquiTicketService';
 
 const RESPOSTA_MAX = 2000;
+
+function toDatetimeLocal(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 function formatDateInput(iso) {
   if (!iso) return '';
@@ -53,6 +63,24 @@ export default function ReclameAquiRegistroPage() {
   const [form, setForm] = useState(initial);
   const [errors, setErrors] = useState({});
   const [registering, setRegistering] = useState(false);
+  const [motivos, setMotivos] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    tabulationApi.getOpcoes(TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI, false)
+      .then((doc) => {
+        if (cancelled) return;
+        const list = (doc?.opcoes || [])
+          .filter((item) => item.ativo !== false)
+          .map((item) => item.valor)
+          .filter(Boolean);
+        setMotivos(list);
+      })
+      .catch(() => {
+        if (!cancelled) setMotivos([]);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   if (!isNew && !initial) {
     return <Navigate to="/especiais/reclame-aqui" replace />;
@@ -76,6 +104,7 @@ export default function ReclameAquiRegistroPage() {
     const nextErrors = {};
     if (!form.assunto?.trim()) nextErrors.assunto = 'Informe o assunto';
     if (!form.consumidor?.trim()) nextErrors.consumidor = 'Informe o consumidor';
+    if (!form.idReclamacaoRa?.trim()) nextErrors.idReclamacaoRa = 'Informe o ID da reclamação (Id Origem)';
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       showNotification('Preencha os campos obrigatórios.', 'warning');
@@ -85,7 +114,7 @@ export default function ReclameAquiRegistroPage() {
     setRegistering(true);
     try {
       const { id } = await registerReclamacaoAndCreateTicket(form);
-      showNotification('Reclamação registrada e workflow acionado.', 'success');
+      showNotification('Reclamação registrada.', 'success');
       navigate(`/especiais/reclame-aqui/ticket/${id}`);
     } catch {
       showNotification('Não foi possível registrar a reclamação.', 'error');
@@ -103,7 +132,7 @@ export default function ReclameAquiRegistroPage() {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const protocoloDisplay = form.protocoloRa ? `#${form.protocoloRa}` : '—';
+  const protocoloDisplay = form.idReclamacaoRa ? `#${form.idReclamacaoRa}` : '—';
   const slaRestante = formatSlaRestante(form.prazoRa);
 
   return (
@@ -162,10 +191,13 @@ export default function ReclameAquiRegistroPage() {
                   <input
                     id="ra-id-ext"
                     type="text"
-                    className="ra-registro__input ra-registro__input--readonly"
-                    value={form.idReclamacaoRa || '—'}
-                    readOnly
+                    className={`ra-registro__input${errors.idReclamacaoRa ? ' is-error' : ''}`}
+                    value={form.idReclamacaoRa || ''}
+                    onChange={(e) => updateField('idReclamacaoRa', e.target.value)}
+                    placeholder="Id Origem da reclamação"
+                    readOnly={!isNew}
                   />
+                  {errors.idReclamacaoRa ? <span className="ra-registro__error">{errors.idReclamacaoRa}</span> : null}
                 </div>
                 <div className="ra-registro__field">
                   <label htmlFor="ra-data">Data da reclamação</label>
@@ -182,10 +214,7 @@ export default function ReclameAquiRegistroPage() {
 
             <section className="ra-registro__card">
               <div className="ra-registro__card-head">
-                <h2 className="ra-registro__card-title">Classificação e workflow</h2>
-                {form.workflowAtivo ? (
-                  <span className="ra-registro__wf-badge">Workflow ativo</span>
-                ) : null}
+                <h2 className="ra-registro__card-title">Classificação</h2>
               </div>
               <div className="ra-registro__row ra-registro__row--3">
                 <div className="ra-registro__field">
@@ -223,7 +252,7 @@ export default function ReclameAquiRegistroPage() {
                     onChange={(e) => updateField('motivo', e.target.value)}
                   >
                     <option value="">Selecione...</option>
-                    {RA_MOTIVOS.map((m) => (
+                    {motivos.map((m) => (
                       <option key={m} value={m}>{m}</option>
                     ))}
                   </select>
@@ -252,6 +281,19 @@ export default function ReclameAquiRegistroPage() {
           <aside className="ra-registro__side">
             <section className="ra-registro__side-card">
               <h3 className="ra-registro__side-title">Indicadores operacionais</h3>
+              <div className="ra-registro__field">
+                <label htmlFor="ra-prazo">Prazo RA</label>
+                <input
+                  id="ra-prazo"
+                  type="datetime-local"
+                  className="ra-registro__input"
+                  value={toDatetimeLocal(form.prazoRa)}
+                  onChange={(e) => updateField(
+                    'prazoRa',
+                    e.target.value ? new Date(e.target.value).toISOString() : '',
+                  )}
+                />
+              </div>
               <p className="ra-registro__side-label">Passível de nota?</p>
               <div className="ra-registro__toggle">
                 <button
@@ -370,7 +412,7 @@ export default function ReclameAquiRegistroPage() {
             disabled={registering}
           >
             <i className="ti ti-check" aria-hidden="true" />
-            {registering ? 'Registrando...' : 'Registrar e acionar workflow'}
+            {registering ? 'Registrando...' : 'Registrar reclamação'}
           </button>
         </div>
       </footer>

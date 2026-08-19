@@ -1,4 +1,4 @@
-/** reclamacao.service v1.3.1 — replica workflowStatus no snapshot de reclamações */
+/** reclamacao.service v1.4.0 — idReclamacaoRa no DTO; consumidor sem fallback em tab.motivo */
 import { Types, type Model } from 'mongoose';
 import { ChamadoN1, type IChamadoN1 } from '../../models/ChamadoN1';
 import type { IReclamacao } from '../../models/reclamacoes/reclamacaoModels';
@@ -15,6 +15,7 @@ import {
   findBacenFromChamado,
   findConsumidorGovFromChamado,
   findProconFromChamado,
+  findReclameAquiFromChamado,
   normalizeStatusValue,
   proconChannelMongoFilter,
   readTabulacaoSnapshot,
@@ -116,6 +117,8 @@ function readCanalMeta(chamado: IChamadoN1): Record<string, unknown> {
   if (ra && typeof ra === 'object' && !Array.isArray(ra)) {
     return ra as Record<string, unknown>;
   }
+  const raFromRegistro = findReclameAquiFromChamado(chamado);
+  if (raFromRegistro) return raFromRegistro;
   const bacen = tab.bacen;
   if (bacen && typeof bacen === 'object' && !Array.isArray(bacen)) {
     return bacen as Record<string, unknown>;
@@ -223,7 +226,6 @@ function buildReclamacaoPayload(
     },
     consumidor: String(
       meta.consumidor
-      ?? tab.motivo
       ?? (chamado.cliente?.[0] as { clienteNome?: string } | undefined)?.clienteNome
       ?? '',
     ).trim(),
@@ -232,7 +234,7 @@ function buildReclamacaoPayload(
       ? (meta.email as string[]).map(String)
       : undefined,
     telefoneWhatsapp: String(meta.telefoneWhatsapp ?? '').trim() || undefined,
-    assunto: String(meta.assunto ?? chamado.chamadoTitulo ?? tab.motivo ?? '').trim(),
+    assunto: String(meta.assunto ?? chamado.chamadoTitulo ?? '').trim(),
     descricao: String(
       meta.descricao
       ?? tab.detalhe
@@ -241,7 +243,11 @@ function buildReclamacaoPayload(
     ).trim(),
     produto: String(meta.produto ?? tab.produto ?? '').trim() || undefined,
     tipo: String(meta.tipo ?? tab.tipoChamado ?? (tab as { classificacaoTipo?: string }).classificacaoTipo ?? '').trim() || undefined,
-    motivo: String(meta.motivo ?? tab.motivo ?? '').trim() || undefined,
+    motivo: String(
+      orgao === 'reclame_aqui'
+        ? (meta.motivo ?? '')
+        : (meta.motivo ?? tab.motivo ?? '')
+    ).trim() || undefined,
     statusCanal: String(
       meta.statusPc
       ?? meta.statusGov
@@ -333,6 +339,16 @@ export async function findByChamadoId(
   return Model.findOne({ chamadoId: new Types.ObjectId(String(chamadoId)) }).exec();
 }
 
+export async function findByIdDemandaExterna(
+  orgao: CasoEspecialOrgao,
+  idDemandaExterna: string,
+): Promise<IReclamacao | null> {
+  const Model = resolveReclamacaoModel(orgao);
+  const id = String(idDemandaExterna ?? '').trim();
+  if (!Model || !id) return null;
+  return Model.findOne({ idDemandaExterna: id }).exec();
+}
+
 export async function findReclamacaoByChamadoIdAnyOrgao(
   chamadoId: string | Types.ObjectId,
 ): Promise<IReclamacao | null> {
@@ -396,7 +412,7 @@ export async function listByOrgao(
   if (filters.aberta != null) query.aberta = filters.aberta;
   if (filters.statusCanal) query.statusCanal = filters.statusCanal;
 
-  const limit = Math.min(Math.max(filters.limit ?? 200, 1), 500);
+  const limit = Math.min(Math.max(filters.limit ?? 50, 1), 100);
   const skip = Math.max(filters.skip ?? 0, 0);
 
   return Model.find(query)
@@ -404,6 +420,18 @@ export async function listByOrgao(
     .skip(skip)
     .limit(limit)
     .exec();
+}
+
+export async function countByOrgao(
+  orgao: CasoEspecialOrgao,
+  filters: Pick<ReclamacaoListFilters, 'aberta' | 'statusCanal'> = {},
+): Promise<number> {
+  const Model = resolveReclamacaoModel(orgao);
+  if (!Model) return 0;
+  const query: Record<string, unknown> = {};
+  if (filters.aberta != null) query.aberta = filters.aberta;
+  if (filters.statusCanal) query.statusCanal = filters.statusCanal;
+  return Model.countDocuments(query).exec();
 }
 
 function escapeRegex(value: string): string {
@@ -517,7 +545,7 @@ function chamadoToPortalDto(chamado: IChamadoN1, orgao: CasoEspecialOrgao): Reco
     cpf: readClientCpf(chamado, meta) || undefined,
     email: Array.isArray(meta.email) ? (meta.email as string[]).map(String) : undefined,
     telefoneWhatsapp: String(meta.telefoneWhatsapp ?? '').trim() || undefined,
-    assunto: String(meta.assunto ?? chamado.chamadoTitulo ?? tab.motivo ?? '').trim(),
+    assunto: String(meta.assunto ?? chamado.chamadoTitulo ?? '').trim(),
     descricao: String(
       meta.descricao
       ?? tab.detalhe
@@ -526,7 +554,11 @@ function chamadoToPortalDto(chamado: IChamadoN1, orgao: CasoEspecialOrgao): Reco
     ).trim(),
     produto: String(meta.produto ?? tab.produto ?? '').trim() || undefined,
     tipo: String(meta.tipo ?? tab.tipoChamado ?? '').trim() || undefined,
-    motivo: String(meta.motivo ?? tab.motivo ?? '').trim() || undefined,
+    motivo: String(
+      orgao === 'reclame_aqui'
+        ? (meta.motivo ?? '')
+        : (meta.motivo ?? tab.motivo ?? '')
+    ).trim() || undefined,
     statusCanal,
     statusPc: meta.statusPc ?? (orgao === 'procon' ? statusCanal : undefined),
     statusGov: meta.statusGov ?? (orgao === 'consumidor_gov' ? statusCanal : undefined),
@@ -537,6 +569,9 @@ function chamadoToPortalDto(chamado: IChamadoN1, orgao: CasoEspecialOrgao): Reco
     protocoloRa: orgao === 'reclame_aqui' ? protocoloExterno || undefined : undefined,
     protocoloBacen: orgao === 'bacen' ? protocoloExterno || undefined : undefined,
     idDemanda: String(meta.idDemanda ?? meta.idReclamacaoRa ?? '').trim() || undefined,
+    idReclamacaoRa: orgao === 'reclame_aqui'
+      ? String(meta.idReclamacaoRa ?? meta.idDemanda ?? '').trim() || undefined
+      : undefined,
     prazoLegal: meta.prazoLegal || meta.prazoRa || undefined,
     prazoRa: meta.prazoRa || undefined,
     slaPct: typeof meta.slaPct === 'number' ? meta.slaPct : undefined,
@@ -661,7 +696,10 @@ export function reclamacaoToPortalDto(doc: IReclamacao): Record<string, unknown>
     protocoloRa: doc.orgao === 'reclame_aqui' ? doc.protocoloExterno : undefined,
     protocoloBacen: doc.orgao === 'bacen' ? doc.protocoloExterno : undefined,
     idDemanda: doc.idDemandaExterna,
+    idReclamacaoRa: doc.orgao === 'reclame_aqui' ? doc.idDemandaExterna : undefined,
     prazoLegal: doc.prazoLegal,
+    prazoRa: doc.orgao === 'reclame_aqui' ? (meta.prazoRa || doc.prazoLegal) : undefined,
+    passivelNota: doc.orgao === 'reclame_aqui' ? Boolean(meta.passivelNota) : undefined,
     slaPct: doc.slaPct,
     orgaoProcon: doc.orgao === 'procon' ? doc.orgaoInstituicao : undefined,
     orgaoGov: doc.orgao === 'consumidor_gov' ? doc.orgaoInstituicao : undefined,
@@ -701,7 +739,7 @@ export async function patchReclamacao(
   const allowed: Partial<IReclamacao> = {};
   const scalarFields = [
     'statusCanal', 'prazoLegal', 'atendente', 'responsavel', 'aberta',
-    'protocoloExterno', 'idDemandaExterna', 'slaPct',
+    'protocoloExterno', 'idDemandaExterna', 'slaPct', 'motivo',
   ] as const;
 
   for (const key of scalarFields) {

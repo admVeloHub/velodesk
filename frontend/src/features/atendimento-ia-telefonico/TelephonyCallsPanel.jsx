@@ -12,10 +12,10 @@ import {
   ROTA_FILTER_OPTIONS,
   desfechoLabel,
 } from './telephonyDataCollected';
+import { formatDateTimeBr } from '../../utils/dateTimeBr';
 
 function formatDate(value) {
-  if (!value) return '—';
-  return new Date(value).toLocaleString('pt-BR');
+  return formatDateTimeBr(value);
 }
 
 function formatDuration(seconds) {

@@ -1,5 +1,5 @@
 /**
- * RaHugmeImportModal — upload, preview e importação em lote da planilha Hugme
+ * RaHugmeImportModal v1.2.0 — import em background; contador por ticket
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -7,23 +7,13 @@ import { useNotifications } from '../../../context/NotificationContext';
 import {
   HUGME_ACCEPT,
   downloadErrorReport,
-  importHugmeFileViaApi,
+  getActiveHugmeImportJob,
   parseHugmeFile,
+  resumeHugmeImportJobIfAny,
+  startHugmeImportJob,
+  subscribeHugmeImportJob,
 } from '../../../services/especiais/hugmeImportService';
 import { refreshReclamacoesFromApi } from '../../../services/especiais/reclameAquiStore';
-
-const IMPORT_MODES = {
-  base_inicial: {
-    id: 'base_inicial',
-    label: 'Base completa (somente armazenar)',
-    hint: 'Primeira carga histórica — grava no banco sem abrir tickets.',
-  },
-  incremental: {
-    id: 'incremental',
-    label: 'Atualização 7 meses (armazenar + tickets)',
-    hint: 'Atualiza registros existentes e abre ticket RA apenas para linhas sem ticket.',
-  },
-};
 
 const STEPS = { upload: 'upload', preview: 'preview', importing: 'importing', done: 'done' };
 
@@ -39,20 +29,36 @@ function StatusBadge({ status }) {
   return <span className={`ra-hugme-badge ${item.cls}`}>{item.label}</span>;
 }
 
+function jobToResult(job) {
+  return {
+    batchId: job.batchId,
+    created: job.created ?? 0,
+    stored: job.stored ?? 0,
+    inserted: job.inserted ?? 0,
+    updated: job.updated ?? 0,
+    skipped: job.skipped ?? 0,
+    failed: job.failed ?? 0,
+    errors: job.errors || [],
+  };
+}
+
 export default function RaHugmeImportModal({ open, onClose, onComplete }) {
   const { showNotification } = useNotifications();
   const fileInputRef = useRef(null);
   const fileRef = useRef(null);
-  const [importMode, setImportMode] = useState('base_inicial');
+  const completedBatchRef = useRef('');
   const [step, setStep] = useState(STEPS.upload);
   const [fileName, setFileName] = useState('');
   const [preview, setPreview] = useState(null);
   const [parseError, setParseError] = useState('');
   const [parsing, setParsing] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [elapsedSec, setElapsedSec] = useState(0);
   const [importResult, setImportResult] = useState(null);
   const stepRef = useRef(step);
+  const openRef = useRef(open);
   stepRef.current = step;
+  openRef.current = open;
 
   const reset = useCallback(() => {
     setStep(STEPS.upload);
@@ -61,25 +67,64 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
     setParseError('');
     setParsing(false);
     setProgress({ current: 0, total: 0 });
+    setElapsedSec(0);
     setImportResult(null);
-    setImportMode('base_inicial');
     fileRef.current = null;
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
   useEffect(() => {
     if (!open) return;
+    const job = getActiveHugmeImportJob();
+    if (job?.running) {
+      setStep(STEPS.importing);
+      setProgress({ current: job.current || 0, total: job.total || 0 });
+      return;
+    }
     reset();
   }, [open, reset]);
 
   useEffect(() => {
+    resumeHugmeImportJobIfAny();
+    return subscribeHugmeImportJob((job) => {
+      if (!job) return;
+      if (job.running) {
+        setProgress({ current: job.current || 0, total: job.total || 0 });
+        if (openRef.current) setStep(STEPS.importing);
+        return;
+      }
+      if (!job.justFinished || !job.batchId || completedBatchRef.current === job.batchId) return;
+      completedBatchRef.current = job.batchId;
+      const result = jobToResult(job);
+      setImportResult(result);
+      setProgress({ current: job.current || 0, total: job.total || 0 });
+      if (openRef.current) setStep(STEPS.done);
+      try {
+        refreshReclamacoesFromApi();
+      } catch {
+        // fail-soft na atualização da lista
+      }
+      onComplete?.(result);
+      const msg = `${result.stored} registro(s) processado(s), ${result.created} ticket(s) criado(s)${result.failed ? `, ${result.failed} erro(s)` : ''}.`;
+      showNotification(msg, result.failed ? 'warning' : 'success');
+    });
+  }, [onComplete, showNotification]);
+
+  useEffect(() => {
     if (!open) return undefined;
     const onKey = (event) => {
-      if (event.key === 'Escape' && stepRef.current !== STEPS.importing) onClose();
+      if (event.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (step !== STEPS.importing) return undefined;
+    setElapsedSec(0);
+    const timer = setInterval(() => setElapsedSec((sec) => sec + 1), 1000);
+    return () => clearInterval(timer);
+  }, [step]);
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -88,7 +133,6 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
     setParseError('');
     setFileName(file.name);
     try {
-      // Libera a UI antes de parsear planilhas grandes (1600+ linhas)
       await new Promise((resolve) => setTimeout(resolve, 0));
       const result = await parseHugmeFile(file);
       if (!result?.rows?.length) {
@@ -130,21 +174,7 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
     setProgress({ current: 0, total: validRows.length });
 
     try {
-      const result = await importHugmeFileViaApi(file, importMode);
-      setImportResult(result);
-      setStep(STEPS.done);
-      if (importMode === 'incremental') {
-        try {
-          await refreshReclamacoesFromApi();
-        } catch {
-          // fail-soft
-        }
-      }
-      onComplete?.(result);
-      const msg = importMode === 'base_inicial'
-        ? `${result.stored} registro(s) armazenado(s) no banco${result.failed ? `, ${result.failed} erro(s)` : ''}.`
-        : `${result.stored} registro(s) atualizado(s), ${result.created} ticket(s) criado(s)${result.failed ? `, ${result.failed} erro(s)` : ''}.`;
-      showNotification(msg, result.failed ? 'warning' : 'success');
+      await startHugmeImportJob(file, 'incremental');
     } catch (err) {
       showNotification(err?.response?.data?.message || err?.message || 'Falha na importação.', 'error');
       setStep(STEPS.preview);
@@ -164,12 +194,13 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
     downloadErrorReport(failed);
   };
 
-  const canClose = step !== STEPS.importing;
-
   if (!open) return null;
 
   const previewRows = preview?.rows?.slice(0, 50) || [];
   const hasMorePreview = (preview?.rows?.length || 0) > 50;
+  const progressPct = progress.total
+    ? Math.min(100, Math.round((progress.current / progress.total) * 100))
+    : 0;
 
   return createPortal(
     <>
@@ -177,8 +208,7 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
         type="button"
         className="queue-box-modal__backdrop"
         aria-label="Fechar importação"
-        onClick={canClose ? onClose : undefined}
-        disabled={!canClose}
+        onClick={onClose}
       />
       <div
         className="queue-box-modal queue-box-modal--wide ra-hugme-modal"
@@ -195,48 +225,21 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
               <h2 className="queue-box-modal__title" id="raHugmeModalTitle">
                 Importar planilha Hugme
               </h2>
-              <p className="queue-box-modal__subtitle">
-                {step === STEPS.done
-                  ? 'Importação concluída'
-                  : importMode === 'base_inicial'
-                    ? 'Armazene a base Hugme completa no banco de dados'
-                    : 'Atualize a base e abra tickets RA para novas reclamações'}
-              </p>
             </div>
           </div>
-          {canClose ? (
-            <button
-              type="button"
-              className="queue-box-modal__close"
-              onClick={onClose}
-              aria-label="Fechar"
-            >
-              <i className="ti ti-x" aria-hidden="true" />
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="queue-box-modal__close"
+            onClick={onClose}
+            aria-label="Fechar"
+          >
+            <i className="ti ti-x" aria-hidden="true" />
+          </button>
         </header>
 
         <div className="queue-box-modal__body ra-hugme-modal__body">
           {step === STEPS.upload && (
             <>
-              <fieldset className="ra-hugme-mode">
-                <legend className="ra-hugme-mode__legend">Tipo de importação</legend>
-                {Object.values(IMPORT_MODES).map((mode) => (
-                  <label key={mode.id} className="ra-hugme-mode__option">
-                    <input
-                      type="radio"
-                      name="hugmeImportMode"
-                      value={mode.id}
-                      checked={importMode === mode.id}
-                      onChange={() => setImportMode(mode.id)}
-                    />
-                    <span>
-                      <strong>{mode.label}</strong>
-                      <small>{mode.hint}</small>
-                    </span>
-                  </label>
-                ))}
-              </fieldset>
               <div
                 className="upload-area ra-hugme-upload"
                 onClick={() => fileInputRef.current?.click()}
@@ -310,19 +313,15 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
           {step === STEPS.importing && (
             <div className="ra-hugme-progress">
               <p className="ra-hugme-progress__label">
-                Importando… {progress.current} de {progress.total}
+                {progress.current} / {progress.total}
               </p>
               <div className="ra-hugme-progress__track">
                 <div
                   className="ra-hugme-progress__bar"
-                  style={{
-                    width: progress.total
-                      ? `${Math.round((progress.current / progress.total) * 100)}%`
-                      : '0%',
-                  }}
+                  style={{ width: `${progressPct}%` }}
                 />
               </div>
-              <p className="ra-hugme-progress__hint">Não feche esta janela durante a importação.</p>
+              <p className="ra-hugme-progress__hint">{elapsedSec}s</p>
             </div>
           )}
 
@@ -330,13 +329,11 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
             <div className="ra-hugme-result">
               <div className="ra-hugme-stats">
                 <span className="ra-hugme-stats__valid">
-                  <strong>{importResult.stored ?? importResult.created}</strong> armazenados
+                  <strong>{importResult.stored ?? importResult.created}</strong> processados
                 </span>
-                {importMode === 'incremental' ? (
-                  <span className="ra-hugme-stats__valid">
-                    <strong>{importResult.created}</strong> tickets
-                  </span>
-                ) : null}
+                <span className="ra-hugme-stats__valid">
+                  <strong>{importResult.created}</strong> tickets novos
+                </span>
                 <span className="ra-hugme-stats__warn">
                   <strong>{importResult.skipped}</strong> ignorados
                 </span>
@@ -379,11 +376,15 @@ export default function RaHugmeImportModal({ open, onClose, onComplete }) {
                 onClick={handleImport}
                 disabled={!preview?.stats?.valid}
               >
-                {importMode === 'base_inicial'
-                  ? `Armazenar ${preview.stats.valid} registro(s)`
-                  : `Importar ${preview.stats.valid} linha(s)`}
+                Importar {preview.stats.valid} linha(s)
               </button>
             </>
+          )}
+
+          {step === STEPS.importing && (
+            <button type="button" className="btn-secondary queue-box-modal__btn" onClick={onClose}>
+              Fechar
+            </button>
           )}
 
           {step === STEPS.done && (

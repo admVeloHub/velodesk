@@ -1,6 +1,6 @@
 /**
- * TabulationProdutosList v1.5.2 — ícone de editar nos cards tipo/canal
- * VERSION: v1.5.2 | DATE: 2026-07-07
+ * TabulationProdutosList v1.6.0 — cards de motivos por órgão
+ * VERSION: v1.6.0 | DATE: 2026-08-19
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { tabulationApi } from '../../../api/client';
@@ -72,6 +72,22 @@ export default function TabulationProdutosList({ id, onChanged }) {
   );
   const canalStats = useMemo(
     () => computeOpcoesStats(opcoesDocs, TABULACAO_OPCOES_CATEGORIAS.CANAL_CONTATO),
+    [opcoesDocs]
+  );
+  const motivoRaStats = useMemo(
+    () => computeOpcoesStats(opcoesDocs, TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI),
+    [opcoesDocs]
+  );
+  const motivoProconStats = useMemo(
+    () => computeOpcoesStats(opcoesDocs, TABULACAO_OPCOES_CATEGORIAS.MOTIVO_PROCON),
+    [opcoesDocs]
+  );
+  const motivoGovStats = useMemo(
+    () => computeOpcoesStats(opcoesDocs, TABULACAO_OPCOES_CATEGORIAS.MOTIVO_CONSUMIDOR_GOV),
+    [opcoesDocs]
+  );
+  const motivoBacenStats = useMemo(
+    () => computeOpcoesStats(opcoesDocs, TABULACAO_OPCOES_CATEGORIAS.MOTIVO_BACEN),
     [opcoesDocs]
   );
   const displayProdutos = orderEditMode ? orderDraft : sortedProdutos;
@@ -239,6 +255,78 @@ export default function TabulationProdutosList({ id, onChanged }) {
           <div className="stat-info">
             <h3>{canalStats.ativos}</h3>
             <p>Canais de contato</p>
+          </div>
+        </button>
+        <button
+          type="button"
+          className="stat-card stat-card--clickable"
+          onClick={() => setOpcoesModal({
+            categoria: TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI,
+            title: 'Motivos Reclame Aqui',
+            description: 'Lista do campo Motivo no formulário Reclame Aqui — independente da tabulação do Desk.',
+          })}
+        >
+          <span className="stat-card__edit-hint" aria-hidden="true">
+            <i className="ti ti-pencil" />
+          </span>
+          <span className="stat-icon" aria-hidden="true"><i className="ti ti-star" /></span>
+          <div className="stat-info">
+            <h3>{motivoRaStats.ativos}</h3>
+            <p>Motivos Reclame Aqui</p>
+          </div>
+        </button>
+        <button
+          type="button"
+          className="stat-card stat-card--clickable"
+          onClick={() => setOpcoesModal({
+            categoria: TABULACAO_OPCOES_CATEGORIAS.MOTIVO_PROCON,
+            title: 'Motivos Procon',
+            description: 'Lista do campo Motivo no formulário Procon — independente da tabulação do Desk.',
+          })}
+        >
+          <span className="stat-card__edit-hint" aria-hidden="true">
+            <i className="ti ti-pencil" />
+          </span>
+          <span className="stat-icon" aria-hidden="true"><i className="ti ti-building-bank" /></span>
+          <div className="stat-info">
+            <h3>{motivoProconStats.ativos}</h3>
+            <p>Motivos Procon</p>
+          </div>
+        </button>
+        <button
+          type="button"
+          className="stat-card stat-card--clickable"
+          onClick={() => setOpcoesModal({
+            categoria: TABULACAO_OPCOES_CATEGORIAS.MOTIVO_CONSUMIDOR_GOV,
+            title: 'Motivos Consumidor.Gov',
+            description: 'Lista do campo Motivo no formulário Consumidor.Gov — independente da tabulação do Desk.',
+          })}
+        >
+          <span className="stat-card__edit-hint" aria-hidden="true">
+            <i className="ti ti-pencil" />
+          </span>
+          <span className="stat-icon" aria-hidden="true"><i className="ti ti-building" /></span>
+          <div className="stat-info">
+            <h3>{motivoGovStats.ativos}</h3>
+            <p>Motivos Consumidor.Gov</p>
+          </div>
+        </button>
+        <button
+          type="button"
+          className="stat-card stat-card--clickable"
+          onClick={() => setOpcoesModal({
+            categoria: TABULACAO_OPCOES_CATEGORIAS.MOTIVO_BACEN,
+            title: 'Motivos Bacen',
+            description: 'Lista do campo Motivo no formulário Bacen — independente da tabulação do Desk.',
+          })}
+        >
+          <span className="stat-card__edit-hint" aria-hidden="true">
+            <i className="ti ti-pencil" />
+          </span>
+          <span className="stat-icon" aria-hidden="true"><i className="ti ti-building-skyscraper" /></span>
+          <div className="stat-info">
+            <h3>{motivoBacenStats.ativos}</h3>
+            <p>Motivos Bacen</p>
           </div>
         </button>
         <div className="stat-card stat-card--static">

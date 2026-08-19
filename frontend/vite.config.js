@@ -1,6 +1,6 @@
 /**
- * vite.config v1.3.0 — portas/proxy via FONTE DA VERDADE/.env-velodesk (8000/8001)
- * VERSION: v1.3.0 | DATE: 2026-06-30 | AUTHOR: VeloHub Development Team
+ * vite.config v1.3.1 — proxy /api sem timeout no import Hug Me
+ * VERSION: v1.3.1 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
  */
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -71,7 +71,7 @@ export default defineConfig({
     strictPort: true,
     open: true,
     proxy: {
-      '/api': { target: backendUrl, changeOrigin: true },
+      '/api': { target: backendUrl, changeOrigin: true, timeout: 0, proxyTimeout: 0 },
       '/health': { target: backendUrl, changeOrigin: true },
       '/velohub-api': velohubProxy,
     },

@@ -1,5 +1,5 @@
 /**
- * RaTicketList — lista de reclamações RA (layout CRM)
+ * RaTicketList v1.1.0 — paginação 50
  */
 import React from 'react';
 import { RA_GROUPS, getStatusLabel, formatSlaRestante } from '../../../services/especiais/reclameAquiData';
@@ -17,6 +17,10 @@ export default function RaTicketList({
   searchActive,
   listSearchQuery = '',
   collapsed,
+  page = 1,
+  totalPages = 1,
+  totalCount,
+  onPageChange,
   onSelectItem,
   onSortChange,
   onListSearchChange,
@@ -26,9 +30,10 @@ export default function RaTicketList({
   onReload,
 }) {
   const groupName = RA_GROUPS.find((g) => g.id === activeGroup)?.label || '';
+  const countLabel = totalCount == null ? items.length : totalCount;
   const listTitle = (searchActive || listSearchQuery.trim())
-    ? `Busca · ${items.length}`
-    : `${groupName} · ${items.length}`;
+    ? `Busca · ${countLabel}`
+    : `${groupName} · ${countLabel}`;
 
   return (
     <aside
@@ -133,6 +138,27 @@ export default function RaTicketList({
             })
           )}
         </ul>
+        {totalPages > 1 ? (
+          <div className="ra-panel__pagination">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => onPageChange?.(page - 1)}
+              aria-label="Página anterior"
+            >
+              <i className="ti ti-chevron-left" />
+            </button>
+            <span>{page} de {totalPages}</span>
+            <button
+              type="button"
+              disabled={page >= totalPages}
+              onClick={() => onPageChange?.(page + 1)}
+              aria-label="Próxima página"
+            >
+              <i className="ti ti-chevron-right" />
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {collapsed ? (

@@ -1,4 +1,4 @@
-/** reclamacoes.routes v1.1.0 — busca dual n1 + reclamacoes */
+/** reclamacoes.routes v1.2.0 — lista paginada 50; upsert RA obrigatório */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import type { AuthPayload } from '../middleware/auth';
@@ -11,15 +11,18 @@ import {
   findByIdOrgao,
   findByChamadoId,
   listByOrgao,
+  countByOrgao,
   parseReclamacaoOrgaoRoute,
   patchReclamacao,
   reclamacaoToPortalDto,
   searchPortalByOrgao,
+  upsertFromChamado,
 } from '../services/reclamacoes/reclamacao.service';
 import type { CasoEspecialOrgao } from '../services/agents/casosEspeciais.types';
 import { createChamadoFromBody } from '../services/chamado.mapper';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { runCasosEspeciaisTriagem } from '../services/agents/casosEspeciaisTrigger.service';
+import { buildFastPathTriagem } from '../services/agents/casosEspeciaisAgent.service';
 
 const router = Router();
 
@@ -80,19 +83,25 @@ router.get('/:orgao', authMiddleware, async (req, res: Response) => {
       : req.query.aberta === 'false'
         ? false
         : undefined;
-    const limit = parseInt(String(req.query.limit ?? '200'), 10) || 200;
+    const limit = parseInt(String(req.query.limit ?? '50'), 10) || 50;
     const skip = parseInt(String(req.query.skip ?? '0'), 10) || 0;
 
-    const items = await listByOrgao(orgao, {
+    const listFilters = {
       aberta,
       statusCanal: typeof req.query.statusCanal === 'string' ? req.query.statusCanal : undefined,
       limit,
       skip,
-    });
+    };
+    const [items, total] = await Promise.all([
+      listByOrgao(orgao, listFilters),
+      countByOrgao(orgao, listFilters),
+    ]);
 
     return res.json({
       items: items.map(reclamacaoToPortalDto),
-      total: items.length,
+      total,
+      limit,
+      skip,
     });
   } catch (err) {
     const status = (err as { status?: number }).status ?? 500;
@@ -185,7 +194,18 @@ router.post('/:orgao', authMiddleware, async (req, res: Response) => {
       if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
 
       await runCasosEspeciaisTriagem(chamado, { source: 'reclamacoes-manual' });
-      const doc = await findByChamadoId(orgao, chamadoId);
+      let doc = await findByChamadoId(orgao, chamadoId);
+      if (!doc && orgao === 'reclame_aqui') {
+        const triagem = {
+          ...buildFastPathTriagem('reclame_aqui', ['reclamacoes-manual']),
+          signals: ['reclamacoes-manual'],
+          at: new Date().toISOString(),
+        };
+        doc = await upsertFromChamado(chamado, triagem, { origemEntrada: 'reclamacoes-manual' });
+        if (!doc) {
+          return res.status(500).json({ message: 'Falha ao persistir reclamação Reclame Aqui' });
+        }
+      }
       if (!doc) {
         return res.status(202).json({
           message: 'Triagem executada; reclamação pendente de validação IA',
@@ -205,6 +225,22 @@ router.post('/:orgao', authMiddleware, async (req, res: Response) => {
     await runCasosEspeciaisTriagem(chamado, { source: 'reclamacoes-register' });
 
     const doc = await findByChamadoId(orgao, chamado._id.toString());
+    if (!doc && orgao === 'reclame_aqui') {
+      const triagem = {
+        ...buildFastPathTriagem('reclame_aqui', ['reclamacoes-register']),
+        signals: ['reclamacoes-register'],
+        at: new Date().toISOString(),
+      };
+      const forced = await upsertFromChamado(chamado, triagem, { origemEntrada: 'reclamacoes-register' });
+      if (!forced) {
+        return res.status(500).json({ message: 'Falha ao persistir reclamação Reclame Aqui' });
+      }
+      return res.status(201).json({
+        chamadoId: chamado._id.toString(),
+        chamadoProtocolo: chamado.chamadoProtocolo,
+        reclamacao: reclamacaoToPortalDto(forced),
+      });
+    }
     return res.status(201).json({
       chamadoId: chamado._id.toString(),
       chamadoProtocolo: chamado.chamadoProtocolo,

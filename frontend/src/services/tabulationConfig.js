@@ -1,6 +1,6 @@
 /**
- * tabulationConfig v1.8.1 — tabulação completa = campos preenchidos (manual, ticket ou IA)
- * VERSION: v1.8.1 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team
+ * tabulationConfig v1.10.0 — categorias de motivo por órgão
+ * VERSION: v1.10.0 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
  */
 
 /** Rótulos de visão/perfil e termos genéricos nunca representam atribuição real. */
@@ -54,6 +54,10 @@ export const EMPTY_TABULATION = {
 export const TABULACAO_OPCOES_CATEGORIAS = {
   TIPO_CHAMADO: 'tipo_chamado',
   CANAL_CONTATO: 'canal_contato',
+  MOTIVO_RECLAME_AQUI: 'motivo_reclame_aqui',
+  MOTIVO_PROCON: 'motivo_procon',
+  MOTIVO_CONSUMIDOR_GOV: 'motivo_consumidor_gov',
+  MOTIVO_BACEN: 'motivo_bacen',
 };
 
 export const FALLBACK_TIPO_OPTIONS = ['Reclamação', 'Solicitação', 'Dúvida', 'Informação'];
@@ -335,6 +339,17 @@ export function applyTabulationSuggestion(prev, tabulation, config) {
 const SEND_STATUSES_REQUIRING_TABULATION = new Set(['em-andamento', 'resolvidos']);
 
 export function validateTabulationForSendStatus(statusId, rightFields, config) {
+  if (statusId === 'resolvidos') {
+    const responsavel = sanitizeResponsavel(rightFields?.responsavel);
+    if (!responsavel) {
+      return {
+        ok: false,
+        missing: ['Responsável'],
+        message: 'Atribua um responsável ao ticket antes de marcá-lo como resolvido.',
+      };
+    }
+  }
+
   if (!SEND_STATUSES_REQUIRING_TABULATION.has(statusId)) {
     return { ok: true, missing: [], message: '' };
   }

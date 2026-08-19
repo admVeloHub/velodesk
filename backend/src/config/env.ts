@@ -95,6 +95,11 @@ export const env = {
   popsSourceDir: (
     process.env.POPS_SOURCE_DIR || path.resolve(__dirname, '..', '..', 'source file', 'POPs')
   ).trim(),
+  /** Versão completa dos POPs (mesma árvore de pastas que popsSourceDir) */
+  popsCompletoSourceDir: (
+    process.env.POPS_COMPLETO_SOURCE_DIR
+    || path.resolve(__dirname, '..', '..', 'source file', 'POP Completo')
+  ).trim(),
   twilioAccountSid: (process.env.TWILIO_ACCOUNT_SID || '').trim(),
   twilioAuthToken: (process.env.TWILIO_AUTH_TOKEN || '').trim(),
   /** Subconta Velodesk — prioridade para WhatsApp / Senders API */

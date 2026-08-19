@@ -1,5 +1,5 @@
 /**
- * ReclameAquiTableView — tabela agrupada por status RA
+ * ReclameAquiTableView v1.1.0 — sem coluna de workflow
  */
 import React from 'react';
 import { getStatusLabel } from '../../../services/especiais/reclameAquiData';
@@ -69,8 +69,7 @@ export default function ReclameAquiTableView({
             <th>SLA</th>
             <th>Prazo RA</th>
             <th>Passível nota</th>
-            <th>Workflow</th>
-            <th>Tabulação</th>
+            <th>Motivo</th>
             <th>Atendente</th>
             <th>Resposta pública</th>
           </tr>
@@ -79,7 +78,7 @@ export default function ReclameAquiTableView({
           {groups.map((group) => (
             <React.Fragment key={group.id}>
               <tr className={`ra-table__group ra-table__group--${group.tone}`}>
-                <td colSpan={10}>
+                <td colSpan={9}>
                   <strong>{group.label}</strong>
                   <span className="ra-table__group-count">
                     ({group.items.length} reclamaç{group.items.length === 1 ? 'ão' : 'ões'})
@@ -113,8 +112,7 @@ export default function ReclameAquiTableView({
                   <td><SlaBar pct={item.slaPct} tone={item.slaTone} /></td>
                   <td>{formatPrazoRa(item.prazoRa)}</td>
                   <td>{item.passivelNota ? 'Sim' : 'Não'}</td>
-                  <td>{item.workflow || '—'}</td>
-                  <td>{item.tabulacao || '—'}</td>
+                  <td>{item.motivo || item.tabulacao || '—'}</td>
                   <td>{item.atendente || '—'}</td>
                   <td>
                     <RespostaButton action={item.respostaAction} item={item} onAction={onRowAction} />

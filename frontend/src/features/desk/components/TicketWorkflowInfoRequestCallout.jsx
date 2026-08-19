@@ -3,15 +3,11 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { getWorkflowInfoRequestsForTicket } from '../../../services/workflow/workflowInfoNotifications';
+import { formatDateTimeBr } from '../../../utils/dateTimeBr';
 
 function formatWhen(iso) {
   if (!iso) return '';
-  return new Date(iso).toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatDateTimeBr(iso, { year: false });
 }
 
 export default function TicketWorkflowInfoRequestCallout({ ticket }) {

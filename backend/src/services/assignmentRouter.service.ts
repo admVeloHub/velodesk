@@ -1,4 +1,4 @@
-/** assignmentRouter.service v1.4.1 — source inbound-ticket */
+/** assignmentRouter.service v1.4.2 — provisionalResponsavel nunca grava rótulo genérico */
 import { env } from '../config/env';
 import type { AuthPayload } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -34,13 +34,13 @@ function emailLocalPart(email?: string): string {
   return normalized.split('@')[0] ?? '';
 }
 
-/** Identificador do agente — nome real preferido; fallback e-mail local. */
+/** Identificador do agente — nome real preferido; fallback e-mail local. Nunca retorna rótulo genérico. */
 export function provisionalResponsavelFromUser(user: { name?: string; email?: string }): string {
   const name = String(user.name ?? '').trim();
   if (name && isRealResponsavel(name)) return name;
   const fromEmail = emailLocalPart(user.email);
-  if (fromEmail) return fromEmail;
-  return name;
+  if (fromEmail && isRealResponsavel(fromEmail)) return fromEmail;
+  return '';
 }
 
 export function provisionalResponsavelFromAuth(authUser: AuthPayload): string {
@@ -122,7 +122,7 @@ export function markChamadoAtribuicaoRoleta(chamado: Partial<IChamadoN1> | ICham
   target.metadados = {
     ...(target.metadados ?? {}),
     atribuicaoRoleta: true,
-    atribuidoEm: new Date().toISOString(),
+    atribuidoEm: new Date(),
   };
 }
 
@@ -189,7 +189,7 @@ export function applyManualResponsavelClaim(
   if (!authUser) return false;
 
   const responsavel = provisionalResponsavelFromAuth(authUser);
-  if (!responsavel) return false;
+  if (!responsavel || !isRealResponsavel(responsavel)) return false;
 
   const status = currentStatus(chamado).toLowerCase();
   const priorInteraction = hasPriorAgentInteraction(chamado);
@@ -455,7 +455,7 @@ function markChamadoAtribuicaoFuncaoEspecial(
   target.metadados = {
     ...(target.metadados ?? {}),
     atribuicaoFuncaoEspecial: funcaoSlug,
-    atribuidoEm: new Date().toISOString(),
+    atribuidoEm: new Date(),
   };
 }
 

@@ -1,10 +1,14 @@
-/** TabulacaoOpcoes v1.0.0 — desk_config.tabulacao_opcoes (doc por categoria) */
+/** TabulacaoOpcoes v1.1.0 — categorias de motivo por órgão */
 import { Schema, Document, Model, Types } from 'mongoose';
 import { getDeskConfigConnection } from '../config/database';
 
 export const TABULACAO_OPCOES_CATEGORIAS = {
   TIPO_CHAMADO: 'tipo_chamado',
   CANAL_CONTATO: 'canal_contato',
+  MOTIVO_RECLAME_AQUI: 'motivo_reclame_aqui',
+  MOTIVO_PROCON: 'motivo_procon',
+  MOTIVO_CONSUMIDOR_GOV: 'motivo_consumidor_gov',
+  MOTIVO_BACEN: 'motivo_bacen',
 } as const;
 
 export type TabulacaoOpcoesCategoria =

@@ -1,10 +1,32 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.86.0 | DATE: 2026-08-18 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.87.0 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — Consulta Operacional POPs, datas BRT, anexos workflow e Hugme/RA
+
+- **Data/Hora**: 2026-08-19
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.87.0
+  - **Backend**: popCatalog.service v1.4.0, processos.routes v1.3.0, env (popsCompletoSourceDir), brDateTime.util v1.0.0, hugmeImport.service v1.2.0, hugmeSpreadsheet.service, reclameAquiTicketCreate.service, permission.service, tabulationOpcoes.service, ticketSearch.service v1.4.0, attachmentScanCallback.service v1.1.0, reclamacoes.routes, reclameAquiHugme.routes
+  - **Frontend**: ProcessosPopover v2.4.0, processosCatalog v1.3.4, DeskRightPanel v1.12.5, dateTimeBr v1.0.0, utils/consultaFormatters, WorkflowApprovalTicketAttachments v1.0.0, WorkflowApprovalEssentials, attachmentPreview, TabulationProdutosList, Hugme/RA (RaHugmeImportModal, RaTicketSide, ReclameAquiRegistroPage), ticketsCache, velodesk-crm.css
+  - **Assets**: `backend/source file/POPs` (resumos .docx) + `backend/source file/POP Completo` (PDFs)
+- **Arquivos principais**:
+  - Consulta Operacional — resumo estruturado lê `POPs/*.docx` (seções h1–h6); botão **Ver Pop Completo** abre PDF de `POP Completo` em nova aba (`GET .../completo/visualizar`)
+  - Auto-match tabulação → produto e motivo POP no drawer Processos
+  - Utilitários BRT centralizados (`brDateTime.util`, `dateTimeBr.js`) — persistência e exibição de datas em inbound, telephony, workspace360, ticketSearch e CRM
+  - Console de aprovação workflow — anexos clicáveis do ticket (`WorkflowApprovalTicketAttachments`, `collectTicketAttachments`)
+  - Import Hugme em lote com progresso persistido; melhorias criação de tickets RA e permissões de tabulação
+- **Descrição**: Corrige separação POP resumo vs POP completo no Desk, padroniza fuso BRT no stack, expõe anexos no fluxo de aprovação e evolui módulo Reclame Aqui/Hugme.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — workflowStatus finished, busca dual órgãos e histórico reclamações
 

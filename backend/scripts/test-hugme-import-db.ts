@@ -1,4 +1,4 @@
-/** test-hugme-import-db v1.0.0 — parser + regras de import Hugme */
+/** test-hugme-import-db v1.1.0 — parser + regras de import Hugme */
 import { readFileSync, existsSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -97,6 +97,8 @@ function testParseValidRow() {
   assert(parsed.stats.valid === 1, 'linha válida');
   const row = parsed.rows.find((r) => r.status === 'valid');
   assert(row?.idOrigem === '20260700015790834', 'idOrigem');
+  assert(row?.idReclamacaoRa === '20260700015790834', 'idReclamacaoRa = Id Origem');
+  assert(row?.idHugme === '998877', 'idHugme');
   assert(row?.cpf === '03550942400', 'cpf normalizado');
   assert(row?.colunasOriginais['Nota'] === '8', 'nota em colunasOriginais');
   assert(row?.uf === 'BA', 'uf');
@@ -129,9 +131,8 @@ function testEmailInboundServiceHasHugmeRoutes() {
 function testImportServiceRules() {
   const fs = require('fs') as typeof import('fs');
   const src = fs.readFileSync(join(__dirname, '../src/services/reclame-aqui/hugmeImport.service.ts'), 'utf8');
-  assert(src.includes("'incremental'"), 'modo incremental');
-  assert(src.includes('HugmeOrigemImportacao'), 'tipo modo importacao');
-  assert(src.includes('!doc.chamadoId'), 'ticket só sem chamadoId');
+  assert(src.includes('upsertRaTicketFromSource'), 'import cria/atualiza ticket RA');
+  assert(src.includes('parsedRowToRaTicketSource'), 'usa Id Origem da planilha');
 }
 
 function testSchemaUniqueIndex() {

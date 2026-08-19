@@ -1,5 +1,5 @@
 /**
- * reclameAquiStore v1.2.0 — reclamações RA via API + busca dual n1/reclamacoes
+ * reclameAquiStore v1.3.0 — lista 50; sem protocolo inventado; passível de nota default false
  */
 import {
   RA_GROUPS,
@@ -17,6 +17,7 @@ import {
 } from './especiaisGroupKey';
 
 const STORAGE_KEY = 'velodesk_reclame_aqui_items';
+export const RA_LIST_PAGE_SIZE = 50;
 
 const GROUP_OPTS = {
   statusField: 'statusRa',
@@ -34,13 +35,6 @@ function ensureNormalizedCache(items) {
   if (changed) writeAll(normalized);
   memoryCache = normalized;
   return normalized;
-}
-
-function daysFromNow(days, hour = 18) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  d.setHours(hour, 0, 0, 0);
-  return d.toISOString();
 }
 
 function readAll() {
@@ -65,10 +59,13 @@ function normalizeApiItem(row) {
     id: row.id || row._id,
     ticketId: row.ticketId || row.chamadoId,
     statusRa,
+    idReclamacaoRa: row.idReclamacaoRa || row.idDemanda || '',
+    protocoloRa: row.protocoloRa || row.idReclamacaoRa || row.idDemanda || '',
+    prazoRa: row.prazoRa || row.prazoLegal || '',
+    passivelNota: Boolean(row.passivelNota),
     ticketStatus: row.ticketStatus || row.statusTicket,
     respostaAction: row.respostaAction || 'responder',
-    workflow: row.workflow || (row.workflowAtivo ? 'Ativo' : '—'),
-    tabulacao: row.tabulacao || row.produto || '—',
+    tabulacao: row.tabulacao || row.produto || row.motivo || '—',
     atendente: row.atendente || row.responsavel || '—',
   };
   return {
@@ -82,11 +79,20 @@ function normalizeApiItem(row) {
 }
 
 export async function refreshReclamacoesFromApi() {
-  const data = await reclamacoesApi.list('reclame-aqui');
-  const items = (data?.items ?? []).map(normalizeApiItem);
-  memoryCache = items;
-  writeAll(items);
-  return items;
+  const all = [];
+  let skip = 0;
+  let total = Infinity;
+  while (skip < total) {
+    const data = await reclamacoesApi.list('reclame-aqui', { limit: RA_LIST_PAGE_SIZE, skip });
+    const batch = (data?.items ?? []).map(normalizeApiItem);
+    total = Number.isFinite(Number(data?.total)) ? Number(data.total) : skip + batch.length;
+    all.push(...batch);
+    if (!batch.length || batch.length < RA_LIST_PAGE_SIZE) break;
+    skip += RA_LIST_PAGE_SIZE;
+  }
+  memoryCache = all;
+  writeAll(all);
+  return all;
 }
 
 /** Busca em chamados_reclamacoes + chamados_n1; faz merge no cache local. */
@@ -139,8 +145,6 @@ function matchesChip(item, chipId) {
       return item.aberta;
     case 'passivel-nota':
       return item.passivelNota;
-    case 'workflow-ativo':
-      return item.workflowAtivo;
     case 'vencendo-hoje':
       return item.groupKey === 'vencendo-hoje';
     case 'finalizadas':
@@ -173,7 +177,7 @@ export function getReclameAquiKpis(items = loadAllReclamacoes()) {
   const respondidas = operational.filter((i) =>
     i.statusRa === RA_STATUS.RESPONDIDA || i.statusRa === RA_STATUS.AGUARD_AVALIACAO,
   ).length;
-  const workflowAtivo = operational.filter((i) => i.workflowAtivo).length;
+  const passivelNota = operational.filter((i) => i.passivelNota).length;
   const notas = operational.filter((i) => typeof i.nota === 'number').map((i) => i.nota);
   const notaMedia = notas.length
     ? (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1)
@@ -188,7 +192,7 @@ export function getReclameAquiKpis(items = loadAllReclamacoes()) {
     { id: 'vencendo', label: 'Vencendo hoje', value: String(vencendoHoje), tone: 'danger', icon: 'ti-clock-exclamation' },
     { id: 'nao-resp', label: 'Não respondidas', value: String(naoRespondidas), tone: 'warning', icon: 'ti-message-exclamation' },
     { id: 'respondidas', label: 'Respondidas', value: String(respondidas), tone: 'info', icon: 'ti-message-check' },
-    { id: 'workflow', label: 'Workflow ativo', value: String(workflowAtivo), tone: 'purple', icon: 'ti-arrows-exchange' },
+    { id: 'passivel', label: 'Passível de nota', value: String(passivelNota), tone: 'purple', icon: 'ti-star' },
     { id: 'nota', label: 'Nota média', value: String(notaMedia), tone: 'success', icon: 'ti-star' },
     { id: 'prazo', label: 'Respondidas no prazo', value: `${pctNoPrazo}%`, tone: 'yellow', icon: 'ti-percentage' },
   ];
@@ -202,17 +206,10 @@ export function groupReclamacoesByStatus(items) {
 }
 
 export function getKanbanColumns(items) {
-  const extra = { id: 'workflow-ativo', label: 'Workflow ativo', tone: 'purple' };
-  const cols = [...RA_GROUPS.filter((g) => g.id !== 'respondidas'), extra, RA_GROUPS.find((g) => g.id === 'respondidas')];
-  return cols.map((col) => {
-    let colItems = [];
-    if (col.id === 'workflow-ativo') {
-      colItems = items.filter((i) => i.workflowAtivo && i.groupKey !== 'respondidas' && i.groupKey !== 'finalizadas');
-    } else {
-      colItems = items.filter((i) => i.groupKey === col.id);
-    }
-    return { ...col, items: colItems };
-  }).filter((c) => c.items.length > 0 || c.id === 'nao-respondidas');
+  return RA_GROUPS.map((col) => ({
+    ...col,
+    items: items.filter((i) => i.groupKey === col.id),
+  })).filter((c) => c.items.length > 0 || c.id === 'nao-respondidas');
 }
 
 export function formatPrazoRa(iso) {
@@ -234,7 +231,6 @@ export function getReportSeries(items = loadAllReclamacoes()) {
   const operational = items.filter((i) => !isEspeciaisItemFinalizada(i));
   const byStatus = {
     'Não respondida': operational.filter((i) => i.statusRa === RA_STATUS.NAO_RESPONDIDA).length,
-    'Workflow ativo': operational.filter((i) => i.workflowAtivo).length,
     Respondida: operational.filter((i) => i.statusRa === RA_STATUS.RESPONDIDA).length,
     'Aguard. avaliação': operational.filter((i) => i.statusRa === RA_STATUS.AGUARD_AVALIACAO).length,
   };
@@ -268,23 +264,15 @@ function computeSlaFromPrazo(prazoRa) {
 }
 
 export function generateProtocolo() {
-  const year = new Date().getFullYear();
-  const items = loadAllReclamacoes();
-  const nums = items
-    .map((i) => i.protocoloRa)
-    .filter(Boolean)
-    .map((p) => parseInt(String(p).split('-').pop(), 10))
-    .filter((n) => !Number.isNaN(n));
-  const next = Math.max(394821, ...nums, 0) + 1;
-  return `RA-${year}-${String(next).padStart(8, '0')}`;
+  return '';
 }
 
 export function buildRegistroDefaults(item = {}) {
   const now = new Date().toISOString();
-  const prazoRa = item.prazoRa || daysFromNow(3, 18);
-  const sla = computeSlaFromPrazo(prazoRa);
+  const prazoRa = item.prazoRa || '';
+  const sla = prazoRa ? computeSlaFromPrazo(prazoRa) : { slaPct: 0, slaTone: 'green' };
   return {
-    protocoloRa: item.protocoloRa || generateProtocolo(),
+    protocoloRa: item.protocoloRa || item.idReclamacaoRa || '',
     consumidor: item.consumidor || '',
     iniciais: item.iniciais || computeIniciais(item.consumidor || ''),
     cpf: item.cpf || '',
@@ -302,13 +290,12 @@ export function buildRegistroDefaults(item = {}) {
     urlRa: item.urlRa || '',
     ticketId: item.ticketId || null,
     chamadoProtocolo: item.chamadoProtocolo || '',
-    passivelNota: item.passivelNota !== false,
+    passivelNota: item.passivelNota === true,
     statusRa: item.statusRa || RA_STATUS.NAO_RESPONDIDA,
     prazoRa,
     slaPct: item.slaPct ?? sla.slaPct,
     slaTone: item.slaTone || sla.slaTone,
-    workflow: item.workflow || '—',
-    tabulacao: item.tabulacao || item.produto || '—',
+    tabulacao: item.tabulacao || item.produto || item.motivo || '—',
     atendente: item.atendente || '—',
     groupKey: resolveEspeciaisGroupKey(item, {
       statusField: 'statusRa',
@@ -318,7 +305,6 @@ export function buildRegistroDefaults(item = {}) {
     ticketStatus: item.ticketStatus || item.statusTicket || '',
     respostaAction: item.respostaAction || 'responder',
     aberta: item.aberta !== false,
-    workflowAtivo: item.workflowAtivo || false,
     isDraft: item.isDraft ?? false,
   };
 }
@@ -327,7 +313,10 @@ export function createEmptyReclamacao() {
   const id = `ra-${Date.now()}`;
   return {
     ...buildRegistroDefaults({
-      protocoloRa: generateProtocolo(),
+      protocoloRa: '',
+      idReclamacaoRa: '',
+      prazoRa: '',
+      passivelNota: false,
       isDraft: true,
     }),
     id,
@@ -389,14 +378,12 @@ export function saveReclamacaoDraft(item) {
 }
 
 export function registerReclamacao(item) {
-  const prazoRa = item.prazoRa || daysFromNow(3, 18);
-  const sla = computeSlaFromPrazo(prazoRa);
+  const prazoRa = item.prazoRa || '';
+  const sla = prazoRa ? computeSlaFromPrazo(prazoRa) : { slaPct: 0, slaTone: 'green' };
   return upsertReclamacao({
     ...item,
     isDraft: false,
-    workflowAtivo: true,
     statusRa: RA_STATUS.NAO_RESPONDIDA,
-    workflow: item.workflow && item.workflow !== '—' ? item.workflow : 'Tratativa RA',
     groupKey: 'nao-respondidas',
     aberta: true,
     respostaAction: 'responder',

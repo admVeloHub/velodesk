@@ -1,10 +1,17 @@
 /**
- * ProcessosPopover v2.0.0 — drawer POP via portal (à esquerda do painel direito)
- * VERSION: v2.0.0 | DATE: 2026-08-14 | AUTHOR: VeloHub Development Team
+ * ProcessosPopover v2.4.0 — resumo estruturado (POPs); PDF só no botão Ver Pop Completo
+ * VERSION: v2.4.0 | DATE: 2026-08-19
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { fetchPop, fetchPops, fetchProdutos, matchTabulacaoProdutoToPop } from '../../../services/desk/processosCatalog';
+import {
+  fetchPop,
+  fetchPops,
+  fetchProdutos,
+  matchTabulacaoMotivoToPopItem,
+  matchTabulacaoProdutoToPop,
+  openPopCompletoInNewTab,
+} from '../../../services/desk/processosCatalog';
 import PopViewer from './PopViewer';
 
 const RIGHT_PANEL_ID = 'crmRightPanel';
@@ -67,7 +74,12 @@ function useProcessosDrawerPosition(open) {
   return layout;
 }
 
-export default function ProcessosPopover({ open, onClose, tabulacaoProduto }) {
+export default function ProcessosPopover({
+  open,
+  onClose,
+  tabulacaoProduto,
+  tabulacaoMotivo = '',
+}) {
   const drawerRef = useRef(null);
   const [visible, setVisible] = useState(false);
   const [produtos, setProdutos] = useState([]);
@@ -78,6 +90,7 @@ export default function ProcessosPopover({ open, onClose, tabulacaoProduto }) {
   const [detail, setDetail] = useState(null);
   const [loadingPops, setLoadingPops] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [openingCompleto, setOpeningCompleto] = useState(false);
   const [error, setError] = useState('');
 
   const layout = useProcessosDrawerPosition(open);
@@ -131,6 +144,13 @@ export default function ProcessosPopover({ open, onClose, tabulacaoProduto }) {
   }, [produtoSlug]);
 
   useEffect(() => {
+    if (!produtoSlug || !pops.length || !String(tabulacaoMotivo || '').trim()) return undefined;
+    const match = matchTabulacaoMotivoToPopItem(tabulacaoMotivo, pops);
+    if (match) setPopId(match.id);
+    return undefined;
+  }, [produtoSlug, pops, tabulacaoMotivo]);
+
+  useEffect(() => {
     setDetail(null);
     if (!produtoSlug || !popId) return;
 
@@ -142,7 +162,22 @@ export default function ProcessosPopover({ open, onClose, tabulacaoProduto }) {
       .finally(() => setLoadingDetail(false));
   }, [produtoSlug, popId]);
 
+  const handleVerPopCompleto = useCallback(async () => {
+    if (!produtoSlug || !popId || openingCompleto) return;
+    setOpeningCompleto(true);
+    setError('');
+    try {
+      await openPopCompletoInNewTab(produtoSlug, popId);
+    } catch (err) {
+      setError(err?.message || 'Não foi possível abrir o POP completo.');
+    } finally {
+      setOpeningCompleto(false);
+    }
+  }, [produtoSlug, popId, openingCompleto]);
+
   if (!open || !layout) return null;
+
+  const selectedPop = pops.find((pop) => pop.id === popId);
 
   return createPortal(
     <div className="ia-processos-drawer" id="processosDrawer">
@@ -172,8 +207,7 @@ export default function ProcessosPopover({ open, onClose, tabulacaoProduto }) {
         </button>
 
         <div className="ia-processos-drawer__header">
-          <span className="ia-processos-drawer__eyebrow">Consulta operacional</span>
-          <h3 className="ia-processos-drawer__title" id="processosDrawerTitle">Processos (POP)</h3>
+          <h3 className="ia-processos-drawer__title" id="processosDrawerTitle">Consulta Operacional</h3>
         </div>
 
         <div className="ia-processos-drawer__fields ia-processos-drawer__fields--grid">
@@ -237,9 +271,31 @@ export default function ProcessosPopover({ open, onClose, tabulacaoProduto }) {
           {error ? <p className="ia-processos-drawer__hint ia-processos-drawer__hint--error">{error}</p> : null}
           {!error && loadingDetail ? <p className="ia-processos-drawer__hint">Carregando POP…</p> : null}
           {!error && !loadingDetail && detail ? (
-            <PopViewer produtoSlug={produtoSlug} popId={popId} detail={detail} />
+            <>
+              <PopViewer
+                produtoSlug={produtoSlug}
+                popId={popId}
+                detail={{
+                  ...detail,
+                  titulo: detail.titulo || selectedPop?.label || '',
+                }}
+              />
+              {detail.completoDisponivel ? (
+                <div className="ia-processos-drawer__content-footer">
+                  <button
+                    type="button"
+                    className="ia-processos-drawer__completo-btn"
+                    disabled={openingCompleto}
+                    onClick={handleVerPopCompleto}
+                  >
+                    <i className="ti ti-external-link" aria-hidden="true" />
+                    {openingCompleto ? 'Abrindo…' : 'Ver Pop Completo'}
+                  </button>
+                </div>
+              ) : null}
+            </>
           ) : null}
-          {!error && !loadingDetail && !detail ? (
+          {!error && !loadingDetail && !detail && !popId ? (
             <p className="ia-processos-drawer__hint">
               Escolha o produto e o POP para visualizar o procedimento operacional completo.
             </p>

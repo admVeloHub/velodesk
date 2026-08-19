@@ -1,8 +1,10 @@
 /**
- * WorkflowApprovalEssentials — ficha limpa do detalhe /workflow
+ * WorkflowApprovalEssentials v1.1.0 — anexos do ticket clicáveis
+ * VERSION: v1.1.0 | DATE: 2026-08-19
  */
 import React from 'react';
 import WorkflowApprovalAttachments from './WorkflowApprovalAttachments';
+import WorkflowApprovalTicketAttachments from './WorkflowApprovalTicketAttachments';
 
 function EssentialRow({ label, value, children }) {
   if (!value && !children) return null;
@@ -28,6 +30,7 @@ export default function WorkflowApprovalEssentials({ essentials, slaLabel }) {
     descricao,
     tipoLabel,
     attachments,
+    ticketAttachments = [],
     layout,
     requisicaoFields = [],
   } = essentials;
@@ -37,6 +40,7 @@ export default function WorkflowApprovalEssentials({ essentials, slaLabel }) {
     (attachments.imagens?.length || 0) + (attachments.videos?.length || 0) > 0
     || attachments.recusouEvidencias
   );
+  const hasTicketAttachments = Array.isArray(ticketAttachments) && ticketAttachments.length > 0;
   const isErrosBugs = layout === 'produtos-erros-bugs';
 
   return (
@@ -82,8 +86,15 @@ export default function WorkflowApprovalEssentials({ essentials, slaLabel }) {
 
       {hasAttachments ? (
         <div className="wf-approval-essentials__attachments">
-          <span className="wf-approval-essentials__label">Anexos</span>
+          <span className="wf-approval-essentials__label">Evidências da solicitação</span>
           <WorkflowApprovalAttachments attachments={attachments} compact />
+        </div>
+      ) : null}
+
+      {hasTicketAttachments ? (
+        <div className="wf-approval-essentials__attachments">
+          <span className="wf-approval-essentials__label">Anexos do ticket</span>
+          <WorkflowApprovalTicketAttachments attachments={ticketAttachments} />
         </div>
       ) : null}
 

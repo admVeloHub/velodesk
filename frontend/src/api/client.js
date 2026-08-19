@@ -1,6 +1,6 @@
 /**
- * API client v1.26.0 — reclamacoesApi.search (dual n1 + reclamacoes)
- * VERSION: v1.26.0 | DATE: 2026-08-18 | AUTHOR: VeloHub Development Team
+ * API client v1.26.2 — import Hug Me assíncrono; poll do lote
+ * VERSION: v1.26.2 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -367,6 +367,7 @@ export const reclameAquiHugmeApi = {
     formData.append('modo', modo);
     return api.post(`/reclame-aqui/hugme/import?modo=${encodeURIComponent(modo)}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120 * 1000,
     }).then((r) => r.data);
   },
   listRegistros: (params = {}) =>
@@ -375,5 +376,7 @@ export const reclameAquiHugmeApi = {
     api.get(`/reclame-aqui/hugme/registros/${encodeURIComponent(idOrigem)}`).then((r) => r.data),
   listBatches: (params = {}) =>
     api.get('/reclame-aqui/hugme/import-batches', { params }).then((r) => r.data),
+  getBatch: (batchId) =>
+    api.get(`/reclame-aqui/hugme/import-batches/${encodeURIComponent(batchId)}`).then((r) => r.data),
   stats: () => api.get('/reclame-aqui/hugme/stats').then((r) => r.data),
 };

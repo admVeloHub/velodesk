@@ -1,13 +1,15 @@
-/** workflowTicket.service v1.7.0 — workflowStatus finished + conclusão da última devolutiva */
+/** workflowTicket.service v1.8.0 — ao concluir workflow, transição pontual para resolvido */
 import { isAutomaticaStep, resolveAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IChamadoWorkflow, IRegistro } from '../models/ChamadoN1';
 import type { IWorkflowDefinicao, IWorkflowPassoEnvelope } from '../models/WorkflowDefinicao';
 import {
+  appendStatusTransition,
   currentStatus,
   isClientIdentifiedOnChamado,
   MERGE_TERMINAL_STATUSES,
+  normalizeStatusValue,
   readTabulacaoSnapshot,
 } from './chamado.mapper';
 import { getWorkflowById, getWorkflowBySlug, resolveWorkflowForTicket } from './workflowDefinicao.service';
@@ -118,6 +120,26 @@ function appendWorkflowRegistro(
   chamado.registro.push(entry);
 }
 
+/**
+ * Transição única para resolvido no instante em que o workflow conclui.
+ * Não reexecuta em leituras/sync — só no bloco de conclusão de advanceToStep.
+ * Respostas posteriores do cliente reabrem via resolveInboundClientReplyStatus.
+ */
+function resolveTicketOnWorkflowFinished(chamado: IChamadoN1, autor: string): void {
+  const status = normalizeStatusValue(currentStatus(chamado));
+  if ((MERGE_TERMINAL_STATUSES as readonly string[]).includes(status)) {
+    return;
+  }
+  appendStatusTransition(chamado, 'resolvido', {
+    autor,
+    anotacaoInterna: 'Ticket resolvido automaticamente ao concluir o workflow.',
+    metadados: {
+      workflowFinishedResolve: true,
+      trigger: 'workflow-finished',
+    },
+  });
+}
+
 async function runSistemaIfNeeded(
   chamado: IChamadoN1,
   definicao: IWorkflowDefinicao,
@@ -160,6 +182,7 @@ async function advanceToStep(
       },
       alteracoes: [{ workflowCompleted: true, trigger: options.trigger }],
     });
+    resolveTicketOnWorkflowFinished(chamado, autor);
     return { autoAdvanced: true };
   }
 

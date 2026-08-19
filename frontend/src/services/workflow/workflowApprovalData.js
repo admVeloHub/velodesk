@@ -1,6 +1,6 @@
 /**
- * workflowApprovalData v1.5.3 — exclui finished das filas operacionais
- * VERSION: v1.5.3 | DATE: 2026-08-18
+ * workflowApprovalData v1.5.5 — anexos do ticket no console de aprovações
+ * VERSION: v1.5.5 | DATE: 2026-08-19
  */
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { findCadastralRequestByTicketId } from '../cadastral/cadastralRequestStore';
@@ -38,6 +38,8 @@ import {
   readTicketRequisicaoValores,
 } from './workflowRequisicao';
 import deskLog from '../../utils/deskDebugLog';
+import { formatDateBr, formatDateTimeBr } from '../../utils/dateTimeBr';
+import { collectTicketAttachments } from '../desk/attachmentPreview';
 
 const QUEUE_LABEL = 'Aguardando aprovação';
 
@@ -68,13 +70,7 @@ function formatElapsedSince(iso) {
 
 function formatDateTime(iso) {
   if (!iso) return '';
-  return new Date(iso).toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatDateTimeBr(iso);
 }
 
 function channelLabel(ticket) {
@@ -315,6 +311,7 @@ function buildFinanceiroApprovalEssentials(ticket, solicitacao, options = {}) {
     requisicaoFields: options.requisicaoFields || [],
     protocol: getTicketProtocolLabel(ticket) || String(ticket?.id || ''),
     clientName: ticket?.clientName || ticket?.solicitante || 'Cliente',
+    ticketAttachments: collectTicketAttachments(ticket),
   };
 }
 
@@ -465,6 +462,7 @@ export function buildWorkflowApprovalEssentials(ticket, solicitacao = null, opti
     requisicaoFields: options.requisicaoFields || [],
     protocol: getTicketProtocolLabel(ticket) || String(ticket?.id || ''),
     clientName: ticket?.clientName || ticket?.solicitante || 'Cliente',
+    ticketAttachments: collectTicketAttachments(ticket),
   };
 }
 
@@ -672,7 +670,7 @@ function buildReembolsoApprovalDetail(ticket, progress, header) {
     fields: [
       { label: 'Cliente', value: ticket.clientName || ticket.solicitante || 'Cliente', tone: 'default' },
       { label: 'Valor do reembolso', value: formatCurrency(valor), tone: 'success' },
-      { label: 'Data da compra', value: approval.dataCompra ? formatDateTime(approval.dataCompra).split(',')[0] : '13/06/2026', tone: 'default' },
+      { label: 'Data da compra', value: approval.dataCompra ? formatDateBr(approval.dataCompra) : '13/06/2026', tone: 'default' },
       { label: 'Dias desde a compra', value: `${days} dias · ${elegivel ? 'elegível' : 'fora do prazo'}`, tone: elegivel ? 'info' : 'danger' },
       { label: 'Pedido', value: approval.pedido || '#PED-2026-98732', tone: 'default' },
       { label: 'Forma de pagamento', value: approval.formaPagamento || 'Cartão · final 4521', tone: 'default' },

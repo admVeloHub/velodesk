@@ -1,8 +1,9 @@
 /**
- * consultaFormatters v1.0.1 — CPF do ticket + client para rascunhos
- * VERSION: v1.0.1 | DATE: 2026-08-03
+ * consultaFormatters v1.1.0 — datas em America/Sao_Paulo; date-only sem shift de dia
+ * VERSION: v1.1.0 | DATE: 2026-08-18
  */
 import { isDraftTicket } from '../../api/adapters/ticketAdapter';
+import { formatDateBr, formatDateTimeBr } from '../../utils/dateTimeBr';
 
 export const CONSULTA_PRODUCT_SLUGS = [
   'emprestimo-pessoal',
@@ -32,17 +33,11 @@ export function formatConsultaMoney(value) {
 }
 
 export function formatConsultaDate(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleDateString('pt-BR');
+  return formatDateBr(value);
 }
 
 export function formatConsultaDateTime(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+  return formatDateTimeBr(value);
 }
 
 export function formatAccountStatus(status) {

@@ -1,6 +1,6 @@
 /**
- * DeskRightPanel v1.12.4 — link Assumir Ticket sob responsável
- * VERSION: v1.12.4 | DATE: 2026-08-11
+ * DeskRightPanel v1.12.5 — tabulação motivo/detalhe para Processos
+ * VERSION: v1.12.5 | DATE: 2026-08-19
  */
 import React, { useMemo, useState } from 'react';
 import { DEFAULT_TIPO, hasApplyableTabulation, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
@@ -282,6 +282,7 @@ export default function DeskRightPanel({
             open={processosOpen}
             onClose={() => setProcessosOpen(false)}
             tabulacaoProduto={effectiveRightFields.produto}
+            tabulacaoMotivo={effectiveRightFields.motivo}
           />
         </section>
       </div>

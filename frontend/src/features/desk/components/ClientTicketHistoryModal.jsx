@@ -20,10 +20,10 @@ import {
 } from '../../../services/desk/utils';
 import { getClient360WorkflowIconMeta } from '../../../services/workflow/workflowTeamQueues';
 import FusaoFundidoBadge from './FusaoFundidoBadge';
+import { formatDateBr } from '../../../utils/dateTimeBr';
 
 function formatTableDate(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('pt-BR');
+  return formatDateBr(iso);
 }
 
 function ticketIdOf(t) {

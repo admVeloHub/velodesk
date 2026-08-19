@@ -1,4 +1,4 @@
-/** ReclamacaoBase.schema v1.2.0 — workflowStatus no snapshot de workflow */
+/** ReclamacaoBase.schema v1.3.0 — índice unique esparso em idDemandaExterna */
 import { Schema, Document, Types } from 'mongoose';
 import type { CasoEspecialOrgao } from '../../services/agents/casosEspeciais.types';
 
@@ -147,7 +147,7 @@ export const ReclamacaoBaseSchema = new Schema<IReclamacao>(
     cidade: { type: String, default: '' },
     uf: { type: String, default: '' },
     protocoloExterno: { type: String, default: '' },
-    idDemandaExterna: { type: String, default: '' },
+    idDemandaExterna: { type: String, default: undefined },
     atendente: { type: String, default: '' },
     responsavel: { type: String, default: '' },
     workflowId: { type: Schema.Types.ObjectId, default: undefined },
@@ -167,3 +167,11 @@ ReclamacaoBaseSchema.index({ chamadoProtocolo: 1 }, { name: 'chamadoProtocolo_1'
 ReclamacaoBaseSchema.index({ statusCanal: 1, prazoLegal: 1 }, { name: 'statusCanal_prazoLegal_1' });
 ReclamacaoBaseSchema.index({ cpf: 1 }, { name: 'cpf_1', sparse: true });
 ReclamacaoBaseSchema.index({ aberta: 1, createdAt: -1 }, { name: 'aberta_createdAt_1' });
+ReclamacaoBaseSchema.index(
+  { idDemandaExterna: 1 },
+  {
+    unique: true,
+    name: 'idDemandaExterna_unique',
+    partialFilterExpression: { idDemandaExterna: { $exists: true, $type: 'string', $gt: '' } },
+  },
+);

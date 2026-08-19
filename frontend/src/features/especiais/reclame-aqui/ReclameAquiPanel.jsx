@@ -1,7 +1,6 @@
 /**
- * ReclameAquiPanel — painel operacional Reclame Aqui
- * VERSION: v1.1.0 | DATE: 2026-08-18
- * — Toolbar usa busca dual n1 + reclamacoes
+ * ReclameAquiPanel v1.2.0 — paginação 50; KPIs sem workflow
+ * VERSION: v1.2.0 | DATE: 2026-08-19
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +13,7 @@ import {
   groupReclamacoesByStatus,
   loadReclamacoes,
   searchReclamacoesFromApi,
+  RA_LIST_PAGE_SIZE,
 } from '../../../services/especiais/reclameAquiStore';
 import { loadReclameAquiTicketsFromApi } from '../../../services/especiais/reclameAquiTicketService';
 import { useEspeciaisDualSearch } from '../shared/useEspeciaisDualSearch';
@@ -83,6 +83,9 @@ export default function ReclameAquiPanel() {
   }, [activeChips, listVersion, isRemoteSearch, remoteItems]);
 
   const footerText = getFooterSummary(view.items, selectedIds.length);
+  const totalPages = Math.max(1, Math.ceil(view.items.length / RA_LIST_PAGE_SIZE));
+  const pagedItems = view.items.slice((page - 1) * RA_LIST_PAGE_SIZE, page * RA_LIST_PAGE_SIZE);
+  const pagedGroups = groupReclamacoesByStatus(pagedItems);
 
   const handleToggleChip = useCallback((chipId) => {
     setActiveChips((prev) =>
@@ -155,7 +158,7 @@ export default function ReclameAquiPanel() {
         <div className="ra-panel__content">
           {activeTab === 'tabela' && (
             <ReclameAquiTableView
-              groups={view.groups}
+              groups={pagedGroups}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
               onToggleSelectAll={handleToggleSelectAll}
@@ -176,8 +179,8 @@ export default function ReclameAquiPanel() {
               <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} aria-label="Página anterior">
                 <i className="ti ti-chevron-left" />
               </button>
-              <span>{page} de 2 páginas</span>
-              <button type="button" disabled={page >= 2} onClick={() => setPage((p) => p + 1)} aria-label="Próxima página">
+              <span>{page} de {totalPages} página{totalPages === 1 ? '' : 's'}</span>
+              <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} aria-label="Próxima página">
                 <i className="ti ti-chevron-right" />
               </button>
             </div>

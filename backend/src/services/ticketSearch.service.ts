@@ -1,7 +1,7 @@
 /**
  * Busca avançada de tickets — builder Mongo + escopo de permissão
- * VERSION: v1.3.0 | DATE: 2026-08-18
- * — histórico por CPF inclui chamados_reclamacoes
+ * VERSION: v1.4.0 | DATE: 2026-08-18
+ * — filtros date-only alinhados ao dia civil BRT
  */
 import mongoose from 'mongoose';
 import { ChamadoN1, type IChamadoN1 } from '../models/ChamadoN1';
@@ -34,6 +34,7 @@ import {
   reclamacaoToHistoryTicketDto,
 } from './reclamacoes/reclamacao.service';
 import { isReclamacoesConnected } from '../config/database';
+import { parseDateOnlyBrBound } from './dates/brDateTime.util';
 
 export interface SearchCriterio {
   campo: string;
@@ -163,15 +164,10 @@ function digitsOnly(value: string): string {
 function parseDateBound(raw: string, endOfDay = false): Date | null {
   const s = String(raw || '').trim();
   if (!s) return null;
+  const brBound = parseDateOnlyBrBound(s, endOfDay);
+  if (brBound) return brBound;
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    if (endOfDay) {
-      d.setUTCHours(23, 59, 59, 999);
-    } else {
-      d.setUTCHours(0, 0, 0, 0);
-    }
-  }
   return d;
 }
 

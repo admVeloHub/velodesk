@@ -4,7 +4,8 @@ import { env } from '../../config/env';
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../../models/ChamadoIaAnalise';
 import { publishTicketEvent } from '../realtime/ticketEventsBroadcast.service';
-import { shouldSpawnNewTicketOnInbound } from '../chamado.mapper';
+/** whatsappInbound.service v1.8.0 — reabre ticket resolvido quando cliente responde */
+import { appendStatusTransition, resolveInboundClientReplyStatus, shouldSpawnNewTicketOnInbound } from '../chamado.mapper';
 import {
   getTwilioActiveAccountSid,
   getTwilioCredentialMode,
@@ -144,6 +145,15 @@ export async function processInboundWhatsAppMessage(payload: TwilioWhatsAppWebho
     anexosScanStatus,
     transcriptionStatus: hasAudio ? 'available' : undefined,
   });
+
+  const reopenStatus = resolveInboundClientReplyStatus(chamado);
+  if (reopenStatus) {
+    appendStatusTransition(chamado, reopenStatus, {
+      origin: 'cliente',
+      autor: payload.profileName || waChatId,
+      metadados: { trigger: 'whatsapp-inbound-reply' },
+    });
+  }
 
   await chamado.save();
   void publishTicketEvent(chamado._id.toString(), 'whatsapp-inbound');

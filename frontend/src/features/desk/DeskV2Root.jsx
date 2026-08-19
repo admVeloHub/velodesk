@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.35.0 | DATE: 2026-08-18
- * — Workflow finished permanece visível sem bloquear novo workflow
+ * VERSION: v3.36.1 | DATE: 2026-08-19
+ * — Enviar Nota: patch otimista (sem reload completo do ticket)
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -74,7 +74,7 @@ import {
   canSendPublicMessageOnTicket,
   hasPermission,
 } from '../../services/permissions/permissionService';
-import { ticketAssignedToCurrentAgent } from '../../services/desk/responsavelSegmentation';
+import { ticketAssignedToCurrentAgent, readTicketResponsavel } from '../../services/desk/responsavelSegmentation';
 import { getAllQueueStatuses, fetchAndHydrateCustomQueues } from '../../services/desk/customQueueBoxes';
 import { refreshQueueCountsFromApi } from '../../services/desk/queueCounts';
 import CreateTicketPanel from './components/CreateTicketPanel';
@@ -659,6 +659,22 @@ export default function DeskV2Root() {
     };
   }, [activeTabId, patchTicket]);
 
+  // Ticket aberto na aba mas ausente das colunas (ex.: refresh de filas) — reidrata sem fechar a aba.
+  useEffect(() => {
+    if (!activeTabId || isDraftTicket({ id: activeTabId })) return undefined;
+    if (findTicketEntry(activeTabId)) return undefined;
+
+    let cancelled = false;
+    void loadTicketDetailFromApi(activeTabId)
+      .then((loaded) => {
+        if (cancelled || !loaded) return;
+        patchTicket(activeTabId, loaded);
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [activeTabId, refreshKey, patchTicket]);
+
   // Filas: ciclo longo e silencioso para novos tickets aparecerem sem recarregar a página
   useEffect(() => {
     let inFlight = false;
@@ -875,6 +891,7 @@ export default function DeskV2Root() {
     const willOpenNext = nextId && String(nextId) !== String(savedTicketId);
     suppressAutoSelectRef.current = !willOpenNext;
     closeTicketTab(savedTicketId);
+    syncUrlTicketParam(willOpenNext ? nextId : null);
 
     if (!willOpenNext) return;
 
@@ -885,7 +902,7 @@ export default function DeskV2Root() {
       openTicket(nextId);
       pendingAdvanceTicketIdRef.current = null;
     });
-  }, [activeQueue, appliedSearch, activeSort, entrySortOldestFirst, openTicket, closeTicketTab, activeTabId, persistTabSession]);
+  }, [activeQueue, appliedSearch, activeSort, entrySortOldestFirst, openTicket, closeTicketTab, activeTabId, persistTabSession, syncUrlTicketParam]);
 
   const selectMainTab = (tab) => {
     persistTabSession(activeTabId);
@@ -1130,6 +1147,11 @@ export default function DeskV2Root() {
           'success',
         );
         void syncTicketViews().catch(() => {});
+        if (!getAutoCloseOnSave()) {
+          void loadTicketDetailFromApi(newId)
+            .then((loaded) => { if (loaded) patchTicket(newId, loaded); })
+            .catch(() => {});
+        }
         advanceAfterSaveIfEnabled(newId, plannedNextId, draftId);
         return newId;
       }
@@ -1192,6 +1214,11 @@ export default function DeskV2Root() {
         'success',
       );
       void syncTicketViews().catch(() => {});
+      if (!getAutoCloseOnSave()) {
+        void loadTicketDetailFromApi(ticket.id)
+          .then((loaded) => { if (loaded) patchTicket(ticket.id, loaded); })
+          .catch(() => {});
+      }
       advanceAfterSaveIfEnabled(ticket.id, plannedNextId, savedListTicketId);
       return ticket.id;
     } catch (err) {
@@ -1249,9 +1276,18 @@ export default function DeskV2Root() {
           ticketLabel: getTicketProtocolLabel(persisted) || 'Rascunho',
         });
         patchTicket(newId, persisted);
+        setActiveTabId(newId);
+        syncUrlTicketParam(newId);
       } else {
-        const updated = await sendInternalNote(ticket.id, internalNoteHtml, author);
-        if (updated) patchTicket(ticket.id, updated);
+        const ticketId = String(ticket.id);
+        const updated = await sendInternalNote(ticketId, internalNoteHtml, author);
+        if (updated) {
+          patchTicket(ticketId, updated);
+        } else {
+          void loadTicketDetailFromApi(ticketId)
+            .then((loaded) => { if (loaded) patchTicket(ticketId, loaded); })
+            .catch(() => {});
+        }
         if (activeTabId) {
           const sessionKey = String(activeTabId);
           const session = tabSessionsRef.current[sessionKey];
@@ -1266,7 +1302,6 @@ export default function DeskV2Root() {
 
       setInternalText('');
       showNotification('Nota interna enviada.', 'success');
-      void syncTicketViews().catch(() => {});
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Erro ao enviar nota interna.';
       showNotification(msg, 'error');
@@ -1433,7 +1468,7 @@ export default function DeskV2Root() {
     }
 
     const agentName = getAgentName();
-    if (!agentName) {
+    if (!agentName || !sanitizeResponsavel(agentName)) {
       showNotification('Não foi possível identificar o agente logado.', 'warning');
       return;
     }
@@ -1445,26 +1480,48 @@ export default function DeskV2Root() {
       return;
     }
 
+    const existingResponsavel = readTicketResponsavel(ticket);
+    if (
+      existingResponsavel
+      && !ticketAssignedToCurrentAgent(ticket)
+      && !hasPermission(perm?.permissoes, 'tickets', 'ver_todos')
+    ) {
+      showNotification('Este ticket já possui responsável atribuído.', 'warning');
+      return;
+    }
+
     setAssumingTicket(true);
     try {
       const next = { ...merged, responsavel: agentName };
-      setRightFields(next);
-
-      if (activeTabId) {
-        const sessionKey = String(activeTabId);
-        tabSessionsRef.current[sessionKey] = {
-          ...(tabSessionsRef.current[sessionKey] || {}),
-          rightFields: next,
-        };
-      }
 
       if (isDraftTicket(ticket)) {
+        setRightFields(next);
+        if (activeTabId) {
+          const sessionKey = String(activeTabId);
+          tabSessionsRef.current[sessionKey] = {
+            ...(tabSessionsRef.current[sessionKey] || {}),
+            rightFields: next,
+          };
+        }
         showNotification('Responsável definido. Salve o ticket para confirmar.', 'success');
         return;
       }
 
-      await updateTicketInCache(ticket.id, (t) => applyRightFieldsToTicket(t, next));
-      await syncTicketViews();
+      const updated = await updateTicketInCache(ticket.id, (t) => applyRightFieldsToTicket(t, next));
+      if (!updated) {
+        throw new Error('Não foi possível atualizar o ticket.');
+      }
+
+      const syncedFields = mergeRightFieldsWithDefaults(next, updated, getAgentName);
+      setRightFields(syncedFields);
+      if (activeTabId) {
+        const sessionKey = String(activeTabId);
+        tabSessionsRef.current[sessionKey] = {
+          ...(tabSessionsRef.current[sessionKey] || {}),
+          rightFields: syncedFields,
+        };
+      }
+      patchTicket(ticket.id, updated);
       showNotification('Ticket assumido com sucesso.', 'success');
     } catch (err) {
       showNotification(
@@ -1477,10 +1534,10 @@ export default function DeskV2Root() {
   }, [
     activeTabId,
     assumingTicket,
+    patchTicket,
     permsCtx?.permissions,
     rightFields,
     showNotification,
-    syncTicketViews,
     ticket,
   ]);
 
@@ -1495,7 +1552,17 @@ export default function DeskV2Root() {
     }
     const merged = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
     const preview = applyRightFieldsToTicket({ ...ticket }, merged);
-    return !ticketAssignedToCurrentAgent(preview);
+    if (ticketAssignedToCurrentAgent(preview)) return false;
+
+    const existingResponsavel = readTicketResponsavel(ticket);
+    if (existingResponsavel && !hasPermission(perm?.permissoes, 'tickets', 'ver_todos')) {
+      return false;
+    }
+
+    const status = String(ticket?.status || '').trim().toLowerCase();
+    if (!existingResponsavel && status !== 'novo') return false;
+
+    return true;
   }, [assumingTicket, permsCtx?.permissions, rightFields, ticket, ticketReadOnly]);
 
   const handleSaveContact = async (draft) => {

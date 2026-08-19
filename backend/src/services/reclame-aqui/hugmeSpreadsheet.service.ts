@@ -1,5 +1,6 @@
-/** hugmeSpreadsheet.service v1.0.0 — parse planilha Hugme Base Completa */
+/** hugmeSpreadsheet.service v1.2.0 — Id Origem = ID da reclamação */
 import * as XLSX from 'xlsx';
+import { parseBrCivilDateTimeToIso, parseBrCivilDateToDate } from '../dates/brDateTime.util';
 
 export const HUGME_COLUMN_MAP: Record<string, string[]> = {
   consumidor: ['nome', 'consumidor', 'nome do consumidor', 'cliente'],
@@ -10,8 +11,15 @@ export const HUGME_COLUMN_MAP: Record<string, string[]> = {
   assunto: ['titulo', 'título', 'assunto'],
   descricao: ['texto da reclamacao', 'texto da reclamação', 'descricao', 'descrição'],
   consideracaoConsumidor: ['consideracao consumidor', 'consideração consumidor'],
-  idReclamacaoRa: ['id hugme', 'id ra'],
-  protocoloRa: ['id origem', 'protocolo', 'protocolo ra'],
+  idOrigem: [
+    'id origem',
+    'id da origem',
+    'de origem',
+    'id da reclamacao',
+    'id reclamacao',
+    'id da reclamação',
+  ],
+  idHugme: ['id hugme'],
   dataReclamacao: ['data reclamacao', 'data reclamação', 'data da reclamacao', 'data da reclamação'],
   dataResposta: ['data de resposta', 'data da resposta'],
   produto: ['produto ra', 'produto', 'produto/servico', 'produto/serviço'],
@@ -45,6 +53,9 @@ export interface ParsedHugmeRow {
   idHugme: string;
   idReclamacaoRa: string;
   protocoloRa: string;
+  hugmeMotivoRa?: string;
+  hugmeCategoriaRa?: string;
+  hugmeProblemaRa?: string;
   dataReclamacao?: string;
   dataResposta?: string;
   produto?: string;
@@ -88,6 +99,19 @@ function normalizeCpf(value: string): string {
 function cellToString(value: unknown): string {
   if (value == null || value === '') return '';
   if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (Number.isInteger(value) || Math.abs(value) >= 1e10) {
+      return String(Math.trunc(value));
+    }
+  }
+  return String(value).trim();
+}
+
+function cellToIdString(value: unknown): string {
+  if (value == null || value === '') return '';
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(Math.trunc(value));
+  }
   return String(value).trim();
 }
 
@@ -99,27 +123,25 @@ export function parseExcelDate(value: unknown): string | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) {
     const parsed = XLSX.SSF.parse_date_code(value);
     if (parsed) {
-      const d = new Date(Date.UTC(parsed.y, parsed.m - 1, parsed.d, parsed.H || 0, parsed.M || 0));
-      return d.toISOString();
+      const iso = `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}T${String(parsed.H || 12).padStart(2, '0')}:${String(parsed.M || 0).padStart(2, '0')}:00-03:00`;
+      const d = new Date(iso);
+      if (!Number.isNaN(d.getTime())) return d.toISOString();
     }
   }
   const str = String(value).trim();
   if (!str) return undefined;
 
-  const brMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
-  if (brMatch) {
-    const day = parseInt(brMatch[1], 10);
-    const month = parseInt(brMatch[2], 10) - 1;
-    let year = parseInt(brMatch[3], 10);
-    if (year < 100) year += 2000;
-    const hour = brMatch[4] ? parseInt(brMatch[4], 10) : 12;
-    const minute = brMatch[5] ? parseInt(brMatch[5], 10) : 0;
-    const d = new Date(year, month, day, hour, minute);
-    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  const brIso = parseBrCivilDateTimeToIso(str);
+  if (brIso) return brIso;
+
+  const brDateOnly = parseBrCivilDateToDate(str);
+  if (brDateOnly) return brDateOnly.toISOString();
+
+  if (/[zZ]$/.test(str) || /[+-]\d{2}:\d{2}$/.test(str)) {
+    const iso = new Date(str);
+    if (!Number.isNaN(iso.getTime())) return iso.toISOString();
   }
 
-  const iso = new Date(str);
-  if (!Number.isNaN(iso.getTime())) return iso.toISOString();
   return undefined;
 }
 
@@ -141,8 +163,9 @@ export function detectHugmeHeaderRow(matrix: unknown[][], scanLimit = 25): numbe
     const hasNome = normalized.includes('nome');
     const hasCpf = normalized.includes('cpf/cnpj');
     const hasIdHugme = normalized.includes('id hugme');
+    const hasIdOrigem = normalized.includes('id origem') || normalized.includes('id da origem');
     const hasTitulo = normalized.includes('titulo') || normalized.includes('título');
-    if (hasNome && hasCpf && (hasIdHugme || hasTitulo)) {
+    if (hasNome && hasCpf && (hasIdHugme || hasIdOrigem || hasTitulo)) {
       return i;
     }
   }
@@ -160,8 +183,8 @@ function isEmptyRow(row: unknown[]): boolean {
 
 function isDataRow(row: unknown[], headerIndex: Record<string, number>): boolean {
   if (isEmptyRow(row) || isMetadataRow(row)) return false;
-  const idOrigem = headerIndex.protocoloRa != null ? cellToString(row[headerIndex.protocoloRa]) : '';
-  const idHugme = headerIndex.idReclamacaoRa != null ? cellToString(row[headerIndex.idReclamacaoRa]) : '';
+  const idOrigem = headerIndex.idOrigem != null ? cellToIdString(row[headerIndex.idOrigem]) : '';
+  const idHugme = headerIndex.idHugme != null ? cellToIdString(row[headerIndex.idHugme]) : '';
   const nome = headerIndex.consumidor != null ? cellToString(row[headerIndex.consumidor]) : '';
   return Boolean(idOrigem || idHugme || nome);
 }
@@ -170,6 +193,12 @@ function getFieldFromRow(row: unknown[], headerIndex: Record<string, number>, fi
   const idx = headerIndex[field];
   if (idx == null) return '';
   return cellToString(row[idx]);
+}
+
+function getIdFromRow(row: unknown[], headerIndex: Record<string, number>, field: string): string {
+  const idx = headerIndex[field];
+  if (idx == null) return '';
+  return cellToIdString(row[idx]);
 }
 
 export function buildColunasOriginais(headers: string[], row: unknown[]): Record<string, string> {
@@ -183,13 +212,12 @@ export function buildColunasOriginais(headers: string[], row: unknown[]): Record
   return result;
 }
 
-function buildMotivo(row: unknown[], headerIndex: Record<string, number>): string | undefined {
-  const parts = [
-    getFieldFromRow(row, headerIndex, 'motivoRa'),
-    getFieldFromRow(row, headerIndex, 'categoriaRa'),
-    getFieldFromRow(row, headerIndex, 'problemaRa'),
-  ].filter(Boolean);
-  return parts.length ? parts.join(' — ') : undefined;
+function buildHugmeTaxonomia(row: unknown[], headerIndex: Record<string, number>) {
+  return {
+    hugmeMotivoRa: getFieldFromRow(row, headerIndex, 'motivoRa') || undefined,
+    hugmeCategoriaRa: getFieldFromRow(row, headerIndex, 'categoriaRa') || undefined,
+    hugmeProblemaRa: getFieldFromRow(row, headerIndex, 'problemaRa') || undefined,
+  };
 }
 
 function buildDescricao(row: unknown[], headerIndex: Record<string, number>): string {
@@ -208,7 +236,6 @@ function mapStatusRaFromHugme(label: string): string | undefined {
   }
   if (value === 'respondido') return 'respondida';
   if (value.includes('avaliado')) return 'aguard-avaliacao';
-  if (value.includes('workflow')) return 'workflow-ativo';
   return undefined;
 }
 
@@ -223,9 +250,10 @@ function mapRowToParsed(
     || getFieldFromRow(row, headerIndex, 'nomeSocial');
   const assunto = getFieldFromRow(row, headerIndex, 'assunto');
   const descricao = buildDescricao(row, headerIndex);
-  const idHugme = getFieldFromRow(row, headerIndex, 'idReclamacaoRa');
-  const idOrigem = getFieldFromRow(row, headerIndex, 'protocoloRa');
+  const idHugme = getIdFromRow(row, headerIndex, 'idHugme');
+  const idOrigem = getIdFromRow(row, headerIndex, 'idOrigem');
   const statusRaLabel = getFieldFromRow(row, headerIndex, 'statusRaLabel');
+  const taxonomia = buildHugmeTaxonomia(row, headerIndex);
 
   return {
     rowIndex,
@@ -241,8 +269,11 @@ function mapRowToParsed(
     assunto,
     descricao: descricao || assunto,
     idHugme,
-    idReclamacaoRa: idHugme || idOrigem,
-    protocoloRa: idOrigem ? `RA-ORIG-${idOrigem}` : '',
+    idReclamacaoRa: idOrigem,
+    protocoloRa: idOrigem,
+    hugmeMotivoRa: taxonomia.hugmeMotivoRa,
+    hugmeCategoriaRa: taxonomia.hugmeCategoriaRa,
+    hugmeProblemaRa: taxonomia.hugmeProblemaRa,
     dataReclamacao: parseExcelDate(
       headerIndex.dataReclamacao != null ? row[headerIndex.dataReclamacao] : '',
     ),
@@ -250,8 +281,8 @@ function mapRowToParsed(
       headerIndex.dataResposta != null ? row[headerIndex.dataResposta] : '',
     ),
     produto: getFieldFromRow(row, headerIndex, 'produto') || undefined,
-    tipo: getFieldFromRow(row, headerIndex, 'origem') || 'Reclamação',
-    motivo: buildMotivo(row, headerIndex),
+    tipo: getFieldFromRow(row, headerIndex, 'origem') || undefined,
+    motivo: undefined,
     nota: getFieldFromRow(row, headerIndex, 'nota') || undefined,
     statusRa: mapStatusRaFromHugme(statusRaLabel),
     statusRaLabel: statusRaLabel || undefined,
@@ -295,6 +326,9 @@ export function prepareHugmeImport(
   const seenIdOrigem = new Set<string>();
   const missingColumns: string[] = [];
 
+  if (headerIndex.idOrigem == null) {
+    missingColumns.push('Id Origem');
+  }
   if (headerIndex.consumidor == null && headerIndex.nomeSocial == null) {
     missingColumns.push('Nome');
   }

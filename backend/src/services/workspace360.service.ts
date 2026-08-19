@@ -128,9 +128,14 @@ function periodRange(period = '7d'): { from: Date; to: Date } {
     return { from: startOfDayInTz(to), to };
   }
   if (period === 'month') {
-    from.setDate(1);
-    from.setHours(0, 0, 0, 0);
-    return { from, to };
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: TZ,
+      year: 'numeric',
+      month: '2-digit',
+    }).formatToParts(to);
+    const y = parts.find((p) => p.type === 'year')?.value ?? '1970';
+    const m = parts.find((p) => p.type === 'month')?.value ?? '01';
+    return { from: new Date(`${y}-${m}-01T00:00:00-03:00`), to };
   }
   if (period === '30d') {
     from.setDate(from.getDate() - 30);

@@ -1,8 +1,8 @@
 /**
- * contact-tel.adapter v1.0.0 — normaliza payload Contact Tel (snake_case)
- * Baseado em "Contact Tel - Obter detalhes de chamada".
+ * contact-tel.adapter v1.1.0 — datas externas parseadas como horário civil BRT
  */
 import type { TelephonyCallInput, TelephonyTranscriptTurn } from '../types';
+import { parseExternalTimestampToDate } from '../../dates/brDateTime.util';
 
 const NO_TRANSCRIPT_STATUSES = new Set([
   'no_answer',
@@ -36,8 +36,8 @@ function pickDate(body: Record<string, unknown>, keys: string[]): Date | undefin
   for (const key of keys) {
     const value = body[key];
     if (!value) continue;
-    const date = new Date(String(value));
-    if (!Number.isNaN(date.getTime())) return date;
+    const date = parseExternalTimestampToDate(value);
+    if (date) return date;
   }
   return undefined;
 }

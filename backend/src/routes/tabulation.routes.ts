@@ -1,4 +1,4 @@
-/** tabulation.routes v1.3.0 — CRUD tabulacao_opcoes (tipo/canal) */
+/** tabulation.routes v1.3.1 — categorias de motivo por órgão no CRUD existente */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { supervisorMiddleware } from '../middleware/supervisor';

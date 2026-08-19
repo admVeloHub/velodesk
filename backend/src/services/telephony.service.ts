@@ -1,9 +1,10 @@
-/** telephony.service v1.2.0 — listagem interna de ligações e KPIs */
+/** telephony.service v1.3.0 — filtros de dia civil em America/Sao_Paulo */
 import mongoose from 'mongoose';
 import { env } from '../config/env';
 import { TelephonyCall, ITelephonyCall } from '../models/TelephonyCall';
 import { loadDadosForRef } from './cliente.service';
 import { resolvePeriodRange } from './gestaoInsights.service';
+import { endOfBrDay, startOfBrDay } from './dates/brDateTime.util';
 
 export interface TelephonyCallsQuery {
   period?: string;
@@ -31,15 +32,11 @@ function normalizePhone(value?: string): string {
 }
 
 function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return startOfBrDay(date);
 }
 
 function endOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
+  return endOfBrDay(date);
 }
 
 function extractDataCollectedValue(

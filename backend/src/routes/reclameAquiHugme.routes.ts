@@ -1,4 +1,4 @@
-/** reclameAquiHugme.routes v1.0.0 — API base Hugme Reclame Aqui */
+/** reclameAquiHugme.routes v1.2.0 — import Hug Me assíncrono com progresso por lote */
 import { Router, Response } from 'express';
 import multer from 'multer';
 import { authMiddleware } from '../middleware/auth';
@@ -9,11 +9,14 @@ import {
   hasPermission,
 } from '../services/permission.service';
 import {
+  beginHugmeImport,
+  getHugmeImportBatch,
   getHugmeImportStats,
   getHugmeRegistroByIdOrigem,
-  importHugmeBuffer,
+  isHugmeBatchRunning,
   listHugmeImportBatches,
   listHugmeRegistros,
+  runHugmeImportLoop,
 } from '../services/reclame-aqui/hugmeImport.service';
 import type { HugmeOrigemImportacao } from '../models/reclamacoes/ReclameAquiHugmeRegistro.schema';
 
@@ -35,7 +38,9 @@ async function assertCanAccessReclameAqui(authUser: AuthPayload): Promise<void> 
 
 function parseModo(raw: unknown): HugmeOrigemImportacao {
   const value = String(raw ?? '').trim().toLowerCase();
-  if (value === 'base_inicial' || value === 'incremental') return value;
+  if (!value || value === 'base_inicial' || value === 'incremental') {
+    return value === 'base_inicial' ? 'base_inicial' : 'incremental';
+  }
   throw Object.assign(new Error('modo inválido — use base_inicial ou incremental'), { status: 400 });
 }
 
@@ -52,20 +57,25 @@ router.post('/import', authMiddleware, upload.single('file'), async (req, res: R
     }
 
     const modo = parseModo(req.query.modo ?? req.body?.modo);
-    const result = await importHugmeBuffer(req.file.buffer, {
+    const started = await beginHugmeImport(req.file.buffer, {
       modo,
       fileName: req.file.originalname,
       importedBy: req.user?.email || req.user?.name || 'sistema',
     });
 
+    void runHugmeImportLoop(started).catch((err) => {
+      console.error('[hugme-import] lote falhou', started.batchId, err);
+    });
+
     return res.status(201).json({
-      batchId: result.batchId,
+      batchId: started.batchId,
       modo,
       fileName: req.file.originalname,
-      stats: result.stats,
-      parseStats: result.parse.stats,
-      missingColumns: result.parse.missingColumns,
-      errors: result.errors.slice(0, 100),
+      stats: started.stats,
+      parseStats: started.parse.stats,
+      missingColumns: started.parse.missingColumns,
+      errors: started.errors.slice(0, 100),
+      running: isHugmeBatchRunning(started.stats),
     });
   } catch (err) {
     const status = (err as { status?: number }).status ?? 500;
@@ -134,6 +144,23 @@ router.get('/import-batches', authMiddleware, async (req, res: Response) => {
   } catch (err) {
     const status = (err as { status?: number }).status ?? 500;
     const message = err instanceof Error ? err.message : 'Erro ao listar lotes de importação';
+    return res.status(status).json({ message });
+  }
+});
+
+router.get('/import-batches/:batchId', authMiddleware, async (req, res: Response) => {
+  if (!isReclamacoesConnected()) {
+    return res.status(503).json({ message: 'Banco chamados_reclamacoes indisponível' });
+  }
+
+  try {
+    await assertCanAccessReclameAqui(req.user!);
+    const batch = await getHugmeImportBatch(String(req.params.batchId || ''));
+    if (!batch) return res.status(404).json({ message: 'Lote não encontrado' });
+    return res.json(batch);
+  } catch (err) {
+    const status = (err as { status?: number }).status ?? 500;
+    const message = err instanceof Error ? err.message : 'Erro ao consultar lote de importação';
     return res.status(status).json({ message });
   }
 });

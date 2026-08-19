@@ -1,7 +1,8 @@
 /**
- * attachmentScanCallback.service v1.0.0 — atualiza scanStatus opcional no chamado
- * VERSION: v1.0.0 | DATE: 2026-08-13
+ * attachmentScanCallback.service v1.1.0 — updateOne atômico evita race com hooks inbound
+ * VERSION: v1.1.0 | DATE: 2026-08-18
  */
+import { Types } from 'mongoose';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { parseInboundAttachmentStorageKeyFromApiUrl } from './inboundAttachmentStorage.service';
 import { readWhatsAppMensagens, WHATSAPP_MENSAGENS_KEY } from './twilio/whatsappThread.service';
@@ -14,6 +15,13 @@ function matchesStorageKey(url: unknown, storageKey: string): boolean {
   if (raw.includes(storageKey)) return true;
   const parsed = parseInboundAttachmentStorageKeyFromApiUrl(raw);
   return parsed === storageKey;
+}
+
+function attachmentMatchesStorageKey(item: unknown, storageKey: string): boolean {
+  const record = item && typeof item === 'object' ? item as Record<string, unknown> : null;
+  if (!record) return false;
+  const key = String(record.storageKey || '').trim();
+  return key === storageKey || matchesStorageKey(record.url, storageKey);
 }
 
 export async function applyAttachmentScanResult(input: {
@@ -33,58 +41,40 @@ export async function applyAttachmentScanResult(input: {
       { 'registro.metadados.emailAttachments.storageKey': storageKey },
       { 'registro.metadados.whatsappMensagens.anexos': new RegExp(storageKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) },
     ],
-  });
-  if (!chamado?.registro?.length) return { updated: false };
+  }).lean();
+  if (!chamado?.registro?.length || !chamado._id) return { updated: false };
 
-  let updated = false;
   const scannedAt = new Date().toISOString();
+  const setFields: Record<string, unknown> = {};
 
-  chamado.registro.forEach((reg, index) => {
+  chamado.registro.forEach((reg, regIdx) => {
     const meta = (reg.metadados && typeof reg.metadados === 'object' && !Array.isArray(reg.metadados))
-      ? { ...(reg.metadados as Record<string, unknown>) }
+      ? reg.metadados as Record<string, unknown>
       : {};
 
     const emailAttachments = Array.isArray(meta.emailAttachments) ? meta.emailAttachments : [];
-    let emailChanged = false;
-    const nextEmail = emailAttachments.map((raw) => {
-      const item = raw && typeof raw === 'object' ? { ...(raw as Record<string, unknown>) } : null;
-      if (!item) return raw;
-      const key = String(item.storageKey || '').trim();
-      if (key !== storageKey && !matchesStorageKey(item.url, storageKey)) return raw;
-      emailChanged = true;
-      return { ...item, scanStatus: status, scanReason: input.reason, scannedAt };
+    emailAttachments.forEach((raw, attIdx) => {
+      if (!attachmentMatchesStorageKey(raw, storageKey)) return;
+      const base = `registro.${regIdx}.metadados.emailAttachments.${attIdx}`;
+      setFields[`${base}.scanStatus`] = status;
+      setFields[`${base}.scannedAt`] = scannedAt;
+      if (input.reason) setFields[`${base}.scanReason`] = input.reason;
     });
-    if (emailChanged) {
-      meta.emailAttachments = nextEmail;
-      updated = true;
-    }
 
     const waMsgs = readWhatsAppMensagens(reg);
-    let waChanged = false;
-    const nextWa = waMsgs.map((msg) => {
-      const statuses = Array.isArray(msg.anexosScanStatus) ? [...msg.anexosScanStatus] : msg.anexos.map(() => '');
-      let hit = false;
-      msg.anexos.forEach((url, idx) => {
+    waMsgs.forEach((msg, msgIdx) => {
+      msg.anexos.forEach((url, attIdx) => {
         if (!matchesStorageKey(url, storageKey)) return;
-        statuses[idx] = status;
-        hit = true;
+        setFields[`registro.${regIdx}.metadados.${WHATSAPP_MENSAGENS_KEY}.${msgIdx}.anexosScanStatus.${attIdx}`] = status;
       });
-      if (!hit) return msg;
-      waChanged = true;
-      return { ...msg, anexosScanStatus: statuses };
     });
-    if (waChanged) {
-      meta[WHATSAPP_MENSAGENS_KEY] = nextWa;
-      updated = true;
-    }
-
-    if (emailChanged || waChanged) {
-      reg.metadados = meta;
-      chamado.markModified(`registro.${index}.metadados`);
-    }
   });
 
-  if (!updated) return { updated: false };
-  await chamado.save();
-  return { updated: true, chamadoProtocolo: chamado.chamadoProtocolo };
+  if (!Object.keys(setFields).length) return { updated: false };
+
+  await ChamadoN1.updateOne({ _id: chamado._id as Types.ObjectId }, { $set: setFields });
+  return {
+    updated: true,
+    chamadoProtocolo: chamado.chamadoProtocolo,
+  };
 }
