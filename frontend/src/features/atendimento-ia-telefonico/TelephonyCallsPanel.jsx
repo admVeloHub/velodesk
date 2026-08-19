@@ -112,10 +112,12 @@ export default function TelephonyCallsPanel() {
         Duração: formatDuration(item.durationSeconds),
         Resumo: item.summary || '',
         'Transcrição completa': item.transcript || '',
+        'Nota CSAT': item.csatNota != null ? item.csatNota : '',
+        'Comentário CSAT': item.csatComentario || '',
       }));
       const worksheet = XLSX.utils.json_to_sheet(rows);
       worksheet['!cols'] = [
-        { wch: 18 }, { wch: 16 }, { wch: 24 }, { wch: 20 }, { wch: 10 }, { wch: 60 }, { wch: 90 },
+        { wch: 18 }, { wch: 16 }, { wch: 24 }, { wch: 20 }, { wch: 10 }, { wch: 60 }, { wch: 90 }, { wch: 10 }, { wch: 60 },
       ];
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Ligações Letícia IA');
@@ -229,6 +231,11 @@ export default function TelephonyCallsPanel() {
               <article><span>Hoje</span><strong>{stats.today}</strong></article>
               <article><span>Com CPF</span><strong>{stats.withCpf}</strong></article>
               <article><span>Convertidas</span><strong>{stats.converted ?? 0}</strong></article>
+              <article>
+                <span>Nota CSAT (méd.)</span>
+                <strong>{stats.csatAvgNota != null ? stats.csatAvgNota.toFixed(1) : '—'}</strong>
+                {stats.csatCount ? <small>{stats.csatCount} avaliações</small> : null}
+              </article>
             </div>
           ) : null}
 
@@ -252,6 +259,8 @@ export default function TelephonyCallsPanel() {
                     <th>Agente</th>
                     <th>Resumo</th>
                     <th>Duração</th>
+                    <th>Nota CSAT</th>
+                    <th>Comentário CSAT</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -277,6 +286,14 @@ export default function TelephonyCallsPanel() {
                       <td>{item.agentName || '—'}</td>
                       <td>{item.summary || '—'}</td>
                       <td>{formatDuration(item.durationSeconds)}</td>
+                      <td>{item.csatNota != null ? `${item.csatNota} / 5` : '—'}</td>
+                      <td>
+                        {item.csatComentario ? (
+                          <span className="telephony-table__csat-comment" title={item.csatComentario}>
+                            {item.csatComentario}
+                          </span>
+                        ) : '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

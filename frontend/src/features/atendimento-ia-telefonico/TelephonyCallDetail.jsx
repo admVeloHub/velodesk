@@ -9,7 +9,7 @@ import {
   politicaLabel,
   tipoLabel,
 } from './telephonyRecadoConstants';
-import { buildDataCollectedSections } from './telephonyDataCollected';
+import { buildCsatSummary, buildDataCollectedSections } from './telephonyDataCollected';
 import { formatDateTimeBr } from '../../utils/dateTimeBr';
 
 function formatDate(value) {
@@ -73,7 +73,12 @@ export default function TelephonyCallDetail() {
   }, [id]);
 
   const dataSections = useMemo(
-    () => buildDataCollectedSections(data?.dataCollected),
+    () => buildDataCollectedSections(data?.dataCollected).filter((section) => section.id !== 'csat'),
+    [data?.dataCollected],
+  );
+
+  const csat = useMemo(
+    () => buildCsatSummary(data?.dataCollected),
     [data?.dataCollected],
   );
 
@@ -182,6 +187,29 @@ export default function TelephonyCallDetail() {
               ))}
             </div>
           ) : null}
+        </section>
+
+        <section className="telephony-detail__card telephony-detail__card--wide">
+          <h3>Avaliação do cliente (CSAT)</h3>
+          {csat ? (
+            <div className="telephony-csat">
+              <div className="telephony-csat__score">
+                <span className="telephony-csat__score-label">Nota</span>
+                <span className="telephony-csat__score-value">{csat.nota != null ? `${csat.nota} / 5` : '—'}</span>
+                {csat.nota != null ? (
+                  <span className="telephony-csat__stars" aria-hidden="true">
+                    {'★'.repeat(csat.nota)}{'☆'.repeat(Math.max(0, 5 - csat.nota))}
+                  </span>
+                ) : null}
+              </div>
+              <p className="telephony-csat__comment">{csat.comentario || 'Sem comentário informado.'}</p>
+              {csat.motivoNaoColetadoLabel ? (
+                <small className="telephony-detail__rationale">Motivo: {csat.motivoNaoColetadoLabel}</small>
+              ) : null}
+            </div>
+          ) : (
+            <p className="telephony-empty-inline">Pesquisa de satisfação não respondida ou não realizada.</p>
+          )}
         </section>
 
         <section className="telephony-detail__card">
