@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.36.1 | DATE: 2026-08-19
- * — Enviar Nota: patch otimista (sem reload completo do ticket)
+ * VERSION: v3.36.2 | DATE: 2026-08-19
+ * — Hidratação cadastro: local primeiro, API só se faltar email/tel; sem loading bloqueante
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -62,7 +62,7 @@ import { isDraftTicket, persistDraftTicket } from '../../services/ticketsCache';
 import { apiTicketToCockpit, cockpitTicketToApi } from '../../api/adapters/ticketAdapter';
 import { lookupClient } from '../../services/clientDb';
 import { clientsApi, colaboradoresApi, ticketsApi } from '../../api/client';
-import { persistClienteContact, applyClienteDocToTicket, ticketNeedsContactHydration } from '../../api/adapters/clienteAdapter';
+import { persistClienteContact, applyClienteDocToTicket, ticketNeedsContactHydration, ticketContactIsComplete } from '../../api/adapters/clienteAdapter';
 import { useTickets } from '../../context/TicketsContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
@@ -238,7 +238,6 @@ export default function DeskV2Root() {
   const waChatOpenRef = useRef(false);
   waChatOpenRef.current = waChatOpen;
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [hydratingContact, setHydratingContact] = useState(false);
   const contactHydrateRef = useRef(new Set());
   const [mergeInProgress, setMergeInProgress] = useState(false);
   const [aiRevisionOpen, setAiRevisionOpen] = useState(false);
@@ -495,7 +494,7 @@ export default function DeskV2Root() {
     };
   }, [activeTabId, refreshKey, patchTicket, showNotification]);
 
-  // Busca inicial: cadastro local ou fallback Customer Data API (overview) → painel superior
+  // Enriquecimento silencioso: só se faltar email ou telefone; Mongo local primeiro, API depois se ainda incompleto
   useEffect(() => {
     if (!ticket) return undefined;
 
@@ -513,23 +512,30 @@ export default function DeskV2Root() {
 
     let cancelled = false;
     contactHydrateRef.current.add(dedupeKey);
-    setHydratingContact(true);
 
-    clientsApi.getByCpf(cpf)
-      .then(async (clienteDoc) => {
-        if (cancelled || !clienteDoc) return;
-        const updated = await updateTicketInCache(ticketId, (t) => {
-          applyClienteDocToTicket(t, clienteDoc);
-          return t;
-        });
-        if (updated) patchTicket(ticketId, updated);
-      })
-      .catch(() => {
-        /* 404 ou API indisponível — painel permanece como está */
-      })
-      .finally(() => {
-        if (!cancelled) setHydratingContact(false);
+    const applyDoc = async (clienteDoc) => {
+      if (cancelled || !clienteDoc) return null;
+      const updated = await updateTicketInCache(ticketId, (t) => {
+        applyClienteDocToTicket(t, clienteDoc);
+        return t;
       });
+      if (updated) patchTicket(ticketId, updated);
+      return updated;
+    };
+
+    (async () => {
+      try {
+        const localDoc = await clientsApi.getByCpf(cpf, { hydrateFromApi: 0 });
+        const afterLocal = await applyDoc(localDoc);
+        if (cancelled) return;
+        if (ticketContactIsComplete(afterLocal || ticket)) return;
+
+        const enrichedDoc = await clientsApi.getByCpf(cpf, { hydrateFromApi: 1 });
+        await applyDoc(enrichedDoc);
+      } catch {
+        /* 404 ou API indisponível — painel permanece como está */
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -538,10 +544,12 @@ export default function DeskV2Root() {
     ticket?.id,
     ticket?.clienteId,
     ticket?.clientCPF,
+    ticket?.clientEmail,
+    ticket?.clientPhone,
     ticket?.lateralForm?.clienteCpf,
     ticket?.lateralForm?.cpf,
-    ticket?.lateralForm?.clienteNome,
-    ticket?.clientName,
+    ticket?.lateralForm?.clienteEmail,
+    ticket?.lateralForm?.clienteTelefone,
     patchTicket,
   ]);
 
@@ -2162,7 +2170,6 @@ export default function DeskV2Root() {
             <DeskClientProfileBar
               ticket={ticket}
               client={client}
-              hydratingContact={hydratingContact}
               onSaveContact={handleSaveContact}
               onOpenHistory={() => setHistoryOpen(true)}
               onAdvanceWorkflow={handleAdvanceWorkflow}

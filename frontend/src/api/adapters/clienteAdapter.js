@@ -1,8 +1,8 @@
 /**
- * clienteAdapter v1.4.0 — hydrate quando falta email ou telefone no cadastro
- * VERSION: v1.4.0 | DATE: 2026-08-18
+ * clienteAdapter v1.4.2 — hidratação só se faltar email ou telefone no ticket
+ * VERSION: v1.4.2 | DATE: 2026-08-19
  */
-import { formatPhone, normalizeCpf, normalizePhone } from '../../services/desk/utils';
+import { formatPhone, normalizeCpf, normalizePhone, isValidCpfDigits } from '../../services/desk/utils';
 
 function normalizeListInput(value) {
   if (Array.isArray(value)) {
@@ -217,11 +217,25 @@ export function applyClienteDocToTicket(ticket, doc) {
   return ticket;
 }
 
+export function collectTicketContactLists(ticket) {
+  const lf = ticket?.lateralForm || {};
+  return {
+    emails: normalizeListInput(lf.clienteEmail ?? ticket?.clientEmail),
+    phones: normalizeListInput(lf.clienteTelefone ?? ticket?.clientPhone),
+  };
+}
+
+/** Cadastro de contato completo no ticket: ≥1 e-mail e ≥1 telefone. */
+export function ticketContactIsComplete(ticket) {
+  const { emails, phones } = collectTicketContactLists(ticket);
+  return emails.length > 0 && phones.length > 0;
+}
+
 export function ticketNeedsContactHydration(ticket) {
   if (!ticket) return false;
-  const lf = ticket.lateralForm || {};
-  const emails = normalizeListInput(lf.clienteEmail ?? ticket.clientEmail);
-  const phones = normalizeListInput(lf.clienteTelefone ?? ticket.clientPhone);
-  // Enriquece via GET /clients?hydrateFromApi=1 quando falta ao menos email ou telefone.
-  return emails.length === 0 || phones.length === 0;
+  const cpf = normalizeCpf(
+    ticket.lateralForm?.clienteCpf || ticket.lateralForm?.cpf || ticket.clientCPF,
+  );
+  if (!isValidCpfDigits(cpf)) return false;
+  return !ticketContactIsComplete(ticket);
 }

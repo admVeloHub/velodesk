@@ -51,6 +51,7 @@ import reclamacoesRoutes from './routes/reclamacoes.routes';
 import internalAttachmentScanRoutes from './routes/internalAttachmentScan.routes';
 import reclameAquiHugmeRoutes from './routes/reclameAquiHugme.routes';
 import processosRoutes from './routes/processos.routes';
+import { logPopCatalogStartup } from './services/processos/popCatalog.service';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
 import { isLanguageToolConfigured, logLanguageToolStartupStatus } from './services/languagetool.service';
@@ -216,6 +217,7 @@ async function tryConnectDatabase(uri?: string): Promise<boolean> {
     }
     await startChamadoProtocoloWatcher();
     console.log('[startup] MongoDB conectado (chamados + cadastros + desk_config + desk_preferences).');
+    logPopCatalogStartup();
     return true;
   } catch (err) {
     const msg = (err as Error).message;

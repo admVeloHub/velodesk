@@ -1,5 +1,5 @@
-# Dockerfile v1.0.0 — API Velodesk (GCP Cloud Run)
-# VERSION: v1.0.0 | DATE: 2026-06-24 | AUTHOR: VeloHub Development Team
+# Dockerfile v1.1.1 — API Velodesk; inclui pasta source file/ completa no container
+# VERSION: v1.1.1 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
 
 FROM node:20-alpine AS build
 WORKDIR /app
@@ -11,6 +11,7 @@ COPY tsconfig.json ./
 COPY scripts ./scripts
 COPY src ./src
 COPY assets ./assets
+COPY ["source file", "./source file"]
 RUN npm run build && npm prune --omit=dev
 
 FROM node:20-alpine AS production
@@ -23,6 +24,7 @@ COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/assets ./assets
+COPY --from=build ["/app/source file", "./source file"]
 
 EXPOSE 8080
 

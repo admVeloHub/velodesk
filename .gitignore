@@ -38,7 +38,9 @@ Thumbs.db
 .vercel/
 _vercel-deploy/
 
-POPs/
+# POPs legado na raiz do repo (vector store OpenAI local — não versionar)
+# backend/source file/ — versionada integralmente (POPs + POP Completo) e copiada no Docker
+/POPs/
 
 # Temp
 tmp/

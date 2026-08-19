@@ -1,10 +1,31 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.87.0 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.88.0 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — source file POPs no container, hidratação cadastro e Consulta Operacional prod
+
+- **Data/Hora**: 2026-08-19
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.88.0
+  - **Backend**: popCatalog.service v1.4.2, index (logPopCatalogStartup), Dockerfile v1.1.1, Dockerfile raiz v2.0.1, `.env.example` (POPS_SOURCE_DIR)
+  - **Frontend**: clienteAdapter v1.4.2, DeskV2Root v3.36.2
+  - **Assets**: `backend/source file/` completa — 16 `.docx` (POPs) + 17 `.pdf` (POP Completo) versionados e copiados no Docker
+- **Arquivos principais**:
+  - `.gitignore` — `/POPs/` só na raiz; `backend/source file/` versionada integralmente
+  - Dockerfiles copiam pasta `source file/` inteira para Cloud Run — corrige prod vazio em `/api/processos/produtos`
+  - Log de boot `[processos] source file POPs: produtos=N docx=N pdf=N` para diagnóstico
+  - Hidratação cadastro silenciosa: só se faltar email ou telefone; Mongo local primeiro (`hydrateFromApi=0`), API externa só se ainda incompleto; sem loading bloqueante no header
+- **Descrição**: Restaura Consulta Operacional em produção (POPs no container) e corrige regressão de hidratação automática de cadastro no Desk.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — Consulta Operacional POPs, datas BRT, anexos workflow e Hugme/RA
 

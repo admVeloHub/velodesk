@@ -1,6 +1,6 @@
 /**
- * popCatalog.service v1.4.0 — seções via h1/h2 nos resumos POPs; completo só PDF
- * VERSION: v1.4.0 | DATE: 2026-08-19
+ * popCatalog.service v1.4.2 — log startup conta docx/pdf em source file
+ * VERSION: v1.4.2 | DATE: 2026-08-19
  *
  * Lê "backend/source file/POPs/<produto>/<pop>.docx" e converte cada POP num JSON estruturado
  * (cabeçalho, seções, tabelas e imagens), em vez de reproduzir o texto corrido do Word.
@@ -102,6 +102,45 @@ export function listProdutos(): { slug: string; label: string }[] {
     .filter((produto) => produto.label.toUpperCase() !== 'OLD')
     .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
     .map(({ slug, label }) => ({ slug, label }));
+}
+
+/** Diagnóstico no boot — confirma pasta source file no container (Cloud Run). */
+export function logPopCatalogStartup(): void {
+  const popsRoot = env.popsSourceDir;
+  const completoRoot = env.popsCompletoSourceDir;
+  const popsExists = fs.existsSync(popsRoot);
+  const completoExists = fs.existsSync(completoRoot);
+  const produtos = popsExists ? listProdutos().length : 0;
+  const countFiles = (dir: string, ext: RegExp) => {
+    if (!fs.existsSync(dir)) return 0;
+    let n = 0;
+    const walk = (base: string) => {
+      for (const entry of fs.readdirSync(base, { withFileTypes: true })) {
+        const abs = path.join(base, entry.name);
+        if (entry.isDirectory()) walk(abs);
+        else if (entry.isFile() && ext.test(entry.name) && !entry.name.startsWith('~$')) n += 1;
+      }
+    };
+    walk(dir);
+    return n;
+  };
+  const docxCount = countFiles(popsRoot, DOCX_EXT);
+  const pdfCount = countFiles(completoRoot, PDF_EXT);
+  console.info(
+    '[processos] source file POPs: dir=%s exists=%s produtos=%d docx=%d | POP Completo: dir=%s exists=%s pdf=%d',
+    popsRoot,
+    popsExists,
+    produtos,
+    docxCount,
+    completoRoot,
+    completoExists,
+    pdfCount,
+  );
+  if (!popsExists || produtos === 0) {
+    console.warn(
+      '[processos] Consulta Operacional sem produtos — verifique deploy de backend/source file/ ou POPS_SOURCE_DIR.',
+    );
+  }
 }
 
 function resolveProdutoDirInRoot(root: string, produtoSlug: string): string | null {
