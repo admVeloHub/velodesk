@@ -1,6 +1,6 @@
 /**
- * dateTimeBr v1.0.0 — parse e formatação em America/Sao_Paulo
- * VERSION: v1.0.0 | DATE: 2026-08-18
+ * dateTimeBr v1.0.1 — year:false omitido corretamente (evita RangeError no Intl)
+ * VERSION: v1.0.1 | DATE: 2026-08-19
  */
 export const TZ_BR = 'America/Sao_Paulo';
 export const BRT_OFFSET = '-03:00';
@@ -31,23 +31,34 @@ export function parseApiInstant(value) {
 export function formatDateBr(value, options = {}) {
   const d = parseApiInstant(value);
   if (!d) return '—';
-  return d.toLocaleDateString('pt-BR', {
+  const { year, ...rest } = options;
+  const intlOpts = {
     timeZone: TZ_BR,
     day: '2-digit',
     month: '2-digit',
-    year: options.year === false ? undefined : 'numeric',
-    ...options,
-  });
+    ...rest,
+  };
+  if (year !== false) {
+    intlOpts.year = year || 'numeric';
+  }
+  return d.toLocaleDateString('pt-BR', intlOpts);
 }
 
 export function formatTimeBr(value, options = {}) {
   const d = parseApiInstant(value);
   if (!d) return '—';
+  const {
+    year: _y,
+    month: _m,
+    day: _d,
+    weekday: _w,
+    ...timeOpts
+  } = options;
   return d.toLocaleTimeString('pt-BR', {
     timeZone: TZ_BR,
     hour: '2-digit',
     minute: '2-digit',
-    ...options,
+    ...timeOpts,
   });
 }
 

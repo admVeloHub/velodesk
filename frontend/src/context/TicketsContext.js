@@ -1,6 +1,6 @@
 /**
- * TicketsContext v1.8.2 — preserva abas de rascunho durante refresh de filas
- * VERSION: v1.8.2 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.8.3 — coalesce refreshTickets para reduzir tempestade /boxes
+ * VERSION: v1.8.3 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi, loadTicketDetailFromApi } from '../services/ticketsStorage';
@@ -38,6 +38,8 @@ export function TicketsProvider({ children }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const hydratedRef = useRef(false);
+  const refreshInFlightRef = useRef(null);
+  const lastExplicitRefreshAtRef = useRef(0);
 
   const patchTicket = useCallback((ticketId, ticket) => {
     const aplicado = patchTicketInCache(ticketId, ticket);
@@ -58,43 +60,65 @@ export function TicketsProvider({ children }) {
   }, []);
 
   const runRefresh = useCallback(async (silent) => {
-    const queueBefore = silent ? fingerprintQueueColumns(getTicketColumns()) : null;
-    if (isAuthenticated) {
-      if (!silent) setLoading(true);
-      deskLog.tickets('TicketsContext.refreshTickets → início', { silent: Boolean(silent) });
-      try {
-        await refreshTicketsFromApi(user?.email);
-        deskLog.tickets('TicketsContext.refreshTickets → ok');
-      } catch (err) {
-        const status = err?.response?.status;
-        const apiMsg = String(err?.response?.data?.message || '').trim();
-        deskLog.error('TICKETS', 'TicketsContext.refreshTickets → falhou', {
-          status,
-          message: apiMsg || err?.message,
-          silent: Boolean(silent),
-        });
-        if (silent) {
-          // Atualização de fundo: falha de rede não deve poluir o console do agente
-        } else if (status === 401 || status === 403) {
-          console.warn('TicketsContext: sessão inválida ao carregar tickets — faça login novamente.');
-        } else if (status === 503 || /mongodb|banco/i.test(apiMsg)) {
-          console.warn('TicketsContext: backend/Mongo indisponível ao carregar tickets.');
-        } else {
-          console.warn('TicketsContext: falha ao carregar tickets.', apiMsg || err?.message);
-        }
-      } finally {
-        if (!silent) setLoading(false);
-      }
+    if (refreshInFlightRef.current) {
+      return refreshInFlightRef.current;
     }
-    if (silent) {
-      const queueAfter = fingerprintQueueColumns(getTicketColumns());
-      if (queueBefore !== queueAfter) {
+    if (!silent) {
+      const now = Date.now();
+      if (now - lastExplicitRefreshAtRef.current < 2000) {
+        return getTicketColumns();
+      }
+      lastExplicitRefreshAtRef.current = now;
+    }
+
+    const queueBefore = silent ? fingerprintQueueColumns(getTicketColumns()) : null;
+    const task = (async () => {
+      if (isAuthenticated) {
+        if (!silent) setLoading(true);
+        deskLog.tickets('TicketsContext.refreshTickets → início', { silent: Boolean(silent) });
+        try {
+          await refreshTicketsFromApi(user?.email);
+          deskLog.tickets('TicketsContext.refreshTickets → ok');
+        } catch (err) {
+          const status = err?.response?.status;
+          const apiMsg = String(err?.response?.data?.message || '').trim();
+          deskLog.error('TICKETS', 'TicketsContext.refreshTickets → falhou', {
+            status,
+            message: apiMsg || err?.message,
+            silent: Boolean(silent),
+          });
+          if (silent) {
+            // Atualização de fundo: falha de rede não deve poluir o console do agente
+          } else if (status === 401 || status === 403) {
+            console.warn('TicketsContext: sessão inválida ao carregar tickets — faça login novamente.');
+          } else if (status === 503 || /mongodb|banco/i.test(apiMsg)) {
+            console.warn('TicketsContext: backend/Mongo indisponível ao carregar tickets.');
+          } else {
+            console.warn('TicketsContext: falha ao carregar tickets.', apiMsg || err?.message);
+          }
+        } finally {
+          if (!silent) setLoading(false);
+        }
+      }
+      if (silent) {
+        const queueAfter = fingerprintQueueColumns(getTicketColumns());
+        if (queueBefore !== queueAfter) {
+          setRefreshKey((k) => k + 1);
+        }
+      } else {
         setRefreshKey((k) => k + 1);
       }
-    } else {
-      setRefreshKey((k) => k + 1);
+      return getTicketColumns();
+    })();
+
+    refreshInFlightRef.current = task;
+    try {
+      return await task;
+    } finally {
+      if (refreshInFlightRef.current === task) {
+        refreshInFlightRef.current = null;
+      }
     }
-    return getTicketColumns();
   }, [isAuthenticated, user?.email]);
 
   const refreshTickets = useCallback(() => runRefresh(false), [runRefresh]);

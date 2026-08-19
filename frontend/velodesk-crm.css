@@ -9263,6 +9263,24 @@ body.desk-v2-mode #cockpitFocusContext {
     color: #272A30;
 }
 
+.desk-attachment-preview__fallback {
+    margin: 8px 0 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #5A6170;
+    text-align: center;
+}
+
+.desk-attachment-preview__inline-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #1B4FD8;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
 .desk-attachment-preview__footer {
     display: flex;
     justify-content: flex-end;

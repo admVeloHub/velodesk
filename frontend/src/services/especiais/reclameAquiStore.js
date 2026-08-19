@@ -1,5 +1,5 @@
 /**
- * reclameAquiStore v1.3.0 — lista 50; sem protocolo inventado; passível de nota default false
+ * reclameAquiStore v1.3.1 — produto sem fallback hardcoded
  */
 import {
   RA_GROUPS,
@@ -282,7 +282,7 @@ export function buildRegistroDefaults(item = {}) {
     descricao: item.descricao || '',
     idReclamacaoRa: item.idReclamacaoRa || '',
     dataReclamacao: item.dataReclamacao || now,
-    produto: item.produto || 'Fibra residencial',
+    produto: item.produto || '',
     tipo: item.tipo || 'Reclamação',
     motivo: item.motivo || '',
     respostaPublica: item.respostaPublica || '',

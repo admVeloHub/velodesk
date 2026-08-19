@@ -1,4 +1,4 @@
-/** permission.service v1.9.0 — atuação exige responsável/atribuição real; claim explícito */
+/** permission.service v1.10.0 — cache TTL curto de resolveUserPermissions por userId */
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { findColaboradorByEmail } from './colaboradoresCadastro.service';
@@ -56,6 +56,13 @@ export interface ResolvedUserPermissions {
 
 let nivelCache: Map<string, number> | null = null;
 
+const USER_PERMISSIONS_TTL_MS = 30_000;
+type CachedUserPermissions = {
+  at: number;
+  promise: Promise<ResolvedUserPermissions>;
+};
+const userPermissionsCache = new Map<string, CachedUserPermissions>();
+
 async function getNivelBySlug(): Promise<Map<string, number>> {
   if (nivelCache) return nivelCache;
   const funcoes = await listFuncoesPermissoes();
@@ -65,6 +72,7 @@ async function getNivelBySlug(): Promise<Map<string, number>> {
 
 export function invalidatePermissionCache(): void {
   nivelCache = null;
+  userPermissionsCache.clear();
 }
 
 async function resolveDbUser(userId?: string) {
@@ -115,6 +123,26 @@ function applyConfigAlwaysVisibleBypass(permissoes: PermissoesMap, email?: strin
 }
 
 export async function resolveUserPermissions(authUser: AuthPayload): Promise<ResolvedUserPermissions> {
+  const cacheKey = String(authUser.userId || authUser.email || '').trim();
+  const now = Date.now();
+  if (cacheKey) {
+    const cached = userPermissionsCache.get(cacheKey);
+    if (cached && now - cached.at < USER_PERMISSIONS_TTL_MS) {
+      return cached.promise;
+    }
+    const promise = resolveUserPermissionsUncached(authUser);
+    userPermissionsCache.set(cacheKey, { at: now, promise });
+    try {
+      return await promise;
+    } catch (err) {
+      userPermissionsCache.delete(cacheKey);
+      throw err;
+    }
+  }
+  return resolveUserPermissionsUncached(authUser);
+}
+
+async function resolveUserPermissionsUncached(authUser: AuthPayload): Promise<ResolvedUserPermissions> {
   const dbUser = await resolveDbUser(authUser.userId);
   const colaborador = await findColaboradorByEmail(authUser.email);
   const funcoes = await resolveUserFuncoes(authUser);

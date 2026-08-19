@@ -1,4 +1,4 @@
-/** reclameAquiTicketCreate.service v1.1.1 — lote Hug Me sem roteamento/sininho por linha */
+/** reclameAquiTicketCreate.service v1.2.0 — produto da tabulação Desk; motivo do órgão fora da árvore */
 import { Types } from 'mongoose';
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -11,7 +11,7 @@ import {
   upsertFromChamado,
 } from '../reclamacoes/reclamacao.service';
 import type { IReclameAquiHugmeRegistro } from '../../models/reclamacoes/ReclameAquiHugmeRegistro.schema';
-import type { ParsedHugmeRow } from './hugmeSpreadsheet.service';
+import { getActiveTabulation } from '../tabulation.service';
 
 export interface RaTicketSource {
   idOrigem: string;
@@ -39,6 +39,31 @@ function asIso(value: string | Date | undefined): string | undefined {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
   const raw = String(value).trim();
   return raw || undefined;
+}
+
+function normalizeProdutoLabel(value: string): string {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+async function resolveTabulacaoProduto(raw?: string): Promise<string> {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+  try {
+    const config = await getActiveTabulation();
+    const names = (config.produtos || [])
+      .filter((item) => item.ativo !== false)
+      .map((item) => String(item.produto || '').trim())
+      .filter(Boolean);
+    const target = normalizeProdutoLabel(value);
+    return names.find((name) => normalizeProdutoLabel(name) === target) || '';
+  } catch {
+    return '';
+  }
 }
 
 export function registroToRaTicketSource(
@@ -131,7 +156,7 @@ export function buildTicketPayloadFromRaSource(source: RaTicketSource, author = 
     lateralForm: {
       classificacaoTipo: source.tipo || 'Reclamação',
       tipoChamado: source.tipo || 'Reclamação',
-      produto: '',
+      produto: source.produto || '',
       motivo: '',
       detalhe: 'Reclamação Reclame Aqui',
       canal: 'Reclame Aqui',
@@ -226,13 +251,16 @@ export async function upsertRaTicketFromSource(
   }
 
   const existing = await findByIdDemandaExterna('reclame_aqui', idOrigem);
+  const deskProduto = await resolveTabulacaoProduto(source.produto);
+  const sourced = { ...source, produto: deskProduto };
+
   if (existing?.chamadoId) {
     const chamado = await ChamadoN1.findById(existing.chamadoId);
     if (!chamado) {
       throw new Error(`Chamado ${existing.chamadoId} não encontrado para Id Origem ${idOrigem}`);
     }
 
-    const payload = buildTicketPayloadFromRaSource(source, author);
+    const payload = buildTicketPayloadFromRaSource(sourced, author);
     const lf = payload.lateralForm as Record<string, unknown>;
     chamado.chamadoTitulo = payload.chamadoTitulo;
     const raMeta = lf.reclameAqui;
@@ -256,12 +284,13 @@ export async function upsertRaTicketFromSource(
       chamado.tabulacao[lastIdx] = {
         ...chamado.tabulacao[lastIdx],
         canal: 'Reclame Aqui',
+        ...(deskProduto ? { produto: deskProduto } : {}),
       };
       chamado.markModified('tabulacao');
     }
     await chamado.save();
 
-    const reclamacao = await persistRaReclamacao(chamado, source, origemEntrada, { route: false });
+    const reclamacao = await persistRaReclamacao(chamado, sourced, origemEntrada, { route: false });
 
     return {
       chamadoId: chamado._id as Types.ObjectId,
@@ -271,10 +300,10 @@ export async function upsertRaTicketFromSource(
     };
   }
 
-  const payload = buildTicketPayloadFromRaSource(source, author);
+  const payload = buildTicketPayloadFromRaSource(sourced, author);
   const partial = await createChamadoFromBody(payload, 'novo');
   const chamado = await ChamadoN1.create(partial) as IChamadoN1;
-  const reclamacao = await persistRaReclamacao(chamado, source, origemEntrada, {
+  const reclamacao = await persistRaReclamacao(chamado, sourced, origemEntrada, {
     route: origemEntrada !== 'hugme-import',
   });
   await appendRespostaPublica(chamado, source.respostaPublica || '', author);

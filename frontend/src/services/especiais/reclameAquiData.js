@@ -1,6 +1,6 @@
 /**
- * reclameAquiData v1.1.0 — constantes RA sem workflow e sem motivos hardcoded
- * VERSION: v1.1.0 | DATE: 2026-08-19
+ * reclameAquiData v1.1.1 — produto sai da tabulação Desk, não desta lista
+ * VERSION: v1.1.1 | DATE: 2026-08-19
  */
 export const RA_TABS = [
   { id: 'tabela', label: 'Tabela', icon: 'ti-table' },
@@ -45,16 +45,6 @@ export function getGroupMeta(groupKey) {
 export function getStatusLabel(statusRa) {
   return RA_STATUS_LABELS[statusRa] || statusRa;
 }
-
-export const RA_PRODUTOS = [
-  'Fibra residencial',
-  'Internet Fibra',
-  'TV',
-  'Combo',
-  'Produto X',
-  'Financeiro',
-  'Telefone',
-];
 
 export const RA_TIPOS = [
   'Reclamação',

@@ -1,4 +1,4 @@
-/** reclamacao.service v1.4.0 — idReclamacaoRa no DTO; consumidor sem fallback em tab.motivo */
+/** reclamacao.service v1.4.1 — produto/motivo RA leem tabulação quando o meta vier vazio */
 import { Types, type Model } from 'mongoose';
 import { ChamadoN1, type IChamadoN1 } from '../../models/ChamadoN1';
 import type { IReclamacao } from '../../models/reclamacoes/reclamacaoModels';
@@ -243,11 +243,7 @@ function buildReclamacaoPayload(
     ).trim(),
     produto: String(meta.produto ?? tab.produto ?? '').trim() || undefined,
     tipo: String(meta.tipo ?? tab.tipoChamado ?? (tab as { classificacaoTipo?: string }).classificacaoTipo ?? '').trim() || undefined,
-    motivo: String(
-      orgao === 'reclame_aqui'
-        ? (meta.motivo ?? '')
-        : (meta.motivo ?? tab.motivo ?? '')
-    ).trim() || undefined,
+    motivo: String(meta.motivo ?? tab.motivo ?? '').trim() || undefined,
     statusCanal: String(
       meta.statusPc
       ?? meta.statusGov
@@ -554,11 +550,7 @@ function chamadoToPortalDto(chamado: IChamadoN1, orgao: CasoEspecialOrgao): Reco
     ).trim(),
     produto: String(meta.produto ?? tab.produto ?? '').trim() || undefined,
     tipo: String(meta.tipo ?? tab.tipoChamado ?? '').trim() || undefined,
-    motivo: String(
-      orgao === 'reclame_aqui'
-        ? (meta.motivo ?? '')
-        : (meta.motivo ?? tab.motivo ?? '')
-    ).trim() || undefined,
+    motivo: String(meta.motivo ?? tab.motivo ?? '').trim() || undefined,
     statusCanal,
     statusPc: meta.statusPc ?? (orgao === 'procon' ? statusCanal : undefined),
     statusGov: meta.statusGov ?? (orgao === 'consumidor_gov' ? statusCanal : undefined),

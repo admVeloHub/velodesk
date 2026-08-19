@@ -1,6 +1,6 @@
 /**
- * WorkflowApprovalShell v1.8.1 — ações somente em workflow ativo
- * VERSION: v1.8.1 | DATE: 2026-08-18
+ * WorkflowApprovalShell v1.9.0 — polling silencioso + Realtime workflow
+ * VERSION: v1.9.0 | DATE: 2026-08-19
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { useNotifications } from '../../../context/NotificationContext';
 import { useWorkflowConfig } from '../../../context/WorkflowConfigContext';
 import { usePermissionsOptional } from '../../../context/PermissionContext';
 import deskLog from '../../../utils/deskDebugLog';
+import { subscribeToTicketEvents } from '../../../services/desk/ticketEventsRealtime';
 import { findTicketEntry, loadTicketDetailFromApi } from '../../../services/ticketsStorage';
 import {
   canInterruptWorkflow,
@@ -46,10 +47,12 @@ const EMPTY_SUMMARY = {
   slaCriticalCount: 0,
 };
 
+const WORKFLOW_QUEUE_POLL_MS = 25_000;
+
 export default function WorkflowApprovalShell() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { refreshKey, refreshTickets } = useTickets();
+  const { refreshKey, refreshTickets, refreshTicketsSilent } = useTickets();
   const { showNotification } = useNotifications();
   const { workflows: workflowDefinitions, loading: workflowConfigLoading } = useWorkflowConfig();
   const permsCtx = usePermissionsOptional();
@@ -80,6 +83,42 @@ export default function WorkflowApprovalShell() {
     window.addEventListener('velodesk:workflow-demo-changed', onDemoChange);
     return () => window.removeEventListener('velodesk:workflow-demo-changed', onDemoChange);
   }, []);
+
+  // Atualiza fila local sem spinner: polling + Realtime (fallback confiável = intervalo).
+  useEffect(() => {
+    if (!hasWorkflowAccess) return undefined;
+
+    let inFlight = false;
+    const syncQueue = async () => {
+      if (inFlight || document.hidden) return;
+      inFlight = true;
+      try {
+        await refreshTicketsSilent();
+        setDetailRevision((v) => v + 1);
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void syncQueue();
+    };
+
+    void syncQueue();
+    const timer = window.setInterval(syncQueue, WORKFLOW_QUEUE_POLL_MS);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    const unsubscribe = subscribeToTicketEvents((payload) => {
+      if (payload?.type === 'workflow' || !payload?.type) {
+        void syncQueue();
+      }
+    });
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      unsubscribe();
+    };
+  }, [hasWorkflowAccess, refreshTicketsSilent]);
 
   useEffect(() => {
     if (!selectedId || !hasWorkflowAccess) return undefined;

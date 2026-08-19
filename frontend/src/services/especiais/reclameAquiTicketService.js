@@ -1,7 +1,7 @@
 /**
  * reclameAquiTicketService — bridge Reclame Aqui ↔ API tickets
- * VERSION: v1.2.0 | DATE: 2026-08-19
- * — cadastro sem workflow; upsert reclamação obrigatório
+ * VERSION: v1.2.2 | DATE: 2026-08-19
+ * — produto e motivo na tabulação Desk; motivo da lista do órgão
  */
 import { ticketsApi, reclamacoesApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
@@ -59,7 +59,7 @@ export function buildTicketPayloadFromReclamacao(form) {
       classificacaoTipo: form.tipo || 'Reclamação',
       tipoChamado: form.tipo || 'Reclamação',
       produto: form.produto || '',
-      motivo: '',
+      motivo: form.motivo || '',
       detalhe: 'Reclamação Reclame Aqui',
       canal: 'Reclame Aqui',
       responsavel: author,

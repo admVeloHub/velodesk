@@ -1,4 +1,4 @@
-/** chamado.mapper v2.12.1 — export findReclameAquiFromChamado */
+/** chamado.mapper v2.12.2 — scanStatus alinhado por storageKey da URL do anexo */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -22,6 +22,7 @@ import { extractEmailReplyContent } from './emailReplyContent.util';
 import { sanitizeResponsavel, inferResponsavelFromAgentRegistro, isRealResponsavel } from './responsavel.util';
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { filterRealAttachmentUrls } from './attachmentFilter.util';
+import { parseInboundAttachmentStorageKeyFromApiUrl } from './inboundAttachmentStorage.service';
 import { excludeFusaoAbsorvidosFilter, serializeFusaoDto } from './ticketFusao.helpers';
 import {
   readWhatsAppMensagens,
@@ -69,15 +70,27 @@ function legacyAlteracoesObject(reg: IRegistro): Record<string, unknown> | null 
   return null;
 }
 
+function scanStatusFromMap(map: Map<string, string>, url: string): string {
+  const u = String(url || '').trim();
+  if (!u) return '';
+  if (map.has(u)) return map.get(u) || '';
+  const parsed = parseInboundAttachmentStorageKeyFromApiUrl(u);
+  if (parsed && map.has(`sk:${parsed}`)) return map.get(`sk:${parsed}`) || '';
+  return '';
+}
+
 function scanStatusesAlignedToUrls(urls: string[], sourceUrls: string[], sourceStatuses?: string[]): string[] | undefined {
   if (!urls.length) return undefined;
   const map = new Map<string, string>();
   (sourceUrls || []).forEach((url, index) => {
     const key = String(url || '').trim();
     if (!key) return;
-    map.set(key, String(sourceStatuses?.[index] || ''));
+    const status = String(sourceStatuses?.[index] || '');
+    map.set(key, status);
+    const parsed = parseInboundAttachmentStorageKeyFromApiUrl(key);
+    if (parsed) map.set(`sk:${parsed}`, status);
   });
-  const aligned = urls.map((url) => map.get(url) || '');
+  const aligned = urls.map((url) => scanStatusFromMap(map, url));
   return aligned.some(Boolean) ? aligned : undefined;
 }
 
@@ -85,15 +98,18 @@ function scanStatusesForPublicAttachments(reg: IRegistro): string[] | undefined 
   const urls = filterRealAttachmentUrls(reg.anexosMensagemPublica);
   const meta = registroMetadados(reg);
   const items = Array.isArray(meta.emailAttachments) ? meta.emailAttachments : [];
-  const sourceUrls = items.map((raw) => {
+  const map = new Map<string, string>();
+  items.forEach((raw) => {
     const item = raw && typeof raw === 'object' ? raw as Record<string, unknown> : null;
-    return String(item?.url || '').trim();
+    if (!item) return;
+    const status = String(item.scanStatus || '').trim();
+    const url = String(item.url || '').trim();
+    const storageKey = String(item.storageKey || '').trim();
+    if (url) map.set(url, status);
+    if (storageKey) map.set(`sk:${storageKey}`, status);
   });
-  const sourceStatuses = items.map((raw) => {
-    const item = raw && typeof raw === 'object' ? raw as Record<string, unknown> : null;
-    return String(item?.scanStatus || '').trim();
-  });
-  return scanStatusesAlignedToUrls(urls, sourceUrls, sourceStatuses);
+  const aligned = urls.map((url) => scanStatusFromMap(map, url));
+  return aligned.some(Boolean) ? aligned : undefined;
 }
 
 function registroMetadados(reg: IRegistro): Record<string, unknown> {

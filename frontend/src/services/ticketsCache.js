@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.14.0 — nota interna: patch otimista sem GET detalhe completo
- * VERSION: v1.14.0 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.16.0 — proteção in-flight no merge /boxes + serialização de detalhe por ticket
+ * VERSION: v1.16.0 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -23,6 +23,7 @@ import {
 import { loadConsumidorGovTicketsFromApi } from './especiais/consumidorGovTicketService';
 import { loadBacenTicketsFromApi } from './especiais/bacenTicketService';
 import { syncEspeciaisGroupFromTicket } from './especiais/especiaisTicketGroupSync';
+import { sanitizeResponsavel } from './tabulationConfig';
 
 const BOXES_CACHE_KEY = 'velodesk_boxes_cache_v2';
 const BOXES_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -86,8 +87,20 @@ function mergeDraftSnapshots(...lists) {
 }
 
 let loadBoxesFromApiChain = Promise.resolve();
+const detailLoadInFlight = new Set();
+const mergeProtectedTicketIds = new Set();
+const detailLoadChains = new Map();
 
 export { isDraftTicket };
+
+/** Protege tickets abertos/em carga contra wipe do GET /boxes durante mergePreservedDetails. */
+export function setMergeProtectedTicketIds(ids) {
+  mergeProtectedTicketIds.clear();
+  (ids || []).forEach((id) => {
+    const normalized = String(id || '').trim();
+    if (normalized) mergeProtectedTicketIds.add(normalized);
+  });
+}
 
 export function isApiMode() {
   return useApi;
@@ -247,8 +260,14 @@ function ticketHasClientContactData(ticket) {
     || Boolean(String(ticket.clientEmail || '').trim());
 }
 
+function ticketIdKey(ticket) {
+  return String(ticket?.id || ticket?._id || '').trim();
+}
+
 function shouldPreserveTicketDetail(ticket) {
   if (!ticket || isDraftTicket(ticket)) return false;
+  const id = ticketIdKey(ticket);
+  if (id && (detailLoadInFlight.has(id) || mergeProtectedTicketIds.has(id))) return true;
   if (hasPendingWorkflowPersist(ticket)) return true;
   if (!ticket._detailLoaded) return false;
   return ticketHasDetailContent(ticket) || ticketHasClientContactData(ticket);
@@ -416,15 +435,17 @@ export function patchTicketInCache(ticketId, nextTicket, userEmail = '') {
   return true;
 }
 
-export async function loadTicketDetailFromApi(ticketId) {
+async function loadTicketDetailFromApiOnce(ticketId) {
   assertApiReady('carregar ticket');
-  deskLog.tickets('loadTicketDetailFromApi → início', { ticketId });
+  const id = String(ticketId || '').trim();
+  detailLoadInFlight.add(id);
+  deskLog.tickets('loadTicketDetailFromApi → início', { ticketId: id });
   try {
-    const raw = await ticketsApi.get(ticketId);
+    const raw = await ticketsApi.get(id);
     if (raw?.listOnly === true) {
       throw new Error('API retornou listagem resumida em vez do detalhe completo');
     }
-    const prevEntry = findInColumns(ticketId);
+    const prevEntry = findInColumns(id);
     const prevTicket = prevEntry?.ticket;
     let full = apiTicketToCockpit(raw);
     if (!full?.id && !full?._id) {
@@ -435,13 +456,13 @@ export async function loadTicketDetailFromApi(ticketId) {
     }
     full.listOnly = false;
     full._detailLoaded = true;
-    const patched = patchTicketInCache(ticketId, full);
+    const patched = patchTicketInCache(id, full);
     if (!patched) {
       insertTicketIntoColumnsIfMissing(full);
     }
     try {
       window.dispatchEvent(new CustomEvent('velodesk:ticket-detail-changed', {
-        detail: { ticketId: String(ticketId) },
+        detail: { ticketId: id },
       }));
     } catch {
       /* ignore */
@@ -452,7 +473,7 @@ export async function loadTicketDetailFromApi(ticketId) {
       /* ignore sync errors */
     }
     deskLog.tickets('loadTicketDetailFromApi → ok', {
-      ticketId,
+      ticketId: id,
       messages: full?.messages?.length || 0,
       internalNotes: full?.internalNotes?.length || 0,
       registroHistorico: full?.registroHistorico?.length || 0,
@@ -462,11 +483,29 @@ export async function loadTicketDetailFromApi(ticketId) {
     return full;
   } catch (err) {
     deskLog.error('TICKETS', 'loadTicketDetailFromApi → falhou', {
-      ticketId,
+      ticketId: id,
       status: err?.response?.status,
       message: err?.response?.data?.message || err?.message,
     });
     throw err;
+  } finally {
+    detailLoadInFlight.delete(id);
+  }
+}
+
+export async function loadTicketDetailFromApi(ticketId) {
+  const id = String(ticketId || '').trim();
+  if (!id) return null;
+  const run = () => loadTicketDetailFromApiOnce(id);
+  const prev = detailLoadChains.get(id) || Promise.resolve();
+  const next = prev.then(run, run);
+  detailLoadChains.set(id, next);
+  try {
+    return await next;
+  } finally {
+    if (detailLoadChains.get(id) === next) {
+      detailLoadChains.delete(id);
+    }
   }
 }
 
@@ -595,6 +634,70 @@ function removeTicketFromColumns(ticketId) {
   });
 }
 
+/** Aplica resposta do PUT no cache local; realoca entre filas se status/box mudou. */
+function syncTicketAfterApiUpdate(ticketId, mergedTicket, userEmail = '') {
+  const id = String(ticketId);
+  const entry = findInColumns(id);
+  const targetBoxId = mergedTicket.boxId || resolveBoxIdForTicketStatus(mergedTicket.status);
+
+  if (entry && entry.boxId === targetBoxId) {
+    patchTicketInCache(id, mergedTicket, userEmail);
+  } else {
+    removeTicketFromColumns(id);
+    const cols = ensureDefaultColumns();
+    const box = cols.find((c) => c.id === targetBoxId) || cols[0];
+    if (box) {
+      if (!box.tickets) box.tickets = [];
+      const idx = box.tickets.findIndex(
+        (t) => String(t.id) === id || String(t._id) === id,
+      );
+      if (idx >= 0) box.tickets[idx] = mergedTicket;
+      else box.tickets.unshift(mergedTicket);
+    }
+    columns = cols;
+    persistColumnsToStorage(cols, userEmail);
+    try {
+      syncEspeciaisGroupFromTicket(mergedTicket);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  dispatchTicketDetailChanged(id);
+  return mergedTicket;
+}
+
+function mergePutResponseIntoCachedTicket(prevTicket, apiResponse) {
+  const fromApi = apiTicketToCockpit(apiResponse);
+  fromApi.listOnly = false;
+  fromApi._detailLoaded = prevTicket?._detailLoaded !== false;
+  return mergeApiTicketPreservingPendingWorkflow(prevTicket, fromApi);
+}
+
+/** Assumir ticket — payload mínimo (só responsável); sem GET /boxes + detalhe bloqueantes. */
+export async function claimTicketResponsavelViaApi(ticketId, agentName) {
+  const apiId = String(ticketId);
+  const entry = findInColumns(apiId);
+  if (!entry) return null;
+
+  assertApiReady('assumir ticket');
+  const prevTicket = entry.ticket;
+  const responsavel = sanitizeResponsavel(agentName);
+  const author = getAgentName() || responsavel;
+
+  deskLog.tickets('claimTicketResponsavelViaApi → PUT', { ticketId: apiId });
+  const apiResponse = await ticketsApi.update(apiId, {
+    responsibleAgent: responsavel,
+    lateralForm: { responsavel },
+    author,
+  });
+
+  const merged = mergePutResponseIntoCachedTicket(prevTicket, apiResponse);
+  syncTicketAfterApiUpdate(apiId, merged);
+  void loadBoxesFromApi().catch(() => {});
+  return merged;
+}
+
 export async function updateTicketViaApi(ticketId, updater) {
   const entry = findInColumns(ticketId);
   if (!entry) return null;
@@ -605,10 +708,12 @@ export async function updateTicketViaApi(ticketId, updater) {
 
   if (useApi && apiId && !isDraftTicket(updated)) {
     assertApiReady('atualizar ticket');
-    await ticketsApi.update(apiId, cockpitTicketToApi(updated));
-    await loadBoxesFromApi();
-    const detailed = await loadTicketDetailFromApi(apiId);
-    return detailed || findInColumns(apiId)?.ticket || updated;
+    const prevTicket = entry.ticket;
+    const apiResponse = await ticketsApi.update(apiId, cockpitTicketToApi(updated));
+    const merged = mergePutResponseIntoCachedTicket(prevTicket, apiResponse);
+    syncTicketAfterApiUpdate(apiId, merged);
+    void loadBoxesFromApi().catch(() => {});
+    return merged;
   }
 
   entry.box.tickets[entry.index] = updated;

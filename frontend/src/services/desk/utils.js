@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.18.0 | DATE: 2026-08-18
- * — formatters de data/hora em America/Sao_Paulo
+ * VERSION: v3.19.0 | DATE: 2026-08-19
+ * — fallback de texto quando extractEmailReplyContent esvazia bolha
  */
 import {
   formatDateBr,
@@ -1545,11 +1545,12 @@ export function buildRegistroThread(ticket) {
       : (m.author || getAgentName());
     const rawText = String(m.text || m.message || '').trim();
     const looksLikeEmailReply = /escreveu:|wrote:|Original Message|^\s*>/m.test(rawText);
-    const text = normalizeMessageDisplayText(
-      isClient && looksLikeEmailReply
-        ? extractEmailReplyContent(rawText)
-        : rawText,
-    );
+    let parsedText = rawText;
+    if (isClient && looksLikeEmailReply) {
+      const extracted = extractEmailReplyContent(rawText);
+      parsedText = extracted || rawText;
+    }
+    const text = normalizeMessageDisplayText(parsedText);
     return {
       id: m.id,
       type: bubbleType,

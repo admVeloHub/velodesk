@@ -1,10 +1,11 @@
 /**
- * DeskRightPanel v1.12.5 — tabulação motivo/detalhe para Processos
- * VERSION: v1.12.5 | DATE: 2026-08-19
+ * DeskRightPanel v1.12.7 — RA: produto e motivo visíveis; motivo do órgão
+ * VERSION: v1.12.7 | DATE: 2026-08-19
  */
-import React, { useMemo, useState } from 'react';
-import { DEFAULT_TIPO, hasApplyableTabulation, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
+import React, { useEffect, useMemo, useState } from 'react';
+import { DEFAULT_TIPO, TABULACAO_OPCOES_CATEGORIAS, hasApplyableTabulation, isReclameAquiCanal, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
 import { useTabulation } from '../../../context/TabulationContext';
+import { tabulationApi } from '../../../api/client';
 import { DeskStatusCommitButton } from './DeskComposePanel';
 import ProcessosPopover from './ProcessosPopover';
 import { DESK_THERMOMETER_UI_ENABLED } from '../../../services/desk/constants';
@@ -85,10 +86,37 @@ export default function DeskRightPanel({
     [rightFields, ticket],
   );
 
-  const motivoOptions = effectiveRightFields.produto ? getMotivos(effectiveRightFields.produto) : [];
-  const detalheOptions = effectiveRightFields.produto && effectiveRightFields.motivo
+  const canalValue = String(effectiveRightFields.canal || '').toLowerCase();
+  const skipTreeMotivo = isReclameAquiCanal(canalValue);
+  const [orgaoMotivos, setOrgaoMotivos] = useState([]);
+
+  useEffect(() => {
+    if (!skipTreeMotivo) {
+      setOrgaoMotivos([]);
+      return undefined;
+    }
+    let cancelled = false;
+    tabulationApi.getOpcoes(TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI, false)
+      .then((doc) => {
+        if (cancelled) return;
+        const list = (doc?.opcoes || [])
+          .filter((item) => item.ativo !== false)
+          .map((item) => item.valor)
+          .filter(Boolean);
+        setOrgaoMotivos(list);
+      })
+      .catch(() => {
+        if (!cancelled) setOrgaoMotivos([]);
+      });
+    return () => { cancelled = true; };
+  }, [skipTreeMotivo]);
+
+  const treeMotivoOptions = effectiveRightFields.produto ? getMotivos(effectiveRightFields.produto) : [];
+  const motivoOptions = skipTreeMotivo ? orgaoMotivos : treeMotivoOptions;
+  const detalheOptions = !skipTreeMotivo && effectiveRightFields.produto && effectiveRightFields.motivo
     ? getDetalhes(effectiveRightFields.produto, effectiveRightFields.motivo)
     : [];
+  const showMotivo = skipTreeMotivo || (Boolean(effectiveRightFields.produto) && motivoOptions.length > 0);
 
   const tabulationComplete = isTabulationComplete(effectiveRightFields, config);
   const showIaTabulationPanel = !tabulationComplete && iaShowSection;
@@ -159,19 +187,23 @@ export default function DeskRightPanel({
             readonly={tabulationReadonly}
             onFieldChange={onFieldChange}
           />
-          {effectiveRightFields.produto && motivoOptions.length > 0 && (
+          {showMotivo ? (
             <SelectField
               id="selMotivo"
               label="Motivo"
               fieldKey="motivo"
               value={effectiveRightFields.motivo}
-              options={motivoOptions}
+              options={
+                effectiveRightFields.motivo && !motivoOptions.includes(effectiveRightFields.motivo)
+                  ? [effectiveRightFields.motivo, ...motivoOptions]
+                  : motivoOptions
+              }
               showPlaceholder
               readonly={tabulationReadonly}
               onFieldChange={onFieldChange}
             />
-          )}
-          {effectiveRightFields.motivo && detalheOptions.length > 0 && (
+          ) : null}
+          {effectiveRightFields.motivo && detalheOptions.length > 0 && !skipTreeMotivo && (
             <SelectField
               id="selDetalhe"
               label="Detalhe"

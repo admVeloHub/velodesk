@@ -1,4 +1,4 @@
-/** tickets.routes v1.22.0 — claim de responsável (Assumir Ticket) com permissão dedicada */
+/** tickets.routes v1.24.0 — reconcilia scanStatus pending com GCS ao carregar ticket */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -28,6 +28,7 @@ import {
 import { TabulacaoValidationError } from '../services/tabulation.service';
 import { notifyAgentReplyAsync, notifyChamadoCreatedAsync } from '../services/emailNotification.service';
 import { publishTicketEvent } from '../services/realtime/ticketEventsBroadcast.service';
+import { reconcileChamadoAttachmentScanStatuses } from '../services/attachmentScanReconcile.service';
 import { getCachedBoxes } from '../services/boxesCache.service';
 import { runInboundAgentPipeline, runInboundPostCreateHooks } from '../services/agents/inboundAgentPipeline.service';
 import {
@@ -152,7 +153,10 @@ router.post('/:sourceId/merge-into/:targetId', authMiddleware, async (req, res: 
 });
 
 router.get('/:id', authMiddleware, async (req, res: Response) => {
-  const chamado = await ChamadoN1.findById(req.params.id);
+  let chamado = await ChamadoN1.findById(req.params.id);
+  if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
+  await reconcileChamadoAttachmentScanStatuses(String(chamado._id));
+  chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
   const boxes = await loadBoxes();
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
@@ -612,6 +616,7 @@ router.post('/:id/workflow/start', authMiddleware, async (req, res: Response) =>
       solicitacaoProdutos,
     );
     await chamado.save();
+    void publishTicketEvent(chamado._id.toString(), 'workflow');
     const boxes = await loadBoxes();
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
   } catch (err) {
@@ -636,6 +641,7 @@ router.post('/:id/workflow/team-solicitation', authMiddleware, async (req, res: 
       solicitacaoFinanceiro,
     });
     await chamado.save();
+    void publishTicketEvent(chamado._id.toString(), 'workflow');
     const boxes = await loadBoxes();
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
   } catch (err) {
@@ -660,6 +666,7 @@ router.post('/:id/workflow/advance', authMiddleware, async (req, res: Response) 
       await advanceWorkflowManual(chamado, req.user);
     }
     await chamado.save();
+    void publishTicketEvent(chamado._id.toString(), 'workflow');
     const boxes = await loadBoxes();
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
   } catch (err) {
@@ -679,6 +686,7 @@ router.post('/:id/workflow/cancel', authMiddleware, async (req, res: Response) =
     await assertCanInterruptWorkflow(req.user!, chamado);
     await cancelWorkflowForChamado(chamado, req.user, motivo || undefined);
     await chamado.save();
+    void publishTicketEvent(chamado._id.toString(), 'workflow');
     const boxes = await loadBoxes();
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
   } catch (err) {
@@ -700,6 +708,7 @@ router.post('/:id/workflow/comunicacao', authMiddleware, async (req, res: Respon
     applyManualResponsavelClaim(chamado, req.user);
     appendComunicacaoWorkflow(chamado, { mensagem, origem }, req.user);
     await chamado.save();
+    void publishTicketEvent(chamado._id.toString(), 'workflow');
     const boxes = await loadBoxes();
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
   } catch (err) {

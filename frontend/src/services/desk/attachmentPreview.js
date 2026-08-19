@@ -1,6 +1,6 @@
 /**
- * attachmentPreview v1.2.0 — coleta de anexos do ticket para console /workflow
- * VERSION: v1.2.0 | DATE: 2026-08-19
+ * attachmentPreview v1.2.1 — PDF no iframe; xlsx como application/zip
+ * VERSION: v1.2.1 | DATE: 2026-08-19
  */
 
 const OFFICE_MIME = new Set([
@@ -68,6 +68,7 @@ export function classifyAttachmentKind(contentType, filename) {
   if (type.startsWith('audio/')) return 'audio';
   if (type.startsWith('video/')) return 'video';
   if (OFFICE_MIME.has(type)) return 'office';
+  if (type === 'application/zip' && /\.(docx?|xlsx?|pptx?|docm|xlsm|pptm)$/i.test(name)) return 'office';
 
   if (/\.pdf$/i.test(name)) return 'pdf';
   if (/\.(png|jpe?g|gif|webp|bmp)$/i.test(name)) return 'image';
@@ -116,7 +117,7 @@ export async function loadAttachmentForPreview(url, knownContentType = '') {
   const blobType = normalizeMime(rawBlob.type);
   const contentType = headerType || blobType || normalizeMime(knownContentType) || 'application/octet-stream';
   const dispositionName = parseFilenameFromDisposition(response.headers.get('content-disposition'));
-  const filename = attachmentLabelFromUrl(dispositionName || url);
+  const filename = dispositionName || attachmentLabelFromUrl(url);
   const blob = rawBlob.type === contentType
     ? rawBlob
     : new Blob([rawBlob], { type: contentType });

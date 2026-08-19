@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.36.2 | DATE: 2026-08-19
- * — Hidratação cadastro: local primeiro, API só se faltar email/tel; sem loading bloqueante
+ * VERSION: v3.37.0 | DATE: 2026-08-19
+ * — Merge leve preserva thread; abas abertas protegidas no refresh /boxes
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -58,7 +58,12 @@ import {
   sendWhatsAppMessageViaApi,
   sendInternalNote,
 } from '../../services/ticketsStorage';
-import { isDraftTicket, persistDraftTicket } from '../../services/ticketsCache';
+import {
+  isDraftTicket,
+  persistDraftTicket,
+  claimTicketResponsavelViaApi,
+  setMergeProtectedTicketIds,
+} from '../../services/ticketsCache';
 import { apiTicketToCockpit, cockpitTicketToApi } from '../../api/adapters/ticketAdapter';
 import { lookupClient } from '../../services/clientDb';
 import { clientsApi, colaboradoresApi, ticketsApi } from '../../api/client';
@@ -140,13 +145,21 @@ function ticketNeedsDetailLoad(ticket) {
  * (cadastro, workflow, Reclame Aqui/Procon, lateralForm, workflow pendente…), que a resposta
  * leve não recomputa. Spread de `prev` primeiro garante a preservação inclusive do pending workflow.
  */
+function mergeThreadField(prevArr, lightArr) {
+  const prevLen = prevArr?.length || 0;
+  const lightLen = lightArr?.length || 0;
+  if (lightLen >= prevLen && lightLen > 0) return lightArr;
+  if (lightLen === 0 && prevLen > 0) return prevArr;
+  return lightArr ?? prevArr;
+}
+
 function mergeLightThreadIntoTicket(prev, light) {
   if (!light) return prev;
   return {
     ...prev,
-    messages: light.messages ?? prev.messages,
-    internalNotes: light.internalNotes ?? prev.internalNotes,
-    registroHistorico: light.registroHistorico ?? prev.registroHistorico,
+    messages: mergeThreadField(prev.messages, light.messages),
+    internalNotes: mergeThreadField(prev.internalNotes, light.internalNotes),
+    registroHistorico: mergeThreadField(prev.registroHistorico, light.registroHistorico),
     status: light.status ?? prev.status,
     updatedAt: light.updatedAt ?? prev.updatedAt,
     queueEntryAt: light.queueEntryAt ?? prev.queueEntryAt,
@@ -666,6 +679,13 @@ export default function DeskV2Root() {
       unsubscribeTicketEvents();
     };
   }, [activeTabId, patchTicket]);
+
+  // Abas abertas ficam protegidas contra wipe do GET /boxes durante refresh silencioso de filas.
+  useEffect(() => {
+    const ids = openTabs.map((tab) => tab.id).filter(Boolean);
+    if (activeTabId && !ids.includes(activeTabId)) ids.push(activeTabId);
+    setMergeProtectedTicketIds(ids);
+  }, [openTabs, activeTabId]);
 
   // Ticket aberto na aba mas ausente das colunas (ex.: refresh de filas) — reidrata sem fechar a aba.
   useEffect(() => {
@@ -1515,12 +1535,16 @@ export default function DeskV2Root() {
         return;
       }
 
-      const updated = await updateTicketInCache(ticket.id, (t) => applyRightFieldsToTicket(t, next));
+      const updated = await claimTicketResponsavelViaApi(ticket.id, agentName);
       if (!updated) {
         throw new Error('Não foi possível atualizar o ticket.');
       }
 
-      const syncedFields = mergeRightFieldsWithDefaults(next, updated, getAgentName);
+      const syncedFields = mergeRightFieldsWithDefaults(
+        { ...next, responsavel: sanitizeResponsavel(updated.lateralForm?.responsavel || agentName) },
+        updated,
+        getAgentName,
+      );
       setRightFields(syncedFields);
       if (activeTabId) {
         const sessionKey = String(activeTabId);

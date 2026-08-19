@@ -1,6 +1,6 @@
 /**
- * ticketsStorage v1.4.1 — mapTicketQueueId prioriza box físico (evita contagem errada em resolvidos)
- * VERSION: v1.4.1 | DATE: 2026-08-07
+ * ticketsStorage v1.4.2 — claimTicketResponsavelViaApi para assumir ticket rápido
+ * VERSION: v1.4.2 | DATE: 2026-08-19
  */
 import {
   getCachedColumns,
@@ -131,6 +131,7 @@ export {
   createDraftTicketInCache,
   persistDraftTicket,
   isDraftTicket,
+  claimTicketResponsavelViaApi,
 };
 
 export { loadTicketDetailFromApi, patchTicketInCache } from './ticketsCache';

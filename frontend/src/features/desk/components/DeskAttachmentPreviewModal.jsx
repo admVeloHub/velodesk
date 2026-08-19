@@ -1,6 +1,6 @@
 /**
- * DeskAttachmentPreviewModal v1.0.1 — preview no Desk (imagem, áudio, vídeo, PDF)
- * VERSION: v1.0.1 | DATE: 2026-08-14
+ * DeskAttachmentPreviewModal v1.1.0 — preview no Desk (imagem, áudio, vídeo, PDF)
+ * VERSION: v1.1.0 | DATE: 2026-08-19
  */
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -34,6 +34,10 @@ export default function DeskAttachmentPreviewModal({
 
   const handleDownload = () => {
     downloadObjectUrl(objectUrl, title);
+  };
+
+  const handleOpenInNewTab = () => {
+    window.open(objectUrl, '_blank', 'noopener,noreferrer');
   };
 
   return createPortal(
@@ -81,16 +85,20 @@ export default function DeskAttachmentPreviewModal({
             </video>
           ) : null}
           {kind === 'pdf' ? (
-            <object
-              className="desk-attachment-preview__pdf"
-              data={objectUrl}
-              type="application/pdf"
-              aria-label={title}
-            >
+            <>
+              <iframe
+                className="desk-attachment-preview__pdf"
+                src={objectUrl}
+                title={title}
+              />
               <p className="desk-attachment-preview__fallback">
-                Seu navegador não conseguiu exibir este PDF. Use Baixar.
+                Se o PDF não aparecer,{' '}
+                <button type="button" className="desk-attachment-preview__inline-link" onClick={handleOpenInNewTab}>
+                  abra em nova aba
+                </button>
+                {' '}ou use Baixar.
               </p>
-            </object>
+            </>
           ) : null}
           {kind === 'office' ? (
             <div className="desk-attachment-preview__office">

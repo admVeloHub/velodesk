@@ -1,6 +1,6 @@
 /**
- * workflowDecisionHandlers v2.3.0 — comunicacaoResumo + Respondidos WS360
- * VERSION: v2.3.0 | DATE: 2026-08-06
+ * workflowDecisionHandlers v2.4.0 — createWorkflowInfoRequest + detalhe workflow no cache
+ * VERSION: v2.4.0 | DATE: 2026-08-19
  */
 import { ticketsApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
@@ -14,11 +14,14 @@ import {
 import {
   applySendStatus,
   getAgentName,
+  getTicketProtocolLabel,
+  getWorkflowProgress,
 } from '../desk/utils';
 import {
   buildProdutosConclusaoClientMessage,
 } from '../cadastral/solicitacoesProdutosData';
 import { markSolicitacaoFeita } from '../cadastral/cadastralRequestStore';
+import { createWorkflowInfoRequest } from './workflowInfoNotifications';
 import deskLog from '../../utils/deskDebugLog';
 
 async function persistTicketFromApi(ticketId, apiTicket) {
@@ -145,11 +148,34 @@ export async function requestWorkflowInfo(ticketId, message = '', origem = 'work
   const texto = String(message || '').trim();
   if (!texto) throw new Error('Mensagem obrigatória');
   deskLog.workflow('comunicacao → API', { ticketId, origem });
+  const prevEntry = findTicketEntry(ticketId);
+  const prevTicket = prevEntry?.ticket;
   const apiTicket = await ticketsApi.postWorkflowComunicacao(ticketId, {
     mensagem: texto,
     origem,
   });
   const full = await persistTicketFromApi(ticketId, apiTicket);
+  if (
+    origem === 'workflow'
+    && full?.workflow?.requisicao?.comunicacaoPendente === true
+  ) {
+    const progress = getWorkflowProgress(full);
+    createWorkflowInfoRequest({
+      ticketId: String(ticketId),
+      clientName: full.clientName || prevTicket?.clientName || 'Cliente',
+      ticketSubject: full.title || prevTicket?.title || '',
+      message: texto,
+      requestedBy: getAgentName() || 'Operador Workflow',
+      targetAgent: full.responsibleAgent || full.lateralForm?.responsavel || prevTicket?.lateralForm?.responsavel || '',
+      stepLabel: progress?.activeStep?.passo?.nome || progress?.activeStep?.nome || 'Aprovação',
+      protocol: getTicketProtocolLabel(full) || getTicketProtocolLabel(prevTicket) || '',
+    });
+    try {
+      window.dispatchEvent(new CustomEvent('velodesk:workflow-info-changed'));
+    } catch {
+      /* ignore */
+    }
+  }
   deskLog.workflow('comunicacao → ok', {
     ticketId,
     mensagens: full?.workflow?.requisicao?.comunicacaoWorkflow?.length || 0,

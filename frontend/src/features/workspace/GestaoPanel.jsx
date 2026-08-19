@@ -1,8 +1,7 @@
 /**
  * Painel 360° — Gestão
- * VERSION: v3.8.0 | DATE: 2026-08-18
- * — GET /gestao-insights/painel unificado para cards analíticos (P3)
- * — voz-cliente congelado (em desenvolvimento)
+ * VERSION: v3.9.0 | DATE: 2026-08-19
+ * — Render progressivo: shell imediato, KPIs/API preenchem sem bloquear tela inteira
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -43,9 +42,10 @@ export default function GestaoPanel() {
 
   const view = useMemo(() => {
     if (data) return buildSupervisor360View(data);
-    if (!loading) return computeSupervisor360View();
-    return null;
-  }, [data, loading]);
+    return computeSupervisor360View();
+  }, [data]);
+
+  const apiKpisLoading = loading && !data;
 
   const escalatedListGroups = useMemo(() => {
     if (!view?.escalated?.groups) return [];
@@ -77,10 +77,6 @@ export default function GestaoPanel() {
     showNotification('Redirecionamento concluído', 'success');
   }, [refreshTickets, refresh, showNotification]);
 
-  if (loading && !view) {
-    return <div className="ws-super-desk"><p className="ws360-loading">Carregando painel…</p></div>;
-  }
-
   if (!view) return null;
 
   const d = view.kpis;
@@ -90,6 +86,11 @@ export default function GestaoPanel() {
       {error ? (
         <p className="ws360-error ws360-error--inline" role="status">
           API indisponível — exibindo dados locais da fila.
+        </p>
+      ) : null}
+      {apiKpisLoading ? (
+        <p className="ws360-loading ws360-loading--inline" role="status">
+          Atualizando indicadores do painel…
         </p>
       ) : null}
       <div className="gestao-actions-bar">

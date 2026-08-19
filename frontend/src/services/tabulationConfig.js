@@ -1,6 +1,6 @@
 /**
- * tabulationConfig v1.10.0 — categorias de motivo por órgão
- * VERSION: v1.10.0 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
+ * tabulationConfig v1.10.2 — RA: produto e motivo na sidebar; motivo do órgão
+ * VERSION: v1.10.2 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
  */
 
 /** Rótulos de visão/perfil e termos genéricos nunca representam atribuição real. */
@@ -64,6 +64,11 @@ export const FALLBACK_TIPO_OPTIONS = ['Reclamação', 'Solicitação', 'Dúvida'
 export const FALLBACK_CANAL_OPTIONS = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
 
 export const DEFAULT_TIPO = 'Solicitação';
+
+export function isReclameAquiCanal(canal) {
+  const raw = String(canal ?? '').trim().toLowerCase();
+  return raw.includes('reclame') && raw.includes('aqui');
+}
 
 export function getActiveProdutos(config) {
   return (config?.produtos || []).filter((p) => p.ativo !== false);
@@ -180,9 +185,16 @@ function hasSavedTabulationValue(value) {
 
 export function buildDefaultRightFields(_config, ticket, getAgentName) {
   const lf = ticket?.lateralForm || {};
+  const canal = lf.canal || ticket?.channel || 'Portal';
+  const skipTreeMotivo = isReclameAquiCanal(canal);
   const produto = hasSavedTabulationValue(lf.produto) ? String(lf.produto).trim() : '';
-  const motivo = produto && hasSavedTabulationValue(lf.motivo) ? String(lf.motivo).trim() : '';
-  const detalhe = motivo && hasSavedTabulationValue(lf.detalhe) ? String(lf.detalhe).trim() : '';
+  const savedMotivo = String(lf.motivo || lf.reclameAqui?.motivo || '').trim();
+  const motivo = (skipTreeMotivo || produto) && hasSavedTabulationValue(savedMotivo)
+    ? savedMotivo
+    : '';
+  const detalhe = !skipTreeMotivo && motivo && hasSavedTabulationValue(lf.detalhe)
+    ? String(lf.detalhe).trim()
+    : '';
   const tipo = String(lf.classificacaoTipo || lf.tipoChamado || DEFAULT_TIPO).trim() || DEFAULT_TIPO;
   // Sem fallback para agente logado: só preenche se houver atribuição real (roleta/manual)
   const responsavel = sanitizeResponsavel(lf.responsavel) || sanitizeResponsavel(ticket?.responsibleAgent);
@@ -226,11 +238,13 @@ export function resolveEffectiveTabulationFields(rightFields, ticket, getAgentNa
 
 export function applyCascadeFieldChange(prev, key, value) {
   const next = { ...prev, [key]: value };
-  if (key === 'produto') {
+  const canal = String((key === 'canal' ? value : prev?.canal) || '').toLowerCase();
+  const skipTreeMotivo = isReclameAquiCanal(canal);
+  if (key === 'produto' && !skipTreeMotivo) {
     next.motivo = '';
     next.detalhe = '';
   }
-  if (key === 'motivo') {
+  if (key === 'motivo' && !skipTreeMotivo) {
     next.detalhe = '';
   }
   return next;
@@ -359,11 +373,13 @@ export function validateTabulationForSendStatus(statusId, rightFields, config) {
   const motivo = String(rightFields?.motivo ?? '').trim();
   const detalhe = String(rightFields?.detalhe ?? '').trim();
   const tipo = String(rightFields?.tipo ?? rightFields?.classificacaoTipo ?? rightFields?.tipoChamado ?? DEFAULT_TIPO).trim() || DEFAULT_TIPO;
+  const canal = String(rightFields?.canal ?? '').trim().toLowerCase();
+  const skipTreeMotivo = isReclameAquiCanal(canal);
 
   if (!produto) missing.push('Produto');
   if (!tipo) missing.push('Tipo');
 
-  if (produto) {
+  if (produto && !skipTreeMotivo) {
     const motivos = getMotivos(config, produto);
     if (motivos.length > 0 && !motivo) missing.push('Motivo');
     if (motivo) {

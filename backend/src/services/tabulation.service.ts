@@ -1,4 +1,4 @@
-/** tabulation.service v1.5.0 — responsável é atribuição, não tabulação */
+/** tabulation.service v1.5.1 — RA não exige motivo/detalhe da árvore produto */
 import type { ITabulacao } from '../models/ChamadoN1';
 import type { ITabulacaoDetalhe, ITabulacaoMotivo, ITabulacaoProduto } from '../models/TabulacaoProduto';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
@@ -180,11 +180,13 @@ export async function assertTabulacaoForStatus(tab: ITabulacao | undefined, stat
   const tipo = String(tab?.tipoChamado ?? '').trim();
   const motivo = String(tab?.motivo ?? '').trim();
   const detalhe = String(tab?.detalhe ?? '').trim();
+  const canal = String(tab?.canal ?? '').trim().toLowerCase();
+  const skipTreeMotivo = canal.includes('reclame') && canal.includes('aqui');
 
   if (!produto) missing.push('Produto');
   if (!tipo) missing.push('Tipo');
 
-  if (produto) {
+  if (produto && !skipTreeMotivo) {
     const config = await getActiveTabulation();
     const motivos = activeMotivos(config, produto);
     if (motivos.length > 0 && !motivo) missing.push('Motivo');

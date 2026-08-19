@@ -1,5 +1,5 @@
 /**
- * RaTicketSide v1.1.0 — sidebar RA sem workflow
+ * RaTicketSide v1.2.0 — produto da tabulação; motivo do órgão
  */
 import React from 'react';
 import { getStatusLabel } from '../../../services/especiais/reclameAquiData';
@@ -51,6 +51,10 @@ export default function RaTicketSide({
             <div>
               <dt>Data da reclamação</dt>
               <dd>{formatComplaintDate(raItem.dataReclamacao)}</dd>
+            </div>
+            <div>
+              <dt>Produto</dt>
+              <dd>{raItem.produto || ticket?.lateralForm?.produto || '—'}</dd>
             </div>
             <div>
               <dt>Motivo</dt>

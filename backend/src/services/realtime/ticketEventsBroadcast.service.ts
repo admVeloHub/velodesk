@@ -1,10 +1,6 @@
 /**
- * ticketEventsBroadcast.service v1.0.0 — publica "ping" de mudança de ticket no Supabase Realtime.
- *
- * Estritamente aditivo e seguro: se PRESENCE_REALTIME_URL/PRESENCE_REALTIME_ANON_KEY não estiverem
- * configurados, é NO-OP e nada muda (o polling leve continua sendo o mecanismo confiável).
- * O payload carrega apenas { ticketId, type } — sem conteúdo sensível — em canal broadcast público,
- * então não depende de políticas RLS específicas do projeto Supabase.
+ * ticketEventsBroadcast.service v1.1.0 — tipo workflow para mutações de aprovação
+ * VERSION: v1.1.0 | DATE: 2026-08-19
  */
 import { env } from '../../config/env';
 
@@ -20,7 +16,8 @@ export type TicketEventType =
   | 'whatsapp-outbound'
   | 'message'
   | 'commit'
-  | 'status';
+  | 'status'
+  | 'workflow';
 
 /**
  * Dispara um evento de mudança de ticket. Fire-and-forget: nunca lança nem bloqueia o fluxo do

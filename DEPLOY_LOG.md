@@ -1,10 +1,31 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.88.0 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.89.0 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — performance Desk, anexos (reconcile/preview) e propagação workflow
+
+- **Data/Hora**: 2026-08-19
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.89.0
+  - **Backend**: tickets.routes v1.24.0, attachmentScanReconcile v1.0.0, chamado.mapper v2.12.2, ticketEventsBroadcast.service v1.1.0, permission.service v1.10.0, gestaoInsightsPainel.service v1.1.0
+  - **Frontend**: ticketsCache v1.16.0, DeskV2Root v3.37.0, DeskAttachmentPreviewModal v1.1.0, attachmentPreview v1.2.1, desk/utils v3.19.0, dateTimeBr v1.0.1, WorkflowApprovalShell v1.9.0, workflowDecisionHandlers v2.4.0, GestaoPanel v3.9.0, useWorkspace360 v1.3.0, TicketsContext v1.8.3, velodesk-crm.css
+- **Arquivos principais**:
+  - Anexos: reconcile `pending`→`clean` ao carregar ticket (GCS já promoveu); alinhamento scanStatus por storageKey; PDF no iframe (sem download fantasma); texto Office simplificado
+  - Race conditions: proteção in-flight + abas abertas no merge `/boxes`; serialização de `loadTicketDetailFromApi` por ticket; merge leve preserva thread; fallback bolha vazia em parse de e-mail
+  - Workflow: `publishTicketEvent('workflow')` nas mutações; polling 25s + Realtime no painel de aprovação; `createWorkflowInfoRequest` no pedido de informação
+  - Performance 360: render progressivo GestaoPanel; hook workspace360 aguarda permissões; cache TTL insights (45s) e permissões por userId (30s); coalesce refreshTickets
+  - Fix crash `dateTimeBr` (`year: false`); assumir ticket sem reload bloqueante
+- **Descrição**: Corrige “Verificando…” preso, preview PDF com download indesejado, lentidão heterogênea, bolhas vazias e fila workflow desatualizada sem alterar contratos de API ou schemas MongoDB.
+- **Status**: Push dev
+
+---
 
 ### GitHub Push — source file POPs no container, hidratação cadastro e Consulta Operacional prod
 

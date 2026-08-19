@@ -1,14 +1,14 @@
 /**
- * ReclameAquiRegistroPage v1.1.0 — ID editável, motivos do órgão, sem workflow
- * VERSION: v1.1.0 | DATE: 2026-08-19
+ * ReclameAquiRegistroPage v1.2.0 — produto da tabulação Desk; motivo do órgão
+ * VERSION: v1.2.0 | DATE: 2026-08-19
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useNotifications } from '../../../context/NotificationContext';
 import { tabulationApi } from '../../../api/client';
+import { useTabulation } from '../../../context/TabulationContext';
 import { TABULACAO_OPCOES_CATEGORIAS } from '../../../services/tabulationConfig';
 import {
-  RA_PRODUTOS,
   RA_TIPOS,
   formatSlaRestante,
   getStatusLabel,
@@ -53,7 +53,9 @@ export default function ReclameAquiRegistroPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showNotification } = useNotifications();
+  const { getProdutoNames } = useTabulation();
   const isNew = !id;
+  const produtoOptions = getProdutoNames();
 
   const initial = useMemo(() => {
     if (isNew) return createEmptyReclamacao();
@@ -225,9 +227,13 @@ export default function ReclameAquiRegistroPage() {
                     value={form.produto}
                     onChange={(e) => updateField('produto', e.target.value)}
                   >
-                    {RA_PRODUTOS.map((p) => (
+                    <option value="">Selecione...</option>
+                    {produtoOptions.map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
+                    {form.produto && !produtoOptions.includes(form.produto) ? (
+                      <option value={form.produto}>{form.produto}</option>
+                    ) : null}
                   </select>
                 </div>
                 <div className="ra-registro__field">
