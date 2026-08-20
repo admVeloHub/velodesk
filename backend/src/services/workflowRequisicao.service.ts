@@ -87,55 +87,6 @@ export function buildRequisicaoSnapshot(
   return snapshot;
 }
 
-export function mergeTeamSolicitationIntoChamado(
-  chamado: IChamadoN1,
-  payload: {
-    team: 'produtos' | 'financeiro';
-    solicitacaoProdutos?: Record<string, unknown>;
-    solicitacaoFinanceiro?: Record<string, unknown>;
-  },
-  authUser?: AuthPayload | null,
-): void {
-  if (!chamado.workflow?.active) {
-    throw new WorkflowRequisicaoError('Ticket sem workflow ativo', 400);
-  }
-
-  const team = String(payload.team || '').trim().toLowerCase();
-  if (team !== 'produtos' && team !== 'financeiro') {
-    throw new WorkflowRequisicaoError('Time inválido', 400);
-  }
-
-  const solicitacaoProdutos = payload.solicitacaoProdutos;
-  const solicitacaoFinanceiro = payload.solicitacaoFinanceiro;
-
-  if (team === 'produtos' && (!solicitacaoProdutos || !Object.keys(solicitacaoProdutos).length)) {
-    throw new WorkflowRequisicaoError('solicitacaoProdutos obrigatória para time produtos', 400);
-  }
-  if (team === 'financeiro' && (!solicitacaoFinanceiro || !Object.keys(solicitacaoFinanceiro).length)) {
-    throw new WorkflowRequisicaoError('solicitacaoFinanceiro obrigatória para time financeiro', 400);
-  }
-
-  const prev = chamado.workflow.requisicao;
-  const autor = authUser?.name || authUser?.email || 'Agente';
-
-  chamado.workflow.requisicao = {
-    preenchidaEm: new Date(),
-    preenchidaPor: autor,
-    valores: prev?.valores || {},
-    comunicacaoWorkflow: prev?.comunicacaoWorkflow || [],
-    comunicacaoResumo: prev?.comunicacaoResumo,
-    solicitacaoProdutos: team === 'produtos'
-      ? solicitacaoProdutos
-      : prev?.solicitacaoProdutos,
-    solicitacaoFinanceiro: team === 'financeiro'
-      ? solicitacaoFinanceiro
-      : prev?.solicitacaoFinanceiro,
-  };
-
-  chamado.markModified('workflow');
-  chamado.markModified('workflow.requisicao');
-}
-
 export function applyRequisicaoToChamado(
   chamado: IChamadoN1,
   snapshot: IChamadoWorkflowRequisicao | null,

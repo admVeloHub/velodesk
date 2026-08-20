@@ -46,12 +46,17 @@ export function getStatusLabel(statusGov) {
 }
 
 export const CG_PRODUTOS = [
-  'Empréstimo',
-  'Financeiro',
-  'Fibra residencial',
-  'Internet Fibra',
-  'Combo',
-  'Telefone',
+  'Antecipação 2026',
+  'Emprestimo Pessoal',
+  'Antecipação do Salário',
+  'Conta Velotax',
+  'Conta Celcoin',
+  'Calculadora',
+  'Cupons',
+  'Seguros',
+  'Quero Quitar',
+  'Sem Contato',
+  'Indique e Ganhe',
 ];
 
 export const CG_TIPOS = [
@@ -62,13 +67,41 @@ export const CG_TIPOS = [
 ];
 
 export const CG_MOTIVOS = [
-  'Cobrança indevida',
-  'Cancelamento',
-  'Produto/serviço',
-  'Atendimento',
-  'Prazo de resposta',
-  'Publicidade enganosa',
-  'Outros',
+  'Abatimento de Juros',
+  'Alega Fraude',
+  'Alteração cadastral',
+  'Cancelamento até 7 dias',
+  'Cancelamento sup. 7 dias',
+  'Desativado',
+  'Dívida Prescrita',
+  'Dúvidas Gerais',
+  'Em cobrança',
+  'Encerramento conta App',
+  'Encerramento conta Celcoin',
+  'Erro app',
+  'Erro Gov',
+  'Juros Abusivo',
+  'Liberação chave pix',
+  'Limite baixo do pix',
+  'Não Elegível a crédito',
+  'Portabilidade Pix',
+  'Quitação automática sem chave pix',
+  'Quitação do contrato',
+  'Reativação cadastral',
+  'Valor mínimo para contratação',
+];
+
+/** Produtos do card "Classificação" no sidebar do ticket — ordem alfabética. */
+export const CG_CLASSIFICACAO_PRODUTOS = [
+  'Antecipação 2026',
+  'Antecipação outros anos',
+  'Calculadora',
+  'Conta Celcoin',
+  'Conta Velotax',
+  'Cupons',
+  'Emprestimo Pessoal',
+  'Indique e Ganhe',
+  'Seguros',
 ];
 
 export const CG_ORGAOS = [

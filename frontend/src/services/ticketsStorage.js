@@ -15,6 +15,7 @@ import {
   persistDraftTicket,
   isDraftTicket,
   isApiMode,
+  claimTicketResponsavelViaApi,
 } from './ticketsCache';
 import { apiTicketToCockpit } from '../api/adapters/ticketAdapter';
 

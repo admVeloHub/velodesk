@@ -37,6 +37,7 @@ export default function EspeciaisDeskTicketView({
   onInternalTextChange,
   composeAttachments = [],
   onComposeAttachmentsChange,
+  extraTab,
 }) {
   const { showNotification } = useNotifications();
   const [mainTab, setMainTab] = useState('conversa');
@@ -116,6 +117,15 @@ export default function EspeciaisDeskTicketView({
             >
               <i className="ti ti-search" /> Consultas
             </button>
+            {extraTab ? (
+              <button
+                type="button"
+                className={'tab-btn' + (mainTab === extraTab.id ? ' is-active' : '')}
+                onClick={() => setMainTab(extraTab.id)}
+              >
+                <i className={extraTab.icon || 'ti ti-shield-check'} /> {extraTab.label}
+              </button>
+            ) : null}
           </div>
           <div className="tabs-top__status-group">
             <TicketFusaoStatusControls ticket={ticket} />
@@ -158,10 +168,11 @@ export default function EspeciaisDeskTicketView({
                 + (mainTab === 'notas' ? ' tab-panel--notes' : '')
                 + (mainTab === 'eventos' ? ' tab-panel--eventos' : '')
                 + (mainTab === 'consultas' ? ' tab-panel--consultas' : '')
+                + (extraTab && mainTab === extraTab.id ? ' tab-panel--extra' : '')
               }
               data-panel={mainTab}
             >
-              {mainTab === 'conversa' ? (
+              {extraTab && mainTab === extraTab.id ? extraTab.content : mainTab === 'conversa' ? (
                 <>
                   {channelConfig?.deadlineLabel ? (
                     <div className="especiais-deadline-callout" role="status">

@@ -34,7 +34,6 @@ import { runInboundAgentPipeline, runInboundPostCreateHooks } from '../services/
 import {
   advanceWorkflowManual,
   advanceWorkflowWithDecision,
-  attachTeamSolicitationToChamado,
   cancelWorkflowForChamado,
   finishWorkflowAfterPublicReply,
   setWorkflowPendingDecision,
@@ -615,31 +614,6 @@ router.post('/:id/workflow/start', authMiddleware, async (req, res: Response) =>
       definicaoSlug,
       solicitacaoProdutos,
     );
-    await chamado.save();
-    void publishTicketEvent(chamado._id.toString(), 'workflow');
-    const boxes = await loadBoxes();
-    res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
-  } catch (err) {
-    if (handleTicketMutationError(err, res)) return;
-    throw err;
-  }
-});
-
-router.post('/:id/workflow/team-solicitation', authMiddleware, async (req, res: Response) => {
-  const chamado = await ChamadoN1.findById(req.params.id);
-  if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
-
-  try {
-    assertChamadoModifiable(chamado);
-    await assertCanActOnTicket(req.user!, chamado);
-    const team = String(req.body?.team || '').trim().toLowerCase();
-    const solicitacaoProdutos = req.body?.solicitacaoProdutos as Record<string, unknown> | undefined;
-    const solicitacaoFinanceiro = req.body?.solicitacaoFinanceiro as Record<string, unknown> | undefined;
-    await attachTeamSolicitationToChamado(chamado, req.user, {
-      team: team as 'produtos' | 'financeiro',
-      solicitacaoProdutos,
-      solicitacaoFinanceiro,
-    });
     await chamado.save();
     void publishTicketEvent(chamado._id.toString(), 'workflow');
     const boxes = await loadBoxes();

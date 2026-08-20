@@ -1,10 +1,12 @@
 /**
- * RaTicketSide v1.2.0 — produto da tabulação; motivo do órgão
+ * RaTicketSide — sidebar direita do ticket RA
  */
 import React from 'react';
 import { getStatusLabel } from '../../../services/especiais/reclameAquiData';
 import { formatRaDeadlineLabel } from '../../../services/especiais/reclameAquiTicketService';
 import { formatComplaintDate } from './raTicketFormatters';
+import RaClassificacaoFields from './RaClassificacaoFields';
+import RaNotaContatoCard from './RaNotaContatoCard';
 import EspeciaisTicketSideFooter from '../shared/EspeciaisTicketSideFooter';
 
 export default function RaTicketSide({
@@ -13,18 +15,16 @@ export default function RaTicketSide({
   waChatOpen = false,
   onOpenChat,
   onCloseChat,
-  onTicketUpdated,
   onSave,
   onFinalize,
   saving = false,
   disabled = false,
   finalized = false,
+  onRaItemUpdated,
 }) {
   if (!raItem) return null;
 
-  const protocoloDisplay = raItem.idReclamacaoRa || raItem.protocoloRa
-    ? `#${raItem.idReclamacaoRa || raItem.protocoloRa}`
-    : '—';
+  const idReclamacaoDisplay = raItem.idReclamacaoRa || '—';
   const deadlineLabel = formatRaDeadlineLabel(raItem.prazoRa);
 
   return (
@@ -37,12 +37,20 @@ export default function RaTicketSide({
           </span>
           <dl>
             <div>
-              <dt>Protocolo RA</dt>
-              <dd>{protocoloDisplay}</dd>
+              <dt>ID Reclame Aqui</dt>
+              <dd>{idReclamacaoDisplay}</dd>
             </div>
             <div>
               <dt>Assunto</dt>
               <dd>{raItem.assunto || '—'}</dd>
+            </div>
+            <div>
+              <dt>Produto</dt>
+              <dd>{raItem.produto || '—'}</dd>
+            </div>
+            <div>
+              <dt>Motivo</dt>
+              <dd>{raItem.motivo || '—'}</dd>
             </div>
             <div>
               <dt>Prazo de resposta</dt>
@@ -52,16 +60,24 @@ export default function RaTicketSide({
               <dt>Data da reclamação</dt>
               <dd>{formatComplaintDate(raItem.dataReclamacao)}</dd>
             </div>
-            <div>
-              <dt>Produto</dt>
-              <dd>{raItem.produto || ticket?.lateralForm?.produto || '—'}</dd>
-            </div>
-            <div>
-              <dt>Motivo</dt>
-              <dd>{raItem.motivo || '—'}</dd>
-            </div>
+            {raItem.workflowAtivo ? (
+              <div>
+                <dt>Workflow</dt>
+                <dd>{raItem.workflow || 'Tratativa RA'}</dd>
+              </div>
+            ) : null}
           </dl>
         </section>
+
+        <RaClassificacaoFields
+          raItem={raItem}
+          onSaved={onRaItemUpdated}
+        />
+
+        <RaNotaContatoCard
+          raItem={raItem}
+          onSaved={onRaItemUpdated}
+        />
 
         <EspeciaisTicketSideFooter
           waChatOpen={waChatOpen}

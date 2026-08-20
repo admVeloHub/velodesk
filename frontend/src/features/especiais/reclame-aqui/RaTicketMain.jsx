@@ -3,6 +3,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import EspeciaisDeskTicketView from '../shared/EspeciaisDeskTicketView';
+import RaModeracaoPanel from './RaModeracaoPanel';
 import { mapChannelStatusToBadgeClass } from '../shared/especiaisStatusBadge';
 import { useNotifications } from '../../../context/NotificationContext';
 import { lookupClient } from '../../../services/clientDb';
@@ -23,6 +24,7 @@ export default function RaTicketMain({
   waComposeText = '',
   onWaComposeTextChange,
   onTicketUpdated,
+  onModeracaoSaved,
   composeMode,
   onComposeModeChange,
   composeText,
@@ -101,12 +103,20 @@ export default function RaTicketMain({
     );
   }
 
+  const moderacaoTab = {
+    id: 'moderacao',
+    label: 'Moderação',
+    icon: 'ti ti-shield-check',
+    content: <RaModeracaoPanel raItem={raItem} onSaved={onModeracaoSaved} />,
+  };
+
   return (
     <EspeciaisDeskTicketView
       ticket={ticket}
       client={client}
       ticketId={raItem?.ticketId}
       channelConfig={channelConfig}
+      extraTab={moderacaoTab}
       emptyMessage="Selecione uma reclamação na lista ao lado"
       waChatOpen={waChatOpen}
       waComposeText={waComposeText}

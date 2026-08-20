@@ -11,6 +11,7 @@ import {
   upsertFromChamado,
 } from '../reclamacoes/reclamacao.service';
 import type { IReclameAquiHugmeRegistro } from '../../models/reclamacoes/ReclameAquiHugmeRegistro.schema';
+import type { ParsedHugmeRow } from './hugmeSpreadsheet.service';
 import { getActiveTabulation } from '../tabulation.service';
 
 export interface RaTicketSource {

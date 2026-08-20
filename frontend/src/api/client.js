@@ -135,8 +135,6 @@ export const ticketsApi = {
     api.post(`/tickets/${sourceId}/merge-into/${targetId}`).then((r) => r.data),
   startWorkflow: (id, body) =>
     api.post(`/tickets/${id}/workflow/start`, body).then((r) => r.data),
-  forwardTeamSolicitation: (id, body) =>
-    api.post(`/tickets/${id}/workflow/team-solicitation`, body).then((r) => r.data),
   cancelWorkflow: (id, body = {}) =>
     api.post(`/tickets/${id}/workflow/cancel`, body).then((r) => r.data),
 };

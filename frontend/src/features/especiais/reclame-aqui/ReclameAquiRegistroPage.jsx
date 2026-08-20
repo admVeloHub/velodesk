@@ -1,6 +1,5 @@
 /**
- * ReclameAquiRegistroPage v1.2.0 — produto da tabulação Desk; motivo do órgão
- * VERSION: v1.2.0 | DATE: 2026-08-19
+ * ReclameAquiRegistroPage — formulário de registro / resposta RA
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -22,24 +21,13 @@ import { registerReclamacaoAndCreateTicket } from '../../../services/especiais/r
 
 const RESPOSTA_MAX = 2000;
 
-function toDatetimeLocal(iso) {
+/** Converte ISO -> valor aceito por <input type="datetime-local"> (hora local). */
+function toDatetimeLocalInput(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function formatDateInput(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 function whatsappUrl(phone, message) {
@@ -196,8 +184,7 @@ export default function ReclameAquiRegistroPage() {
                     className={`ra-registro__input${errors.idReclamacaoRa ? ' is-error' : ''}`}
                     value={form.idReclamacaoRa || ''}
                     onChange={(e) => updateField('idReclamacaoRa', e.target.value)}
-                    placeholder="Id Origem da reclamação"
-                    readOnly={!isNew}
+                    placeholder="ID da reclamação no Reclame Aqui"
                   />
                   {errors.idReclamacaoRa ? <span className="ra-registro__error">{errors.idReclamacaoRa}</span> : null}
                 </div>
@@ -205,10 +192,13 @@ export default function ReclameAquiRegistroPage() {
                   <label htmlFor="ra-data">Data da reclamação</label>
                   <input
                     id="ra-data"
-                    type="text"
-                    className="ra-registro__input ra-registro__input--readonly"
-                    value={formatDateInput(form.dataReclamacao)}
-                    readOnly
+                    type="datetime-local"
+                    className="ra-registro__input"
+                    value={toDatetimeLocalInput(form.dataReclamacao)}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      updateField('dataReclamacao', raw ? new Date(raw).toISOString() : '');
+                    }}
                   />
                 </div>
               </div>
@@ -293,7 +283,7 @@ export default function ReclameAquiRegistroPage() {
                   id="ra-prazo"
                   type="datetime-local"
                   className="ra-registro__input"
-                  value={toDatetimeLocal(form.prazoRa)}
+                  value={toDatetimeLocalInput(form.prazoRa)}
                   onChange={(e) => updateField(
                     'prazoRa',
                     e.target.value ? new Date(e.target.value).toISOString() : '',
@@ -418,7 +408,7 @@ export default function ReclameAquiRegistroPage() {
             disabled={registering}
           >
             <i className="ti ti-check" aria-hidden="true" />
-            {registering ? 'Registrando...' : 'Registrar reclamação'}
+            {registering ? 'Registrando...' : 'Registrar'}
           </button>
         </div>
       </footer>

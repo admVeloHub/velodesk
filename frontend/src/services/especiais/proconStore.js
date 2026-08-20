@@ -292,7 +292,7 @@ export function buildRegistroDefaults(item = {}) {
     orgaoProcon: item.orgaoProcon || '',
     cidade: item.cidade || '',
     uf: item.uf || '',
-    produto: item.produto || 'Empréstimo',
+    produto: item.produto || '',
     tipo: item.tipo || 'Reclamação',
     motivo: item.motivo || '',
     respostaPublica: item.respostaPublica || '',

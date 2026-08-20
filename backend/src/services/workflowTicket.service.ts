@@ -12,7 +12,7 @@ import {
   normalizeStatusValue,
   readTabulacaoSnapshot,
 } from './chamado.mapper';
-import { getWorkflowById, getWorkflowBySlug, resolveWorkflowForTicket } from './workflowDefinicao.service';
+import { getActiveWorkflows, getWorkflowById, getWorkflowBySlug, resolveWorkflowForTicket } from './workflowDefinicao.service';
 import { getActiveGrupos } from './grupoResponsabilidade.service';
 import {
   buildTabulationFieldsFromChamado,
@@ -33,7 +33,6 @@ import { buildLateralWorkflowDto } from './workflowDto.util';
 import {
   applyRequisicaoToChamado,
   buildRequisicaoSnapshot,
-  mergeTeamSolicitationIntoChamado,
   WorkflowRequisicaoError,
 } from './workflowRequisicao.service';
 import type { IChamadoWorkflowRequisicao } from '../config/workflowRequisicaoDefaults';
@@ -62,13 +61,17 @@ export function resolveDevolutivaStepIndex(definicao: IWorkflowDefinicao): numbe
   return idx >= 0 ? idx : passos.length - 1;
 }
 
-export function resolveProdutosApprovalStepIndex(definicao: IWorkflowDefinicao): number | null {
+function resolveTeamApprovalStepIndex(definicao: IWorkflowDefinicao, grupoSlug: string): number | null {
   const passos = sortPassos(definicao);
   const idx = passos.findIndex((p) => {
-    const grupoSlug = String(p.passo?.atribuicao?.grupoSlug || '').toLowerCase();
-    return grupoSlug === 'produtos' && p.passo?.acao?.tipo === 'aprovacao';
+    const slug = String(p.passo?.atribuicao?.grupoSlug || '').toLowerCase();
+    return slug === grupoSlug && p.passo?.acao?.tipo === 'aprovacao';
   });
   return idx >= 0 ? idx : null;
+}
+
+export function resolveProdutosApprovalStepIndex(definicao: IWorkflowDefinicao): number | null {
+  return resolveTeamApprovalStepIndex(definicao, 'produtos');
 }
 
 function ensureWorkflowState(chamado: IChamadoN1): IChamadoWorkflow {
@@ -369,76 +372,6 @@ export async function startWorkflowForChamado(
       trigger: 'requisicao-start-forward',
     });
   }
-
-  return chamado;
-}
-
-const PRODUTOS_SOLICITACAO_LABELS: Record<string, string> = {
-  solicitacoes: 'Alteração de dados',
-  'erros-bugs': 'Erros/Bugs',
-  'liberacao-pix': 'Liberação chave PIX',
-  documentos: 'Solicitação de documentos',
-};
-
-const FINANCEIRO_SOLICITACAO_LABELS: Record<string, string> = {
-  estorno: 'Estorno/Cobrança',
-  cobranca: 'Estorno/Cobrança',
-  outros: 'Outros',
-  documentos: 'Solicitação de documentos',
-};
-
-function buildTeamSolicitationLabel(
-  team: string,
-  solicitacaoProdutos?: Record<string, unknown>,
-  solicitacaoFinanceiro?: Record<string, unknown>,
-): string {
-  if (team === 'produtos') {
-    const categoria = String(solicitacaoProdutos?.categoria ?? '').trim().toLowerCase();
-    return PRODUTOS_SOLICITACAO_LABELS[categoria] || categoria || 'Solicitação Produtos';
-  }
-  const categoria = String(solicitacaoFinanceiro?.categoria ?? '').trim().toLowerCase();
-  return FINANCEIRO_SOLICITACAO_LABELS[categoria] || categoria || 'Solicitação Financeiro';
-}
-
-export async function attachTeamSolicitationToChamado(
-  chamado: IChamadoN1,
-  authUser: AuthPayload | null | undefined,
-  payload: {
-    team: 'produtos' | 'financeiro';
-    solicitacaoProdutos?: Record<string, unknown>;
-    solicitacaoFinanceiro?: Record<string, unknown>;
-  },
-): Promise<IChamadoN1> {
-  try {
-    mergeTeamSolicitationIntoChamado(chamado, payload, authUser);
-  } catch (err) {
-    if (err instanceof WorkflowRequisicaoError) {
-      throw new WorkflowAdvanceError(err.message, err.status);
-    }
-    throw err;
-  }
-
-  const team = String(payload.team || '').trim().toLowerCase();
-  const autor = authUser?.name || authUser?.email || 'Agente';
-  const label = buildTeamSolicitationLabel(
-    team,
-    payload.solicitacaoProdutos,
-    payload.solicitacaoFinanceiro,
-  );
-  const teamLabel = team === 'produtos' ? 'Produtos' : 'Financeiro';
-
-  appendWorkflowRegistro(chamado, {
-    autor,
-    anotacaoInterna: `Solicitação encaminhada ao time ${teamLabel} — ${label}`,
-    metadados: {
-      teamSolicitation: {
-        team,
-        ...(team === 'produtos'
-          ? { solicitacaoProdutos: payload.solicitacaoProdutos }
-          : { solicitacaoFinanceiro: payload.solicitacaoFinanceiro }),
-      },
-    },
-  });
 
   return chamado;
 }

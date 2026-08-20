@@ -10871,7 +10871,6 @@ body.desk-v2-mode #aiChatbotModal {
 }
 
 .ra-badge--nao-respondida { background: #ffedd5; color: #c2410c; }
-.ra-badge--workflow-ativo { background: #ede9fe; color: #6d28d9; }
 .ra-badge--respondida { background: #dbeafe; color: #1d4ed8; }
 .ra-badge--aguard-avaliacao { background: #fef9c3; color: #a16207; }
 
@@ -11611,6 +11610,21 @@ body.desk-v2-mode #aiChatbotModal {
     color: #64748b;
 }
 
+label[for$="-classificacao-produto"],
+label[for$="-classificacao-motivo"] {
+    display: block;
+    margin-bottom: 0.15rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #64748b;
+}
+
+label[for$="-classificacao-motivo"] {
+    margin-top: 0.3rem;
+}
+
 .ra-registro__input,
 .ra-registro__select,
 .ra-registro__textarea {
@@ -11745,6 +11759,66 @@ body.desk-v2-mode #aiChatbotModal {
     background: #dcfce7;
     border-color: #22c55e;
     color: #166534;
+}
+
+.ra-moderacao-panel {
+    max-width: 640px;
+    padding: 1.25rem 0;
+}
+
+.ra-moderacao-panel__title {
+    margin: 0 0 0.35rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.ra-moderacao-panel__hint {
+    margin: 0 0 1.15rem;
+    font-size: 0.82rem;
+    color: #64748b;
+    line-height: 1.45;
+}
+
+.ra-moderacao-panel__field {
+    margin-bottom: 1rem;
+}
+
+.ra-nota-contato__field {
+    margin-top: 0.75rem;
+    margin-bottom: 0;
+}
+
+.ra-moderacao-panel__field .ra-registro__toggle {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.ra-moderacao-panel__field .ra-registro__toggle-btn {
+    flex: 0 0 auto;
+    padding: 0.28rem 0.6rem;
+    font-size: 0.72rem;
+}
+
+.ra-moderacao-panel__save-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
+    padding: 0.4rem 0.75rem;
+    border: none;
+    border-radius: 8px;
+    background: #000058;
+    color: #fff;
+    font-size: 0.76rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.ra-moderacao-panel__save-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .ra-registro__side-card--whatsapp {
@@ -11921,309 +11995,6 @@ body.desk-v2-mode #aiChatbotModal {
     margin: 0 0 0.55rem;
     font-size: 0.84rem;
     color: #0f172a;
-}
-
-/* --- Solicitações internas (RA / Procon / CG) --- */
-.especiais-wf-solicit-card {
-    margin-top: 0.65rem;
-}
-
-.especiais-wf-solicit-card__pending {
-    margin-bottom: 0.75rem;
-    padding: 0.65rem 0.7rem;
-    border-radius: 8px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-}
-
-.especiais-wf-solicit-card__team {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.15rem 0.45rem;
-    border-radius: 999px;
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-}
-
-.especiais-wf-solicit-card__team--produtos {
-    background: rgba(22, 52, 255, 0.1);
-    color: #1634FF;
-}
-
-.especiais-wf-solicit-card__team--financeiro {
-    background: rgba(234, 88, 12, 0.12);
-    color: #ea580c;
-}
-
-.especiais-wf-solicit-card__pending-label {
-    margin: 0.35rem 0 0;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #0f172a;
-}
-
-.especiais-wf-solicit-card__pending-date {
-    margin: 0.2rem 0 0;
-    font-size: 0.72rem;
-    color: #94a3b8;
-}
-
-.especiais-wf-solicit-card__accordion {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-    margin-bottom: 0.75rem;
-}
-
-.especiais-wf-solicit-card__acc-item {
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    overflow: hidden;
-    background: #fff;
-}
-
-.especiais-wf-solicit-card__acc-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 0.55rem 0.65rem;
-    border: none;
-    background: #fff;
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: #334155;
-    cursor: pointer;
-    text-align: left;
-}
-
-.especiais-wf-solicit-card__acc-header:hover {
-    background: #f8fafc;
-}
-
-.especiais-wf-solicit-card__acc-item--produtos.is-open .especiais-wf-solicit-card__acc-header {
-    color: #1634FF;
-    background: rgba(22, 52, 255, 0.06);
-}
-
-.especiais-wf-solicit-card__acc-item--financeiro.is-open .especiais-wf-solicit-card__acc-header {
-    color: #ea580c;
-    background: rgba(234, 88, 12, 0.08);
-}
-
-.especiais-wf-solicit-card__acc-panel {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    background: #f8fafc;
-    border-top: 1px solid #e2e8f0;
-}
-
-.especiais-wf-solicit-card__acc-panel li + li {
-    border-top: 1px solid #e2e8f0;
-}
-
-.especiais-wf-solicit-card__acc-option {
-    display: block;
-    width: 100%;
-    padding: 0.5rem 0.65rem;
-    border: none;
-    background: transparent;
-    font-size: 0.76rem;
-    font-weight: 600;
-    color: #475569;
-    text-align: left;
-    cursor: pointer;
-}
-
-.especiais-wf-solicit-card__acc-item--produtos .especiais-wf-solicit-card__acc-option:hover {
-    background: rgba(22, 52, 255, 0.06);
-    color: #1634FF;
-}
-
-.especiais-wf-solicit-card__acc-item--financeiro .especiais-wf-solicit-card__acc-option:hover {
-    background: rgba(234, 88, 12, 0.08);
-    color: #ea580c;
-}
-
-.especiais-wf-solicit-card__cta {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    width: 100%;
-    border: 1px solid rgba(22, 52, 255, 0.25);
-    border-radius: 10px;
-    background: #fff;
-    color: #1634FF;
-    font-size: 0.8rem;
-    font-weight: 700;
-    padding: 0.55rem 0.75rem;
-    cursor: pointer;
-}
-
-.especiais-wf-solicit-card__cta:hover {
-    background: rgba(22, 52, 255, 0.06);
-}
-
-.especiais-wf-solicit-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 9000;
-    pointer-events: none;
-}
-
-.especiais-wf-solicit-modal__backdrop {
-    position: fixed;
-    inset: 0;
-    border: none;
-    padding: 0;
-    margin: 0;
-    background: rgba(15, 23, 42, 0.35);
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    pointer-events: auto;
-    cursor: pointer;
-}
-
-.especiais-wf-solicit-modal__backdrop.is-visible {
-    opacity: 1;
-}
-
-.especiais-wf-solicit-modal__panel {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: min(560px, 100vw);
-    height: 100vh;
-    background: #fff;
-    border-left: 1px solid #e2e8f0;
-    box-shadow: -12px 0 40px rgba(15, 23, 42, 0.12);
-    display: flex;
-    flex-direction: column;
-    transform: translateX(24px);
-    opacity: 0;
-    transition: transform 0.22s ease, opacity 0.22s ease;
-    pointer-events: auto;
-}
-
-.especiais-wf-solicit-modal__panel.is-visible {
-    transform: translateX(0);
-    opacity: 1;
-}
-
-.especiais-wf-solicit-modal__header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 1rem 1rem 0.75rem;
-    border-bottom: 1px solid #e2e8f0;
-}
-
-.especiais-wf-solicit-modal__eyebrow {
-    margin: 0 0 0.2rem;
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: #1634FF;
-}
-
-.especiais-wf-solicit-modal__header h2 {
-    margin: 0;
-    font-size: 1rem;
-    color: #0f172a;
-}
-
-.especiais-wf-solicit-modal__close {
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: 8px;
-    background: #f1f5f9;
-    color: #64748b;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
-.especiais-wf-solicit-modal__back {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    margin: 0.65rem 1rem 0;
-    border: none;
-    background: transparent;
-    color: #1634FF;
-    font-size: 0.78rem;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 0;
-}
-
-.especiais-wf-solicit-modal__body {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-    padding: 0.75rem 1rem 1.25rem;
-}
-
-.especiais-wf-solicit-modal__body.is-busy {
-    opacity: 0.72;
-    pointer-events: none;
-}
-
-.especiais-wf-solicit-modal__picker {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.especiais-wf-solicit-modal__team-title {
-    margin: 0 0 0.5rem;
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-}
-
-.especiais-wf-solicit-modal__team-title--produtos {
-    color: #1634FF;
-}
-
-.especiais-wf-solicit-modal__team-title--financeiro {
-    color: #ea580c;
-}
-
-.especiais-wf-solicit-modal__type-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-}
-
-.especiais-wf-solicit-modal__type-btn {
-    width: 100%;
-    text-align: left;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    background: #fff;
-    padding: 0.65rem 0.75rem;
-    font-size: 0.84rem;
-    font-weight: 600;
-    color: #0f172a;
-    cursor: pointer;
-}
-
-.especiais-wf-solicit-modal__type-btn--produtos:hover {
-    border-color: rgba(22, 52, 255, 0.35);
-    background: rgba(22, 52, 255, 0.04);
-}
-
-.especiais-wf-solicit-modal__type-btn--financeiro:hover {
-    border-color: rgba(234, 88, 12, 0.35);
-    background: rgba(234, 88, 12, 0.04);
 }
 
 #especiais-reclame-aqui .ra-ticket__side .ra-ticket__moderacao , #especiais-procon .ra-ticket__side .ra-ticket__moderacao, #especiais-consumidor-gov .ra-ticket__side .ra-ticket__moderacao, #especiais-bacen .ra-ticket__side .ra-ticket__moderacao {

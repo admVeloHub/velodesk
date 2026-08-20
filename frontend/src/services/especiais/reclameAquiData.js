@@ -1,6 +1,5 @@
 /**
- * reclameAquiData v1.1.1 — produto sai da tabulação Desk, não desta lista
- * VERSION: v1.1.1 | DATE: 2026-08-19
+ * reclameAquiData — constantes do canal Reclame Aqui
  */
 export const RA_TABS = [
   { id: 'tabela', label: 'Tabela', icon: 'ti-table' },
@@ -51,6 +50,44 @@ export const RA_TIPOS = [
   'Solicitação',
   'Elogio',
   'Dúvida',
+];
+
+/** Produtos do acordeão "Classificação de motivo" no sidebar do ticket — ordem alfabética. */
+export const RA_CLASSIFICACAO_PRODUTOS = [
+  'Antecipação 2026',
+  'Antecipação outros anos',
+  'Calculadora',
+  'Conta Celcoin',
+  'Conta Velotax',
+  'Cupons',
+  'Emprestimo Pessoal',
+  'Indique e Ganhe',
+  'Seguros',
+];
+
+export const RA_MOTIVOS = [
+  'Abatimento de Juros',
+  'Alega Fraude',
+  'Alteração cadastral',
+  'Cancelamento até 7 dias',
+  'Cancelamento sup. 7 dias',
+  'Desativado',
+  'Dívida Prescrita',
+  'Dúvidas Gerais',
+  'Em cobrança',
+  'Encerramento conta App',
+  'Encerramento conta Celcoin',
+  'Erro app',
+  'Erro Gov',
+  'Juros Abusivo',
+  'Liberação chave pix',
+  'Limite baixo do pix',
+  'Não Elegível a crédito',
+  'Portabilidade Pix',
+  'Quitação automática sem chave pix',
+  'Quitação do contrato',
+  'Reativação cadastral',
+  'Valor mínimo para contratação',
 ];
 
 export const RA_WHATSAPP_DEFAULT_MSG =

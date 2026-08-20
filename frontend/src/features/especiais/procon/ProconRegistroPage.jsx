@@ -197,6 +197,7 @@ export default function ProconRegistroPage() {
                     value={form.produto}
                     onChange={(e) => updateField('produto', e.target.value)}
                   >
+                    <option value="">Selecione...</option>
                     {PC_PRODUTOS.map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}

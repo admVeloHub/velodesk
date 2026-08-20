@@ -197,6 +197,7 @@ export default function ConsumidorGovRegistroPage() {
                     value={form.produto}
                     onChange={(e) => updateField('produto', e.target.value)}
                   >
+                    <option value="">Selecione...</option>
                     {CG_PRODUTOS.map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}

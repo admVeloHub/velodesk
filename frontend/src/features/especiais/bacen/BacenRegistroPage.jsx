@@ -197,6 +197,7 @@ export default function BacenRegistroPage() {
                     value={form.produto}
                     onChange={(e) => updateField('produto', e.target.value)}
                   >
+                    <option value="">Selecione...</option>
                     {BC_PRODUTOS.map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}

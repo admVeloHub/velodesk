@@ -223,6 +223,11 @@ export default function ReclameAquiCrmRoot() {
     setListVersion((v) => v + 1);
   }, []);
 
+  const handleModeracaoSaved = useCallback((updatedRaItem) => {
+    if (updatedRaItem) setRaItem(updatedRaItem);
+    setListVersion((v) => v + 1);
+  }, []);
+
   const handleOpenChat = useCallback(() => {
     setWaChatOpen(true);
   }, []);
@@ -293,6 +298,7 @@ export default function ReclameAquiCrmRoot() {
         waComposeText={waComposeText}
         onWaComposeTextChange={setWaComposeText}
         onTicketUpdated={handleTicketUpdated}
+        onModeracaoSaved={handleModeracaoSaved}
         composeMode={composeMode}
         onComposeModeChange={setComposeMode}
         composeText={composeText}
@@ -315,6 +321,7 @@ export default function ReclameAquiCrmRoot() {
         saving={committing}
         disabled={readOnly || finalized}
         finalized={finalized}
+        onRaItemUpdated={handleModeracaoSaved}
       />
 
       {novaModals}

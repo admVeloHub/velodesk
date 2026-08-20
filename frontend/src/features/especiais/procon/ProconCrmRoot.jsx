@@ -212,6 +212,11 @@ export default function ProconCrmRoot() {
     setListVersion((v) => v + 1);
   }, []);
 
+  const handlePcItemUpdated = useCallback((updatedPcItem) => {
+    if (updatedPcItem) setPcItem(updatedPcItem);
+    setListVersion((v) => v + 1);
+  }, []);
+
   const handleOpenChat = useCallback(() => {
     setWaChatOpen(true);
   }, []);
@@ -300,6 +305,7 @@ export default function ProconCrmRoot() {
         saving={committing}
         disabled={readOnly || finalized}
         finalized={finalized}
+        onPcItemUpdated={handlePcItemUpdated}
       />
 
       {demandaModals}

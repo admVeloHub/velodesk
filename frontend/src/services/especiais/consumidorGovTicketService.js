@@ -346,7 +346,7 @@ export function buildDemandaFromTicket(ticket) {
     orgaoGov: pc.orgaoGov || '',
     cidade: pc.cidade || '',
     uf: pc.uf || '',
-    produto: pc.produto || lf.produto || 'Empréstimo',
+    produto: pc.produto || lf.produto || '',
     tipo: pc.tipo || lf.tipoChamado || lf.classificacaoTipo || 'Reclamação',
     motivo: pc.motivo || lf.motivo || assunto,
     prazoLegal,

@@ -212,6 +212,11 @@ export default function ConsumidorGovCrmRoot() {
     setListVersion((v) => v + 1);
   }, []);
 
+  const handleCgItemUpdated = useCallback((updatedCgItem) => {
+    if (updatedCgItem) setCgItem(updatedCgItem);
+    setListVersion((v) => v + 1);
+  }, []);
+
   const handleOpenChat = useCallback(() => {
     setWaChatOpen(true);
   }, []);
@@ -300,6 +305,7 @@ export default function ConsumidorGovCrmRoot() {
         saving={committing}
         disabled={readOnly || finalized}
         finalized={finalized}
+        onCgItemUpdated={handleCgItemUpdated}
       />
 
       {demandaModals}

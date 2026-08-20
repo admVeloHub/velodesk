@@ -449,7 +449,11 @@ function channelMongoFilterForOrgao(orgao: CasoEspecialOrgao): Record<string, un
   }
 }
 
-function buildReclamacaoTextSearchFilter(q: string, digits: string): Record<string, unknown> {
+function buildReclamacaoTextSearchFilter(
+  q: string,
+  digits: string,
+  ticketObjectId: Types.ObjectId | null,
+): Record<string, unknown> {
   const re = new RegExp(escapeRegex(q), 'i');
   const clauses: Record<string, unknown>[] = [
     { chamadoProtocolo: re },
@@ -468,10 +472,17 @@ function buildReclamacaoTextSearchFilter(q: string, digits: string): Record<stri
     clauses.push({ chamadoProtocolo: digitRe });
     clauses.push({ protocoloExterno: digitRe });
   }
+  if (ticketObjectId) {
+    clauses.push({ chamadoId: ticketObjectId });
+  }
   return { $or: clauses };
 }
 
-function buildChamadoN1TextSearchFilter(q: string, digits: string): Record<string, unknown> {
+function buildChamadoN1TextSearchFilter(
+  q: string,
+  digits: string,
+  ticketObjectId: Types.ObjectId | null,
+): Record<string, unknown> {
   const re = new RegExp(escapeRegex(q), 'i');
   const clauses: Record<string, unknown>[] = [
     { chamadoProtocolo: re },
@@ -498,6 +509,9 @@ function buildChamadoN1TextSearchFilter(q: string, digits: string): Record<strin
     clauses.push({ 'registro.metadados.procon.cpf': digitRe });
     clauses.push({ 'registro.metadados.consumidorGov.cpf': digitRe });
     clauses.push({ 'registro.metadados.bacen.cpf': digitRe });
+  }
+  if (ticketObjectId) {
+    clauses.push({ _id: ticketObjectId });
   }
   return { $or: clauses };
 }
@@ -598,11 +612,14 @@ export async function searchPortalByOrgao(
 
   const capped = Math.min(Math.max(limit, 1), 200);
   const digits = q.replace(/\D/g, '');
+  // Types.ObjectId.isValid aceita qualquer string de 12 chars (buffer bruto) — restringe ao
+  // formato hex de 24 chars, que é o único formato real de _id/chamadoId usado no app.
+  const ticketObjectId = /^[a-fA-F0-9]{24}$/.test(q) ? new Types.ObjectId(q) : null;
   const byChamadoId = new Map<string, Record<string, unknown>>();
 
   const Model = resolveReclamacaoModel(orgao);
   if (Model) {
-    const reclamacoes = await Model.find(buildReclamacaoTextSearchFilter(q, digits))
+    const reclamacoes = await Model.find(buildReclamacaoTextSearchFilter(q, digits, ticketObjectId))
       .sort({ updatedAt: -1 })
       .limit(capped)
       .exec();
@@ -617,7 +634,7 @@ export async function searchPortalByOrgao(
     const channelFilter = channelMongoFilterForOrgao(orgao);
     if (channelFilter) {
       const n1Hits = await ChamadoN1.find({
-        $and: [channelFilter, buildChamadoN1TextSearchFilter(q, digits)],
+        $and: [channelFilter, buildChamadoN1TextSearchFilter(q, digits, ticketObjectId)],
       })
         .sort({ updatedAt: -1 })
         .limit(capped)
@@ -692,6 +709,13 @@ export function reclamacaoToPortalDto(doc: IReclamacao): Record<string, unknown>
     prazoLegal: doc.prazoLegal,
     prazoRa: doc.orgao === 'reclame_aqui' ? (meta.prazoRa || doc.prazoLegal) : undefined,
     passivelNota: doc.orgao === 'reclame_aqui' ? Boolean(meta.passivelNota) : undefined,
+    moderacaoSolicitada: doc.orgao === 'reclame_aqui' ? Boolean(meta.moderacaoSolicitada) : undefined,
+    moderacaoAceita: doc.orgao === 'reclame_aqui' ? Boolean(meta.moderacaoAceita) : undefined,
+    moderacaoMotivo: doc.orgao === 'reclame_aqui' ? String(meta.moderacaoMotivo ?? '') : undefined,
+    moderacaoAvaliacaoCliente: doc.orgao === 'reclame_aqui'
+      ? String(meta.moderacaoAvaliacaoCliente ?? '')
+      : undefined,
+    tentativaContato: doc.orgao === 'reclame_aqui' ? String(meta.tentativaContato ?? '') : undefined,
     slaPct: doc.slaPct,
     orgaoProcon: doc.orgao === 'procon' ? doc.orgaoInstituicao : undefined,
     orgaoGov: doc.orgao === 'consumidor_gov' ? doc.orgaoInstituicao : undefined,
@@ -731,7 +755,7 @@ export async function patchReclamacao(
   const allowed: Partial<IReclamacao> = {};
   const scalarFields = [
     'statusCanal', 'prazoLegal', 'atendente', 'responsavel', 'aberta',
-    'protocoloExterno', 'idDemandaExterna', 'slaPct', 'motivo',
+    'protocoloExterno', 'idDemandaExterna', 'slaPct', 'motivo', 'produto',
   ] as const;
 
   for (const key of scalarFields) {

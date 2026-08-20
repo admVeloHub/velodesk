@@ -212,6 +212,11 @@ export default function BacenCrmRoot() {
     setListVersion((v) => v + 1);
   }, []);
 
+  const handleBcItemUpdated = useCallback((updatedBcItem) => {
+    if (updatedBcItem) setBcItem(updatedBcItem);
+    setListVersion((v) => v + 1);
+  }, []);
+
   const handleOpenChat = useCallback(() => {
     setWaChatOpen(true);
   }, []);
@@ -300,6 +305,7 @@ export default function BacenCrmRoot() {
         saving={committing}
         disabled={readOnly || finalized}
         finalized={finalized}
+        onBcItemUpdated={handleBcItemUpdated}
       />
 
       {demandaModals}
