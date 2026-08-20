@@ -1,4 +1,4 @@
-/** permission middleware v1.0.0 */
+/** permission middleware v1.1.0 — Gestão só via funções do cadastro, não JWT */
 import { Request, Response, NextFunction } from 'express';
 import {
   assertPermission,
@@ -34,7 +34,6 @@ export function requireGestaoOrPermission(modulo: string, key: string) {
       if (
         resolved.funcaoSlug === 'gestao'
         || resolved.funcoes.includes('gestao')
-        || String(req.user.role).toLowerCase() === 'supervisor'
         || hasPermission(resolved.permissoes, modulo, key)
       ) {
         return next();

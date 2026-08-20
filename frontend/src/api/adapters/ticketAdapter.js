@@ -1,6 +1,6 @@
 /**
- * ticketAdapter v1.7.4 — não envia workflow pendente em PUT/commit (só flush no save)
- * VERSION: v1.7.4 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team
+ * ticketAdapter v1.7.5 — timestamp estável (sem Date.now() em mensagem sem data)
+ * VERSION: v1.7.5 | DATE: 2026-08-20
  */
 import { getAgentName } from '../../services/clientDb';
 import { stripPendingWorkflowForApiPayload } from '../../services/desk/pendingWorkflowStart';
@@ -35,7 +35,7 @@ function normalizeMessage(msg) {
   return {
     ...msg,
     text: repairUtf8Mojibake(msg.text || msg.message || ''),
-    timestamp: msg.timestamp || msg.time || msg.createdAt || new Date().toISOString(),
+    timestamp: msg.timestamp || msg.time || msg.createdAt || '',
     origin: msg.origin || (msg.sender === 'them' ? 'cliente' : 'agente'),
     fromClient: isClient,
     type: isInternal ? 'internal' : (isClient ? 'client' : (msg.type === 'system' ? 'system' : 'agent')),

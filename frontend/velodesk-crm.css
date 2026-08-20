@@ -7868,6 +7868,22 @@ body.desk-v2-mode #cockpitFocusContext {
     font-size: var(--wf-stepper-compact-icon);
 }
 
+/* Velodesk CRM v1.18.1 - stepper workflow denied (reprovação) */
+
+#velodeskDeskV2Root .desk-workflow-stepper__step--denied .desk-workflow-stepper__circle {
+    background: #dc2626;
+    color: #fff;
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper__step--denied .desk-workflow-stepper__label {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+#velodeskDeskV2Root .desk-workflow-stepper__step--denied .desk-workflow-stepper__text {
+    color: #dc2626;
+}
+
 #velodeskDeskV2Root .desk-workflow-stepper__step--completed .desk-workflow-stepper__circle {
     background: #15A237;
     color: #fff;

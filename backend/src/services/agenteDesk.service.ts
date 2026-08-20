@@ -1,4 +1,4 @@
-/** agenteDesk.service v1.3.0 — GET lê VeloHub ao vivo; sync sem conflito updatedBy */
+/** agenteDesk.service v1.4.0 — resolve e-mail do agente pelo nome (sininho workflow) */
 import { getDeskAgenteModel, IDeskAgente } from '../models/DeskAgente';
 import {
   listColaboradoresVelotaxDesk,
@@ -119,6 +119,38 @@ export async function listAgentesDesk(): Promise<AgenteDeskPublico[]> {
   const funcaoBySlug = await buildFuncaoMap();
   const docs = await Model.find().sort({ colaboradorNome: 1 }).lean() as unknown as IDeskAgente[];
   return docs.map((d) => mapDocToPublico(d, funcaoBySlug));
+}
+
+function normalizePersonToken(value: unknown): string {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Resolve o e-mail Desk do colaborador a partir do nome gravado em responsável/atribuído.
+ * Fail-soft: devolve string vazia se não houver match (não bloqueia o fluxo de comunicação).
+ */
+export async function findAgenteEmailByNome(nome: string): Promise<string> {
+  const target = normalizePersonToken(nome);
+  if (!target) return '';
+
+  const agentes = await listAgentesDesk();
+  const exact = agentes.find((agente) => {
+    const colaboradorNome = normalizePersonToken(agente.colaboradorNome);
+    const localPart = normalizePersonToken(String(agente.email || '').split('@')[0]);
+    return colaboradorNome === target || localPart === target;
+  });
+  if (exact?.email) return normalizeEmail(exact.email);
+
+  const partial = agentes.find((agente) => {
+    const colaboradorNome = normalizePersonToken(agente.colaboradorNome);
+    return colaboradorNome && (colaboradorNome.includes(target) || target.includes(colaboradorNome));
+  });
+  return partial?.email ? normalizeEmail(partial.email) : '';
 }
 
 /**

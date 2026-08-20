@@ -1,6 +1,6 @@
 /**
- * clientMessageEnvelope.service v1.1.0 — resolveClientGreetingName exportado (WhatsApp template)
- * VERSION: v1.1.0 | DATE: 2026-08-11
+ * clientMessageEnvelope.service v1.2.0 — stripComposerOpening (refinar / normalização núcleo)
+ * VERSION: v1.2.0 | DATE: 2026-08-20
  */
 import type { TicketAiMessageInput } from './agents/agentTypes';
 import { isPrimeiroContatoAgente } from './agents/agentTabulation.util';
@@ -29,6 +29,17 @@ export function resolveClientGreetingName(clientName?: string, fallback = 'clien
 function resolveAgentDisplayName(agentName?: string): string {
   const name = trimStr(agentName, 120);
   return name || 'Atendimento Velotax';
+}
+
+/** Abertura mecânica aplicada no composer (1º contato). */
+const MECHANICAL_OPENING_RE = /^Olá,\s*.+?,\s*tudo bem\?\s*\r?\n\s*\r?\nEu sou .+?, do time de atendimento Velotax\.\s*\r?\n\s*\r?\n/s;
+
+/** Remove abertura mecânica do composer para obter só o núcleo (refinar, IA). */
+export function stripComposerOpening(text: string): string {
+  const raw = trimStr(text, 32_000);
+  if (!raw) return '';
+  const stripped = raw.replace(MECHANICAL_OPENING_RE, '').trim();
+  return stripped || raw;
 }
 
 /** Monta texto do composer: abertura mecânica + núcleo (sem fechamento visual). */

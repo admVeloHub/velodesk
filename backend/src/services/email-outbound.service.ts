@@ -1,6 +1,7 @@
-﻿/** email-outbound.service v1.5.0 — inline logo CID + anexos MIME */
+/** email-outbound.service v1.5.1 — espera Gmail no startup antes de descartar envio */
 import { sendViaGmailApi, type GmailInlineImage, type GmailOutboundAttachment } from './gmail/gmailApiSend';
 import {
+  ensureEmailTransportReady,
   getEffectiveFromAddress,
   getEmailTransportSnapshot,
   isEmailTransportReady,
@@ -38,7 +39,10 @@ function wrapTextAsHtml(text: string): string {
 
 export async function sendOutboundEmail(payload: OutboundEmailPayload): Promise<OutboundEmailResult> {
   if (!isEmailTransportReady()) {
-    return { sent: false, reason: 'Gmail API não configurado (desk_config.email_transport)' };
+    const ready = await ensureEmailTransportReady();
+    if (!ready) {
+      return { sent: false, reason: 'Gmail API não configurado (desk_config.email_transport)' };
+    }
   }
 
   const snap = getEmailTransportSnapshot();

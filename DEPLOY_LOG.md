@@ -1,10 +1,30 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.89.0 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.90.0 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — layout e-mail outbound, workflow reprovação e melhorias Desk/360
+
+- **Data/Hora**: 2026-08-20
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.90.0
+  - **Backend**: emailSkeleton.service v1.3.0, emailBrand.util v1.2.0, emailOutbound.constants, emailAssinatura/Conteudo/Trigger services, emailOutbound.routes, EmailAssinatura/Conteudo/DisparoLog models, emailSlaTrigger.job, workflowDto.util v1.4.0, workflowTicket.service v1.9.0, workspace360.service v1.5.1, workflowStatus.util, whatsappInbound.service, email-inbound/outbound/notification/transport/replyContent
+  - **Frontend**: EmailOutboundEditor, EmailAssinaturaSection, EmailRemetentesSection, emailPreviewHtml v1.2.1, TicketWorkflowStepper v1.7.1, desk/utils v3.19.1, workflowEngine v1.11.2, DeskV2Root, workflowDecisionHandlers, deskData v2.6.1, velodesk-crm.css v1.18.1, DeskTicketErrorBoundary
+  - **Assets**: `backend/assets/email/velotax_ajustada_branco.png`, `public/velotax_ajustada_branco.png`
+- **Arquivos principais**:
+  - E-mail outbound — skeleton HTML padronizado (header Velotax, despedida, assinatura configurável), brand colors/logo inline, preview na config, rotas e modelos de conteúdo/disparo
+  - Workflow — estado `denied` no stepper após reprovação; reprovação sem auto-resposta; approve Produtos envia mensagem ao cliente; tickets reprovados em action-now no Painel 360
+  - Desk/360 — melhorias thread e-mail, WhatsApp inbound, queue counts, workspace360 API, VeloNews, sugestões IA e error boundary no ticket
+- **Descrição**: Entrega layout profissional de e-mails enviados, fluxo de reprovação workflow visível ao agente e pacote de melhorias operacionais no Desk sem alterar contratos de API ou schemas MongoDB existentes.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — performance Desk, anexos (reconcile/preview) e propagação workflow
 

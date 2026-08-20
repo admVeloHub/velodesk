@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.19.0 | DATE: 2026-08-19
- * — fallback de texto quando extractEmailReplyContent esvazia bolha
+ * VERSION: v3.19.1 | DATE: 2026-08-20
+ * — stepper denied após reprovação workflow
  */
 import {
   formatDateBr,
@@ -601,6 +601,31 @@ export function isTicketWorkflowFinished(ticket) {
   );
 }
 
+export function isTicketWorkflowCancelled(ticket) {
+  const persisted = ticket?.workflow;
+  const lateral = readTicketLateralWorkflow(ticket);
+  return Boolean(
+    persisted?.workflowStatus === 'cancel'
+    || lateral?.workflowStatus === 'cancel',
+  );
+}
+
+function ticketRegistroHasWorkflowReject(ticket) {
+  const rows = ticket?.registroHistorico || ticket?.registro || [];
+  return rows.some((row) => {
+    if (row?.metadados?.workflowDecision === 'reject') return true;
+    return (row?.alteracoes || []).some((item) => item?.workflowDecision === 'reject');
+  });
+}
+
+/** Workflow reprovado — responsável (N1) deve retornar ao cliente manualmente. */
+export function isWorkflowRejectAwaitingAgent(ticket) {
+  if (!isTicketWorkflowActive(ticket)) return false;
+  if (!ticketRegistroHasWorkflowReject(ticket)) return false;
+  const status = String(ticket?.status || '').trim().toLowerCase().replace(/\s+/g, '-');
+  return status === 'em-andamento' || status === 'pendente' || status === 'em-espera';
+}
+
 /** Presença de workflow atual ou concluído — usado somente para indicação visual/histórico. */
 export function isTicketInWorkflow(ticket) {
   if (ticket?.workflow?.active) return true;
@@ -676,6 +701,7 @@ export function getWorkflowProgress(ticket) {
   const workflow = readTicketLateralWorkflow(ticket);
   if (!workflow) return null;
   const workflowFinished = isTicketWorkflowFinished(ticket);
+  const workflowCancelled = isTicketWorkflowCancelled(ticket);
 
   let template = getWorkflowTemplateForTicket(ticket);
   if (!template?.steps?.length) {
@@ -697,11 +723,25 @@ export function getWorkflowProgress(ticket) {
       .map((h) => h.stepId),
   );
 
+  const deniedIds = new Set(
+    (workflow.stepHistory || [])
+      .filter((h) => h.status === 'denied')
+      .map((h) => h.stepId),
+  );
+
   const stepsWithState = template.steps.map((step, index) => {
     let state = 'pending';
-    if (workflowFinished || completedIds.has(step.id)) state = 'completed';
-    else if (step.id === currentStepId) state = 'active';
-    else if (index < activeStepIndex) state = 'completed';
+    if (workflowCancelled) {
+      state = index < activeStepIndex ? 'completed' : 'skipped';
+    } else if (deniedIds.has(step.id)) {
+      state = 'denied';
+    } else if (workflowFinished || completedIds.has(step.id)) {
+      state = 'completed';
+    } else if (step.id === currentStepId) {
+      state = 'active';
+    } else if (index < activeStepIndex) {
+      state = 'completed';
+    }
 
     const historyEntry = (workflow.stepHistory || []).find((h) => h.stepId === step.id);
     return {

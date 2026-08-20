@@ -1,4 +1,4 @@
-﻿/* ??? VELODESK ECOSYSTEM V3 ? Design fluido ??? */
+/* ??? VELODESK ECOSYSTEM V3 ? Design fluido ??? */
 
 :root {
     --eco-navy: #000058;
@@ -857,6 +857,10 @@ body:has(.eco-prototype-banner) {
 .client360-workflow-icon--finished {
     background: rgba(21, 162, 55, 0.14);
     color: #15A237;
+}
+.client360-workflow-icon--cancel {
+    background: #fef2f2;
+    color: #dc2626;
 }
 .client360-empty { text-align: center; color: #64748b; padding: 1rem !important; }
 .client360-analise { font-size: 0.9rem; color: #475569; margin: 0.85rem 0 1.15rem; line-height: 1.5; }
@@ -6610,6 +6614,12 @@ body.desk-v2-mode #aiChatbotModal {
     border-color: #15A237;
     background: #15A237;
     color: #fff;
+}
+
+.wf-approval-shell .desk-workflow-modal__step--skipped .desk-workflow-modal__circle {
+    border-color: #dc2626;
+    background: #fef2f2;
+    color: #dc2626;
 }
 
 .wf-approval-shell .desk-workflow-modal__step--active .desk-workflow-modal__circle,

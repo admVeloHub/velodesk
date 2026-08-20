@@ -1,6 +1,6 @@
 /**
  * VeloNews — estilos Desk (popover, crítico, histórico)
- * VERSION: v1.0.1 | DATE: 2026-07-31 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.1.0 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team
  */
 
 /* Popover (base ws360-news-popover renomeado) */
@@ -32,6 +32,22 @@
   padding: 14px 16px 12px;
   border-bottom: 0.5px solid var(--eco-border, #E4E6EA);
   background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+}
+
+.velonews-popover__body {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.velonews-popover__section-title {
+  margin: 0;
+  padding: 10px 16px 4px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #000058;
 }
 
 .velonews-popover__title {
@@ -69,8 +85,6 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  overflow-y: auto;
-  flex: 1;
 }
 
 .velonews-popover__item {
@@ -170,6 +184,10 @@
   font-size: 0.875rem;
   font-weight: 600;
   color: #334155;
+}
+
+.velonews-popover__empty--compact {
+  padding: 12px 16px 16px;
 }
 
 /* Molduras crítica / resolvida */

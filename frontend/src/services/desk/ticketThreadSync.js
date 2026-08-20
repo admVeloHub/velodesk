@@ -1,10 +1,17 @@
 /**
- * ticketThreadSync v1.8.0 — poll também detecta nota interna persistida
- * VERSION: v1.8.0 | DATE: 2026-08-17
+ * ticketThreadSync v1.9.0 — fingerprint estável (epoch) e IA só com msg do cliente / nota do agente
+ * VERSION: v1.9.0 | DATE: 2026-08-20
  */
 
 function normalizeMsgText(value) {
   return String(value || '').trim();
+}
+
+/** Instantâneo comparável — Date, ISO e locale string viram o mesmo epoch. */
+function fingerprintTime(value) {
+  if (value == null || value === '') return '';
+  const t = new Date(value).getTime();
+  return Number.isFinite(t) ? String(t) : String(value);
 }
 
 function publicMessagesFromTicket(ticket) {
@@ -19,7 +26,7 @@ export function buildPublicThreadFingerprint(ticket) {
   if (!ticket) return '';
   return publicMessagesFromTicket(ticket)
     .map((m) => {
-      const ts = m.timestamp || m.time || m.createdAt || '';
+      const ts = fingerprintTime(m.timestamp || m.time || m.createdAt);
       const text = normalizeMsgText(m.text || m.message);
       const att = Array.isArray(m.attachments) ? m.attachments.length : 0;
       return `${m.id || ''}|${m.type || ''}|${ts}|${text}|${att}`;
@@ -32,7 +39,7 @@ export function buildClientThreadFingerprint(convMsgs) {
   return (convMsgs || [])
     .filter((m) => m?.type === 'client')
     .map((m) => {
-      const ts = m.timestamp || '';
+      const ts = fingerprintTime(m.timestamp);
       const text = normalizeMsgText(m.text);
       const att = Array.isArray(m.attachments) ? m.attachments.length : 0;
       return `${ts}|${text}|${att}`;
@@ -41,25 +48,22 @@ export function buildClientThreadFingerprint(convMsgs) {
 }
 
 /** Notas internas persistidas no ticket (sem rascunho local do compose). */
-export function buildPersistedInternalNotesFingerprint(ticket) {
+/** Notas internas do agente (sem eventos de workflow em registroHistorico). */
+export function buildAgentInternalNotesFingerprint(ticket) {
   if (!ticket) return '';
-  const parts = [];
+  return (ticket.internalNotes || [])
+    .map((note) => {
+      const text = normalizeMsgText(note.text || note.message);
+      if (!text) return '';
+      const ts = fingerprintTime(note.timestamp || note.time);
+      return `${ts}|${text}`;
+    })
+    .filter(Boolean)
+    .join(';;');
+}
 
-  (ticket.internalNotes || []).forEach((note) => {
-    const text = normalizeMsgText(note.text || note.message);
-    if (!text) return;
-    const ts = note.timestamp || note.time || '';
-    parts.push(`${ts}|${text}`);
-  });
-
-  (ticket.registroHistorico || ticket.registroAlteracoes || []).forEach((entry) => {
-    const text = normalizeMsgText(entry.anotacaoInterna);
-    if (!text) return;
-    const ts = entry.time || entry.timestamp || '';
-    parts.push(`${ts}|${text}`);
-  });
-
-  return parts.join(';;');
+export function buildPersistedInternalNotesFingerprint(ticket) {
+  return buildAgentInternalNotesFingerprint(ticket);
 }
 
 export function hasPublicThreadChanged(prevTicket, nextTicket) {
@@ -88,7 +92,7 @@ function whatsAppMessagesFromTicket(ticket) {
 export function buildWhatsAppThreadFingerprint(ticket) {
   return whatsAppMessagesFromTicket(ticket)
     .map((m) => {
-      const ts = m.timestamp || m.time || m.createdAt || '';
+      const ts = fingerprintTime(m.timestamp || m.time || m.createdAt);
       const text = normalizeMsgText(m.text || m.message);
       const origin = m.origin || (m.sender === 'them' ? 'cliente' : 'agente');
       const attachments = Array.isArray(m.attachments) ? m.attachments.join(',') : '';
@@ -105,9 +109,10 @@ export function hasWhatsAppThreadChanged(prevTicket, nextTicket) {
 }
 
 /**
- * Dispara refresh da sugestão IA. Sempre considera notas internas persistidas —
- * mesmo com mensagem do cliente, o Agente 1 usa nota interna como contexto adicional,
- * então uma nota nova/editada precisa invalidar a sugestão em cache.
+ * Refresh da sugestão IA só com contexto que muda a consulta:
+ * - ticket sem msg do cliente: nota interna persistida
+ * - ticket com thread pública: nova mensagem do cliente
+ * Histórico de workflow, transcrição e poll de registro NÃO entram aqui.
  */
 export function buildAiSuggestionRefreshKey({
   ticketId,
@@ -122,7 +127,7 @@ export function buildAiSuggestionRefreshKey({
       id,
       contextSource,
       'internal-context',
-      buildPersistedInternalNotesFingerprint(ticket),
+      buildAgentInternalNotesFingerprint(ticket),
     ].join('::');
   }
   return [
@@ -130,8 +135,6 @@ export function buildAiSuggestionRefreshKey({
     contextSource,
     'client',
     buildClientThreadFingerprint(convMsgs),
-    buildWhatsAppThreadFingerprint(ticket),
-    buildPersistedInternalNotesFingerprint(ticket),
   ].join('::');
 }
 

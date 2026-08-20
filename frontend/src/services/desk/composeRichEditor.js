@@ -1,6 +1,6 @@
 /**
- * composeRichEditor v1.0.3 — fix serialização DocumentFragment na thread
- * VERSION: v1.0.3 | DATE: 2026-07-31
+ * composeRichEditor v1.0.4 — sanitize HTML sem crash em e-mail aninhado
+ * VERSION: v1.0.4 | DATE: 2026-08-20
  */
 
 const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'DIV', 'P', 'UL', 'OL', 'LI', 'IMG']);
@@ -53,57 +53,67 @@ export function normalizePlainToHtml(text) {
 }
 
 export function sanitizeComposeHtml(html) {
-  const template = document.createElement('template');
-  template.innerHTML = String(html || '');
+  try {
+    const template = document.createElement('template');
+    template.innerHTML = String(html || '');
 
-  const walk = (node) => {
-    [...node.childNodes].forEach((child) => {
-      if (child.nodeType === Node.ELEMENT_NODE) {
-        const el = child;
-        if (el.tagName === 'IMG') {
-          const src = el.getAttribute('src') || '';
-          if (!isAllowedComposeImageSrc(src)) {
+    const walk = (node, depth = 0) => {
+      if (!node || depth > 48) return;
+      [...node.childNodes].forEach((child) => {
+        if (child.nodeType === Node.ELEMENT_NODE) {
+          const el = child;
+          if (el.tagName === 'IMG') {
+            const src = el.getAttribute('src') || '';
+            if (!isAllowedComposeImageSrc(src)) {
+              el.remove();
+              return;
+            }
+            const alt = String(el.getAttribute('alt') || 'Imagem anexada').slice(0, 200);
+            [...el.attributes].forEach((attr) => el.removeAttribute(attr.name));
+            el.setAttribute('src', src);
+            el.setAttribute('alt', alt);
+            el.className = 'compose-inline-image';
+            return;
+          }
+          if (!ALLOWED_TAGS.has(el.tagName)) {
+            const parent = el.parentNode;
+            if (parent) {
+              while (el.firstChild) parent.insertBefore(el.firstChild, el);
+            }
             el.remove();
             return;
           }
-          const alt = String(el.getAttribute('alt') || 'Imagem anexada').slice(0, 200);
           [...el.attributes].forEach((attr) => el.removeAttribute(attr.name));
-          el.setAttribute('src', src);
-          el.setAttribute('alt', alt);
-          el.className = 'compose-inline-image';
+          walk(el, depth + 1);
           return;
         }
-        if (!ALLOWED_TAGS.has(el.tagName)) {
-          const fragment = document.createDocumentFragment();
-          while (el.firstChild) fragment.appendChild(el.firstChild);
-          el.replaceWith(fragment);
-          walk(fragment);
-          return;
+        if (child.nodeType === Node.COMMENT_NODE) {
+          child.remove();
         }
-        [...el.attributes].forEach((attr) => el.removeAttribute(attr.name));
-        walk(el);
-        return;
-      }
-      if (child.nodeType === Node.COMMENT_NODE) {
-        child.remove();
-      }
-    });
-  };
+      });
+    };
 
-  walk(template.content);
-  return template.innerHTML.replace(/<div>\s*<br\s*\/?>\s*<\/div>/gi, '<br />');
+    walk(template.content);
+    return template.innerHTML.replace(/<div>\s*<br\s*\/?>\s*<\/div>/gi, '<br />');
+  } catch (err) {
+    console.warn('[composeRichEditor] sanitizeComposeHtml falhou', err);
+    return '';
+  }
 }
 
 /** Serializa nós DOM — DocumentFragment não expõe innerHTML. */
 function domNodesToHtml(root) {
   if (!root) return '';
   const wrapper = document.createElement('div');
-  wrapper.append(...root.childNodes);
+  while (root.firstChild) {
+    wrapper.appendChild(root.firstChild);
+  }
   return wrapper.innerHTML;
 }
 
 /** Normaliza HTML salvo pelo editor para exibição fiel na thread (listas + parágrafos após lista). */
 export function normalizeMessageHtmlForDisplay(html) {
+  try {
   const raw = String(html ?? '').trim();
   if (!raw) return '';
 
@@ -153,6 +163,10 @@ export function normalizeMessageHtmlForDisplay(html) {
   });
 
   return domNodesToHtml(root).replace(/<div>\s*<br\s*\/?>\s*<\/div>/gi, '<br />');
+  } catch (err) {
+    console.warn('[composeRichEditor] normalizeMessageHtmlForDisplay falhou', err);
+    return '';
+  }
 }
 
 export function execComposeFormat(root, action) {

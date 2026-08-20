@@ -1,6 +1,9 @@
-/** workflowNotificacao.service v1.1.0 — createCasoEspecialNotificacao (sininho sem workflow dedicado) */
+/** workflowNotificacao.service v1.2.0 — notifica responsável no pedido de informação do workflow */
 import { Types } from 'mongoose';
 import { getWorkflowNotificacaoModel, IWorkflowNotificacao } from '../models/WorkflowNotificacao';
+import type { IChamadoN1 } from '../models/ChamadoN1';
+import { User } from '../models/User';
+import { findAgenteEmailByNome } from './agenteDesk.service';
 
 export async function createWorkflowNotificacao(payload: {
   destinatarioEmail: string;
@@ -28,6 +31,75 @@ export async function createWorkflowNotificacao(payload: {
     lida: false,
   });
   return doc.toObject() as IWorkflowNotificacao;
+}
+
+/**
+ * Sininho do agente responsável quando o time de workflow pede informação.
+ * Reusa tipo `workflow_cta` (sem alteração de schema). Fail-soft se o e-mail não resolver.
+ */
+async function resolveResponsavelEmail(nome: string): Promise<string> {
+  const trimmed = String(nome || '').trim();
+  if (!trimmed) return '';
+  if (trimmed.includes('@')) return trimmed.toLowerCase();
+
+  const fromAgente = await findAgenteEmailByNome(trimmed);
+  if (fromAgente) return fromAgente;
+
+  const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const user = await User.findOne({ name: new RegExp(`^${escaped}$`, 'i') }).select('email').lean();
+  return user?.email ? String(user.email).trim().toLowerCase() : '';
+}
+
+export async function notifyWorkflowMensagemToResponsavel(
+  chamado: IChamadoN1,
+): Promise<IWorkflowNotificacao | null> {
+  const tab = chamado.tabulacao?.[chamado.tabulacao.length - 1];
+  const responsavelNome = String(tab?.responsavel || '').trim();
+  if (!responsavelNome) {
+    console.info('[workflow-notif] pedido de info sem responsável no ticket', {
+      ticketId: String(chamado._id),
+    });
+    return null;
+  }
+
+  const destinatarioEmail = await resolveResponsavelEmail(responsavelNome);
+  if (!destinatarioEmail) {
+    console.info('[workflow-notif] e-mail do responsável não resolvido', {
+      ticketId: String(chamado._id),
+      responsavelNome,
+    });
+    return null;
+  }
+
+  const workflowId = chamado.workflow?.workflowId
+    ? String(chamado.workflow.workflowId)
+    : '';
+  if (!workflowId || !Types.ObjectId.isValid(workflowId)) {
+    console.info('[workflow-notif] ticket sem workflowId válido para CTA', {
+      ticketId: String(chamado._id),
+    });
+    return null;
+  }
+
+  const protocolo = String(chamado.chamadoProtocolo || '').trim() || String(chamado._id);
+  const recado = `Você tem mensagem no ticket número ${protocolo}`;
+
+  try {
+    return await createWorkflowNotificacao({
+      destinatarioEmail,
+      ticketId: String(chamado._id),
+      chamadoProtocolo: protocolo,
+      workflowId,
+      workflowSlug: 'workflow-info-request',
+      step: chamado.workflow?.step ?? 0,
+      passoId: chamado.workflow?.passoId ? String(chamado.workflow.passoId) : null,
+      titulo: 'Workflow',
+      mensagem: recado,
+    });
+  } catch (err) {
+    console.warn('[workflow-notif] falha ao criar recado no sininho:', (err as Error).message);
+    return null;
+  }
 }
 
 /**

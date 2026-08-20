@@ -1,6 +1,6 @@
 /**
- * TicketsContext v1.8.3 — coalesce refreshTickets para reduzir tempestade /boxes
- * VERSION: v1.8.3 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.8.4 — evento de permissões não força refresh se a listagem não mudou
+ * VERSION: v1.8.4 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi, loadTicketDetailFromApi } from '../services/ticketsStorage';
@@ -15,6 +15,15 @@ import { getTicketProtocolLabel } from '../services/desk/utils';
 import deskLog from '../utils/deskDebugLog';
 import deskPlatformTrace from '../utils/deskPlatformTrace';
 import { useAuth } from './AuthContext';
+import { readCachedPermissions } from '../services/permissions/permissionService';
+
+function listingScopeFingerprint() {
+  const tickets = readCachedPermissions()?.permissoes?.tickets || {};
+  return JSON.stringify({
+    ver_todos: Boolean(tickets.ver_todos),
+    ver_meus: Boolean(tickets.ver_meus),
+  });
+}
 
 const TicketsContext = createContext(null);
 
@@ -183,12 +192,21 @@ export function TicketsProvider({ children }) {
     };
   }, [isAuthenticated, user?.email]);
 
+  const listingScopeRef = useRef('');
+
   useEffect(() => {
     if (!isAuthenticated) return undefined;
+    listingScopeRef.current = listingScopeFingerprint();
     const reloadOnPermissions = () => {
+      const next = listingScopeFingerprint();
+      if (next === listingScopeRef.current) {
+        deskLog.tickets('TicketsContext: permissões atualizadas — listagem inalterada');
+        return;
+      }
+      listingScopeRef.current = next;
       deskLog.tickets('TicketsContext: permissões atualizadas → recarregar filas');
       void refreshQueueCountsFromApi(user?.email);
-      void refreshTickets();
+      void refreshTicketsSilent();
     };
     const reloadOnQueuesChanged = () => {
       setRefreshKey((k) => k + 1);
@@ -199,7 +217,7 @@ export function TicketsProvider({ children }) {
       window.removeEventListener('velodesk:permissions', reloadOnPermissions);
       window.removeEventListener('velodesk:queues-changed', reloadOnQueuesChanged);
     };
-  }, [isAuthenticated, refreshTickets]);
+  }, [isAuthenticated, refreshTicketsSilent, user?.email]);
 
   useEffect(() => {
     setOpenTabs((prev) => {

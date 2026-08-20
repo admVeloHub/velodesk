@@ -1,4 +1,4 @@
-/** chamado.mapper v2.12.2 — scanStatus alinhado por storageKey da URL do anexo */
+/** chamado.mapper v2.15.0 — inbound: janela 48h reabre; fechado gera ticket derivado */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -28,6 +28,7 @@ import {
   readWhatsAppMensagens,
   WHATSAPP_THREAD_SOURCE,
 } from './twilio/whatsappThread.service';
+import { hasPersistedWorkflowSnapshot, markWorkflowCancelledOnTicketClose } from './workflowStatus.util';
 
 function normalizeTicketMessageText(raw: string): string {
   return decodeBasicHtmlEntities(String(raw ?? '').trim());
@@ -688,7 +689,7 @@ export interface TicketDto {
   lateralForm?: Record<string, unknown>;
   workflow?: {
     active?: boolean;
-    workflowStatus?: 'active' | 'finished' | null;
+    workflowStatus?: 'active' | 'finished' | 'cancel' | null;
     workflowId?: string | null;
     step?: number;
     passoId?: string | null;
@@ -758,9 +759,7 @@ export async function buildChamadoMapContext(
   const clienteBatch = await batchLoadDadosForRefs(refs);
 
   const workflowIds = chamados
-    .filter((chamado) => (
-      chamado.workflow?.active || chamado.workflow?.workflowStatus === 'finished'
-    ) && chamado.workflow?.workflowId)
+    .filter((chamado) => hasPersistedWorkflowSnapshot(chamado.workflow))
     .map((chamado) => String(chamado.workflow!.workflowId));
 
   const workflowById = mode === 'list'
@@ -908,8 +907,12 @@ export class ChamadoClosedError extends Error {
 }
 
 export function normalizeStatusValue(status: unknown): string {
-  return String(status ?? '').trim().toLowerCase().replace(/\s+/g, '-');
+  const raw = String(status ?? '').trim().toLowerCase().replace(/\s+/g, '-');
+  if (raw === 'resolvidos') return 'resolvido';
+  return raw;
 }
+
+const INBOUND_REOPEN_STATUSES = new Set(['pendente', 'em-andamento', 'resolvido']);
 
 export function isChamadoFechado(chamado: IChamadoN1): boolean {
   return normalizeStatusValue(currentStatus(chamado)) === 'fechado';
@@ -940,8 +943,8 @@ export function isResolvedWithinReopenWindow(
 
 /**
  * Inbound: anexar no ticket existente vs criar novo.
- * - pendente / em-andamento / resolvido&lt;48h → anexar (com transição para em-aberto)
- * - fechado / cancelado / resolvido≥48h → spawn ticket novo
+ * - pendente / em-andamento / resolvido dentro da janela (48h) → anexar e ir para em-aberto
+ * - resolvido fora da janela / fechado / cancelado → ticket novo (nota de origem)
  */
 export function shouldSpawnNewTicketOnInbound(
   chamado: IChamadoN1,
@@ -950,23 +953,50 @@ export function shouldSpawnNewTicketOnInbound(
 ): boolean {
   const status = normalizeStatusValue(currentStatus(chamado));
   if (status === 'fechado' || status === 'cancelado') return true;
-  if (status === 'resolvido') {
-    return !isResolvedWithinReopenWindow(chamado, windowMs, now);
-  }
+  if (status === 'resolvido') return !isResolvedWithinReopenWindow(chamado, windowMs, now);
   return false;
 }
 
 /**
  * Status gravado ao anexar resposta do cliente no ticket existente (inbound).
- * Só deve ser chamado quando `shouldSpawnNewTicketOnInbound` é false —
- * inclui resolvido dentro da janela de 48h (antes do fechamento automático).
+ * `em-aberto` alimenta a lista "Cliente respondeu" (rótulo Em andamento no Desk).
  */
 export function resolveInboundClientReplyStatus(chamado: IChamadoN1): string | undefined {
   const status = normalizeStatusValue(currentStatus(chamado));
-  if (status === 'pendente' || status === 'em-andamento' || status === 'resolvido') {
+  if (INBOUND_REOPEN_STATUSES.has(status)) {
     return 'em-aberto';
   }
   return undefined;
+}
+
+export function buildInboundDerivedTicketNote(sourceProtocolo: string): string {
+  const proto = String(sourceProtocolo ?? '').trim() || 'ticket anterior';
+  return `Novo ticket derivado de ${proto}`;
+}
+
+/** Insere a nota de origem como primeiro registro (ticket novo derivado de fechado/expirado). */
+export function prependInboundDerivedTicketNote(
+  chamado: { registro?: IRegistro[] },
+  sourceProtocolo: string,
+  status = 'novo',
+): void {
+  const note: IRegistro = {
+    data: new Date(),
+    origin: 'agente',
+    autor: 'sistema',
+    mensagemPublica: '',
+    anexosMensagemPublica: [],
+    anotacaoInterna: buildInboundDerivedTicketNote(sourceProtocolo),
+    anexosAnotacaoInterna: [],
+    alteracoes: [],
+    metadados: {
+      trigger: 'inbound-derived-ticket',
+      sourceProtocolo: String(sourceProtocolo ?? '').trim(),
+    },
+    status,
+  };
+  if (!chamado.registro) chamado.registro = [];
+  chamado.registro.unshift(note);
 }
 
 export function assertChamadoModifiable(chamado: IChamadoN1): void {
@@ -999,6 +1029,7 @@ export function appendStatusTransition(
     metadados: params.metadados ?? {},
     status,
   });
+  markWorkflowCancelledOnTicketClose(chamado, status);
 }
 
 /** Tickets com último status diferente de resolvido/cancelado/fechado */
@@ -1387,7 +1418,7 @@ export async function prepareChamadoFromBody(
 
   let targetStatus = currentStatus(chamado);
   if (body.status !== undefined && String(body.status).trim()) {
-    const nextStatus = String(body.status).trim();
+    const nextStatus = normalizeStatusValue(body.status);
     if (nextStatus !== targetStatus) {
       targetStatus = nextStatus;
       pendingChanges.status = nextStatus;
@@ -1535,6 +1566,8 @@ export async function commitChamadoFromAgent(
   ensureConsumidorGovChannelStamp(chamado, body);
   ensureBacenChannelStamp(chamado, body);
 
+  markWorkflowCancelledOnTicketClose(chamado, targetStatus);
+
   return {
     messageResult,
     publicText,
@@ -1577,6 +1610,7 @@ export async function applyBodyToChamado(
   ensureProconChannelStamp(chamado, body);
   ensureConsumidorGovChannelStamp(chamado, body);
   ensureBacenChannelStamp(chamado, body);
+  markWorkflowCancelledOnTicketClose(chamado, targetStatus);
 }
 
 export interface AppendRegistroResult {
@@ -1738,10 +1772,7 @@ async function chamadoToTicketFull(
   if (!cadastro) cadastro = legacyDadosFromRef(ref);
 
   let lateralWorkflow: Record<string, unknown> | undefined;
-  if (
-    (chamado.workflow?.active || chamado.workflow?.workflowStatus === 'finished')
-    && chamado.workflow.workflowId
-  ) {
+  if (hasPersistedWorkflowSnapshot(chamado.workflow)) {
     const definicao = await loadWorkflowDefForChamado(chamado);
     if (definicao) {
       lateralWorkflow = buildLateralWorkflowDto(chamado, definicao) ?? undefined;
@@ -1911,8 +1942,7 @@ function buildTicketDtoCore(
   let lateralWorkflow: Record<string, unknown> | undefined = extras.lateralWorkflow;
   if (
     !lateralWorkflow
-    && (chamado.workflow?.active || chamado.workflow?.workflowStatus === 'finished')
-    && chamado.workflow.workflowId
+    && hasPersistedWorkflowSnapshot(chamado.workflow)
     && listOnly
     && ctx
   ) {
@@ -1973,7 +2003,7 @@ function buildTicketDtoCore(
     clientName,
     clientCPF: clientCpf,
     responsibleAgent: responsavel,
-    workflow: chamado.workflow?.active || chamado.workflow?.workflowStatus === 'finished'
+    workflow: hasPersistedWorkflowSnapshot(chamado.workflow) && chamado.workflow
       ? {
         active: chamado.workflow.active,
         workflowStatus: chamado.workflow.workflowStatus

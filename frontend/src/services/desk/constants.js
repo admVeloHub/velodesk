@@ -1,6 +1,6 @@
 /**
  * Desk CRM — constantes de filas e classificação
- * VERSION: v2.3.6 | DATE: 2026-08-03
+ * VERSION: v2.3.7 | DATE: 2026-08-20
  */
 export const MEUS_TICKETS_QUEUE_ID = 'meus-tickets';
 
@@ -98,6 +98,9 @@ export const SLA_SHORT_LABELS = {
 
 /** Corretor ortográfico do compose — desativado enquanto revisão IA for obrigatória */
 export const COMPOSE_SPELLCHECK_ENABLED = false;
+
+/** Resposta pública digitada na mão exige Revisor de Texto antes do envio. Sugestão da IA já conta como revisada. */
+export const COMPOSE_AI_REVIEW_REQUIRED = true;
 
 /** Termômetro do cliente no painel direito — oculto temporariamente no front. */
 export const DESK_THERMOMETER_UI_ENABLED = false;

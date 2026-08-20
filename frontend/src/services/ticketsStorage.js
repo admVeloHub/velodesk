@@ -1,6 +1,6 @@
 /**
- * ticketsStorage v1.4.2 — claimTicketResponsavelViaApi para assumir ticket rápido
- * VERSION: v1.4.2 | DATE: 2026-08-19
+ * ticketsStorage v1.4.3 — mapTicketQueueId cobre pendente e colunas meus-*
+ * VERSION: v1.4.3 | DATE: 2026-08-20
  */
 import {
   getCachedColumns,
@@ -67,10 +67,20 @@ export function mapTicketQueueId(ticket, boxId) {
   if (custom) return custom.id;
 
   const normalizedBox = String(boxId || ticket?.boxId || '').trim();
-  if (normalizedBox === 'resolvidos') return 'resolvidos';
-  if (normalizedBox === 'novos') return 'novos';
-  if (normalizedBox === 'em-espera' || normalizedBox === 'pendentes') return 'pendente';
-  if (normalizedBox === 'em-andamento') return 'em-andamento';
+  if (normalizedBox === 'resolvidos' || normalizedBox === 'meus-resolvidos') return 'resolvidos';
+  if (normalizedBox === 'novos' || normalizedBox === 'meus-novos') return 'novos';
+  if (
+    normalizedBox === 'em-espera'
+    || normalizedBox === 'pendentes'
+    || normalizedBox === 'pendente'
+    || normalizedBox === 'meus-pendente'
+  ) return 'pendente';
+  if (
+    normalizedBox === 'em-andamento'
+    || normalizedBox === 'em-aberto'
+    || normalizedBox === 'meus-em-andamento'
+    || normalizedBox === 'meus-em-aberto'
+  ) return 'em-andamento';
 
   const status = String(ticket?.status || '').trim().toLowerCase();
   const entries = Object.entries(QUEUE_MAP);

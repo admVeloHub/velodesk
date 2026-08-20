@@ -1,9 +1,10 @@
 /**
- * geminiRefinar.service v1.1.0 — flash-lite prioritário, timeout e fallback rápido
- * VERSION: v1.1.0 | DATE: 2026-07-30
+ * geminiRefinar.service v1.1.1 — saída núcleo + strip abertura mecânica residual
+ * VERSION: v1.1.1 | DATE: 2026-08-20
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from '../config/env';
+import { stripComposerOpening } from './clientMessageEnvelope.service';
 import { getRefinarRascunhoPersona } from './refinarRascunhoPersona';
 import { logAiUsage } from './aiUsage.service';
 
@@ -95,12 +96,12 @@ function buildUserBlock(rascunho: string, nomeOperador: string): string {
   const nome = String(nomeOperador || '').trim() || 'não informado';
   return (
     '## Dados desta solicitação\n\n'
-    + '- **Nome do operador** (usar no lugar de [Nome do Operador] no template; se for "não informado", use cumprimento profissional sem inventar nome): '
+    + '- **Nome do operador** (contexto interno; **não** incluir apresentação na saída): '
     + `${nome}\n\n`
     + '- **Rascunho do colaborador** (única fonte do desenvolvimento; não invente prazos, valores nem procedimentos):\n\n'
     + `${rascunho}\n\n`
     + '## Tarefa\n\n'
-    + 'Aplique a persona (travas, estrutura do e-mail). **Saída:** somente o corpo do e-mail refinado em português brasileiro, texto simples, sem rascunho repetido, sem análise, sem seções, sem preâmbulo.\n'
+    + 'Aplique a persona (travas, estrutura do núcleo). **Saída:** somente o núcleo operacional refinado em português brasileiro, texto simples, sem saudação, apresentação, assinatura ou rodapé, sem rascunho repetido, sem análise, sem seções, sem preâmbulo.\n'
   );
 }
 
@@ -162,7 +163,8 @@ export async function generateRefinarRascunhoWithGemini(params: {
   for (const modelName of modelsToTry) {
     const modelStarted = Date.now();
     try {
-      const response = await callGeminiModel(modelName, userBlock, params.userId);
+      const rawResponse = await callGeminiModel(modelName, userBlock, params.userId);
+      const response = stripComposerOpening(String(rawResponse || '').trim()) || String(rawResponse || '').trim();
       console.info('[gemini-refinar] ok', {
         model: modelName,
         ms: Date.now() - startedAt,

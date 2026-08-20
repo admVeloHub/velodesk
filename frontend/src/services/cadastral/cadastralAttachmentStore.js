@@ -1,13 +1,18 @@
 /**
- * cadastralAttachmentStore v1.0.0 — blobs de anexos Erros/Bugs (IndexedDB)
- * VERSION: v1.0.0 | DATE: 2026-07-23
+ * cadastralAttachmentStore v1.1.0 — limite de vídeo 25MB (evidências de workflow)
+ * VERSION: v1.1.0 | DATE: 2026-08-20
  */
 
 const DB_NAME = 'velodesk_cadastral_attachments';
 const DB_VERSION = 1;
 const STORE_NAME = 'attachments';
 
-export const ATTACHMENT_MAX_BYTES = 4 * 1024 * 1024;
+/** Imagens — capturas de tela / fotos de evidência. */
+export const ATTACHMENT_MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+/** Vídeos — evidências do cliente; alinhado a attachmentGuard (25MB). */
+export const ATTACHMENT_MAX_VIDEO_BYTES = 25 * 1024 * 1024;
+/** @deprecated use ATTACHMENT_MAX_IMAGE_BYTES */
+export const ATTACHMENT_MAX_BYTES = ATTACHMENT_MAX_IMAGE_BYTES;
 export const MAX_ATTACHMENT_IMAGES = 5;
 export const MAX_ATTACHMENT_VIDEOS = 2;
 
@@ -57,8 +62,10 @@ async function withStore(mode, callback) {
 
 export function validateAttachmentFile(file, { isVideo = false } = {}) {
   if (!file) return 'Arquivo inválido.';
-  if (file.size > ATTACHMENT_MAX_BYTES) {
-    return `Arquivo muito grande (máx. ${Math.round(ATTACHMENT_MAX_BYTES / (1024 * 1024))} MB).`;
+  const maxBytes = isVideo ? ATTACHMENT_MAX_VIDEO_BYTES : ATTACHMENT_MAX_IMAGE_BYTES;
+  const kindLabel = isVideo ? 'vídeo' : 'imagem';
+  if (file.size > maxBytes) {
+    return `${kindLabel.charAt(0).toUpperCase()}${kindLabel.slice(1)} muito grande (máx. ${Math.round(maxBytes / (1024 * 1024))} MB).`;
   }
   if (isVideo) {
     if (!String(file.type || '').startsWith('video/')) return 'Selecione um arquivo de vídeo.';

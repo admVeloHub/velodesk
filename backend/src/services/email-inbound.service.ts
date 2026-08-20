@@ -1,4 +1,4 @@
-/** email-inbound.service v1.17.0 — prazo legal em horário civil BRT (-03:00) */
+/** email-inbound.service v1.19.1 — descarta logo Velotax citado na resposta do cliente */
 import { addBrCivilDaysIso } from './dates/brDateTime.util';
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -6,10 +6,15 @@ import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
 import { applyAssignmentIfNeeded } from './assignmentRouter.service';
 import {
   appendMessage,
+  appendStatusTransition,
   createChamadoFromBody,
+  currentStatus,
+  normalizeStatusValue,
+  prependInboundDerivedTicketNote,
   resolveInboundClientReplyStatus,
   shouldSpawnNewTicketOnInbound,
 } from './chamado.mapper';
+import { publishTicketEvent } from './realtime/ticketEventsBroadcast.service';
 import { normalizeEmail, resolveClienteRefFromEmail } from './cliente.service';
 import { notifyTicketOpenedAsync } from './emailNotification.service';
 import { runInboundPostCreateHooks } from './agents/inboundAgentPipeline.service';
@@ -24,6 +29,7 @@ import { extractEmailReplyContent } from './emailReplyContent.util';
 import {
   attachmentMatchesKnownFingerprints,
   collectChamadoAttachmentFingerprints,
+  isBrandInlineAttachmentFilename,
 } from './attachmentFilter.util';
 import type { InboundEmailPayload, InboundEmailProcessResult } from './inbound-email/types';
 import type { IChamadoN1 } from '../models/ChamadoN1';
@@ -113,6 +119,47 @@ export function resolveEmailBody(payload: InboundEmailPayload): string {
 
   const raw = text || (htmlRaw ? stripHtml(htmlRaw) : '');
   return extractEmailReplyContent(raw);
+}
+
+/** Corpo a persistir: extração da resposta, senão o texto cru — nunca descarta o e-mail. */
+export function resolveEmailBodyForPersist(payload: InboundEmailPayload): string {
+  const extracted = resolveEmailBody(payload).trim();
+  if (extracted) return extracted;
+  const rawText = String(payload.textBody ?? '').trim();
+  if (rawText) return rawText;
+  const rawHtml = String(payload.htmlBody ?? '').trim();
+  if (rawHtml) return stripHtml(rawHtml);
+  return '';
+}
+
+function persistInboundEmailOnChamado(
+  chamado: IChamadoN1,
+  payload: InboundEmailPayload,
+  bodyText: string,
+  attachments: string[],
+  emailMeta: Record<string, unknown>,
+  statusOverride?: string,
+): void {
+  const autor = payload.from.name || payload.from.email;
+  const textToStore = bodyText.trim() || (attachments.length ? '' : '[E-mail recebido]');
+  const lenBefore = chamado.registro?.length ?? 0;
+  appendMessage(chamado, textToStore, false, 'them', attachments, emailMeta, statusOverride);
+  if ((chamado.registro?.length ?? 0) > lenBefore) return;
+
+  if (!chamado.registro) chamado.registro = [];
+  const status = String(statusOverride || currentStatus(chamado) || 'em-aberto').trim();
+  chamado.registro.push({
+    data: new Date(),
+    origin: 'cliente',
+    autor,
+    mensagemPublica: textToStore || '[E-mail recebido]',
+    anexosMensagemPublica: attachments,
+    anotacaoInterna: '',
+    anexosAnotacaoInterna: [],
+    alteracoes: statusOverride ? [{ status }] : [],
+    metadados: emailMeta,
+    status,
+  });
 }
 
 export function extractProtocolFromSubject(subject: string): string | null {
@@ -221,6 +268,17 @@ function retainOnlyNewAttachments(
     });
   }
   payload.attachments = kept;
+}
+
+function dropBrandInlineAttachments(payload: InboundEmailPayload): void {
+  const attachments = payload.attachments ?? [];
+  if (!attachments.length) return;
+  payload.attachments = attachments.filter((item) => {
+    const filename = String(item.filename || '').trim();
+    const url = String(item.url || '').trim();
+    return !isBrandInlineAttachmentFilename(filename)
+      && !isBrandInlineAttachmentFilename(url);
+  });
 }
 
 function buildAttachmentMetadados(payload: InboundEmailPayload): Record<string, unknown> {
@@ -560,8 +618,9 @@ async function runInboundEmailFlow(
 
   const existing = await findChamadoForEmailReply(payload);
   retainOnlyNewAttachments(payload, existing);
+  dropBrandInlineAttachments(payload);
 
-  const bodyText = appendAttachmentReferencesToBody(resolveEmailBody(payload), payload);
+  const bodyText = appendAttachmentReferencesToBody(resolveEmailBodyForPersist(payload), payload);
 
   const bacenParsed = isBacenRdrStructuredInboundEmail(payload, bodyText)
     ? parseBacenRdrInboundEmail(bodyText)
@@ -603,8 +662,18 @@ async function runInboundEmailFlow(
 
   if (existing && !shouldSpawnNewTicketOnInbound(existing)) {
     const statusOverride = resolveInboundClientReplyStatus(existing);
-    appendMessage(existing, bodyText, false, 'them', attachments, emailMeta, statusOverride);
+    persistInboundEmailOnChamado(existing, payload, bodyText, attachments, emailMeta, statusOverride);
+    const current = normalizeStatusValue(currentStatus(existing));
+    if (statusOverride && statusOverride !== current) {
+      appendStatusTransition(existing, statusOverride, {
+        origin: 'cliente',
+        autor: payload.from.name || payload.from.email,
+        metadados: { trigger: 'email-inbound-reply' },
+      });
+    }
+    existing.markModified('registro');
     await existing.save();
+    void publishTicketEvent(existing._id.toString(), 'message');
     await ChamadoIaAnalise.updateOne(
       { chamadoId: existing._id, origem: { $ne: 'manual' } },
       { $set: { needsReanalysis: true } },
@@ -699,6 +768,13 @@ async function runInboundEmailFlow(
       ...(isPriority ? { mailPriority: 'alta' } : {}),
     };
     partial.registro[0].alteracoes = partial.registro[0].alteracoes ?? [];
+  }
+
+  if (existing) {
+    prependInboundDerivedTicketNote(partial, existing.chamadoProtocolo, 'novo');
+    if (existing.cliente?.length && (!partial.cliente || partial.cliente.length === 0)) {
+      partial.cliente = existing.cliente;
+    }
   }
 
   if (!cgovStructured && !bacenStructured && clienteRef && (!partial.cliente || partial.cliente.length === 0)) {

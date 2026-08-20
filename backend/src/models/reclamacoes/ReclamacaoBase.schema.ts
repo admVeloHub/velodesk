@@ -1,4 +1,4 @@
-/** ReclamacaoBase.schema v1.3.0 — índice unique esparso em idDemandaExterna */
+/** ReclamacaoBase.schema v1.4.0 — workflowStatus inclui cancel */
 import { Schema, Document, Types } from 'mongoose';
 import type { CasoEspecialOrgao } from '../../services/agents/casosEspeciais.types';
 
@@ -27,7 +27,7 @@ export interface IReclamacaoWorkflowRequisicao {
  */
 export interface IReclamacaoWorkflow {
   active: boolean;
-  workflowStatus?: 'active' | 'finished' | null;
+  workflowStatus?: 'active' | 'finished' | 'cancel' | null;
   workflowId: Types.ObjectId | null;
   step: number;
   passoId: Types.ObjectId | null;
@@ -110,7 +110,7 @@ const ReclamacaoWorkflowRequisicaoSchema = new Schema<IReclamacaoWorkflowRequisi
 const ReclamacaoWorkflowSchema = new Schema<IReclamacaoWorkflow>(
   {
     active: { type: Boolean, default: false },
-    workflowStatus: { type: String, enum: ['active', 'finished'], default: null },
+    workflowStatus: { type: String, enum: ['active', 'finished', 'cancel'], default: null },
     workflowId: { type: Schema.Types.ObjectId, default: null },
     step: { type: Number, default: 0 },
     passoId: { type: Schema.Types.ObjectId, default: null },

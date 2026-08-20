@@ -1,6 +1,6 @@
 /**
- * ProdSolicAttachments v1.1.0 — miniaturas + file ref para IndexedDB
- * VERSION: v1.1.0 | DATE: 2026-07-23
+ * ProdSolicAttachments v1.1.1 — validação com limites distintos imagem/vídeo
+ * VERSION: v1.1.1 | DATE: 2026-08-20
  */
 import React, { useRef } from 'react';
 import { toAttachmentMetadata } from '../../../services/cadastral/cadastralRequestStore';

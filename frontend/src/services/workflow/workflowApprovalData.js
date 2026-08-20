@@ -1,6 +1,6 @@
 /**
- * workflowApprovalData v1.5.5 — anexos do ticket no console de aprovações
- * VERSION: v1.5.5 | DATE: 2026-08-19
+ * workflowApprovalData v1.6.0 — console omite finished/cancel e atribuido de outro time
+ * VERSION: v1.6.0 | DATE: 2026-08-20
  */
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { findCadastralRequestByTicketId } from '../cadastral/cadastralRequestStore';
@@ -19,14 +19,15 @@ import {
 import { resolveApprovalHeader, ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import {
   agentCanDecideTicket as permAgentCanDecide,
-  canActOnTicket,
   canApproveWorkflow,
 } from '../permissions/permissionService';
 import { ticketAwaitingProdutosComunicacaoReview } from './workflowDecisionHandlers';
 import {
   getWorkflowTeamQueueMeta,
   isTeamStepActive,
+  isWorkflowStatusOffApprovalConsole,
   isWorkflowTicketCompleted,
+  ticketAtribuidoMatchesWorkflowQueue,
   ticketMatchesWorkflowTeam,
   WORKFLOW_TEAM_QUEUES,
 } from './workflowTeamQueues';
@@ -914,8 +915,9 @@ function collectAssigneeWorkflowEntries() {
 
   getAllCockpitTickets().forEach((entry) => {
     const { ticket } = entry;
+    if (isWorkflowStatusOffApprovalConsole(ticket)) return;
     if (!isTicketWorkflowActive(ticket)) return;
-    if (!canActOnTicket(ticket)) return;
+    if (!agentCanDecideTicket(ticket)) return;
     const progress = getWorkflowProgress(ticket);
     items.push({ entry, progress, queueItem: buildQueueItem(entry) });
   });
@@ -974,7 +976,11 @@ function collectTeamWorkflowEntries(teamId) {
 
   getAllCockpitTickets().forEach((entry) => {
     const { ticket } = entry;
-    if (!ticketMatchesWorkflowTeam(ticket, teamId)) return;
+    if (isWorkflowStatusOffApprovalConsole(ticket)) return;
+    if (!isTicketWorkflowActive(ticket)) return;
+    const atribuidoNoTime = ticketAtribuidoMatchesWorkflowQueue(ticket, teamId);
+    const atribuidoNoAgente = agentCanDecideTicket(ticket) && ticketMatchesWorkflowTeam(ticket, teamId);
+    if (!atribuidoNoTime && !atribuidoNoAgente) return;
     const progress = getWorkflowProgress(ticket);
     items.push({ entry, progress, queueItem: buildQueueItem(entry, teamId) });
   });
@@ -1009,6 +1015,7 @@ function collectPendingEntries() {
 
   getAllCockpitTickets().forEach((entry) => {
     const { ticket } = entry;
+    if (isWorkflowStatusOffApprovalConsole(ticket)) return;
     if (!isTicketWorkflowActive(ticket)) return;
     if (!agentCanDecideTicket(ticket)) return;
     const progress = getWorkflowProgress(ticket);
@@ -1040,14 +1047,9 @@ export function computeWorkflowTeamQueue(teamId, options = {}) {
   const label = meta?.name || teamId;
   const finalizedView = options.view === 'finalizados' || options.view === 'respondidos';
   let entries = sortTeamQueueEntries(collectTeamWorkflowEntries(teamId), teamId);
+  entries = entries.filter(({ entry }) => !isWorkflowStatusOffApprovalConsole(entry.ticket));
   if (!finalizedView) {
     entries = entries.filter(({ entry }) => !isWorkflowTicketCompleted(entry.ticket));
-  } else {
-    entries = entries.filter(({ entry }) => {
-      const comp = isWorkflowTicketCompleted(entry.ticket);
-      const progress = getWorkflowProgress(entry.ticket);
-      return comp || progress?.workflow?.status === 'completed' || ticketAwaitingProdutosComunicacaoReview(entry.ticket);
-    });
   }
   let slaCritical = 0;
   let awaitingDecisionCount = 0;
@@ -1102,7 +1104,13 @@ export function computeWorkflowApprovalQueue() {
 export function getWorkflowTeamDetail(ticketId, teamId) {
   const id = String(ticketId);
   const match = getAllCockpitTickets().find(({ ticket }) => String(ticket.id) === id);
-  if (!match || !ticketMatchesWorkflowTeam(match.ticket, teamId)) return null;
+  if (!match || isWorkflowStatusOffApprovalConsole(match.ticket) || !isTicketWorkflowActive(match.ticket)) {
+    return null;
+  }
+  const atribuidoNoTime = ticketAtribuidoMatchesWorkflowQueue(match.ticket, teamId);
+  const atribuidoNoAgente = agentCanDecideTicket(match.ticket)
+    && ticketMatchesWorkflowTeam(match.ticket, teamId);
+  if (!atribuidoNoTime && !atribuidoNoAgente) return null;
 
   const progress = getWorkflowProgress(match.ticket);
   const awaitingDecision = ticketAwaitingDecision(match.ticket, progress);
@@ -1130,7 +1138,9 @@ export function getWorkflowTeamDetail(ticketId, teamId) {
 export function getWorkflowAssigneeDetail(ticketId) {
   const id = String(ticketId);
   const match = getAllCockpitTickets().find(({ ticket }) => String(ticket.id) === id);
-  if (!match || !canActOnTicket(match.ticket)) return null;
+  if (!match || isWorkflowStatusOffApprovalConsole(match.ticket) || !agentCanDecideTicket(match.ticket)) {
+    return null;
+  }
 
   const progress = getWorkflowProgress(match.ticket);
   const awaitingDecision = ticketAwaitingDecision(match.ticket, progress);
@@ -1159,6 +1169,9 @@ export function getWorkflowApprovalDetail(ticketId, teamId = null) {
   const id = String(ticketId);
   let match = getAllCockpitTickets().find(({ ticket }) => String(ticket.id) === id);
   if (!match) return null;
+  if (isWorkflowStatusOffApprovalConsole(match.ticket) || !isTicketWorkflowActive(match.ticket)) {
+    return null;
+  }
   const progress = getWorkflowProgress(match.ticket);
   if (!ticketAwaitingDecision(match.ticket, progress)) return null;
   return buildDetailView(match.ticket, progress);

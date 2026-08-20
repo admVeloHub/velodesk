@@ -1,8 +1,10 @@
-/** attachmentFilter.util v1.2.0 — dedupe por hash/conteúdo, não só por nome */
+/** attachmentFilter.util v1.2.1 — logo velotax_ajustada também é marca, não anexo do cliente */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 
 const BRAND_INLINE_FILENAME_PATTERNS = [
   /simbolo_velotax/i,
+  /velotax_ajustada/i,
+  /velotax_logo/i,
   /velotax.*logo/i,
   /^velodesk-brand/i,
   /^logo\.(png|jpe?g|gif|webp)$/i,

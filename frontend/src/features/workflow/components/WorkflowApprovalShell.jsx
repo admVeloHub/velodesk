@@ -1,6 +1,6 @@
 /**
- * WorkflowApprovalShell v1.9.0 — polling silencioso + Realtime workflow
- * VERSION: v1.9.0 | DATE: 2026-08-19
+ * WorkflowApprovalShell v1.9.1 — console não atua em workflow cancel/finished
+ * VERSION: v1.9.1 | DATE: 2026-08-20
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -204,8 +204,9 @@ export default function WorkflowApprovalShell() {
   );
 
   const canAdvanceWorkflow = useMemo(() => {
+    if (!selectedTicket || !isTicketWorkflowActive(selectedTicket)) return false;
     if (selectedTicket?.workflow?.pendingPersist) return false;
-    if (!workflowProgress || workflowProgress.workflow?.status === 'completed') return false;
+    if (!workflowProgress || workflowProgress.workflow?.status === 'completed' || workflowProgress.workflow?.status === 'cancelled') return false;
     const step = workflowProgress.activeStep;
     if (!step) return false;
     if (step.acao?.tipo === 'automatica' || step.atribuicao?.tipo === 'sistema') {
@@ -374,6 +375,7 @@ export default function WorkflowApprovalShell() {
 
   const handleRequestInfoSubmit = useCallback(async (message) => {
     if (!selectedId || busy) return null;
+    if (selectedTicket && !isTicketWorkflowActive(selectedTicket)) return null;
     setBusy(true);
     try {
       const updated = await requestWorkflowInfo(selectedId, message, 'workflow');
@@ -387,7 +389,7 @@ export default function WorkflowApprovalShell() {
     } finally {
       setBusy(false);
     }
-  }, [busy, refreshTickets, selectedId, showNotification]);
+  }, [busy, refreshTickets, selectedId, selectedTicket, showNotification]);
 
   const handleAdvanceWorkflow = useCallback(async () => {
     if (!selectedId || advancingWorkflow) return;

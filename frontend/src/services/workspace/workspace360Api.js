@@ -1,12 +1,55 @@
 /**
- * workspace360Api v1.0.0 — Painel 360° via GET /api/workspace360
- * VERSION: v1.0.0 | DATE: 2026-07-06
+ * workspace360Api v1.1.1 — fingerprint aceita kpis objeto (payload agente)
+ * VERSION: v1.1.1 | DATE: 2026-08-20
  */
 import api from '../../api/client';
+
+/** Intervalo do poll invisível no Painel 360° (alinhado ao refresh leve do Desk). */
+export const WORKSPACE360_POLL_MS = 15000;
 
 export async function fetchWorkspace360(params) {
   const { data } = await api.get('/workspace360', { params });
   return data;
+}
+
+function kpiFingerprint(kpis) {
+  if (!kpis) return '';
+  if (Array.isArray(kpis)) {
+    return kpis.map((k) => `${k?.id}:${k?.value}`).join('|');
+  }
+  return Object.keys(kpis)
+    .sort()
+    .map((key) => `${key}:${kpis[key]}`)
+    .join('|');
+}
+
+function sectionTicketIds(section) {
+  const rows = section?.entries ?? section?.tickets ?? [];
+  return rows
+    .map((entry) => {
+      const t = entry?.ticket ?? entry;
+      return String(t?.id ?? t?._id ?? '').trim();
+    })
+    .filter(Boolean)
+    .join(',');
+}
+
+/** Assinatura estável para evitar re-render quando o payload não mudou. */
+export function fingerprintWorkspace360Payload(payload) {
+  if (!payload) return '';
+  const sections = (payload.sections ?? []).map((section) => ({
+    id: section.id,
+    count: section.count ?? 0,
+    tickets: sectionTicketIds(section),
+  }));
+  return JSON.stringify({
+    alert: payload.alert?.ticketId ?? null,
+    kpis: kpiFingerprint(payload.kpis),
+    sections,
+    productionWeek: (payload.productionWeek ?? []).map((d) => d.value).join(','),
+    escalated: payload.escalated?.slaCriticalCount ?? null,
+    leaderboard: (payload.leaderboard?.ranking ?? []).length,
+  });
 }
 
 export async function fetchWorkspace360Report(reportId, filters = {}) {

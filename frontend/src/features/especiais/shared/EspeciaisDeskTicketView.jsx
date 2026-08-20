@@ -189,6 +189,7 @@ export default function EspeciaisDeskTicketView({
                   />
                   <DeskComposePanel
                     ticketId={ticket?.id || ticketId}
+                    ticket={ticket}
                     variant="full"
                     composeMode={composeMode}
                     composeText={composeText}

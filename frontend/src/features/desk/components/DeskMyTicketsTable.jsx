@@ -1,6 +1,6 @@
 /**
- * DeskMyTicketsTable v1.5.5 — Meus Tickets: só responsável/atribuído do agente logado
- * VERSION: v1.5.5 | DATE: 2026-08-11
+ * DeskMyTicketsTable v1.5.9 — ícone de workflow imediatamente após o título
+ * VERSION: v1.5.9 | DATE: 2026-08-20
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -13,6 +13,7 @@ import {
   groupMyTicketsByStatus,
   normalizeTicketForDeskV2,
 } from '../../../services/desk/utils';
+import { getClient360WorkflowIconMeta } from '../../../services/workflow/workflowTeamQueues';
 import { SLA_SHORT_LABELS } from '../../../services/desk/constants';
 
 function renderTicketRows(sectionEntries, onSelectTicket) {
@@ -23,6 +24,7 @@ function renderTicketRows(sectionEntries, onSelectTicket) {
     const slaClass = getSlaClass(ticket);
     const slaLabel = formatTicketSlaRemaining(ticket);
     const slaStatus = SLA_SHORT_LABELS[slaClass] || 'No prazo';
+    const workflowIcon = getClient360WorkflowIconMeta(ticket);
 
     return (
       <tr
@@ -35,7 +37,18 @@ function renderTicketRows(sectionEntries, onSelectTicket) {
       >
         <td className="desk-my-tickets-table__num">{protocol || '—'}</td>
         <td className="desk-my-tickets-table__title-cell">
-          <span className="desk-my-tickets-table__subject" title={title}>{title}</span>
+          <span className="desk-my-tickets-table__title-inner">
+            <span className="desk-my-tickets-table__subject" title={title}>{title}</span>
+            {workflowIcon ? (
+              <span
+                className={`client360-workflow-icon client360-workflow-icon--${workflowIcon.modifier}`}
+                title={workflowIcon.title}
+                aria-label={workflowIcon.title}
+              >
+                <i className={`ti ${workflowIcon.icon}`} aria-hidden="true" />
+              </span>
+            ) : null}
+          </span>
         </td>
         <td className="desk-my-tickets-table__sla">
           <span className={'desk-my-tickets-table__sla-badge desk-my-tickets-table__sla-badge--' + slaClass}>

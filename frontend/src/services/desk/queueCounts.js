@@ -1,6 +1,6 @@
 /**
- * queueCounts v1.0.0 — contadores reais das filas (Mongo), cache + polling + delta otimista
- * VERSION: v1.0.0 | DATE: 2026-08-07 | AUTHOR: VeloHub Development Team
+ * queueCounts v1.1.0 — delta otimista em qualquer troca de fila (não só Resolvidos)
+ * VERSION: v1.1.0 | DATE: 2026-08-20
  */
 import { boxesApi } from '../../api/client';
 import { isBackendJwtUsable } from '../../utils/backendJwt';
@@ -100,21 +100,36 @@ export function getDeskQueueDisplayCount(queueId) {
   return Math.max(0, base + delta);
 }
 
+function toDeskQueueCountId(queueId) {
+  const id = String(queueId || '').trim();
+  if (AGENT_DESK_QUEUE_IDS.has(id)) return id;
+  if (id === 'meus-novos') return 'novos';
+  if (id === 'em-aberto' || id === 'meus-em-aberto' || id === 'meus-em-andamento') return 'em-andamento';
+  if (id === 'em-espera' || id === 'pendentes' || id === 'meus-pendente') return 'pendente';
+  if (id === 'meus-resolvidos') return 'resolvidos';
+  return null;
+}
+
 export function bumpDeskQueueCountOptimistic(queueId, delta = 1) {
-  const normalized = String(queueId || '').trim();
-  if (!AGENT_DESK_QUEUE_IDS.has(normalized) || !Number.isFinite(delta) || delta === 0) return;
+  const normalized = toDeskQueueCountId(queueId);
+  if (!normalized || !Number.isFinite(delta) || delta === 0) return;
   optimisticDeltas[normalized] = Number(optimisticDeltas[normalized] || 0) + delta;
   dispatchCountsChanged();
 }
 
+/** Entre pollings: move entre filas do Desk até a contagem real chegar. */
+export function markTicketMovedOptimistic(sourceQueueId, targetQueueId) {
+  const from = toDeskQueueCountId(sourceQueueId);
+  const to = toDeskQueueCountId(targetQueueId);
+  if (!from && !to) return;
+  if (from === to) return;
+  if (from) bumpDeskQueueCountOptimistic(from, -1);
+  if (to) bumpDeskQueueCountOptimistic(to, 1);
+}
+
 /** Entre pollings: ticket finalizado incrementa Resolvidos até a contagem real chegar. */
 export function markTicketResolvedOptimistic(sourceQueueId) {
-  const source = String(sourceQueueId || '').trim();
-  if (source === 'resolvidos') return;
-  bumpDeskQueueCountOptimistic('resolvidos', 1);
-  if (source && AGENT_DESK_QUEUE_IDS.has(source) && source !== 'resolvidos') {
-    bumpDeskQueueCountOptimistic(source, -1);
-  }
+  markTicketMovedOptimistic(sourceQueueId, 'resolvidos');
 }
 
 export async function refreshQueueCountsFromApi(userEmail = '') {

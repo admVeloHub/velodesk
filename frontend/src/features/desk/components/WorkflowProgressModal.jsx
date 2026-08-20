@@ -1,11 +1,12 @@
 /**
- * WorkflowProgressModal v1.1.0 — confirmação visual de workflow concluído
- * VERSION: v1.1.0 | DATE: 2026-08-18
+ * WorkflowProgressModal v1.2.0 — cancel: passos não cumpridos + selo interrompido
+ * VERSION: v1.2.0 | DATE: 2026-08-20
  */
 import React, { useEffect, useMemo } from 'react';
 import {
   getWorkflowProgress,
   isTicketInWorkflow,
+  isTicketWorkflowCancelled,
   isTicketWorkflowFinished,
 } from '../../../services/desk/utils';
 import { getWorkflowStepSubtitle } from '../../../services/desk/workflowDefinitions';
@@ -14,6 +15,9 @@ import { useWorkflowConfig } from '../../../context/WorkflowConfigContext';
 function StepIcon({ step }) {
   if (step.state === 'completed') {
     return <i className="ti ti-check" aria-hidden="true" />;
+  }
+  if (step.state === 'skipped') {
+    return <i className="ti ti-x" aria-hidden="true" />;
   }
   return <i className={'ti ' + step.icon} aria-hidden="true" />;
 }
@@ -48,6 +52,7 @@ export default function WorkflowProgressModal({
 
   const { template, stepsWithState } = progress;
   const workflowFinished = isTicketWorkflowFinished(ticket);
+  const workflowCancelled = isTicketWorkflowCancelled(ticket);
 
   return (
     <div
@@ -103,13 +108,18 @@ export default function WorkflowProgressModal({
         </ol>
 
         <footer className="desk-workflow-modal__footer">
-          {workflowFinished ? (
+          {workflowCancelled ? (
+            <span className="desk-workflow-modal__finished desk-workflow-modal__finished--cancelled">
+              <i className="ti ti-x" aria-hidden="true" />
+              Workflow interrompido
+            </span>
+          ) : workflowFinished ? (
             <span className="desk-workflow-modal__finished">
               <i className="ti ti-check" aria-hidden="true" />
               Workflow concluído
             </span>
           ) : null}
-          {canCancel ? (
+          {canCancel && !workflowCancelled && !workflowFinished ? (
             <button
               type="button"
               className="btn-danger desk-workflow-modal__btn-cancel"
@@ -121,7 +131,7 @@ export default function WorkflowProgressModal({
           ) : (
             <span aria-hidden="true" />
           )}
-          {canAdvance ? (
+          {canAdvance && !workflowCancelled && !workflowFinished ? (
             <button
               type="button"
               className="btn-primary desk-workflow-modal__btn-advance"

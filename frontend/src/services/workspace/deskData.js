@@ -1,13 +1,14 @@
 /**
  * Workspace — dados operacionais do painel 360°
- * VERSION: v2.5.1 | DATE: 2026-08-18
- * — Workflows finished ficam fora das filas operacionais
+ * VERSION: v2.5.2 | DATE: 2026-08-20
+ * — prefetchAgent360TicketDetails para abrir ticket mais rápido no Desk
  */
-import { getAllCockpitTickets } from '../ticketsStorage';
+import { getAllCockpitTickets, findTicketEntry, loadTicketDetailFromApi } from '../ticketsStorage';
 import { getAgentName } from '../clientDb';
 import {
   getSlaClass,
   isTicketWorkflowActive,
+  isWorkflowRejectAwaitingAgent,
   getWorkflowProgress,
 } from '../desk/utils';
 import { MEUS_TICKETS_QUEUE_ID, MY_TICKETS_SECTION_CLIENTE_RESPONDEU } from '../desk/constants';
@@ -255,6 +256,7 @@ export function mergeWorkflowInfoRequestsIntoSection(section, existingTickets = 
 
 function classifyEntry(entry) {
   const { queueId, ticket } = entry;
+  if (isWorkflowRejectAwaitingAgent(ticket)) return 'action-now';
   const status = String(ticket?.status || '').trim().toLowerCase().replace(/\s+/g, '-');
   const sla = getSlaClass(ticket);
   if (status === 'em-aberto') return 'client-replied';
@@ -304,6 +306,38 @@ export function buildDeskNavigationForWs360Ticket(ticketId, sectionId) {
   const myTicketsSection = WS360_SECTION_MY_TICKETS_SECTION[sectionId];
   if (myTicketsSection) params.set('section', myTicketsSection);
   return `/tickets?${params.toString()}`;
+}
+
+const prefetched360TicketIds = new Set();
+
+/** Pré-carrega detalhe dos tickets listados no Painel 360° (clique abre mais rápido). */
+export function prefetchAgent360TicketDetails(view) {
+  if (!view) return;
+
+  const ids = new Set();
+  if (view.alert?.ticketId) ids.add(String(view.alert.ticketId).trim());
+
+  (view.sections || []).forEach((section) => {
+    (section.tickets || []).forEach((row) => {
+      const id = String(row?.id || '').trim();
+      if (id && !row?.infoRequestId) ids.add(id);
+    });
+  });
+
+  ids.forEach((ticketId) => {
+    if (!ticketId || prefetched360TicketIds.has(ticketId)) return;
+
+    const entry = findTicketEntry(ticketId);
+    if (entry?.ticket?._detailLoaded && entry.ticket?.registro?.length) {
+      prefetched360TicketIds.add(ticketId);
+      return;
+    }
+
+    prefetched360TicketIds.add(ticketId);
+    void loadTicketDetailFromApi(ticketId).catch(() => {
+      prefetched360TicketIds.delete(ticketId);
+    });
+  });
 }
 
 export function computeAgent360View() {

@@ -1,6 +1,6 @@
 /**
- * DeskResolvedTicketTable — lista tabular de tickets finalizados
- * VERSION: v1.2.2 | DATE: 2026-08-07
+ * DeskResolvedTicketTable v1.3.1 — ícone de workflow imediatamente após o título
+ * VERSION: v1.3.1 | DATE: 2026-08-20
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -13,6 +13,7 @@ import {
   getTicketTitle,
   sortTicketEntries,
 } from '../../../services/desk/utils';
+import { getClient360WorkflowIconMeta } from '../../../services/workflow/workflowTeamQueues';
 const PAGE_SIZE = 20;
 
 function buildPageNumbers(current, total) {
@@ -201,6 +202,7 @@ export default function DeskResolvedTicketTable({
               const title = getTicketTitle(ticket);
               const responsible = getTicketResponsible(ticket);
               const resolvedAt = formatResolvedDateShort(getTicketResolvedAt(ticket));
+              const workflowIcon = getClient360WorkflowIconMeta(ticket);
               return (
                 <tr
                   key={ticket.id}
@@ -215,6 +217,15 @@ export default function DeskResolvedTicketTable({
                     <div className="desk-resolved-table__title-inner">
                       <span className="desk-resolved-table__icon" aria-hidden="true">R</span>
                       <span className="desk-resolved-table__subject" title={title}>{title}</span>
+                      {workflowIcon ? (
+                        <span
+                          className={`client360-workflow-icon client360-workflow-icon--${workflowIcon.modifier}`}
+                          title={workflowIcon.title}
+                          aria-label={workflowIcon.title}
+                        >
+                          <i className={`ti ${workflowIcon.icon}`} aria-hidden="true" />
+                        </span>
+                      ) : null}
                     </div>
                   </td>
                   <td className="desk-resolved-table__resp">{responsible}</td>

@@ -1,6 +1,6 @@
 /**
  * Sidebar rail unificada — 3 estados: 10px | hover 52px | chevron fixa 220px
- * VERSION: v1.11.0 | DATE: 2026-07-27
+ * VERSION: v1.12.0 | DATE: 2026-08-20
  * Perfil: VeloHub (sem botÃ£o local na barra)
  */
 import React, { useCallback, useRef, useState } from 'react';
@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { useProfile } from '../context/ProfileContext';
 import { useVeloNews } from '../features/velonews/VeloNewsProvider';
 import VeloNewsPopover from '../features/velonews/VeloNewsPopover';
+import { useNotifications } from '../context/NotificationContext';
 
 function navKeyActivate(e, action) {
   if (e.key === 'Enter' || e.key === ' ') {
@@ -30,6 +31,8 @@ export default function Sidebar() {
   const { logout } = useAuth();
   const { isNavAllowed } = useProfile();
   const { unreadCount, popoverOpen, togglePopover, bellAnchorRef } = useVeloNews();
+  const { pulseBadgeCount } = useNotifications();
+  const footerBadgeCount = pulseBadgeCount > 0 ? pulseBadgeCount : unreadCount;
   const navigate = useNavigate();
   const location = useLocation();
   const [hoverExpanded, setHoverExpanded] = useState(false);
@@ -218,23 +221,27 @@ export default function Sidebar() {
           {renderNavList()}
         </ul>
         <div className="velo-nav-rail__foot">
-          <div ref={bellAnchorRef} className="velo-nav-rail__foot-actions" data-tooltip="VeloNews">
+          <div ref={bellAnchorRef} className="velo-nav-rail__foot-actions" data-tooltip="Notificações">
             <div
-              className={'notification-bell ws360-notification-bell velo-nav-rail__alerts-bell' + (popoverOpen ? ' is-open' : '')}
+              className={
+                'notification-bell ws360-notification-bell velo-nav-rail__alerts-bell'
+                + (popoverOpen ? ' is-open' : '')
+                + (pulseBadgeCount > 0 ? ' is-pulse' : '')
+              }
               id="btnAlertsNav"
-              data-tooltip="VeloNews"
-              title="VeloNews â€” alertas e notÃ­cias"
+              data-tooltip="Notificações"
+              title="Notificações — tickets, alertas e VeloNews"
               onClick={togglePopover}
               onKeyDown={(e) => navKeyActivate(e, togglePopover)}
               role="button"
               tabIndex={0}
-              aria-label="VeloNews â€” alertas e notÃ­cias"
+              aria-label="Notificações — tickets, alertas e VeloNews"
               aria-expanded={popoverOpen}
             >
               <i className="fas fa-bell" />
-              {unreadCount > 0 ? (
-                <span className="notification-badge" aria-label={`${unreadCount} nÃ£o lidos`}>
-                  {unreadCount}
+              {footerBadgeCount > 0 ? (
+                <span className="notification-badge" aria-label={`${footerBadgeCount} não lidos`}>
+                  {footerBadgeCount}
                 </span>
               ) : null}
             </div>

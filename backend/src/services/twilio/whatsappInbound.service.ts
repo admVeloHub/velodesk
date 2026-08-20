@@ -1,11 +1,19 @@
-/** whatsappInbound.service v1.7.0 — broadcast Realtime (ping) ao anexar mensagem inbound */
+/** whatsappInbound.service v1.10.0 — janela 48h reabre; fechado gera ticket derivado */
 import twilio from 'twilio';
 import { env } from '../../config/env';
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../../models/ChamadoIaAnalise';
 import { publishTicketEvent } from '../realtime/ticketEventsBroadcast.service';
-/** whatsappInbound.service v1.8.0 — reabre ticket resolvido quando cliente responde */
-import { appendStatusTransition, resolveInboundClientReplyStatus, shouldSpawnNewTicketOnInbound } from '../chamado.mapper';
+import {
+  appendStatusTransition,
+  createChamadoFromBody,
+  currentStatus,
+  normalizeStatusValue,
+  resolveInboundClientReplyStatus,
+  shouldSpawnNewTicketOnInbound,
+  buildInboundDerivedTicketNote,
+} from '../chamado.mapper';
+import { runInboundPostCreateHooks } from '../agents/inboundAgentPipeline.service';
 import {
   getTwilioActiveAccountSid,
   getTwilioCredentialMode,
@@ -16,6 +24,7 @@ import type { TwilioWhatsAppWebhookPayload } from './whatsappInbound.types';
 import {
   parseTwilioInboundMedia,
   persistTwilioInboundMedia,
+  type PersistedTwilioInboundMedia,
 } from './twilioMediaInbound.service';
 import {
   appendWhatsAppMensagemToChamado,
@@ -77,58 +86,33 @@ function hasWhatsAppMessageSid(chamado: InstanceType<typeof ChamadoN1>, messageS
   return false;
 }
 
-export async function findChamadoForWhatsAppInbound(waFrom: string) {
+async function listChamadosForWhatsAppInbound(waFrom: string) {
   const digits = normalizeWaChatId(waFrom);
-  if (!digits || digits.length < 8) return null;
+  if (!digits || digits.length < 8) return [];
   const suffix = digits.slice(-8);
 
-  const candidates = await ChamadoN1.find({
+  return ChamadoN1.find({
     $or: [
       { 'registro.metadados.source': WHATSAPP_THREAD_SOURCE, 'registro.metadados.waChatId': { $regex: `${suffix}$` } },
+      { 'registro.metadados.waChatId': { $regex: `${suffix}$` } },
       { 'registro.metadados.waFrom': { $regex: `${suffix}$` } },
     ],
   })
     .sort({ updatedAt: -1 })
-    .limit(8);
-
-  for (const chamado of candidates) {
-    if (!shouldSpawnNewTicketOnInbound(chamado)) {
-      return chamado;
-    }
-  }
-
-  return null;
+    .limit(30);
 }
 
-export async function processInboundWhatsAppMessage(payload: TwilioWhatsAppWebhookPayload): Promise<void> {
-  console.info('[whatsapp-inbound] mensagem recebida', {
-    messageSid: payload.messageSid,
-    from: payload.from,
-    to: payload.to,
-    profileName: payload.profileName || null,
-    bodyPreview: payload.body.slice(0, 120) || '[sem texto]',
-    numMedia: payload.numMedia,
-  });
+export async function findChamadoForWhatsAppInbound(waFrom: string) {
+  const candidates = await listChamadosForWhatsAppInbound(waFrom);
+  return candidates.find((chamado) => !shouldSpawnNewTicketOnInbound(chamado)) || null;
+}
 
+function appendInboundWhatsAppToChamado(
+  chamado: InstanceType<typeof ChamadoN1>,
+  payload: TwilioWhatsAppWebhookPayload,
+  storedMedia: PersistedTwilioInboundMedia[],
+): string {
   const texto = String(payload.body ?? '').trim();
-  if (!texto && payload.numMedia <= 0) return;
-
-  const chamado = await findChamadoForWhatsAppInbound(payload.from);
-  if (!chamado) {
-    console.info('[whatsapp-inbound] nenhum ticket aberto para o número — mensagem ignorada', {
-      from: payload.from,
-    });
-    return;
-  }
-
-  if (hasWhatsAppMessageSid(chamado, payload.messageSid)) {
-    console.info('[whatsapp-inbound] mensagem duplicada ignorada', { messageSid: payload.messageSid });
-    return;
-  }
-
-  const storedMedia = payload.media.length
-    ? await persistTwilioInboundMedia(payload.messageSid, payload.accountSid, payload.media)
-    : [];
   const attachmentUrls = storedMedia.map((item) => item.url);
   const mediaContentTypes = storedMedia.map((item) => item.contentType);
   const anexosScanStatus = storedMedia.map((item) => item.scanStatus);
@@ -145,28 +129,134 @@ export async function processInboundWhatsAppMessage(payload: TwilioWhatsAppWebho
     anexosScanStatus,
     transcriptionStatus: hasAudio ? 'available' : undefined,
   });
+  return waChatId;
+}
 
+async function saveWhatsAppReplyOnChamado(
+  chamado: InstanceType<typeof ChamadoN1>,
+  payload: TwilioWhatsAppWebhookPayload,
+  storedMedia: PersistedTwilioInboundMedia[],
+): Promise<void> {
+  const waChatId = appendInboundWhatsAppToChamado(chamado, payload, storedMedia);
   const reopenStatus = resolveInboundClientReplyStatus(chamado);
-  if (reopenStatus) {
+  if (reopenStatus && reopenStatus !== normalizeStatusValue(currentStatus(chamado))) {
     appendStatusTransition(chamado, reopenStatus, {
       origin: 'cliente',
       autor: payload.profileName || waChatId,
       metadados: { trigger: 'whatsapp-inbound-reply' },
     });
   }
-
+  chamado.markModified('registro');
   await chamado.save();
   void publishTicketEvent(chamado._id.toString(), 'whatsapp-inbound');
   await ChamadoIaAnalise.updateOne(
     { chamadoId: chamado._id, origem: { $ne: 'manual' } },
     { $set: { needsReanalysis: true } },
   );
+}
 
-  console.info('[whatsapp-inbound] mensagem anexada ao ticket', {
-    chamadoProtocolo: chamado.chamadoProtocolo,
-    ticketId: chamado._id.toString(),
-    attachments: attachmentUrls.length,
-    audioTranscription: hasAudio ? 'available-on-demand' : 'not-applicable',
+async function createDerivedWhatsAppChamado(
+  source: InstanceType<typeof ChamadoN1>,
+  payload: TwilioWhatsAppWebhookPayload,
+  storedMedia: PersistedTwilioInboundMedia[],
+): Promise<InstanceType<typeof ChamadoN1>> {
+  const waChatId = normalizeWaChatId(payload.waId || payload.from);
+  const tab = source.tabulacao?.[source.tabulacao.length - 1];
+  const clientRef = source.cliente?.[0];
+  const ticketBody: Record<string, unknown> = {
+    title: source.chamadoTitulo || `WhatsApp ${waChatId}`,
+    chamadoTitulo: source.chamadoTitulo || `WhatsApp ${waChatId}`,
+    text: buildInboundDerivedTicketNote(source.chamadoProtocolo),
+    internal: true,
+    status: 'novo',
+    clientName: payload.profileName || waChatId,
+    source: 'whatsapp-thread',
+    channel: 'whatsapp',
+    messageOrigin: 'agente',
+    lateralForm: {
+      canal: tab?.canal || 'WhatsApp',
+      clienteNome: payload.profileName || '',
+      responsavel: tab?.responsavel || '',
+      atribuido: tab?.atribuido || '',
+      produto: tab?.produto || '',
+      motivo: tab?.motivo || source.chamadoTitulo || '',
+      detalhe: tab?.detalhe || '',
+      tipoChamado: tab?.tipoChamado || '',
+    },
+  };
+  if (clientRef?.clienteId) ticketBody.clienteId = clientRef.clienteId.toString();
+  if (clientRef?.clienteCpf) ticketBody.clientCPF = clientRef.clienteCpf;
+
+  const partial = await createChamadoFromBody(ticketBody, 'novo');
+  if (source.cliente?.length && (!partial.cliente || partial.cliente.length === 0)) {
+    partial.cliente = source.cliente;
+  }
+  if (partial.registro?.[0]) {
+    partial.registro[0].metadados = {
+      ...(partial.registro[0].metadados ?? {}),
+      trigger: 'inbound-derived-ticket',
+      sourceProtocolo: String(source.chamadoProtocolo ?? '').trim(),
+    };
+  }
+
+  const chamado = await ChamadoN1.create(partial);
+  appendInboundWhatsAppToChamado(chamado, payload, storedMedia);
+  chamado.markModified('registro');
+  await chamado.save();
+  void publishTicketEvent(chamado._id.toString(), 'whatsapp-inbound');
+  void runInboundPostCreateHooks(chamado, { source: 'whatsapp-inbound' }).catch((err: Error) => {
+    console.warn('[whatsapp-inbound] hooks inbound fail-soft:', err.message);
+  });
+  return chamado;
+}
+
+export async function processInboundWhatsAppMessage(payload: TwilioWhatsAppWebhookPayload): Promise<void> {
+  console.info('[whatsapp-inbound] mensagem recebida', {
+    messageSid: payload.messageSid,
+    from: payload.from,
+    to: payload.to,
+    profileName: payload.profileName || null,
+    bodyPreview: payload.body.slice(0, 120) || '[sem texto]',
+    numMedia: payload.numMedia,
+  });
+
+  const texto = String(payload.body ?? '').trim();
+  if (!texto && payload.numMedia <= 0) return;
+
+  const candidates = await listChamadosForWhatsAppInbound(payload.from);
+  if (payload.messageSid && candidates.some((item) => hasWhatsAppMessageSid(item, payload.messageSid))) {
+    console.info('[whatsapp-inbound] mensagem duplicada ignorada', { messageSid: payload.messageSid });
+    return;
+  }
+
+  const storedMedia = payload.media.length
+    ? await persistTwilioInboundMedia(payload.messageSid, payload.accountSid, payload.media)
+    : [];
+
+  const reopenable = candidates.find((chamado) => !shouldSpawnNewTicketOnInbound(chamado));
+  if (reopenable) {
+    await saveWhatsAppReplyOnChamado(reopenable, payload, storedMedia);
+    console.info('[whatsapp-inbound] mensagem anexada ao ticket', {
+      chamadoProtocolo: reopenable.chamadoProtocolo,
+      ticketId: reopenable._id.toString(),
+      attachments: storedMedia.length,
+    });
+    return;
+  }
+
+  const source = candidates[0];
+  if (source) {
+    const derived = await createDerivedWhatsAppChamado(source, payload, storedMedia);
+    console.info('[whatsapp-inbound] ticket derivado criado', {
+      origemProtocolo: source.chamadoProtocolo,
+      chamadoProtocolo: derived.chamadoProtocolo,
+      ticketId: derived._id.toString(),
+    });
+    return;
+  }
+
+  console.info('[whatsapp-inbound] nenhum ticket para o número — mensagem ignorada', {
+    from: payload.from,
   });
 }
 

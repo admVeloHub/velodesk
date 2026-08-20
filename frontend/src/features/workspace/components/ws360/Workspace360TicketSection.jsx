@@ -1,4 +1,6 @@
-/** Workspace360TicketSection v1.1.0 — repassa sectionId ao abrir ticket */
+/**
+ * Workspace360TicketSection v1.2.0 — emptyText da seção (workflow = só atenção)
+ */
 import React from 'react';
 import Workspace360TicketRow from './Workspace360TicketRow';
 
@@ -16,7 +18,7 @@ export default function Workspace360TicketSection({ section, onOpenTicket, onSee
       </div>
       <div className="ws360-section__list">
         {section.tickets.length === 0 ? (
-          <p className="ws360-section__empty">Nenhum ticket nesta fila.</p>
+          <p className="ws360-section__empty">{section.emptyText || 'Nenhum ticket nesta fila.'}</p>
         ) : (
           section.tickets.map((ticket) => (
             <Workspace360TicketRow

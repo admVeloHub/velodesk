@@ -1,4 +1,4 @@
-/** permission.service v1.10.0 — cache TTL curto de resolveUserPermissions por userId */
+/** permission.service v1.11.0 — comunicação/aprovação bloqueadas em workflow cancel */
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { findColaboradorByEmail } from './colaboradoresCadastro.service';
@@ -33,6 +33,7 @@ import { getWorkflowById, workflowDefinitionMatchesFuncao } from './workflowDefi
 import { provisionalResponsavelFromAuth } from './assignmentRouter.service';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
+import { isWorkflowOperable } from './workflowStatus.util';
 
 export class PermissionDeniedError extends Error {
   status: number;
@@ -675,7 +676,7 @@ export async function canWorkflowComunicacao(
   chamado: IChamadoN1,
   origem: 'workflow' | 'responsavel',
 ): Promise<boolean> {
-  if (!chamado.workflow?.active) return false;
+  if (!isWorkflowOperable(chamado.workflow, normalizeStatusValue(currentStatus(chamado)))) return false;
 
   if (origem === 'responsavel') {
     return matchesResponsavel(chamado, resolved.responsavelCandidates)

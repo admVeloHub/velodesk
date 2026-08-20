@@ -1,5 +1,6 @@
-/** emailTransport.service v1.0.0 — snapshot Gmail API de desk_config.email_transport */
+/** emailTransport.service v1.1.0 — envio espera snapshot Gmail no startup */
 import { env } from '../config/env';
+import { isDeskConfigConnected } from '../config/database';
 import { findEmailTransportSingleton, IServiceAccountJson } from '../models/EmailTransportConfig';
 
 export interface EmailTransportSnapshot {
@@ -9,7 +10,12 @@ export interface EmailTransportSnapshot {
   serviceAccountJson: IServiceAccountJson;
 }
 
+const READY_WAIT_MS = 15_000;
+const READY_POLL_MS = 400;
+
 let snapshot: EmailTransportSnapshot | null = null;
+let loadInflight: Promise<'ready' | 'incomplete' | 'unavailable'> | null = null;
+let loggedReady = false;
 
 function applyDoc(doc: {
   transportMode?: string;
@@ -66,21 +72,71 @@ export function getDelegatedUserEmail(): string {
   return snapshot?.delegatedUserEmail ?? '';
 }
 
-export async function loadEmailTransport(): Promise<void> {
+async function loadEmailTransportOnce(): Promise<'ready' | 'incomplete' | 'unavailable'> {
   try {
     const doc = await findEmailTransportSingleton();
     applyDoc(doc);
     if (isEmailTransportReady()) {
-      console.log(`[emailTransport] Gmail API pronto — from=${getEffectiveFromAddress()}`);
-    } else if (env.emailEnabled) {
+      if (!loggedReady) {
+        loggedReady = true;
+        console.log(`[emailTransport] Gmail API pronto — from=${getEffectiveFromAddress()}`);
+      }
+      return 'ready';
+    }
+    loggedReady = false;
+    if (env.emailEnabled) {
       console.warn('[emailTransport] EMAIL_ENABLED=true mas desk_config.email_transport incompleto');
     }
+    return 'incomplete';
   } catch (err) {
     console.error('[emailTransport] falha ao carregar:', (err as Error).message);
     snapshot = null;
+    loggedReady = false;
+    return 'unavailable';
   }
 }
 
+export async function loadEmailTransport(): Promise<void> {
+  await runLoadEmailTransport();
+}
+
+async function runLoadEmailTransport(): Promise<'ready' | 'incomplete' | 'unavailable'> {
+  if (loadInflight) return loadInflight;
+  loadInflight = loadEmailTransportOnce().finally(() => {
+    loadInflight = null;
+  });
+  return loadInflight;
+}
+
+/**
+ * Garante o snapshot Gmail antes de enviar.
+ * No restart o HTTP sobe antes do bootstrap: se desk_config já conectou, carrega na hora;
+ * senão espera até timeoutMs pelo Mongo/desk_config. Config incompleta não fica em loop.
+ */
+export async function ensureEmailTransportReady(timeoutMs = READY_WAIT_MS): Promise<boolean> {
+  if (!env.emailEnabled) return false;
+  if (isEmailTransportReady()) return true;
+
+  const deadline = Date.now() + Math.max(0, timeoutMs);
+
+  while (Date.now() <= deadline) {
+    if (isEmailTransportReady()) return true;
+    if (isDeskConfigConnected()) {
+      const result = await runLoadEmailTransport();
+      if (result === 'ready') return true;
+      if (result === 'incomplete') return false;
+    }
+    await new Promise((resolve) => setTimeout(resolve, READY_POLL_MS));
+  }
+
+  if (isDeskConfigConnected() && !isEmailTransportReady()) {
+    const result = await runLoadEmailTransport();
+    return result === 'ready';
+  }
+  return isEmailTransportReady();
+}
+
 export async function reloadEmailTransport(): Promise<void> {
+  loggedReady = false;
   await loadEmailTransport();
 }

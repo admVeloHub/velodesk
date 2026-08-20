@@ -1,7 +1,7 @@
 /**
  * Painel 360° — Agente
- * VERSION: v3.2.0 | DATE: 2026-08-12
- * — Exibe alerta de SLA crítico quando a API/local retorna `alert`
+ * VERSION: v3.4.1 | DATE: 2026-08-20
+ * — poll silencioso atualiza só o quadro quando o payload muda
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -10,8 +10,10 @@ import {
   computeAgent360View,
   buildDeskNavigationForWs360Section,
   buildDeskNavigationForWs360Ticket,
+  prefetchAgent360TicketDetails,
 } from '../../services/workspace/deskData';
 import { useWorkspace360 } from '../../hooks/useWorkspace360';
+import { useTickets } from '../../context/TicketsContext';
 import { getAgentName } from '../../services/clientDb';
 import { markWorkflowInfoRequestsReadForTicket } from '../../services/workflow/workflowInfoNotifications';
 import Workspace360Kpis from './components/ws360/Workspace360Kpis';
@@ -22,20 +24,37 @@ import Workspace360ProductionChart from './components/ws360/Workspace360Producti
 
 export default function AgentPanel() {
   const navigate = useNavigate();
-  const { data, loading, error } = useWorkspace360();
+  const { refreshTicketsSilent } = useTickets();
+  const onPollTick = useCallback(async ({ changed } = {}) => {
+    await refreshTicketsSilent();
+    if (changed) setInfoRevision((value) => value + 1);
+  }, [refreshTicketsSilent]);
+  const { data, loading, error, refresh } = useWorkspace360({ poll: true, onPollTick });
   const [infoRevision, setInfoRevision] = useState(0);
 
   useEffect(() => {
-    const onInfoChanged = () => setInfoRevision((value) => value + 1);
+    const onInfoChanged = () => {
+      setInfoRevision((value) => value + 1);
+      refresh();
+    };
     window.addEventListener('velodesk:workflow-info-changed', onInfoChanged);
-    return () => window.removeEventListener('velodesk:workflow-info-changed', onInfoChanged);
-  }, []);
+    window.addEventListener('velodesk:desk-notifications-changed', onInfoChanged);
+    return () => {
+      window.removeEventListener('velodesk:workflow-info-changed', onInfoChanged);
+      window.removeEventListener('velodesk:desk-notifications-changed', onInfoChanged);
+    };
+  }, [refresh]);
 
   const view = useMemo(() => {
     if (data) return buildAgent360View(data, getAgentName());
     if (!loading) return computeAgent360View();
     return null;
   }, [data, loading, infoRevision]);
+
+  useEffect(() => {
+    if (!view) return;
+    prefetchAgent360TicketDetails(view);
+  }, [view]);
 
   const clientReplied = view?.sections?.find((s) => s.id === 'client-replied');
   const actionNow = view?.sections?.find((s) => s.id === 'action-now');

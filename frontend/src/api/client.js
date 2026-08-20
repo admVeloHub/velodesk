@@ -1,6 +1,6 @@
 /**
- * API client v1.26.2 — import Hug Me assíncrono; poll do lote
- * VERSION: v1.26.2 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
+ * API client v1.27.0 — e-mails de saída configuráveis
+ * VERSION: v1.27.0 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -135,6 +135,8 @@ export const ticketsApi = {
     api.post(`/tickets/${sourceId}/merge-into/${targetId}`).then((r) => r.data),
   startWorkflow: (id, body) =>
     api.post(`/tickets/${id}/workflow/start`, body).then((r) => r.data),
+  forwardTeamSolicitation: (id, body) =>
+    api.post(`/tickets/${id}/workflow/team-solicitation`, body).then((r) => r.data),
   cancelWorkflow: (id, body = {}) =>
     api.post(`/tickets/${id}/workflow/cancel`, body).then((r) => r.data),
 };
@@ -315,6 +317,29 @@ export const mailRulesApi = {
     api.patch(`/mail-rules/${encodeURIComponent(list)}/${encodeURIComponent(id)}`, data).then((r) => r.data),
   remove: (list, id) =>
     api.delete(`/mail-rules/${encodeURIComponent(list)}/${encodeURIComponent(id)}`).then((r) => r.data),
+};
+
+export const emailOutboundApi = {
+  opcoes: () => api.get('/email-outbound/opcoes').then((r) => r.data),
+  layout: () => api.get('/email-outbound/layout').then((r) => r.data),
+  listConteudos: () => api.get('/email-outbound/conteudos').then((r) => r.data),
+  getConteudo: (id) => api.get(`/email-outbound/conteudos/${encodeURIComponent(id)}`).then((r) => r.data),
+  createConteudo: (data) => api.post('/email-outbound/conteudos', data).then((r) => r.data),
+  updateConteudo: (id, data) => api.put(`/email-outbound/conteudos/${encodeURIComponent(id)}`, data).then((r) => r.data),
+  removeConteudo: (id) => api.delete(`/email-outbound/conteudos/${encodeURIComponent(id)}`).then((r) => r.data),
+  getAssinatura: () => api.get('/email-outbound/assinatura').then((r) => r.data),
+  saveAssinatura: (data) => api.put('/email-outbound/assinatura', data).then((r) => r.data),
+  uploadAssinaturaImagem: (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post('/email-outbound/assinatura/imagem', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data);
+  },
+  signatureAsset: (objectKey) => api.get(
+    `/email-outbound/assets/signature/${encodeURIComponent(objectKey)}`,
+    { responseType: 'arraybuffer' },
+  ),
 };
 
 export const consultasApi = {

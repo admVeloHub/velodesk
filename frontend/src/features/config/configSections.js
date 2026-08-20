@@ -1,6 +1,6 @@
 /**
  * Seções da Central de Configurações
- * VERSION: v1.4.0 | DATE: 2026-07-27
+ * VERSION: v1.5.0 | DATE: 2026-08-20
  */
 export const CONFIG_SECTIONS = [
   {
@@ -27,8 +27,8 @@ export const CONFIG_SECTIONS = [
   {
     id: 'email',
     label: 'E-mail',
-    menuDesc: 'Ignorados, spam e remetentes prioritários',
-    cardDesc: 'Filtros do inbound antes de criar tickets',
+    menuDesc: 'Remetentes, e-mails de saída e assinatura',
+    cardDesc: 'Controle de inbound, textos de saída e assinatura',
     icon: 'ti-mail',
   },
   {

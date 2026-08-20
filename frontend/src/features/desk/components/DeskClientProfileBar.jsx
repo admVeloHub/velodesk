@@ -1,6 +1,6 @@
 /**
- * DeskClientProfileBar v1.15.0 — loading durante hidratação automática de cadastro
- * VERSION: v1.15.0 | DATE: 2026-08-12 | AUTHOR: VeloHub Development Team
+ * DeskClientProfileBar v1.16.0 — stepper abre o modal de progresso para o agente responsável
+ * VERSION: v1.16.0 | DATE: 2026-08-20
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clientsApi } from '../../../api/client';
@@ -340,7 +340,7 @@ export default function DeskClientProfileBar({
                 <TicketWorkflowStepper
                   ticket={ticket}
                   layout="headerStack"
-                  clickable={canManageWorkflow}
+                  clickable
                   onClick={() => setWorkflowModalOpen(true)}
                 />
               </div>
@@ -358,22 +358,20 @@ export default function DeskClientProfileBar({
                 {historyButton}
               </div>
             </div>
-            {canManageWorkflow ? (
-              <WorkflowProgressModal
-                open={workflowModalOpen}
-                ticket={ticket}
-                onClose={() => setWorkflowModalOpen(false)}
-                onCancelWorkflow={async () => {
-                  await onCancelWorkflow?.();
-                  setWorkflowModalOpen(false);
-                }}
-                onAdvanceWorkflow={onAdvanceWorkflow}
-                canceling={cancelingWorkflow}
-                advancing={advancingWorkflow}
-                canAdvance={canAdvanceWorkflow}
-                canCancel
-              />
-            ) : null}
+            <WorkflowProgressModal
+              open={workflowModalOpen}
+              ticket={ticket}
+              onClose={() => setWorkflowModalOpen(false)}
+              onCancelWorkflow={async () => {
+                await onCancelWorkflow?.();
+                setWorkflowModalOpen(false);
+              }}
+              onAdvanceWorkflow={onAdvanceWorkflow}
+              canceling={cancelingWorkflow}
+              advancing={advancingWorkflow}
+              canAdvance={canAdvanceWorkflow}
+              canCancel={canManageWorkflow}
+            />
           </div>
         ) : null}
       </section>

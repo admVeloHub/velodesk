@@ -1,4 +1,4 @@
-/** seed.service v1.8.0 — seed motivos por órgão (RA) */
+/** seed.service v1.9.0 — seed e-mails de saída */
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { getClienteModel } from '../models/Cliente';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
@@ -89,6 +89,8 @@ async function purgeLegacyEscalonarPermissao(): Promise<void> {
 export async function runDeskConfigMigrations(): Promise<void> {
   await purgeLegacyEscalonarPermissao();
   await migrateGrupoToFuncao();
+  const { seedEmailConteudosIfEmpty } = await import('./emailConteudo.service');
+  await seedEmailConteudosIfEmpty();
 }
 
 export async function seedDevelopmentData() {

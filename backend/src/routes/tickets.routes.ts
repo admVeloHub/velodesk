@@ -1,4 +1,4 @@
-/** tickets.routes v1.24.0 — reconcilia scanStatus pending com GCS ao carregar ticket */
+/** tickets.routes v1.26.0 — workflow cancel ao encerrar ticket (contrato workflowStatus) */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -70,6 +70,7 @@ import {
 } from '../services/twilio/whatsappActiveOutbound.service';
 import { requestWhatsAppAudioTranscription } from '../services/twilio/whatsappAudioTranscription.service';
 import { resolveSentAttachmentSendMeta } from '../services/sentAttachmentStorage.service';
+import { notifyWorkflowMensagemToResponsavel } from '../services/workflowNotificacao.service';
 
 const router = Router();
 
@@ -682,6 +683,9 @@ router.post('/:id/workflow/comunicacao', authMiddleware, async (req, res: Respon
     applyManualResponsavelClaim(chamado, req.user);
     appendComunicacaoWorkflow(chamado, { mensagem, origem }, req.user);
     await chamado.save();
+    if (origem === 'workflow') {
+      void notifyWorkflowMensagemToResponsavel(chamado);
+    }
     void publishTicketEvent(chamado._id.toString(), 'workflow');
     const boxes = await loadBoxes();
     res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));

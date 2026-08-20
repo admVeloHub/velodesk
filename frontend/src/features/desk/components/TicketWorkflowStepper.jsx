@@ -1,6 +1,6 @@
 /**
- * TicketWorkflowStepper v1.7.0 — estado finished com todos os checks verdes
- * VERSION: v1.7.0 | DATE: 2026-08-18
+ * TicketWorkflowStepper v1.7.1 — estado denied (reprovação) no stepper
+ * VERSION: v1.7.1 | DATE: 2026-08-20
  */
 import React, { useMemo } from 'react';
 import {
@@ -12,6 +12,9 @@ import { getWorkflowStepSubtitle } from '../../../services/desk/workflowDefiniti
 import { useWorkflowConfig } from '../../../context/WorkflowConfigContext';
 
 function StepIcon({ step }) {
+  if (step.state === 'denied') {
+    return <i className="ti ti-x" aria-hidden="true" />;
+  }
   if (step.state === 'completed') {
     return <i className="ti ti-check" aria-hidden="true" />;
   }

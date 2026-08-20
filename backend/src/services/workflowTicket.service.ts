@@ -1,10 +1,11 @@
-/** workflowTicket.service v1.8.0 — ao concluir workflow, transição pontual para resolvido */
+/** workflowTicket.service v1.9.0 — reprovação: sem auto-resposta; approve Produtos envia msg no BE */
 import { isAutomaticaStep, resolveAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IChamadoWorkflow, IRegistro } from '../models/ChamadoN1';
 import type { IWorkflowDefinicao, IWorkflowPassoEnvelope } from '../models/WorkflowDefinicao';
 import {
+  appendRegistroEntry,
   appendStatusTransition,
   currentStatus,
   isClientIdentifiedOnChamado,
@@ -12,6 +13,7 @@ import {
   normalizeStatusValue,
   readTabulacaoSnapshot,
 } from './chamado.mapper';
+import { wrapComposerOpening } from './clientMessageEnvelope.service';
 import { getActiveWorkflows, getWorkflowById, getWorkflowBySlug, resolveWorkflowForTicket } from './workflowDefinicao.service';
 import { getActiveGrupos } from './grupoResponsabilidade.service';
 import {
@@ -98,6 +100,49 @@ function applyAtribuidoForPasso(chamado: IChamadoN1, passo: IWorkflowPassoEnvelo
   chamado.tabulacao = [{ ...tab, atribuido }];
 }
 
+const TIPO_SOLICITACAO_LABELS: Record<string, string> = {
+  'alteracao-dados-cadastrais': 'alteração de dados cadastrais',
+};
+
+function buildProdutosConclusaoClientMessage(chamado: IChamadoN1): string {
+  const nome = String(chamado.chamadoTitulo || '').trim().split(/\s+/)[0] || 'cliente';
+  const solic = chamado.workflow?.requisicao?.solicitacaoProdutos as Record<string, unknown> | undefined;
+  const tipoRaw = String(solic?.tipoSolicitacao || '').trim();
+  const tab = readTabulacaoSnapshot(chamado.tabulacao[0]);
+  let tipo = TIPO_SOLICITACAO_LABELS[tipoRaw] || 'solicitação';
+  if (!tipoRaw && tab?.motivo && tab?.produto) {
+    tipo = `${tab.motivo} · ${tab.produto}`;
+  } else if (!tipoRaw && tab?.motivo) {
+    tipo = String(tab.motivo);
+  }
+  return `Olá, ${nome}! Sua solicitação de ${tipo} foi analisada e concluída pelo time de Produtos. Estamos à disposição caso precise de algo mais.`;
+}
+
+function appendProdutosConclusaoPublicMessage(chamado: IChamadoN1, autor: string): void {
+  const nucleo = buildProdutosConclusaoClientMessage(chamado);
+  const composerText = wrapComposerOpening({ nucleo, agentName: autor });
+  appendRegistroEntry(chamado, {
+    mensagemPublica: composerText,
+    sender: 'me',
+    autor,
+    metadados: {
+      workflowProdutosConclusao: true,
+      at: new Date().toISOString(),
+    },
+  });
+}
+
+function markTicketEmAndamentoAfterReject(chamado: IChamadoN1, autor: string): void {
+  const status = normalizeStatusValue(currentStatus(chamado));
+  if ((MERGE_TERMINAL_STATUSES as readonly string[]).includes(status)) return;
+  if (status === 'em-andamento') return;
+  appendStatusTransition(chamado, 'em-andamento', {
+    autor,
+    anotacaoInterna: 'Workflow reprovado — aguardando retorno manual ao cliente pelo responsável.',
+    metadados: { workflowReject: true },
+  });
+}
+
 function appendWorkflowRegistro(
   chamado: IChamadoN1,
   payload: {
@@ -165,7 +210,13 @@ async function advanceToStep(
   definicao: IWorkflowDefinicao,
   nextStep: number,
   autor: string,
-  options: { trigger?: string; skipped?: boolean; decision?: string } = {},
+  options: {
+    trigger?: string;
+    skipped?: boolean;
+    decision?: string;
+    /** Reprovação: não dispara resposta automática ao cliente na devolutiva. */
+    skipSistema?: boolean;
+  } = {},
 ): Promise<{ autoAdvanced: boolean }> {
   const wf = ensureWorkflowState(chamado);
   const passos = sortPassos(definicao);
@@ -211,7 +262,7 @@ async function advanceToStep(
     alteracoes: [{ workflowStep: nextStep, passoNome: passo.passo?.nome }],
   });
 
-  if (isAutomaticaStep(passo.passo)) {
+  if (!options.skipSistema && isAutomaticaStep(passo.passo)) {
     const nested = await runSistemaIfNeeded(chamado, definicao, nextStep);
     return { autoAdvanced: nested.autoAdvanced };
   }
@@ -434,8 +485,10 @@ export async function advanceWorkflowManual(
       trigger: 'decision-reject',
       skipped: devolutivaIdx > currentStep + 1,
       decision: 'reject',
+      skipSistema: true,
     });
     wf.pendingDecision = null;
+    markTicketEmAndamentoAfterReject(chamado, autor);
     return chamado;
   }
 
@@ -544,7 +597,9 @@ async function advanceWorkflowProdutosQueueDecision(
       trigger: 'decision-reject',
       skipped: devolutivaIdx > produtosStepIdx + 1,
       decision: 'reject',
+      skipSistema: true,
     });
+    markTicketEmAndamentoAfterReject(chamado, autor);
     return chamado;
   }
 
@@ -554,8 +609,8 @@ async function advanceWorkflowProdutosQueueDecision(
     metadados: { workflowDecision: 'approve' },
   });
   wf.pendingDecision = null;
-  // "Feito" em produtos encerra o workflow — o agente é notificado automaticamente
-  // pelo frontend, então nenhuma etapa manual (ex.: "Retorno ao cliente") é necessária depois.
+  appendProdutosConclusaoPublicMessage(chamado, autor);
+  // "Feito" em produtos encerra o workflow — mensagem ao cliente já persistida acima.
   await advanceToStep(chamado, definicao, sortPassos(definicao).length, autor, {
     trigger: 'produtos-queue-feito',
     decision: 'approve',

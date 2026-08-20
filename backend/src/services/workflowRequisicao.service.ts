@@ -1,4 +1,4 @@
-/** workflowRequisicao.service v1.2.0 — markModified ao append comunicacaoWorkflow */
+/** workflowRequisicao.service v1.3.0 — bloqueia comunicação se workflow cancel/finished */
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import type { IWorkflowDefinicao } from '../models/WorkflowDefinicao';
@@ -11,7 +11,8 @@ import {
   validateRequisicaoValores,
   WorkflowRequisicaoError,
 } from '../config/workflowRequisicaoDefaults';
-import { appendRegistroEntry } from './chamado.mapper';
+import { appendRegistroEntry, currentStatus, normalizeStatusValue } from './chamado.mapper';
+import { isWorkflowOperable } from './workflowStatus.util';
 
 export { WorkflowRequisicaoError };
 
@@ -135,6 +136,9 @@ export function appendComunicacaoWorkflow(
     throw new WorkflowRequisicaoError('Origem inválida', 400);
   }
 
+  if (!isWorkflowOperable(chamado.workflow, normalizeStatusValue(currentStatus(chamado)))) {
+    throw new WorkflowRequisicaoError('Workflow encerrado — comunicação não é mais possível', 400);
+  }
   const requisicao = ensureRequisicaoShell(chamado);
   const nome = authUser?.name || authUser?.email || 'Agente';
   const prefix = payload.origem === 'workflow' ? 'WF' : 'Responsavel';

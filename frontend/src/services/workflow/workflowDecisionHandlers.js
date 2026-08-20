@@ -1,6 +1,6 @@
 /**
- * workflowDecisionHandlers v2.4.0 — createWorkflowInfoRequest + detalhe workflow no cache
- * VERSION: v2.4.0 | DATE: 2026-08-19
+ * workflowDecisionHandlers v2.5.0 — approve Produtos: msg no BE; reject mantém WF ativo
+ * VERSION: v2.5.0 | DATE: 2026-08-20
  */
 import { ticketsApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
@@ -8,7 +8,6 @@ import {
   findTicketEntry,
   loadTicketDetailFromApi,
   patchTicketInCache,
-  sendTicketMessage,
   updateTicketInCache,
 } from '../ticketsStorage';
 import {
@@ -17,9 +16,6 @@ import {
   getTicketProtocolLabel,
   getWorkflowProgress,
 } from '../desk/utils';
-import {
-  buildProdutosConclusaoClientMessage,
-} from '../cadastral/solicitacoesProdutosData';
 import { markSolicitacaoFeita } from '../cadastral/cadastralRequestStore';
 import { createWorkflowInfoRequest } from './workflowInfoNotifications';
 import deskLog from '../../utils/deskDebugLog';
@@ -83,9 +79,7 @@ export async function approveWorkflowDecision(ticketId, options = {}) {
   const isProdutosFinalize = options.finalizeProdutos === true && !stillActive;
   if (!isProdutosFinalize || !finalTicket) return finalTicket;
 
-  const clientText = buildProdutosConclusaoClientMessage(finalTicket);
-  await sendTicketMessage(ticketId, clientText, getAgentName() || 'Operador Produtos');
-
+  // Mensagem pública enviada pelo backend (advanceWorkflowProdutosQueueDecision).
   const entry = findTicketEntry(ticketId);
   if (entry) {
     applySendStatus(entry, 'resolvidos');
@@ -112,7 +106,30 @@ export async function rejectWorkflowDecision(ticketId) {
   // responsável (ver advanceWorkflowProdutosQueueDecision no backend) — nesse caso o
   // status do ticket permanece o que o agente definiu (resolvido/cancelado/fechado).
   const stillActive = Boolean(apiTicket?.workflow?.active);
-  if (stillActive) return ticket;
+  if (stillActive) {
+    return (await updateTicketInCache(ticketId, (t) => {
+      if (!t) return t;
+      const next = { ...t };
+      next.status = apiTicket?.status || 'em-andamento';
+      if (next.workflow) {
+        next.workflow = { ...next.workflow, active: true, status: 'active' };
+      }
+      if (next.lateralForm?.workflow) {
+        next.lateralForm = {
+          ...next.lateralForm,
+          workflow: {
+            ...next.lateralForm.workflow,
+            active: true,
+            status: 'active',
+            stepHistory: apiTicket?.lateralForm?.workflow?.stepHistory
+              || apiTicket?.workflow?.stepHistory
+              || next.lateralForm.workflow.stepHistory,
+          },
+        };
+      }
+      return next;
+    })) || ticket;
+  }
 
   const completedAt = apiTicket?.workflow?.completedAt
     || apiTicket?.lateralForm?.workflow?.completedAt

@@ -1,4 +1,4 @@
-/** emailBrand.util v1.1.0 — logo completo no header + header legado */
+/** emailBrand.util v1.2.0 — cabeçalho padrão (faixa #000058 + status) */
 import fs from 'fs';
 import path from 'path';
 import { escapeHtmlAttribute } from './emailHtml.util';
@@ -6,14 +6,21 @@ import { escapeHtmlAttribute } from './emailHtml.util';
 export const EMAIL_BRAND_COLORS = {
   blueDark: '#000058',
   blueMedium: '#1634FF',
+  blueLight: '#1694FF',
+  /** Azul claro 40% sobre branco — equivalente sólido para clientes de e-mail */
+  blueLight40: '#A2D4FF',
   blueOpaque: '#006AB9',
 } as const;
 
 export const VELOTAX_LOGO_CID = 'velotax-logo';
 export const VELOTAX_LOGO_COMPLETO_CID = 'velotax-logo-completo';
+export const VELOTAX_HEADER_LOGO_CID = 'velotax-header-logo';
+export const EMAIL_HEADER_PREVIEW_STATUS = '• PROTOCOLO ABERTO · EM ATENDIMENTO';
 
+const HEADER_LOGO_FILENAME = 'velotax_ajustada_branco.png';
 const LOGO_COMPLETO_FILENAME = 'velotax_logo_completo.png';
 const LOGO_SIMBOLO_FILENAME = 'simbolo_velotax_ajustada_branco.png';
+const HEADER_TOP_RADIUS = 20;
 
 function resolveAssetPath(fileName: string): string | null {
   const candidates = [
@@ -32,6 +39,65 @@ function resolveAssetPath(fileName: string): string | null {
 
 function resolveVelotaxLogoPath(): string | null {
   return resolveAssetPath(LOGO_SIMBOLO_FILENAME);
+}
+
+function resolveVelotaxHeaderLogoPath(): string | null {
+  return resolveAssetPath(HEADER_LOGO_FILENAME)
+    || resolveAssetPath(LOGO_COMPLETO_FILENAME)
+    || resolveVelotaxLogoPath();
+}
+
+export function loadVelotaxHeaderLogoInline(): {
+  cid: string;
+  filename: string;
+  contentType: string;
+  buffer: Buffer;
+} | null {
+  const logoPath = resolveVelotaxHeaderLogoPath();
+  if (!logoPath) {
+    console.warn('[emailBrand] logo do cabeçalho padrão não encontrado');
+    return null;
+  }
+  return loadLogoFromPath(logoPath, VELOTAX_HEADER_LOGO_CID, HEADER_LOGO_FILENAME);
+}
+
+export function emailHeaderStatusLabel(status: string): string {
+  const key = String(status || '').trim().toLowerCase();
+  switch (key) {
+    case 'pendente':
+      return '• PROTOCOLO ABERTO · PENDENTE';
+    case 'em-espera':
+      return '• PROTOCOLO ABERTO · EM ESPERA';
+    case 'resolvido':
+      return '• PROTOCOLO ABERTO · RESOLVIDO';
+    case 'fechado':
+      return '• PROTOCOLO ENCERRADO';
+    case 'cancelado':
+      return '• PROTOCOLO CANCELADO';
+    default:
+      return EMAIL_HEADER_PREVIEW_STATUS;
+  }
+}
+
+/** Cabeçalho padrão: faixa #000058 + logo branca + faixa de status. */
+export function buildStandardEmailHeaderHtml(statusLabel: string, withLogo: boolean): string {
+  const safeStatus = escapeHtmlAttribute(statusLabel || EMAIL_HEADER_PREVIEW_STATUS);
+  const logoCell = withLogo
+    ? `<img src="cid:${VELOTAX_HEADER_LOGO_CID}" alt="Velotax" height="36" style="display:block;border:0;outline:none;height:36px;width:auto;max-width:180px;" />`
+    : `<span style="font-size:18px;font-weight:700;color:#ffffff;font-family:Arial,sans-serif;">Velotax</span>`;
+
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;border-spacing:0;">
+  <tr>
+    <td style="background:${EMAIL_BRAND_COLORS.blueDark};padding:18px 24px;border-radius:${HEADER_TOP_RADIUS}px ${HEADER_TOP_RADIUS}px 0 0;">
+      ${logoCell}
+    </td>
+  </tr>
+  <tr>
+    <td style="background:${EMAIL_BRAND_COLORS.blueLight40};background-color:${EMAIL_BRAND_COLORS.blueLight40};padding:8px 24px;">
+      <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.06em;color:${EMAIL_BRAND_COLORS.blueDark};font-family:Arial,sans-serif;">${safeStatus}</p>
+    </td>
+  </tr>
+</table>`;
 }
 
 function resolveVelotaxLogoCompletoPath(): string | null {

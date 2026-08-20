@@ -1,6 +1,6 @@
 /**
- * permissionService v1.9.0 — canActOnTicket alinhado ao backend (sanitizeResponsavel)
- * VERSION: v1.9.0 | DATE: 2026-08-18
+ * permissionService v1.9.1 — workflow cancel/finished não autoriza atuação de WF
+ * VERSION: v1.9.1 | DATE: 2026-08-20
  */
 import api from '../../api/client';
 import { normalizeProfileId } from '../../config/profiles';
@@ -363,6 +363,7 @@ export function canSendInternalNoteOnTicket(ticket, perm = readCachedPermissions
 
 function ticketWorkflowActive(ticket) {
   const wf = ticket?.workflow || ticket?.lateralForm?.workflow;
+  if (wf?.workflowStatus === 'finished' || wf?.workflowStatus === 'cancel') return false;
   return Boolean(wf?.active);
 }
 

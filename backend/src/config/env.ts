@@ -1,4 +1,4 @@
-/** env v1.38.0 — secrets inbound tickets por origem ([a-z0-9]{35}) */
+/** env v1.39.0 — bucket de recursos da assinatura de e-mail */
 import fs from 'fs';
 import path from 'path';
 
@@ -131,6 +131,11 @@ export const env = {
     || 'https://velodesk-278491073220.us-east1.run.app'
   ).trim().replace(/\/+$/, ''),
   gcpStorageBucket: (process.env.GCP_STORAGE_BUCKET || 'velodesk_storage').trim(),
+  /** Imagens da assinatura de e-mail — gs://velodesk_resources/mail_signature_img */
+  gcpEmailResourcesBucket: (process.env.GCP_EMAIL_RESOURCES_BUCKET || 'velodesk_resources').trim(),
+  gcpEmailSignaturePrefix: (
+    process.env.GCP_EMAIL_SIGNATURE_PREFIX || 'mail_signature_img'
+  ).trim().replace(/^\/+|\/+$/g, ''),
   /** E-mail recebido (inbound Gmail) */
   gcpStorageInboundAttachmentsPrefix: (
     process.env.GCP_STORAGE_INBOUND_ATTACHMENTS_PREFIX

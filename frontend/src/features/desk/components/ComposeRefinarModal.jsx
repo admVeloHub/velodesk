@@ -1,6 +1,6 @@
 /**
- * ComposeRefinarModal v1.0.5 — timeout 25s na revisão Gemini
- * VERSION: v1.0.5 | DATE: 2026-07-30
+ * ComposeRefinarModal v1.0.6 — preview núcleo; envelope aplicado ao substituir
+ * VERSION: v1.0.6 | DATE: 2026-08-20
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -174,7 +174,7 @@ export default function ComposeRefinarModal({
             <div className="ai-review-panel">
               <div className="ai-review-status">
                 <i className="fas fa-magic" aria-hidden="true" />
-                <span>Texto sugerido para substituir o compose</span>
+                <span>Texto sugerido (núcleo) — saudação e apresentação entram ao substituir</span>
               </div>
               <pre className="ai-revised-text compose-refinar-modal__text">{result}</pre>
               <div className="ai-review-actions">

@@ -1,6 +1,6 @@
 /**
- * DeskRightPanel v1.12.7 — RA: produto e motivo visíveis; motivo do órgão
- * VERSION: v1.12.7 | DATE: 2026-08-19
+ * DeskRightPanel v1.12.8 — Iniciar workflow some se já há WF (ativo/cancel/finished)
+ * VERSION: v1.12.8 | DATE: 2026-08-20
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { DEFAULT_TIPO, TABULACAO_OPCOES_CATEGORIAS, hasApplyableTabulation, isReclameAquiCanal, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
@@ -9,7 +9,7 @@ import { tabulationApi } from '../../../api/client';
 import { DeskStatusCommitButton } from './DeskComposePanel';
 import ProcessosPopover from './ProcessosPopover';
 import { DESK_THERMOMETER_UI_ENABLED } from '../../../services/desk/constants';
-import { isTicketWorkflowActive } from '../../../services/desk/utils';
+import { isTicketInWorkflow, isTicketWorkflowActive } from '../../../services/desk/utils';
 import { resolveComunicacaoResumo, ticketHasComunicacaoWorkflow } from '../../../services/workflow/workflowDecisionHandlers';
 
 const CANAL_OPTIONS_FALLBACK = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
@@ -135,7 +135,7 @@ export default function DeskRightPanel({
   );
   const inWorkflow = isTicketWorkflowActive(ticket);
   const showThermoUi = DESK_THERMOMETER_UI_ENABLED;
-  const showStartWorkflow = canStartWorkflow && !inWorkflow && !ticketReadOnly;
+  const showStartWorkflow = canStartWorkflow && !isTicketInWorkflow(ticket) && !ticketReadOnly;
   const showReplyWorkflow = inWorkflow && ticketHasComunicacaoWorkflow(ticket) && typeof onReplyWorkflowRequest === 'function';
   // Última mensagem enviada pelo time de workflow ("WF:") = ainda não respondida pelo agente responsável.
   const hasUnreadWorkflowMessage = showReplyWorkflow && resolveComunicacaoResumo(ticket)?.ultimaOrigem === 'workflow';

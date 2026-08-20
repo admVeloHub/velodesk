@@ -1,11 +1,33 @@
-/** workflowDto.util v1.2.0 — preserva snapshot visual de workflow finished */
+/** workflowDto.util v1.4.0 — stepHistory com estado denied após reprovação */
 import { Types } from 'mongoose';
-import type { IChamadoN1, IChamadoWorkflow } from '../models/ChamadoN1';
+import type { IChamadoN1, IChamadoWorkflow, IRegistro } from '../models/ChamadoN1';
 import type { IWorkflowDefinicao, IWorkflowPassoEnvelope } from '../models/WorkflowDefinicao';
 import { getWorkflowById, resolveWorkflowForTicket } from './workflowDefinicao.service';
 
 function sortPassos(definicao: IWorkflowDefinicao): IWorkflowPassoEnvelope[] {
   return [...(definicao.passos || [])].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+}
+
+function registroHasWorkflowReject(registro: IRegistro[] = []): boolean {
+  return registro.some((row) => {
+    if (row.metadados?.workflowDecision === 'reject') return true;
+    return (row.alteracoes || []).some(
+      (item) => (item as Record<string, unknown>)?.workflowDecision === 'reject',
+    );
+  });
+}
+
+/** Índice do passo de aprovação reprovado (para stepper denied). */
+function resolveRejectedApprovalStepIndex(
+  chamado: IChamadoN1,
+  passos: IWorkflowPassoEnvelope[],
+): number | null {
+  if (!registroHasWorkflowReject(chamado.registro || [])) return null;
+  const step = Math.min(Math.max(chamado.workflow?.step ?? 0, 0), Math.max(passos.length - 1, 0));
+  for (let index = step; index >= 0; index -= 1) {
+    if (passos[index]?.passo?.acao?.tipo === 'aprovacao') return index;
+  }
+  return null;
 }
 
 function buildPassosResumo(definicao: IWorkflowDefinicao) {
@@ -30,10 +52,12 @@ export function buildLateralWorkflowDto(
 ): Record<string, unknown> | null {
   const wf = chamado.workflow;
   const finished = wf?.workflowStatus === 'finished';
-  if ((!wf?.active && !finished) || !wf.workflowId) return null;
+  const cancelled = wf?.workflowStatus === 'cancel';
+  if ((!wf?.active && !finished && !cancelled) || !wf.workflowId) return null;
 
   const passos = sortPassos(definicao);
   const step = Math.min(Math.max(wf.step ?? 0, 0), Math.max(passos.length - 1, 0));
+  const rejectedStepIdx = resolveRejectedApprovalStepIndex(chamado, passos);
   const currentPasso = passos[step];
   const currentStepId = currentPasso?._id ? String(currentPasso._id) : '';
   const startedAt = wf.startedAt ? new Date(wf.startedAt).toISOString() : new Date().toISOString();
@@ -41,9 +65,16 @@ export function buildLateralWorkflowDto(
 
   const stepHistory = passos.map((p, index) => {
     const stepId = String(p._id);
-    let status: 'completed' | 'active' | 'pending' | 'skipped' = 'pending';
-    if (finished || wf.completedAt || index < step) status = 'completed';
-    else if (index === step && !wf.completedAt) status = 'active';
+    let status: 'completed' | 'active' | 'pending' | 'skipped' | 'denied' = 'pending';
+    if (rejectedStepIdx != null && index === rejectedStepIdx) {
+      status = 'denied';
+    } else if (cancelled) {
+      status = index < step ? 'completed' : 'skipped';
+    } else if (finished || wf.completedAt || index < step) {
+      status = 'completed';
+    } else if (index === step && !wf.completedAt) {
+      status = 'active';
+    }
     return {
       stepId,
       status,
@@ -63,7 +94,7 @@ export function buildLateralWorkflowDto(
     step,
     startedAt,
     completedAt,
-    status: finished ? 'completed' : 'active',
+    status: finished ? 'completed' : cancelled ? 'cancelled' : 'active',
     workflowStatus: wf.workflowStatus ?? (wf.active ? 'active' : null),
     stepHistory,
     passosResumo: buildPassosResumo(definicao),

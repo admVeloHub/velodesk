@@ -1,6 +1,6 @@
 /**
  * Central de Configurações — layout V2
- * VERSION: v3.6.0 | DATE: 2026-07-27
+ * VERSION: v3.7.0 | DATE: 2026-08-20
  */
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';

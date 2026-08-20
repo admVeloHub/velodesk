@@ -1,6 +1,6 @@
 /**
- * DeskComposePanel v1.13.1 — Enviar Nota substitui Revisor de Texto na aba interna
- * VERSION: v1.13.1 | DATE: 2026-08-18
+ * DeskComposePanel v1.15.0 — revisão de texto aplica envelope como sugestão IA
+ * VERSION: v1.15.0 | DATE: 2026-08-20
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { uploadsApi } from '../../../api/client';
@@ -17,6 +17,10 @@ import SpellSuggestionBar, { SpellErrorsPanel } from './SpellSuggestionBar';
 import ComposeRichEditor from './ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
 import ComposeRefinarModal from './ComposeRefinarModal';
+import {
+  stripComposerOpening,
+  wrapComposerOpeningForTicket,
+} from '../../../services/desk/clientMessageEnvelope';
 
 function readImageFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -404,6 +408,7 @@ function InternalNoteFields({
 
 export default function DeskComposePanel({
   ticketId,
+  ticket = null,
   composeMode,
   composeText,
   internalText,
@@ -411,6 +416,7 @@ export default function DeskComposePanel({
   onComposeAttachmentsChange,
   onComposeModeChange,
   onComposeTextChange,
+  onComposeReviewed,
   onInternalTextChange,
   spellIgnoredWords,
   onIgnoreSpellWord,
@@ -506,8 +512,10 @@ export default function DeskComposePanel({
   };
 
   const handleApplyRefinar = useCallback((plainText) => {
-    onComposeTextChange(normalizePlainToHtml(plainText));
-  }, [onComposeTextChange]);
+    const html = normalizePlainToHtml(plainText);
+    onComposeTextChange(html);
+    onComposeReviewed?.(html);
+  }, [onComposeTextChange, onComposeReviewed]);
 
   const handlePublicAttachImage = useCallback((file) => {
     void attachImageToEditor(publicEditorRef, file, showNotification);
@@ -702,6 +710,7 @@ export default function DeskComposePanel({
                   draftText={refinarDraft}
                   nomeOperador={nomeOperador}
                   onApply={handleApplyRefinar}
+                  onReviewComplete={onComposeReviewed}
                 />
               </div>
               ) : null}

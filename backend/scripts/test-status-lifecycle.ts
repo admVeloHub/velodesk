@@ -1,5 +1,5 @@
 /**
- * test-status-lifecycle v1.0.0 — ciclo pendente/resolvido/fechado + inbound + job 48h
+ * test-status-lifecycle v1.2.0 — janela 48h reabre; fechado gera ticket derivado
  * Rode: npx tsx scripts/test-status-lifecycle.ts
  */
 import type { IChamadoN1 } from '../src/models/ChamadoN1';
@@ -17,6 +17,8 @@ import {
   shouldSpawnNewTicketOnInbound,
   statusFromBoxName,
   boxNameFromStatus,
+  buildInboundDerivedTicketNote,
+  prependInboundDerivedTicketNote,
   RESOLVED_REOPEN_WINDOW_MS,
 } from '../src/services/chamado.mapper';
 
@@ -68,18 +70,20 @@ function testHelpersBasics() {
 function testResolvedWindow() {
   const now = Date.now();
   const recent = mockChamado('resolvido', new Date(now - 2 * 60 * 60 * 1000));
-  assert(isResolvedWithinReopenWindow(recent, RESOLVED_REOPEN_WINDOW_MS, now) === true, 'resolvido <48h reabre');
-  assert(shouldSpawnNewTicketOnInbound(recent, RESOLVED_REOPEN_WINDOW_MS, now) === false, 'não spawn <48h');
+  assert(isResolvedWithinReopenWindow(recent, RESOLVED_REOPEN_WINDOW_MS, now) === true, 'resolvido <48h na janela');
+  assert(shouldSpawnNewTicketOnInbound(recent, RESOLVED_REOPEN_WINDOW_MS, now) === false, 'resolvido <48h anexa no mesmo');
 
   const old = mockChamado('resolvido', new Date(now - 50 * 60 * 60 * 1000));
-  assert(isResolvedWithinReopenWindow(old, RESOLVED_REOPEN_WINDOW_MS, now) === false, 'resolvido ≥48h não reabre');
-  assert(shouldSpawnNewTicketOnInbound(old, RESOLVED_REOPEN_WINDOW_MS, now) === true, 'spawn ≥48h');
+  assert(isResolvedWithinReopenWindow(old, RESOLVED_REOPEN_WINDOW_MS, now) === false, 'resolvido ≥48h sai da janela');
+  assert(shouldSpawnNewTicketOnInbound(old, RESOLVED_REOPEN_WINDOW_MS, now) === true, 'resolvido ≥48h gera ticket novo');
 
   const closed = mockChamado('fechado');
-  assert(shouldSpawnNewTicketOnInbound(closed) === true, 'fechado spawn novo');
+  assert(shouldSpawnNewTicketOnInbound(closed) === true, 'fechado gera ticket novo');
+  assert(resolveInboundClientReplyStatus(closed) === undefined, 'fechado não reabre no mesmo');
 
   const cancelado = mockChamado('cancelado');
-  assert(shouldSpawnNewTicketOnInbound(cancelado) === true, 'cancelado spawn novo');
+  assert(shouldSpawnNewTicketOnInbound(cancelado) === true, 'cancelado gera ticket novo');
+  assert(resolveInboundClientReplyStatus(cancelado) === undefined, 'cancelado não reabre');
 
   const pendente = mockChamado('pendente');
   assert(shouldSpawnNewTicketOnInbound(pendente) === false, 'pendente anexa no mesmo');
@@ -97,7 +101,7 @@ function testInboundStatusOverride() {
   const now = Date.now();
   const resolvido = mockChamado('resolvido', new Date(now - 60 * 60 * 1000));
   appendMessage(resolvido, 'cliente voltou', false, 'them', [], { source: 'test' }, 'em-aberto');
-  assert(currentStatus(resolvido) === 'em-aberto', 'resolvido <48h + inbound → em-aberto');
+  assert(currentStatus(resolvido) === 'em-aberto', 'resolvido + inbound → em-aberto');
   assert(getResolvedAt(resolvido) != null, 'getResolvedAt preserva histórico resolvido');
 }
 
@@ -106,10 +110,21 @@ function testInboundResolvido48hIntegration() {
 
   const recent = mockChamado('resolvido', new Date(now - 60 * 60 * 1000));
   assert(shouldSpawnNewTicketOnInbound(recent, RESOLVED_REOPEN_WINDOW_MS, now) === false, 'resolvido <48h anexa no mesmo');
-  assert(resolveInboundClientReplyStatus(recent) === 'em-aberto', 'resolvido <48h → em-aberto (Cliente respondeu)');
+  assert(resolveInboundClientReplyStatus(recent) === 'em-aberto', 'resolvido → em-aberto (Cliente respondeu)');
 
   const old = mockChamado('resolvido', new Date(now - 50 * 60 * 60 * 1000));
   assert(shouldSpawnNewTicketOnInbound(old, RESOLVED_REOPEN_WINDOW_MS, now) === true, 'resolvido ≥48h gera ticket novo');
+}
+
+function testDerivedTicketNote() {
+  assert(
+    buildInboundDerivedTicketNote('0100180031') === 'Novo ticket derivado de 0100180031',
+    'nota de origem usa o protocolo',
+  );
+  const novo = mockChamado('novo');
+  prependInboundDerivedTicketNote(novo, '0100180031', 'novo');
+  assert(novo.registro[0].anotacaoInterna === 'Novo ticket derivado de 0100180031', 'nota vai no primeiro registro');
+  assert(novo.registro.length === 2, 'nota é inserida no início sem apagar o registro original');
 }
 
 function testJobCloseTransition() {
@@ -149,6 +164,7 @@ function main() {
   testResolvedWindow();
   testInboundStatusOverride();
   testInboundResolvido48hIntegration();
+  testDerivedTicketNote();
   testJobCloseTransition();
   testBoxResolvidosIncludesFechado();
   console.log('OK test-status-lifecycle — todos os cenários passaram');

@@ -1,13 +1,14 @@
 /**
- * useTicketAiSuggestions v1.10.0 — contexto interno usado sempre que não há 1ª msg do cliente (não só telefone)
- * VERSION: v1.10.0 | DATE: 2026-08-17
+ * useTicketAiSuggestions v1.12.1 — cache por ticket; não refaz POST no flicker de thread/permissões
+ * VERSION: v1.12.1 | DATE: 2026-08-20
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ticketAiApi, agentsApi } from '../api/client';
 import { htmlToPlainText } from '../services/desk/composeRichEditor';
 import { getClientContactFields, getAgentName, isWhatsAppCustomerSessionOpen, buildWhatsAppConvMsgs } from '../services/desk/utils';
 import {
-  buildAiSuggestionRefreshKey,
+  buildAgentInternalNotesFingerprint,
+  buildClientThreadFingerprint,
   isLastPublicInteractionFromAgent,
 } from '../services/desk/ticketThreadSync';
 
@@ -15,6 +16,9 @@ export const TICKET_AI_INTERNAL_NOTE_MIN_CHARS = 80;
 const PUBLIC_DEBOUNCE_MS = 2000;
 const INTERNAL_DEBOUNCE_MS = 1500;
 const LOG_PREFIX = '[ticket-ai-desk]';
+
+/** Sobrevive a remount/HMR: ticketId → { hash, result } */
+const AI_SUGGESTION_STORE = new Map();
 
 function parseAuditScore(value) {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -256,6 +260,10 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
   const agentsEnabledRef = useRef(false);
   const fetchContextRef = useRef({});
 
+  const lastTicketIdRef = useRef('');
+  const stickyClientFpRef = useRef('');
+  const scheduledHashRef = useRef('');
+
   const internalPlain = useMemo(() => htmlToPlainText(internalText || '').trim(), [internalText]);
   const internalNotesBlock = useMemo(
     () => collectInternalNotesPlain(ticket, internalPlain),
@@ -267,7 +275,17 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
    * sem histórico do canal), usa a nota interna do agente como contexto da consulta —
    * independente do canal do ticket.
    */
-  const useInternalContext = !hasClientMessage(aiMsgs);
+  const hasClient = hasClientMessage(aiMsgs);
+  const ticketIdNow = String(ticket?.id || ticket?._id || '');
+  if (ticketIdNow && ticketIdNow !== lastTicketIdRef.current) {
+    lastTicketIdRef.current = ticketIdNow;
+    stickyClientFpRef.current = '';
+  }
+  const liveClientFp = buildClientThreadFingerprint(convMsgs);
+  if (liveClientFp) stickyClientFpRef.current = liveClientFp;
+  const clientFp = liveClientFp || stickyClientFpRef.current;
+  const seenClientForTicket = Boolean(clientFp);
+  const useInternalContext = !hasClient && !seenClientForTicket;
   const contextSource = useInternalContext ? 'internal' : 'public';
 
   /** Agente já respondeu — só nova msg do cliente reabre sugestão (rascunho no compose não conta). */
@@ -286,16 +304,15 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     return true;
   }, [ticket, useInternalContext, internalNotesBlock, awaitingClientAfterAgentReply]);
 
-  const aiRefreshKey = useMemo(() => {
-    if (!ticket || !canFetch) return '';
-    return buildAiSuggestionRefreshKey({
-      ticketId: ticket.id || ticket._id,
+  const notesFp = buildAgentInternalNotesFingerprint(ticket);
+  const aiRefreshKey = (!ticket || !canFetch)
+    ? ''
+    : [
+      String(ticket.id || ticket._id),
       contextSource,
-      useInternalContext,
-      convMsgs,
-      ticket,
-    });
-  }, [ticket, canFetch, contextSource, useInternalContext, convMsgs]);
+      useInternalContext ? 'internal-context' : 'client',
+      useInternalContext ? notesFp : clientFp,
+    ].join('::');
 
   fetchContextRef.current = {
     ticket,
@@ -374,7 +391,9 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       return;
     }
 
-    const cached = cacheRef.current.get(hash);
+    const ticketId = String(payload.ticketId || '');
+    const stored = AI_SUGGESTION_STORE.get(ticketId);
+    const cached = cacheRef.current.get(hash) || (stored?.hash === hash ? stored.result : null);
     if (cached) {
       logTicketAi('info', 'Sugestão servida do cache local.', {
         ticketId: payload.ticketId,
@@ -395,6 +414,8 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       setWaitingReason(null);
       setLoading(false);
       lastFetchedHashRef.current = hash;
+      cacheRef.current.set(hash, cached);
+      AI_SUGGESTION_STORE.set(ticketId, { hash, result: cached });
       return;
     }
 
@@ -406,13 +427,15 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     setLoading(true);
     setError(null);
     setWaitingReason(null);
-    setRespostaSugerida('');
-    setTabulacao(null);
-    setTabulacaoDisplay('');
-    setTabulacaoFonte('atendimento');
-    setAuditScore(null);
-    setAuditAprovado(null);
-    setAuditComplete(false);
+    if (!stored?.result?.respostaSugerida) {
+      setRespostaSugerida('');
+      setTabulacao(null);
+      setTabulacaoDisplay('');
+      setTabulacaoFonte('atendimento');
+      setAuditScore(null);
+      setAuditAprovado(null);
+      setAuditComplete(false);
+    }
 
     logTicketAi('info', 'Iniciando POST /ticket-ai/suggest…', {
       ticketId: payload.ticketId,
@@ -453,6 +476,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       }
 
       cacheRef.current.set(hash, result);
+      AI_SUGGESTION_STORE.set(ticketId, { hash, result });
       applySuggestionResult({
         setRespostaSugerida,
         setTabulacao,
@@ -505,18 +529,34 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
   }, []);
 
   useEffect(() => {
-    lastFetchedHashRef.current = '';
-    inFlightHashRef.current = '';
     abortRef.current?.abort();
+    inFlightHashRef.current = '';
+    scheduledHashRef.current = '';
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
+    }
+    const id = String(ticket?.id || ticket?._id || '');
+    const stored = id ? AI_SUGGESTION_STORE.get(id) : null;
+    lastFetchedHashRef.current = stored?.hash || '';
+    if (stored?.result) {
+      applySuggestionResult({
+        setRespostaSugerida,
+        setTabulacao,
+        setTabulacaoDisplay,
+        setTabulacaoFonte,
+        setAuditScore,
+        setAuditAprovado,
+        setAuditComplete,
+      }, stored.result);
     }
   }, [ticket?.id, ticket?._id]);
 
   useEffect(() => {
     if (!ticket) {
-      logTicketAi('info', 'Sem ticket ativo — estado IA resetado.');
+      if (lastTicketIdRef.current) {
+        logTicketAi('info', 'Sem ticket ativo — estado IA resetado.');
+      }
       setLoading(false);
       setError(null);
       setRespostaSugerida('');
@@ -527,8 +567,8 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       setAuditAprovado(null);
       setAuditComplete(false);
       setWaitingReason(null);
-      lastFetchedHashRef.current = '';
       inFlightHashRef.current = '';
+      scheduledHashRef.current = '';
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
@@ -537,6 +577,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     }
 
     const ticketId = ticket.id || ticket._id;
+    const stored = AI_SUGGESTION_STORE.get(String(ticketId));
 
     if (serviceUnavailableRef.current) {
       setLoading(false);
@@ -545,17 +586,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     }
 
     if (!canFetch || !aiRefreshKey) {
-      abortRef.current?.abort();
-      inFlightHashRef.current = '';
       setLoading(false);
-      setError(null);
-      setRespostaSugerida('');
-      setTabulacao(null);
-      setTabulacaoDisplay('');
-      setTabulacaoFonte('atendimento');
-      setAuditScore(null);
-      setAuditAprovado(null);
-      setAuditComplete(false);
       let reason = 'awaiting_client_message';
       if (useInternalContext) {
         reason = 'awaiting_internal_note';
@@ -574,11 +605,31 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
           ticketId,
         });
       }
-      lastFetchedHashRef.current = '';
+      return undefined;
+    }
+
+    if (stored?.hash === aiRefreshKey && stored.result) {
+      applySuggestionResult({
+        setRespostaSugerida,
+        setTabulacao,
+        setTabulacaoDisplay,
+        setTabulacaoFonte,
+        setAuditScore,
+        setAuditAprovado,
+        setAuditComplete,
+      }, stored.result);
+      lastFetchedHashRef.current = aiRefreshKey;
+      setError(null);
+      setWaitingReason(null);
+      setLoading(false);
       return undefined;
     }
 
     if (aiRefreshKey === lastFetchedHashRef.current || inFlightHashRef.current === aiRefreshKey) {
+      return undefined;
+    }
+
+    if (scheduledHashRef.current === aiRefreshKey) {
       return undefined;
     }
 
@@ -592,7 +643,9 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       ticketId,
       aiRefreshKey: hashPreview(aiRefreshKey),
     });
+    scheduledHashRef.current = aiRefreshKey;
     debounceRef.current = setTimeout(() => {
+      scheduledHashRef.current = '';
       fetchSuggestions(aiRefreshKey, buildPayload(fetchContextRef.current));
     }, debounceMs);
 
@@ -600,6 +653,9 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
+      }
+      if (scheduledHashRef.current === aiRefreshKey) {
+        scheduledHashRef.current = '';
       }
     };
   }, [
@@ -655,7 +711,11 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
         auditComplete: isAuditComplete(data, agentsEnabledRef.current),
       };
 
-      if (aiRefreshKey) cacheRef.current.set(aiRefreshKey, result);
+      if (aiRefreshKey) {
+        cacheRef.current.set(aiRefreshKey, result);
+        const tid = String(ticket?.id || ticket?._id || '');
+        if (tid) AI_SUGGESTION_STORE.set(tid, { hash: aiRefreshKey, result });
+      }
       applySuggestionResult({
         setRespostaSugerida,
         setTabulacao,

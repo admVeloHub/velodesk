@@ -1,4 +1,4 @@
-/** ChamadoN1 v1.12.0 — workflowStatus active/finished persistente */
+/** ChamadoN1 v1.13.0 — workflowStatus active/finished/cancel persistente */
 import mongoose, { Schema, Document, Types } from 'mongoose';
 import type { IChamadoWorkflowRequisicao } from '../config/workflowRequisicaoDefaults';
 
@@ -31,9 +31,12 @@ export interface IChamadoFusao {
   childIds?: Types.ObjectId[];
 }
 
+export const WORKFLOW_STATUS_VALUES = ['active', 'finished', 'cancel'] as const;
+export type WorkflowRuntimeStatus = (typeof WORKFLOW_STATUS_VALUES)[number];
+
 export interface IChamadoWorkflow {
   active: boolean;
-  workflowStatus?: 'active' | 'finished' | null;
+  workflowStatus?: WorkflowRuntimeStatus | null;
   workflowId: Types.ObjectId | null;
   step: number;
   passoId: Types.ObjectId | null;
@@ -160,7 +163,7 @@ const ChamadoWorkflowRequisicaoSchema = new Schema(
 const ChamadoWorkflowSchema = new Schema<IChamadoWorkflow>(
   {
     active: { type: Boolean, default: false },
-    workflowStatus: { type: String, enum: ['active', 'finished'], default: null },
+    workflowStatus: { type: String, enum: WORKFLOW_STATUS_VALUES, default: null },
     workflowId: { type: Schema.Types.ObjectId, default: null },
     step: { type: Number, default: 0 },
     passoId: { type: Schema.Types.ObjectId, default: null },

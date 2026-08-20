@@ -1,7 +1,7 @@
 /**
  * Painel 360° — Gestão
- * VERSION: v3.9.0 | DATE: 2026-08-19
- * — Render progressivo: shell imediato, KPIs/API preenchem sem bloquear tela inteira
+ * VERSION: v3.10.0 | DATE: 2026-08-20
+ * — poll silencioso alinhado ao painel Agente
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -30,11 +30,18 @@ import AiUsageCostCard from './components/aiUsage/AiUsageCostCard';
 export default function GestaoPanel() {
   const navigate = useNavigate();
   const { showNotification } = useNotifications();
-  const { openTicket, refreshTickets } = useTickets();
+  const { openTicket, refreshTickets, refreshTicketsSilent } = useTickets();
+  const onPollTick = useCallback(async () => {
+    await refreshTicketsSilent();
+  }, [refreshTicketsSilent]);
   // Pede o leaderboard já no payload principal (período padrão "mês") para o card reaproveitar
   // sem uma segunda chamada. Memoizado para não recriar o refresh do hook a cada render.
   const wsReportParams = useMemo(() => ({ leaderboardPeriod: 'mes' }), []);
-  const { data, loading, error, refresh } = useWorkspace360({ reportParams: wsReportParams });
+  const { data, loading, error, refresh } = useWorkspace360({
+    reportParams: wsReportParams,
+    poll: true,
+    onPollTick,
+  });
   const [escalatedListOpen, setEscalatedListOpen] = useState(false);
   const [redistributeOpen, setRedistributeOpen] = useState(false);
   const [insightsPeriod, setInsightsPeriod] = useState({ period: 'mes' });

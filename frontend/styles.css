@@ -17577,6 +17577,10 @@ body.velodesk-dark .sidebar {
     background: #ecfdf5;
     color: #047857;
 }
+.client360-workflow-icon--cancel {
+    background: #fef2f2;
+    color: #dc2626;
+}
 
 .ticket-client-fusao-wrap {
     position: relative;

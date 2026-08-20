@@ -1,6 +1,6 @@
 /**
  * Velodesk — modo escuro unificado (LAYOUT_GUIDELINES)
- * VERSION: v1.2.1 | DATE: 2026-08-13
+ * VERSION: v1.2.2 | DATE: 2026-08-20
  * Importar por último em src/styles/cockpit/index.css
  */
 
@@ -480,6 +480,7 @@ body.velodesk-dark .velonews-history-modal__filters {
 }
 
 body.velodesk-dark .velonews-popover__title,
+body.velodesk-dark .velonews-popover__section-title,
 body.velodesk-dark .velonews-popover__item-head strong,
 body.velodesk-dark .velonews-history-modal__item-head h3,
 body.velodesk-dark .velonews-read-modal h2 {

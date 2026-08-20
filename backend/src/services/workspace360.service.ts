@@ -1,4 +1,4 @@
-/** workspace360.service v1.5.0 — P1: loadSupervisorChamados via agregação com registro enxuto (sem corpos de mensagem) */
+/** workspace360.service v1.5.1 — reprovação workflow → seção action-now do agente */
 import mongoose from 'mongoose';
 import { ChamadoN1, IChamadoN1 } from '../models/ChamadoN1';
 import { User } from '../models/User';
@@ -357,7 +357,28 @@ async function enrichTicketsForPanel(
   });
 }
 
+function registroHasWorkflowReject(chamado: IChamadoN1): boolean {
+  return (chamado.registro || []).some((row) => {
+    if (row.metadados?.workflowDecision === 'reject') return true;
+    return (row.alteracoes || []).some(
+      (item) => (item as Record<string, unknown>)?.workflowDecision === 'reject',
+    );
+  });
+}
+
+/** Workflow reprovado aguardando retorno manual do responsável (N1). */
+function isWorkflowRejectAwaitingAgent(chamado: IChamadoN1): boolean {
+  const wf = chamado.workflow;
+  if (!wf?.active || wf.workflowStatus === 'finished' || wf.workflowStatus === 'cancel') {
+    return false;
+  }
+  if (!registroHasWorkflowReject(chamado)) return false;
+  const status = currentStatus(chamado);
+  return status === 'em-andamento' || status === 'pendente' || status === 'em-espera';
+}
+
 function classifyAgentSection(chamado: IChamadoN1): 'action-now' | 'client-replied' | 'workflow' | null {
+  if (isWorkflowRejectAwaitingAgent(chamado)) return 'action-now';
   const status = currentStatus(chamado);
   if (status === 'em-aberto') return 'client-replied';
   if (status === 'em-andamento' || status === 'pendente' || status === 'em-espera') return 'workflow';

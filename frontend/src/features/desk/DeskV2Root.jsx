@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.37.0 | DATE: 2026-08-19
- * — Merge leve preserva thread; abas abertas protegidas no refresh /boxes
+ * VERSION: v3.37.9 | DATE: 2026-08-20
+ * — abrir ticket vazio não entra em loop de detalhe (tela branca)
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -89,6 +89,7 @@ import DeskResolvedTicketTable from './components/DeskResolvedTicketTable';
 import DeskMyTicketsTable from './components/DeskMyTicketsTable';
 import DeskTicketTabsBar from './components/DeskTicketTabsBar';
 import DeskClientProfileBar from './components/DeskClientProfileBar';
+import DeskTicketErrorBoundary from './components/DeskTicketErrorBoundary';
 import ClientTicketHistoryModal from './components/ClientTicketHistoryModal';
 import TicketFusaoStatusControls from './components/TicketFusaoStatusControls';
 import DeskConversation from './components/DeskConversation';
@@ -104,7 +105,7 @@ import { applyCascadeFieldChange, applyTabulationSuggestion, buildDefaultRightFi
 import { useTabulation } from '../../context/TabulationContext';
 import { useWorkflowConfig } from '../../context/WorkflowConfigContext';
 import { createSpellContext, loadSpellEngine, scanText } from '../../services/spellcheck/spellEngine';
-import { htmlToPlainText } from '../../services/desk/composeRichEditor';
+import { htmlToPlainText, normalizeComposePlain } from '../../services/desk/composeRichEditor';
 import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
 import DeskAiRevisionModal from './components/DeskAiRevisionModal';
 import { resolveAutomaticaConfig } from '../config/workflow/workflowConfigData';
@@ -112,12 +113,12 @@ import { resolveWorkflowForTicket } from '../../services/desk/workflowEngine';
 import { getRuntimeWorkflows } from '../../services/desk/workflowRuntimeStore';
 import { resolveRequisicaoCamposVisiveis } from '../../services/workflow/workflowRequisicao';
 import { getAutoCloseOnSave } from '../../services/desk/agentDeskPreferences';
-import { parseDeskQueueFromUrl, parseDeskMyTicketsSectionFromUrl } from '../../services/desk/constants';
+import { parseDeskQueueFromUrl, parseDeskMyTicketsSectionFromUrl, COMPOSE_AI_REVIEW_REQUIRED } from '../../services/desk/constants';
 import ProdutosForwardPopover from './components/ProdutosForwardPopover';
 import WorkflowComunicacaoModal from '../workflow/components/WorkflowComunicacaoModal';
 import { replyWorkflowComunicacao } from '../../services/workflow/workflowDecisionHandlers';
 import deskPlatformTrace, { createPlatformTraceCounter } from '../../utils/deskPlatformTrace';
-import { hasPublicThreadChanged, hasWhatsAppThreadChanged, hasPersistedInternalNotesChanged } from '../../services/desk/ticketThreadSync';
+import { hasPublicThreadChanged, hasWhatsAppThreadChanged, hasPersistedInternalNotesChanged, buildPublicThreadFingerprint } from '../../services/desk/ticketThreadSync';
 import { hasAtendimentoFuncao } from '../../services/desk/atuacaoVision';
 
 /** Respostas de cliente chegam por e-mail a qualquer momento: a thread se atualiza sozinha */
@@ -131,12 +132,10 @@ const WORKFLOW_REQUIRES_CLIENT_MESSAGE = 'Identifique o cliente (CPF válido) an
 function ticketNeedsDetailLoad(ticket) {
   if (!ticket) return true;
   if (ticket.listOnly === true) return true;
-  if (!ticket._detailLoaded) return true;
-  const hasContent = (ticket.messages?.length || 0) > 0
-    || (ticket.internalNotes?.length || 0) > 0
-    || (ticket.registroHistorico?.length || 0) > 0;
-  // Sem thread no cache — buscar detalhe (ticket "novo" no servidor pode já ter msg do cliente)
-  return !hasContent;
+  // Detalhe já veio da API — mesmo sem mensagens (ticket novo / só status).
+  // Recarregar nesse caso incrementava refreshKey em loop e brancava a tela.
+  if (ticket._detailLoaded) return false;
+  return true;
 }
 
 /**
@@ -148,9 +147,33 @@ function ticketNeedsDetailLoad(ticket) {
 function mergeThreadField(prevArr, lightArr) {
   const prevLen = prevArr?.length || 0;
   const lightLen = lightArr?.length || 0;
-  if (lightLen >= prevLen && lightLen > 0) return lightArr;
-  if (lightLen === 0 && prevLen > 0) return prevArr;
+  if (lightLen > prevLen) return lightArr;
+  if (prevLen > 0) return prevArr;
   return lightArr ?? prevArr;
+}
+
+function mergeLightWorkflow(prevWf, lightWf, prevTicket) {
+  if (prevTicket?.workflow?.pendingPersist || prevTicket?._pendingWorkflowStart) {
+    return prevWf;
+  }
+  if (!lightWf) return prevWf;
+  if (!prevWf) return lightWf;
+  return {
+    ...prevWf,
+    ...lightWf,
+    requisicao: lightWf.requisicao || prevWf.requisicao,
+  };
+}
+
+function ticketStatusWorkflowFingerprint(ticket) {
+  const wf = ticket?.workflow || {};
+  return [
+    String(ticket?.status || ''),
+    wf.active ? '1' : '0',
+    String(wf.workflowStatus || ''),
+    String(wf.step ?? ''),
+    String(wf.completedAt || ''),
+  ].join('|');
 }
 
 function mergeLightThreadIntoTicket(prev, light) {
@@ -163,6 +186,7 @@ function mergeLightThreadIntoTicket(prev, light) {
     status: light.status ?? prev.status,
     updatedAt: light.updatedAt ?? prev.updatedAt,
     queueEntryAt: light.queueEntryAt ?? prev.queueEntryAt,
+    workflow: mergeLightWorkflow(prev.workflow, light.workflow, prev),
     _detailLoaded: true,
     listOnly: false,
   };
@@ -202,6 +226,7 @@ function buildDefaultSessionFromTicket(ticket, config) {
     composeText: '',
     internalText: '',
     composeAttachments: [],
+    composeReviewedPlain: '',
     sendStatus: 'em-andamento',
     rightFields: buildDefaultRightFields(config, ticket, getAgentName),
     waChatOpen: false,
@@ -232,6 +257,9 @@ export default function DeskV2Root() {
 
   const detailLoadRef = useRef(null);
   const [activeQueue, setActiveQueue] = useState(() => parseDeskQueueFromUrl(searchParams.get('queue')));
+  const activeQueueRef = useRef(activeQueue);
+  activeQueueRef.current = activeQueue;
+  const lastUrlQueueRef = useRef(String(searchParams.get('queue') || '').trim());
   const [activeSort, setActiveSort] = useState('data');
   const [entrySortOldestFirst, setEntrySortOldestFirst] = useState(false);
   const [searchDraft, setSearchDraft] = useState('');
@@ -244,6 +272,7 @@ export default function DeskV2Root() {
   const [composeText, setComposeText] = useState('');
   const [internalText, setInternalText] = useState('');
   const [composeAttachments, setComposeAttachments] = useState([]);
+  const [composeReviewedPlain, setComposeReviewedPlain] = useState('');
   const [sendStatus, setSendStatus] = useState('em-andamento');
   const [rightFields, setRightFields] = useState({});
   const [waChatOpen, setWaChatOpen] = useState(false);
@@ -282,8 +311,11 @@ export default function DeskV2Root() {
 
   const syncUrlTicketParam = useCallback((ticketId) => {
     const id = ticketId ? String(ticketId).trim() : '';
+    const queueId = activeQueueRef.current;
+    lastUrlQueueRef.current = queueId;
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
+      next.set('queue', queueId);
       if (id) next.set('ticket', id);
       else next.delete('ticket');
       return next;
@@ -292,12 +324,20 @@ export default function DeskV2Root() {
   }, [setSearchParams]);
 
   useEffect(() => {
-    const fromUrl = searchParams.get('queue');
+    const fromUrl = String(searchParams.get('queue') || '').trim();
     if (!fromUrl) return;
+    // Só reaplica fila quando ?queue= mudou — não quando só ?ticket= foi atualizado.
+    if (fromUrl === lastUrlQueueRef.current) return;
+    lastUrlQueueRef.current = fromUrl;
     const queue = parseDeskQueueFromUrl(fromUrl);
     suppressAutoSelectRef.current = true;
     setActiveQueue((current) => (current === queue ? current : queue));
-    setTableQueueBrowsing(isDeskTableQueue(queue));
+    activeQueueRef.current = queue;
+    // Só entra em modo lista quando a fila veio da URL sem ticket aberto.
+    const ticketFromUrl = String(searchParams.get('ticket') || '').trim();
+    if (!ticketFromUrl) {
+      setTableQueueBrowsing(isDeskTableQueue(queue));
+    }
   }, [searchParams]);
 
   useEffect(() => {
@@ -320,11 +360,17 @@ export default function DeskV2Root() {
         } catch {
           if (!cancelled) {
             showNotification('Não foi possível abrir o ticket — recarregue a lista.', 'warning');
+            setTableQueueBrowsing(isDeskTableQueue(activeQueueRef.current));
           }
           return;
         }
       }
-      if (cancelled || !entry) return;
+      if (cancelled) return;
+      if (!entry) {
+        showNotification('Não foi possível abrir o ticket — recarregue a lista.', 'warning');
+        setTableQueueBrowsing(isDeskTableQueue(activeQueueRef.current));
+        return;
+      }
       openedTicketFromUrlRef.current = ticketId;
       suppressAutoSelectRef.current = true;
       setTableQueueBrowsing(false);
@@ -387,12 +433,13 @@ export default function DeskV2Root() {
       composeText,
       internalText,
       composeAttachments,
+      composeReviewedPlain,
       sendStatus,
       rightFields,
       waChatOpen,
       spellIgnoredWords: Array.from(spellIgnoredWords),
     };
-  }, [mainTab, composeMode, composeText, internalText, composeAttachments, sendStatus, rightFields, waChatOpen, spellIgnoredWords]);
+  }, [mainTab, composeMode, composeText, internalText, composeAttachments, composeReviewedPlain, sendStatus, rightFields, waChatOpen, spellIgnoredWords]);
 
   const persistComposeDraft = useCallback((patch) => {
     if (!activeTabId) return;
@@ -404,6 +451,12 @@ export default function DeskV2Root() {
   const handleComposeTextChange = useCallback((html) => {
     setComposeText(html);
     persistComposeDraft({ composeText: html });
+  }, [persistComposeDraft]);
+
+  const handleComposeReviewed = useCallback((value) => {
+    const plain = normalizeComposePlain(value);
+    setComposeReviewedPlain(plain);
+    persistComposeDraft({ composeReviewedPlain: plain });
   }, [persistComposeDraft]);
 
   const handleInternalTextChange = useCallback((html) => {
@@ -430,6 +483,7 @@ export default function DeskV2Root() {
     setComposeText(session.composeText ?? defaults.composeText);
     setInternalText(session.internalText ?? defaults.internalText);
     setComposeAttachments(Array.isArray(session.composeAttachments) ? session.composeAttachments : defaults.composeAttachments);
+    setComposeReviewedPlain(session.composeReviewedPlain ?? defaults.composeReviewedPlain ?? '');
     setSendStatus(session.sendStatus ?? defaults.sendStatus);
     setRightFields(nextRightFields);
     setWaChatOpen(session.waChatOpen ?? defaults.waChatOpen);
@@ -505,7 +559,7 @@ export default function DeskV2Root() {
     return () => {
       cancelled = true;
     };
-  }, [activeTabId, refreshKey, patchTicket, showNotification]);
+  }, [activeTabId, patchTicket, showNotification]);
 
   // Enriquecimento silencioso: só se faltar email ou telefone; Mongo local primeiro, API depois se ainda incompleto
   useEffect(() => {
@@ -603,6 +657,8 @@ export default function DeskV2Root() {
         const threadChanged = hasPublicThreadChanged(prevTicket, merged);
         const waThreadChanged = hasWhatsAppThreadChanged(prevTicket, merged);
         const internalNotesChanged = hasPersistedInternalNotesChanged(prevTicket, merged);
+        const statusOrWorkflowChanged = ticketStatusWorkflowFingerprint(prevTicket)
+          !== ticketStatusWorkflowFingerprint(merged);
 
         if (threadChanged || waThreadChanged || internalNotesChanged) {
           const msgs = merged?.messages?.length ?? 0;
@@ -622,7 +678,7 @@ export default function DeskV2Root() {
           !cancelled
           && seq === requestSeq
           && !commitInProgressRef.current
-          && (threadChanged || waThreadChanged || internalNotesChanged)
+          && (threadChanged || waThreadChanged || internalNotesChanged || statusOrWorkflowChanged)
         ) {
           patchTicket(ticketId, merged);
         }
@@ -940,11 +996,21 @@ export default function DeskV2Root() {
   const selectQueue = (queueId) => {
     suppressAutoSelectRef.current = true;
     setActiveQueue(queueId);
+    activeQueueRef.current = queueId;
+    lastUrlQueueRef.current = queueId;
     setSearchDraft('');
     setAppliedSearch('');
     localStorage.setItem('velodeskCrmTicketListCollapsed', '0');
     setListCollapsed(false);
     setTableQueueBrowsing(isDeskTableQueue(queueId));
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('queue', queueId);
+      if (isDeskTableQueue(queueId)) {
+        next.delete('ticket');
+      }
+      return next;
+    }, { replace: true });
   };
 
   const handleSearchChange = useCallback((value) => {
@@ -1012,6 +1078,7 @@ export default function DeskV2Root() {
       return null;
     }
     commitInProgressRef.current = true;
+    let commitRollbackTicket = null;
     const status = statusId || sendStatus;
     const savedListTicketId = getEntryTicketId(entry);
     const workingListBeforeSave = resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst);
@@ -1058,6 +1125,15 @@ export default function DeskV2Root() {
     }
 
     if (messageText) {
+      if (
+        COMPOSE_AI_REVIEW_REQUIRED
+        && normalizeComposePlain(messageText) !== composeReviewedPlain
+      ) {
+        setComposeMode('public');
+        showNotification('Use o Revisor de Texto antes de enviar a resposta pública.', 'warning');
+        commitInProgressRef.current = false;
+        return null;
+      }
       if (composeSpellErrors.length > 0) {
         showNotification(
           `Corrija ${composeSpellErrors.length} erro${composeSpellErrors.length > 1 ? 's' : ''} ortográfico${composeSpellErrors.length > 1 ? 's' : ''} antes de enviar.`,
@@ -1157,6 +1233,7 @@ export default function DeskV2Root() {
             ...session,
             sendStatus: status,
             composeText: hasPublicPayload ? '' : session.composeText,
+            composeReviewedPlain: hasPublicPayload ? '' : session.composeReviewedPlain,
             internalText: internalNoteText ? '' : session.internalText,
             composeAttachments: hasPublicPayload ? [] : session.composeAttachments,
           };
@@ -1168,6 +1245,7 @@ export default function DeskV2Root() {
         });
         setSendStatus(status);
         if (hasPublicPayload) setComposeText('');
+        if (hasPublicPayload) setComposeReviewedPlain('');
         if (internalNoteText) setInternalText('');
         if (hasPublicPayload) setComposeAttachments([]);
         showNotification(
@@ -1184,14 +1262,21 @@ export default function DeskV2Root() {
         return newId;
       }
 
+      const ticketBeforeMutate = findTicketEntry(ticket.id)?.ticket || ticket;
+      commitRollbackTicket = ticketBeforeMutate;
       let prepared = applyRightFieldsToTicket(
         { ...ticket },
         mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
       );
       syncTicketWorkflowOnCommit(prepared);
       applySendStatus({ ticket: prepared, boxId: entry.boxId }, status);
+      patchTicket(ticket.id, {
+        ...prepared,
+        listOnly: false,
+        _detailLoaded: Boolean(ticket._detailLoaded || ticketBeforeMutate._detailLoaded),
+      });
 
-      const ticketBeforeSave = findTicketEntry(ticket.id)?.ticket || ticket;
+      const ticketBeforeSave = findTicketEntry(ticket.id)?.ticket || prepared;
       const workflowFlushDeps = {
         ticketsApi,
         apiTicketToCockpit,
@@ -1223,6 +1308,7 @@ export default function DeskV2Root() {
 
       setSendStatus(status);
       if (hasPublicPayload) setComposeText('');
+      if (hasPublicPayload) setComposeReviewedPlain('');
       if (internalNoteText) setInternalText('');
       if (hasPublicPayload) setComposeAttachments([]);
       if (activeTabId) {
@@ -1232,6 +1318,7 @@ export default function DeskV2Root() {
           tabSessionsRef.current[sessionKey] = {
             ...session,
             composeText: hasPublicPayload ? '' : session.composeText,
+            composeReviewedPlain: hasPublicPayload ? '' : session.composeReviewedPlain,
             internalText: internalNoteText ? '' : session.internalText,
             composeAttachments: hasPublicPayload ? [] : session.composeAttachments,
           };
@@ -1250,6 +1337,9 @@ export default function DeskV2Root() {
       advanceAfterSaveIfEnabled(ticket.id, plannedNextId, savedListTicketId);
       return ticket.id;
     } catch (err) {
+      if (commitRollbackTicket && ticket?.id) {
+        patchTicket(ticket.id, commitRollbackTicket);
+      }
       const msg = err?.response?.data?.message || err?.message || 'Erro ao salvar ticket.';
       showNotification(msg, 'error');
       return null;
@@ -1699,10 +1789,22 @@ export default function DeskV2Root() {
     setCreateOpen(false);
     openTicket(id);
     setActiveQueue('novos');
+    activeQueueRef.current = 'novos';
+    lastUrlQueueRef.current = 'novos';
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('queue', 'novos');
+      next.set('ticket', String(id));
+      return next;
+    }, { replace: true });
     showNotification('Rascunho aberto — salve quando concluir o atendimento.', 'success');
   };
 
-  const convMsgs = ticket ? buildRegistroThread(ticket) : [];
+  const publicThreadFp = ticket ? buildPublicThreadFingerprint(ticket) : '';
+  const convMsgs = useMemo(
+    () => (ticket ? buildRegistroThread(ticket) : []),
+    [ticket?.id, ticket?._id, publicThreadFp],
+  );
   // Timeline exibe um balão único da conversa WhatsApp; IA continua lendo convMsgs completo
   const displayMsgs = collapseWhatsAppThreadToBalloon(convMsgs);
   const waConvMsgs = ticket ? buildWhatsAppConvMsgs(ticket) : [];
@@ -1809,7 +1911,7 @@ export default function DeskV2Root() {
   );
 
   const matchedWorkflowTemplate = useMemo(() => {
-    if (!ticket || isDraftTicket(ticket) || isTicketWorkflowActive(ticket)) return null;
+    if (!ticket || isDraftTicket(ticket) || isTicketInWorkflow(ticket)) return null;
     if (!isClientIdentifiedForWorkflow(ticket)) return null;
     const fields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
     return resolveWorkflowForTicket(ticket, fields, workflowDefinitions);
@@ -1817,7 +1919,7 @@ export default function DeskV2Root() {
 
   const executeWorkflowStart = useCallback(async (payload) => {
     const template = pendingWorkflowTemplateRef.current || workflowStartTemplate;
-    if (!ticket || !template || startingWorkflow || isTicketWorkflowActive(ticket)) return false;
+    if (!ticket || !template || startingWorkflow || isTicketInWorkflow(ticket)) return false;
 
     const requisicaoValores = payload?.valores ?? payload;
     const solicitacaoProdutos = payload?.solicitacaoProdutos ?? null;
@@ -1892,7 +1994,7 @@ export default function DeskV2Root() {
   ]);
 
   const handleOpenComunicacaoModal = useCallback(async () => {
-    if (!ticket || comunicacaoBusy) return;
+    if (!ticket || comunicacaoBusy || !isTicketWorkflowActive(ticket)) return;
     setComunicacaoBusy(true);
     try {
       if (ticket.listOnly || !ticket._detailLoaded) {
@@ -1925,7 +2027,7 @@ export default function DeskV2Root() {
   }, [comunicacaoBusy, showNotification, syncTicketViews, ticket]);
 
   const handleStartWorkflow = useCallback(() => {
-    if (!ticket || isDraftTicket(ticket) || startingWorkflow || isTicketWorkflowActive(ticket)) return;
+    if (!ticket || isDraftTicket(ticket) || startingWorkflow || isTicketInWorkflow(ticket)) return;
     if (isTicketReadOnly(ticket)) {
       showNotification('Ticket fechado — não aceita modificações.', 'warning');
       return;
@@ -2112,12 +2214,21 @@ export default function DeskV2Root() {
       agentName: getAgentName(),
     });
     setComposeText(wrapped);
-    persistComposeDraft({ composeText: wrapped });
+    const reviewed = normalizeComposePlain(wrapped);
+    setComposeReviewedPlain(reviewed);
+    persistComposeDraft({ composeText: wrapped, composeReviewedPlain: reviewed });
   }, [ticket, persistComposeDraft]);
 
   const showTableQueueMain = isTableQueueView && tableQueueBrowsing && !createOpen;
   const showTicketMain = Boolean(ticket) && !showTableQueueMain;
   const showOpenTabsBar = openTabs.length > 0 && !createOpen && !showTableQueueMain;
+
+  const handleTicketRenderCrash = useCallback(() => {
+    const crashedId = activeTabId;
+    setTableQueueBrowsing(isDeskTableQueue(activeQueueRef.current));
+    if (crashedId) closeTicketTab(crashedId);
+    syncUrlTicketParam('');
+  }, [activeTabId, closeTicketTab, syncUrlTicketParam]);
 
   return (
     <div className={'app-shell' + (isTableQueueView ? ' app-shell--table-queue' : '')} id="deskAppShell">
@@ -2190,6 +2301,17 @@ export default function DeskV2Root() {
             ) : !showTicketMain ? (
               <div className="crm-empty-state" id="crmEmptyMain">Selecione um ticket na lista ao lado</div>
             ) : (
+              <DeskTicketErrorBoundary
+                resetKey={activeTabId}
+                fallback={(
+                  <div className="crm-empty-state" role="alert">
+                    <p>Não foi possível abrir este ticket.</p>
+                    <button type="button" className="queue-btn queue-btn--primary" onClick={handleTicketRenderCrash}>
+                      Voltar à fila
+                    </button>
+                  </div>
+                )}
+              >
               <div className="crm-ticket-view desk-crm-ticket-scope">
             <DeskClientProfileBar
               ticket={ticket}
@@ -2305,6 +2427,7 @@ export default function DeskV2Root() {
                       />
                       <DeskComposePanel
                         ticketId={ticket.id}
+                        ticket={ticket}
                         variant="full"
                         composeMode={composeMode}
                         composeText={composeText}
@@ -2313,6 +2436,7 @@ export default function DeskV2Root() {
                         onComposeAttachmentsChange={setComposeAttachments}
                         onComposeModeChange={setComposeMode}
                         onComposeTextChange={handleComposeTextChange}
+                        onComposeReviewed={handleComposeReviewed}
                         onInternalTextChange={handleInternalTextChange}
                         spellIgnoredWords={spellIgnoredWords}
                         onIgnoreSpellWord={handleIgnoreSpellWord}
@@ -2346,12 +2470,14 @@ export default function DeskV2Root() {
               )}
             </div>
           </div>
+              </DeskTicketErrorBoundary>
             )}
           </>
         )}
       </main>
 
       {ticket && !createOpen && !showTableQueueMain && (
+        <DeskTicketErrorBoundary resetKey={activeTabId}>
         <DeskRightPanel
           ticket={ticket}
           client={client}
@@ -2390,6 +2516,7 @@ export default function DeskV2Root() {
           tabulationReadonly={tabulationReadonly}
           ticketReadOnly={ticketReadOnly}
         />
+        </DeskTicketErrorBoundary>
       )}
 
       <DeskAiRevisionModal

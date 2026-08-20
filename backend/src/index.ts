@@ -1,4 +1,4 @@
-/** index v1.16.0 — callback interno de scan de anexo */
+/** index v1.17.0 — e-mails de saída configuráveis */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -41,6 +41,7 @@ import permissionsRoutes from './routes/permissions.routes';
 import funcoesPermissoesRoutes from './routes/funcoesPermissoes.routes';
 import agentesDeskRoutes from './routes/agentesDesk.routes';
 import mailRulesRoutes from './routes/mailRules.routes';
+import emailOutboundRoutes from './routes/emailOutbound.routes';
 import ticketIaAnalysisRoutes from './routes/ticketIaAnalysis.routes';
 import telephonyRoutes from './routes/telephony.routes';
 import consultasRoutes from './routes/consultas.routes';
@@ -63,6 +64,7 @@ import { seedDevelopmentData, purgeAllMockTickets, runDeskConfigMigrations } fro
 import { getAgentsStatus } from './services/agents/openaiAgent.util';
 import { startGestaoChamadosJob } from './jobs/gestaoChamados.job';
 import { startCloseResolvedTicketsJob } from './jobs/closeResolvedTickets.job';
+import { startEmailSlaTriggerJob } from './jobs/emailSlaTrigger.job';
 import { startResolvePendenteTicketsJob } from './jobs/resolvePendenteTickets.job';
 import { startChamadoIaAnaliseJob } from './jobs/chamadoIaAnalise.job';
 import { bootstrapEmailServices } from './services/emailBootstrap.service';
@@ -179,6 +181,7 @@ app.use('/api/permissions', permissionsRoutes);
 app.use('/api/funcoes-permissoes', funcoesPermissoesRoutes);
 app.use('/api/agentes-desk', agentesDeskRoutes);
 app.use('/api/mail-rules', mailRulesRoutes);
+app.use('/api/email-outbound', emailOutboundRoutes);
 app.use('/api/ticket-ia-analysis', ticketIaAnalysisRoutes);
 app.use('/api/telephony', telephonyRoutes);
 app.use('/api/consultas', consultasRoutes);
@@ -321,6 +324,7 @@ async function start() {
       // Independente do programa de agentes autônomos — controlado só por CHAMADO_IA_ANALISE_ENABLED.
       startChamadoIaAnaliseJob();
       startCloseResolvedTicketsJob();
+      startEmailSlaTriggerJob();
       startResolvePendenteTicketsJob();
       startWhatsAppAudioTranscriptionWorker();
     });

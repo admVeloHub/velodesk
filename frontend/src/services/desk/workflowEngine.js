@@ -428,7 +428,9 @@ export function evaluateWorkflowAutoAdvance(workflow, template) {
 
 export function getWorkflowStepSubtitle(step, progress) {
   if (!step) return '';
+  if (step.state === 'denied') return 'negado';
   if (step.state === 'completed') return 'concluído';
+  if (step.state === 'skipped') return 'não cumprido';
   if (step.state === 'pending') return 'aguardando';
   if (step.state === 'signaled') {
     const teamLabel = step.teamLabel || getWorkflowTeamLabel(step.team);
