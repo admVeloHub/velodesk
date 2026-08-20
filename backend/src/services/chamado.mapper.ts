@@ -1,4 +1,4 @@
-/** chamado.mapper v2.15.0 — inbound: janela 48h reabre; fechado gera ticket derivado */
+/** chamado.mapper v2.15.1 — isEspeciaisChamado + narrow workflow no list DTO */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -388,6 +388,14 @@ function isBacenCanalFromBody(body: Record<string, unknown>): boolean {
 
 export function isBacenChamado(chamado: IChamadoN1): boolean {
   return Boolean(findBacenFromChamado(chamado));
+}
+
+/** Ticket de canal especial (RA, Procon, Consumidor.gov, BACEN) — sem e-mails padrão automáticos. */
+export function isEspeciaisChamado(chamado: IChamadoN1): boolean {
+  return isProconChamado(chamado)
+    || isConsumidorGovChamado(chamado)
+    || isBacenChamado(chamado)
+    || Boolean(findReclameAquiFromChamado(chamado));
 }
 
 export function bacenChannelMongoFilter(): Record<string, unknown> {
@@ -1940,13 +1948,15 @@ function buildTicketDtoCore(
   }
 
   let lateralWorkflow: Record<string, unknown> | undefined = extras.lateralWorkflow;
+  const persistedWorkflow = chamado.workflow;
   if (
     !lateralWorkflow
-    && hasPersistedWorkflowSnapshot(chamado.workflow)
+    && persistedWorkflow
+    && hasPersistedWorkflowSnapshot(persistedWorkflow)
     && listOnly
     && ctx
   ) {
-    const definicao = ctx.workflowById.get(String(chamado.workflow.workflowId));
+    const definicao = ctx.workflowById.get(String(persistedWorkflow.workflowId));
     if (definicao) {
       lateralWorkflow = buildLateralWorkflowListDto(chamado, definicao);
     }

@@ -1,4 +1,4 @@
-/** emailTrigger.service v1.0.0 — matcher canal/status/SLA dos e-mails de saída */
+/** emailTrigger.service v1.0.1 — isEspeciaisChamado + corpo opcional no template */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import type { IEmailCriterio } from '../models/EmailConteudo';
 import { getEmailDisparoLogModel } from '../models/EmailDisparoLog';
@@ -125,8 +125,8 @@ async function sendTemplateEmail(chamado: IChamadoN1, doc: {
   const assembled = await assembleClientEmail({
     mode: 'template',
     chamado,
-    saudacao: doc.saudacao,
-    corpo: doc.corpo,
+    saudacao: doc.saudacao ?? '',
+    corpo: doc.corpo ?? '',
   });
 
   const protocolo = chamado.chamadoProtocolo;

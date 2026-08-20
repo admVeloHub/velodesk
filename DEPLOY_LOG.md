@@ -1,10 +1,28 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.90.0 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.90.1 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — fix build TypeScript (emailTrigger + chamado.mapper)
+
+- **Data/Hora**: 2026-08-20
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.90.1
+  - **Backend**: chamado.mapper v2.15.1, emailTrigger.service v1.0.1
+- **Arquivos principais**:
+  - `isEspeciaisChamado` exportado em chamado.mapper (RA, Procon, Consumidor.gov, BACEN)
+  - Narrow de `chamado.workflow` no DTO de listagem
+  - Fallback `saudacao`/`corpo` vazios no disparo de e-mail template
+- **Descrição**: Corrige falha `tsc` no Cloud Build do commit ac8efca sem alterar contratos de API.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — layout e-mail outbound, workflow reprovação e melhorias Desk/360
 
