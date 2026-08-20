@@ -1,10 +1,26 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.90.1 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.90.2 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — fix CSS hub de cards do módulo E-mail (config)
+
+- **Data/Hora**: 2026-08-20
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.90.2
+  - **Frontend**: styles.css v2.4.9 (config-email-hub, outbound editor, assinatura)
+- **Arquivos principais**:
+  - Grid 3 colunas dos cards do hub E-mail; layout editor/preview outbound e assinatura
+- **Descrição**: CSS do hub de e-mail estava no stash local e não tinha ido no push ac8efca — cards quebravam em prod.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — fix build TypeScript (emailTrigger + chamado.mapper)
 
