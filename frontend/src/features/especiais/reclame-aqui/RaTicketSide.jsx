@@ -3,8 +3,8 @@
  */
 import React from 'react';
 import { getStatusLabel } from '../../../services/especiais/reclameAquiData';
-import { formatRaDeadlineLabel } from '../../../services/especiais/reclameAquiTicketService';
 import { formatComplaintDate } from './raTicketFormatters';
+import RaDadosEditableFields from './RaDadosEditableFields';
 import RaClassificacaoFields from './RaClassificacaoFields';
 import RaNotaContatoCard from './RaNotaContatoCard';
 import EspeciaisTicketSideFooter from '../shared/EspeciaisTicketSideFooter';
@@ -24,9 +24,6 @@ export default function RaTicketSide({
 }) {
   if (!raItem) return null;
 
-  const idReclamacaoDisplay = raItem.idReclamacaoRa || '—';
-  const deadlineLabel = formatRaDeadlineLabel(raItem.prazoRa);
-
   return (
     <aside className="ra-crm-side">
       <div className="ra-ticket__side">
@@ -36,14 +33,7 @@ export default function RaTicketSide({
             {getStatusLabel(raItem.statusRa)}
           </span>
           <dl>
-            <div>
-              <dt>ID Reclame Aqui</dt>
-              <dd>{idReclamacaoDisplay}</dd>
-            </div>
-            <div>
-              <dt>Assunto</dt>
-              <dd>{raItem.assunto || '—'}</dd>
-            </div>
+            <RaDadosEditableFields raItem={raItem} onSaved={onRaItemUpdated} />
             <div>
               <dt>Produto</dt>
               <dd>{raItem.produto || '—'}</dd>
@@ -51,10 +41,6 @@ export default function RaTicketSide({
             <div>
               <dt>Motivo</dt>
               <dd>{raItem.motivo || '—'}</dd>
-            </div>
-            <div>
-              <dt>Prazo de resposta</dt>
-              <dd className="ra-ticket__deadline-value">{deadlineLabel}</dd>
             </div>
             <div>
               <dt>Data da reclamação</dt>

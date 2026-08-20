@@ -3,12 +3,14 @@
  * VERSION: v1.2.2 | DATE: 2026-08-19
  * — produto e motivo na tabulação Desk; motivo da lista do órgão
  */
-import { ticketsApi, reclamacoesApi } from '../../api/client';
+import { ticketsApi, reclamacoesApi, clientsApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
+import { mapClienteDocToContact } from '../../api/adapters/clienteAdapter';
 import { getAgentName } from '../clientDb';
 import { RA_STATUS } from './reclameAquiData';
 import {
   buildRegistroDefaults,
+  createEmptyReclamacao,
   registerReclamacao,
   getReclamacaoById,
   getReclamacaoByTicketId,
@@ -73,6 +75,39 @@ export function buildTicketPayloadFromReclamacao(form) {
   };
 }
 
+/**
+ * Reclamação a partir de um cliente achado/cadastrado por CPF — ID Reclame Aqui, assunto,
+ * produto, motivo e prazo ficam em branco para edição direta no DADOS do ticket recém-criado.
+ */
+export function buildReclamacaoFromCliente(doc) {
+  const contact = mapClienteDocToContact(doc);
+  if (!contact) return null;
+  const consumidor = String(contact.clientName || '').trim() || 'Consumidor';
+  return {
+    ...createEmptyReclamacao(),
+    consumidor,
+    cpf: contact.clientCPF || '',
+    email: contact.email || contact.emails?.[0] || '',
+    telefoneWhatsapp: contact.whatsappPhone || contact.phone || contact.phones?.[0] || '',
+    assunto: `Reclamação Reclame Aqui — ${consumidor}`,
+    isDraft: false,
+  };
+}
+
+export async function createReclamacaoFromCliente(doc) {
+  const form = buildReclamacaoFromCliente(doc);
+  if (!form) {
+    throw new Error('Dados do cliente inválidos.');
+  }
+  return registerReclamacaoAndCreateTicket(form);
+}
+
+export async function createReclamacaoFromCpf(cpfRaw) {
+  const cpf = normalizeCpf(cpfRaw);
+  const cliente = await clientsApi.getByCpf(cpf);
+  return createReclamacaoFromCliente(cliente);
+}
+
 export async function createTicketFromReclamacao(form) {
   const payload = buildTicketPayloadFromReclamacao(form);
   const created = await ticketsApi.create(payload);
@@ -81,9 +116,6 @@ export async function createTicketFromReclamacao(form) {
 
 export async function registerReclamacaoAndCreateTicket(form) {
   const idOrigem = String(form.idReclamacaoRa || form.protocoloRa || '').trim();
-  if (!idOrigem) {
-    throw new Error('Informe o ID da reclamação (Id Origem)');
-  }
 
   const payload = buildTicketPayloadFromReclamacao({ ...form, idReclamacaoRa: idOrigem, protocoloRa: idOrigem });
   const created = await ticketsApi.create(payload);

@@ -65,7 +65,7 @@ export default function RaNovaReclamacaoModal({ open, onClose, onManual, onImpor
             </span>
             <span className="ra-nova-modal__option-text">
               <strong>Cadastro manual</strong>
-              <small>Preencher formulário de uma reclamação por vez</small>
+              <small>Informe o CPF do consumidor para abrir a reclamação</small>
             </span>
             <i className="ti ti-chevron-right ra-nova-modal__option-arrow" aria-hidden="true" />
           </button>

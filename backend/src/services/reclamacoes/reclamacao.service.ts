@@ -755,7 +755,7 @@ export async function patchReclamacao(
   const allowed: Partial<IReclamacao> = {};
   const scalarFields = [
     'statusCanal', 'prazoLegal', 'atendente', 'responsavel', 'aberta',
-    'protocoloExterno', 'idDemandaExterna', 'slaPct', 'motivo', 'produto',
+    'protocoloExterno', 'idDemandaExterna', 'slaPct', 'motivo', 'produto', 'assunto',
   ] as const;
 
   for (const key of scalarFields) {

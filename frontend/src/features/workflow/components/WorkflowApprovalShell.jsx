@@ -332,18 +332,15 @@ export default function WorkflowApprovalShell() {
   );
 
   const handleFeito = useCallback(async () => {
-    const { ok, result } = await runAction(
+    const { ok } = await runAction(
       approveWorkflowDecision,
       'Solicitação finalizada — cliente notificado e ticket movido para Resolvido.',
       [{ finalizeProdutos: true }],
     );
     if (!ok) return;
-    const finalized = isWorkflowTicketCompleted(result);
+    // Feito só remove o ticket da fila atual — sem redirecionar para a view "Finalizados".
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      if (finalized) {
-        next.set('view', 'finalizados');
-      }
       next.delete('ticket');
       return next;
     }, { replace: true });

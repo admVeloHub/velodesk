@@ -1,12 +1,14 @@
 /**
- * useRaNovaReclamacaoModals — fluxo compartilhado Nova reclamação (manual | Hugme)
+ * useRaNovaReclamacaoModals — fluxo compartilhado Nova reclamação (manual por CPF | Hugme)
  */
 import React, { useCallback, useState } from 'react';
 import RaHugmeImportModal from '../features/especiais/reclame-aqui/RaHugmeImportModal';
 import RaNovaReclamacaoModal from '../features/especiais/reclame-aqui/RaNovaReclamacaoModal';
+import RaNovaReclamacaoCpfModal from '../features/especiais/reclame-aqui/RaNovaReclamacaoCpfModal';
 
 export function useRaNovaReclamacaoModals({ navigate, onImported } = {}) {
   const [novaOpen, setNovaOpen] = useState(false);
+  const [cpfOpen, setCpfOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
   const openNovaFlow = useCallback(() => {
@@ -15,7 +17,20 @@ export function useRaNovaReclamacaoModals({ navigate, onImported } = {}) {
 
   const handleManual = useCallback(() => {
     setNovaOpen(false);
-    navigate?.('/especiais/reclame-aqui/nova');
+    setCpfOpen(true);
+  }, []);
+
+  const handleCpfClose = useCallback(() => {
+    setCpfOpen(false);
+  }, []);
+
+  // Ticket é criado com ID/assunto/produto/motivo/prazo em branco — o agente completa
+  // direto no DADOS do ticket (campos editáveis), sem passar pelo formulário de registro.
+  const handleCpfSuccess = useCallback((raId) => {
+    setCpfOpen(false);
+    if (raId) {
+      navigate?.(`/especiais/reclame-aqui/ticket/${raId}`);
+    }
   }, [navigate]);
 
   const handleImport = useCallback(() => {
@@ -34,6 +49,11 @@ export function useRaNovaReclamacaoModals({ navigate, onImported } = {}) {
         onClose={() => setNovaOpen(false)}
         onManual={handleManual}
         onImport={handleImport}
+      />
+      <RaNovaReclamacaoCpfModal
+        open={cpfOpen}
+        onClose={handleCpfClose}
+        onSuccess={handleCpfSuccess}
       />
       <RaHugmeImportModal
         open={importOpen}

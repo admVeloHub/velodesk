@@ -75,7 +75,13 @@ export default function Sidebar() {
 
   // Ordem natural de NAV_ITEMS (não a ordem de um único perfil "ativo"), pra quem acumula
   // funções ver todos os módulos liberados numa posição estável e previsível.
-  const visibleNav = NAV_ITEMS.filter((item) => isNavAllowed(item.id));
+  // Nem "Finalizados" do Desk (tickets-resolvidos) nem o do workflow (workflow-finalizados)
+  // são exibidos — "Feito"/conclusão apenas remove o ticket da fila, sem tela de finalizados.
+  const visibleNav = NAV_ITEMS.filter((item) => (
+    isNavAllowed(item.id)
+    && item.id !== 'workflow-finalizados'
+    && item.id !== 'tickets-resolvidos'
+  ));
 
   const handleNavClick = useCallback((item) => {
     const path = item.id === 'tickets' ? '/tickets?desk=v2' : item.path;
