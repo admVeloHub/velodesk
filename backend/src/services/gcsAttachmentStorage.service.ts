@@ -1,4 +1,4 @@
-/** gcsAttachmentStorage v1.5.0 — prefixo quarentena + metadado scan-status */
+/** gcsAttachmentStorage v1.5.1 — meta GCS inclui updatedAt p/ stale scan */
 import { Readable } from 'stream';
 import { google } from 'googleapis';
 import { env } from '../config/env';
@@ -96,7 +96,7 @@ export async function uploadAttachmentToGcs(
 export async function readAttachmentMetaFromGcs(
   prefix: string,
   storageKey: string,
-): Promise<{ scanStatus?: string; scanReason?: string; contentType?: string } | null> {
+): Promise<{ scanStatus?: string; scanReason?: string; contentType?: string; updatedAt?: Date } | null> {
   if (!isGcsAttachmentStorageConfigured()) return null;
 
   try {
@@ -110,6 +110,9 @@ export async function readAttachmentMetaFromGcs(
       scanStatus: metadata['scan-status'] || metadata.scanStatus,
       scanReason: metadata['scan-reason'] || metadata.scanReason,
       contentType: String(res.data?.contentType || '').trim() || undefined,
+      updatedAt: res.data?.updated
+        ? new Date(String(res.data.updated))
+        : (res.data?.timeCreated ? new Date(String(res.data.timeCreated)) : undefined),
     };
   } catch (err) {
     const message = (err as Error).message || '';
@@ -216,7 +219,7 @@ export async function readQuarantineAttachmentFromGcs(
 
 export async function readQuarantineAttachmentMeta(
   storageKey: string,
-): Promise<{ scanStatus?: string; scanReason?: string; contentType?: string } | null> {
+): Promise<{ scanStatus?: string; scanReason?: string; contentType?: string; updatedAt?: Date } | null> {
   return readAttachmentMetaFromGcs(getInboundQuarantinePrefix(), storageKey);
 }
 

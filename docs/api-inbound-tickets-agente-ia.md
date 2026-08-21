@@ -4,10 +4,6 @@
 
 Documento para **homologação e uso** da API de **abertura de tickets** no Velodesk após atendimento do **Agente IA Telefônico** (Contact Tel / LetícIA).
 
-- **Coleção MongoDB:** `b2c_chamados.chamados_n1`
-- **Backend:** `desk/backend` — rota em `backend/src/routes/inbound.routes.ts`
-- **Canal aplicado automaticamente pelo servidor:** **`Agente IA`**
-
 > **Importante:** este endpoint **cria** o chamado no Desk. Não confundir com `POST /api/inbound/telephony/calls`, que **registra a ligação** em `telephony_calls` para o módulo Atendimento IA Telefônico. Os dois fluxos são complementares: ligação → `telephony/calls`; abertura de ticket para o agente humano → este endpoint.
 
 ---

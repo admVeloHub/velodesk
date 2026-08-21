@@ -1,6 +1,6 @@
 /**
- * workflowTeamQueues v1.5.0 — workflow cancel: ícone vermelho e fora do console
- * VERSION: v1.5.0 | DATE: 2026-08-20
+ * workflowTeamQueues v1.6.0 — match atribuido com normalizeFuncao + fallback tabulacao
+ * VERSION: v1.6.0 | DATE: 2026-08-21
  */
 import {
   getWorkflowProgress,
@@ -10,6 +10,7 @@ import {
   isTicketWorkflowCancelled,
   isTicketWorkflowFinished,
 } from '../desk/utils';
+import { normalizeFuncao } from '../desk/atuacaoVision';
 import { ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import { resolveWorkflowTeamQueueForUser } from '../permissions/permissionService';
 
@@ -121,14 +122,25 @@ export function isWorkflowTicketCompleted(ticket) {
   );
 }
 
+function readTicketAtribuidoRaw(ticket) {
+  const lateral = ticket?.lateralForm?.atribuido || ticket?.atribuido || '';
+  if (String(lateral).trim()) return lateral;
+  const tabs = ticket?.tabulacao || ticket?.lateralForm?.tabulacao;
+  if (Array.isArray(tabs) && tabs.length) {
+    const last = tabs[tabs.length - 1];
+    return last?.atribuido || '';
+  }
+  return '';
+}
+
 /** Atribuído atual é a função da fila de workflow (ex.: funcao:financeiro). */
 export function ticketAtribuidoMatchesWorkflowQueue(ticket, teamId) {
-  const team = normalizeTeamSlug(teamId);
+  const team = normalizeFuncao(normalizeTeamSlug(teamId));
   if (!team) return false;
-  const atribuido = normalizeAtribuido(
-    ticket?.lateralForm?.atribuido || ticket?.atribuido || '',
-  );
-  return atribuido === `funcao:${team}`;
+  const atribuido = normalizeAtribuido(readTicketAtribuidoRaw(ticket));
+  if (!atribuido.startsWith('funcao:')) return false;
+  const slug = normalizeFuncao(atribuido.slice(7));
+  return slug === team;
 }
 
 /** Ticket já encerrado pelo agente responsável (fora do fluxo de workflow). */

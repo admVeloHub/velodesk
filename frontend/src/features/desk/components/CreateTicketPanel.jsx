@@ -1,6 +1,6 @@
 /**
  * Painel compacto — criar ticket draft por CPF
- * VERSION: v2.0.2 | DATE: 2026-08-03
+ * VERSION: v2.0.3 | DATE: 2026-08-21
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { clientsApi } from '../../../api/client';
@@ -55,6 +55,11 @@ export default function CreateTicketPanel({ onClose, onSaved }) {
     setLoading(true);
     try {
       const cliente = await clientsApi.getByCpf(cpf);
+      if (!cliente) {
+        setPendingCpf(cpf);
+        setRegisterOpen(true);
+        return;
+      }
       openDraftForCliente(cliente);
     } catch (err) {
       if (err?.response?.status === 404) {

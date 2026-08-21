@@ -1,6 +1,6 @@
 /**
- * attachmentPreview v1.2.1 — PDF no iframe; xlsx como application/zip
- * VERSION: v1.2.1 | DATE: 2026-08-19
+ * attachmentPreview v1.3.0 — helpers p/ scan pending + poll acelerado
+ * VERSION: v1.3.0 | DATE: 2026-08-21
  */
 
 const OFFICE_MIME = new Set([
@@ -177,4 +177,30 @@ export function collectTicketAttachments(ticket) {
   (ticket.internalNotes || []).forEach((note) => pushMessageAttachments(result, seen, note));
 
   return result;
+}
+
+export function ticketHasPendingAttachmentScan(ticket) {
+  if (!ticket) return false;
+  const lists = [ticket.messages, ticket.internalNotes];
+  return lists.some((messages) => (messages || []).some((message) => {
+    const statuses = Array.isArray(message?.attachmentScanStatuses) ? message.attachmentScanStatuses : [];
+    return statuses.some((status) => String(status || '').trim().toLowerCase() === 'pending');
+  }));
+}
+
+export function attachmentScanStatusesChanged(prevArr, lightArr) {
+  const prev = Array.isArray(prevArr) ? prevArr : [];
+  const light = Array.isArray(lightArr) ? lightArr : [];
+  if (prev.length !== light.length) return false;
+  for (let i = 0; i < light.length; i += 1) {
+    const prevStatuses = Array.isArray(prev[i]?.attachmentScanStatuses) ? prev[i].attachmentScanStatuses : [];
+    const lightStatuses = Array.isArray(light[i]?.attachmentScanStatuses) ? light[i].attachmentScanStatuses : [];
+    if (prevStatuses.length !== lightStatuses.length) return true;
+    for (let j = 0; j < lightStatuses.length; j += 1) {
+      if (String(prevStatuses[j] || '').trim().toLowerCase() !== String(lightStatuses[j] || '').trim().toLowerCase()) {
+        return true;
+      }
+    }
+  }
+  return false;
 }

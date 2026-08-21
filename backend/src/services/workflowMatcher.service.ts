@@ -4,6 +4,7 @@ import type { IGrupoResponsabilidade } from '../models/GrupoResponsabilidade';
 import type { IWorkflowCriterio } from '../models/WorkflowDefinicao';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { isProconChamado, readTabulacaoSnapshot } from './chamado.mapper';
+import { normalizeFuncao } from '../utils/normalizeFuncao';
 
 function normalize(value: unknown): string {
   return String(value ?? '')
@@ -181,11 +182,11 @@ export function resolveAtribuidoForPasso(
     case 'colaborador':
       return String(atribuicao.colaborador || '').trim();
     case 'funcao':
-      return atribuicao.funcaoSlug ? `funcao:${atribuicao.funcaoSlug}` : '';
+      return atribuicao.funcaoSlug ? `funcao:${normalizeFuncao(atribuicao.funcaoSlug)}` : '';
     case 'grupo':
       if (atribuicao.grupoSlug) {
         const mapped = GRUPO_TO_FUNCAO_MAP[atribuicao.grupoSlug.toLowerCase()] || atribuicao.grupoSlug;
-        return `funcao:${mapped}`;
+        return `funcao:${normalizeFuncao(mapped)}`;
       }
       return '';
     case 'responsavel_ticket':

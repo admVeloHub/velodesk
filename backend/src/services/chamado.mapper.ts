@@ -1,4 +1,4 @@
-/** chamado.mapper v2.15.2 — em-espera não inclui em-andamento (contagem/listagem alinhadas) */
+/** chamado.mapper v2.15.3 — scan outbound skipped + enrich efetivo pós-montagem */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -23,6 +23,7 @@ import { sanitizeResponsavel, inferResponsavelFromAgentRegistro, isRealResponsav
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { filterRealAttachmentUrls } from './attachmentFilter.util';
 import { parseInboundAttachmentStorageKeyFromApiUrl } from './inboundAttachmentStorage.service';
+import { enrichTicketAttachmentScanStatuses } from './attachmentScanStatus.service';
 import { excludeFusaoAbsorvidosFilter, serializeFusaoDto } from './ticketFusao.helpers';
 import {
   readWhatsAppMensagens,
@@ -74,6 +75,7 @@ function legacyAlteracoesObject(reg: IRegistro): Record<string, unknown> | null 
 function scanStatusFromMap(map: Map<string, string>, url: string): string {
   const u = String(url || '').trim();
   if (!u) return '';
+  if (/\/(?:api\/)?uploads\/sent\//i.test(u)) return 'skipped';
   if (map.has(u)) return map.get(u) || '';
   const parsed = parseInboundAttachmentStorageKeyFromApiUrl(u);
   if (parsed && map.has(`sk:${parsed}`)) return map.get(`sk:${parsed}`) || '';
@@ -1795,7 +1797,7 @@ async function chamadoToTicketFull(
     lateralWorkflow = findLatestWorkflowFromRegistro(chamado) ?? undefined;
   }
 
-  return buildTicketDtoCore(chamado, boxId, undefined, {
+  const ticket = buildTicketDtoCore(chamado, boxId, undefined, {
     cadastro,
     lateralWorkflow,
     persistedApproval: findLatestApprovalFromRegistro(chamado) ?? undefined,
@@ -1803,6 +1805,16 @@ async function chamadoToTicketFull(
     procon: findProconFromChamado(chamado),
     consumidorGov: findConsumidorGovFromChamado(chamado),
   });
+  await enrichTicketAttachmentScanStatuses(ticket);
+  return ticket;
+}
+
+function resolveTicketPriorityFromChamado(chamado: IChamadoN1): string {
+  for (const reg of chamado.registro ?? []) {
+    const mailPriority = String(reg.metadados?.mailPriority ?? '').trim().toLowerCase();
+    if (mailPriority === 'alta' || mailPriority === 'critica') return mailPriority;
+  }
+  return 'media';
 }
 
 /**
@@ -1819,7 +1831,7 @@ export async function chamadoToTicketLight(
   const cadastro = legacyDadosFromRef(ref);
   const lateralWorkflow = findLatestWorkflowFromRegistro(chamado) ?? undefined;
 
-  return buildTicketDtoCore(chamado, boxId, undefined, {
+  const ticket = buildTicketDtoCore(chamado, boxId, undefined, {
     cadastro,
     lateralWorkflow,
     persistedApproval: findLatestApprovalFromRegistro(chamado) ?? undefined,
@@ -1827,14 +1839,8 @@ export async function chamadoToTicketLight(
     procon: findProconFromChamado(chamado),
     consumidorGov: findConsumidorGovFromChamado(chamado),
   });
-}
-
-function resolveTicketPriorityFromChamado(chamado: IChamadoN1): string {
-  for (const reg of chamado.registro ?? []) {
-    const mailPriority = String(reg.metadados?.mailPriority ?? '').trim().toLowerCase();
-    if (mailPriority === 'alta' || mailPriority === 'critica') return mailPriority;
-  }
-  return 'media';
+  await enrichTicketAttachmentScanStatuses(ticket);
+  return ticket;
 }
 
 function buildTicketDtoCore(

@@ -1,4 +1,4 @@
-/** inboundAttachmentStorage v1.6.0 — quarentena GCS; cache local só para skipped/clean */
+/** inboundAttachmentStorage v1.8.0 — gate stale pending + reconcile antes do download */
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import path from 'path';
@@ -13,11 +13,18 @@ import {
   isGcsAttachmentStorageConfigured,
   inboundCleanObjectExists,
   readInboundAttachmentFromGcs,
+  readQuarantineAttachmentFromGcs,
   readQuarantineAttachmentMeta,
   uploadInboundAttachmentToGcs,
   uploadQuarantineAttachmentToGcs,
 } from './gcsAttachmentStorage.service';
+
 const STORAGE_KEY_SEP = '__';
+
+const STALE_PENDING_MS = Math.max(
+  60_000,
+  parseInt(process.env.ATTACHMENT_SCAN_STALE_MS || '300000', 10),
+);
 
 function resolveBaseDir(): string {
   const configured = String(env.inboundAttachmentsDir || '').trim();
@@ -218,6 +225,14 @@ export async function inspectInboundAttachmentGate(storageKey: string): Promise<
     const status = String(meta.scanStatus || 'pending').toLowerCase();
     if (status === 'infected') return { state: 'infected', reason: meta.scanReason };
     if (status === 'unscannable') return { state: 'infected', reason: meta.scanReason || 'unscannable' };
+    if (status === 'clean') return { state: 'ready' };
+    if (status === 'pending') {
+      const ageMs = meta.updatedAt instanceof Date
+        ? Date.now() - meta.updatedAt.getTime()
+        : 0;
+      if (ageMs >= STALE_PENDING_MS) return { state: 'ready' };
+      return { state: 'pending' };
+    }
     return { state: 'pending' };
   }
 
@@ -239,6 +254,20 @@ export async function openInboundAttachment(storageKey: string): Promise<{
     if (disk) return disk;
 
     const gcs = await readInboundAttachmentFromGcs(key);
+    if (gcs) {
+      return {
+        source: 'gcs',
+        stream: gcs.stream,
+        contentType: gcs.contentType,
+        filename: path.basename(key),
+      };
+    }
+  }
+
+  for (const key of candidates) {
+    const meta = await readQuarantineAttachmentMeta(key);
+    if (String(meta?.scanStatus || '').toLowerCase() !== 'clean') continue;
+    const gcs = await readQuarantineAttachmentFromGcs(key);
     if (gcs) {
       return {
         source: 'gcs',

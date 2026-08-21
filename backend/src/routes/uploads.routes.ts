@@ -1,4 +1,4 @@
-/** uploads.routes v1.5.0 — attachment + nosniff; inbound 423/403 na quarentena */
+/** uploads.routes v1.6.0 — reconcile scan pending antes de servir inbound */
 import path from 'path';
 import multer from 'multer';
 import { Router, Response, Request } from 'express';
@@ -8,6 +8,7 @@ import {
   inspectInboundAttachmentGate,
   openInboundAttachment,
 } from '../services/inboundAttachmentStorage.service';
+import { reconcilePendingStorageKey } from '../services/attachmentScanReconcile.service';
 import {
   openSentAttachment,
   persistSentAttachment,
@@ -102,7 +103,9 @@ router.post('/sent', authMiddleware, upload.array('files', 10), async (req: Requ
 
 router.get('/inbound/:storageKey', authMiddleware, async (req, res: Response) => {
   try {
-    const gate = await inspectInboundAttachmentGate(String(req.params.storageKey ?? ''));
+    const storageKey = String(req.params.storageKey ?? '');
+    await reconcilePendingStorageKey(storageKey);
+    const gate = await inspectInboundAttachmentGate(storageKey);
     if (gate.state === 'pending') {
       return res.status(423).json({ message: 'Anexo em verificação. Tente novamente em instantes.' });
     }

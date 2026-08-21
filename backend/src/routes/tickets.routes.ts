@@ -132,7 +132,11 @@ router.get('/by-protocol/:protocolo', authMiddleware, async (req, res: Response)
   const protocolo = String(req.params.protocolo ?? '').trim();
   if (!protocolo) return res.status(400).json({ message: 'Protocolo inválido' });
 
-  const chamado = await ChamadoN1.findOne({ chamadoProtocolo: protocolo });
+  let chamado = await ChamadoN1.findOne({ chamadoProtocolo: protocolo });
+  if (!chamado) return res.status(404).json({ message: 'Chamado não encontrado' });
+
+  await reconcileChamadoAttachmentScanStatuses(String(chamado._id));
+  chamado = await ChamadoN1.findOne({ chamadoProtocolo: protocolo });
   if (!chamado) return res.status(404).json({ message: 'Chamado não encontrado' });
 
   const boxes = await loadBoxes();

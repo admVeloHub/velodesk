@@ -1,11 +1,12 @@
 /**
- * permissionService v1.9.1 — workflow cancel/finished não autoriza atuação de WF
- * VERSION: v1.9.1 | DATE: 2026-08-20
+ * permissionService v1.9.2 — userFuncaoSlugs com normalizeFuncao
+ * VERSION: v1.9.2 | DATE: 2026-08-21
  */
 import api from '../../api/client';
 import { normalizeProfileId } from '../../config/profiles';
 import { isWorkflowTeamQueueId } from '../workflow/workflowTeamQueues';
 import { sanitizeResponsavel } from '../tabulationConfig';
+import { normalizeFuncao } from '../desk/atuacaoVision';
 
 const STORAGE_KEY = 'velodesk_permissions';
 
@@ -266,7 +267,7 @@ function userFuncaoSlugs(perm) {
   return [
     ...new Set(
       [perm?.funcaoSlug, ...(perm?.funcoes || [])]
-        .map((s) => String(s || '').trim().toLowerCase())
+        .map((s) => normalizeFuncao(String(s || '').trim()))
         .filter(Boolean),
     ),
   ];
@@ -275,7 +276,7 @@ function userFuncaoSlugs(perm) {
 function matchesAtribuidoAnyUserFuncao(ticket, perm) {
   const atribuido = normalizeAtribuido(ticket?.lateralForm?.atribuido);
   if (!atribuido.startsWith('funcao:')) return false;
-  const slug = atribuido.slice(7).toLowerCase();
+  const slug = normalizeFuncao(atribuido.slice(7));
   return userFuncaoSlugs(perm).includes(slug);
 }
 
@@ -394,7 +395,7 @@ export function agentCanDecideTicket(ticket, perm = readCachedPermissions()) {
   }
 
   if (atribuido.startsWith('funcao:')) {
-    const slug = atribuido.slice(7);
+    const slug = normalizeFuncao(atribuido.slice(7));
     return userFuncaoSlugs(perm).includes(slug)
       && hasPermission(perm?.permissoes, 'tickets', 'atuar_atribuido');
   }

@@ -1,6 +1,7 @@
 /**
  * Perfis operacionais — Agente / Gestão / Workflow / Especiais
- * VERSION: v1.8.0 | DATE: 2026-08-10 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.9.3 | DATE: 2026-08-21
+ * — Tickets antes do Console de aprovações na barra
  */
 export const ESPECIAIS_NAV_IDS = [
   'especiais-reclame-aqui',
@@ -68,14 +69,7 @@ export const NAV_ITEMS = [
     icon: 'ti-broadcast',
     tooltip: 'Painel operacional ao vivo',
   },
-  { id: 'workflow-inbox', path: '/workflow', label: 'Aprovações', icon: 'ti-checkbox', tooltip: 'Console de aprovações' },
-  {
-    id: 'atendimento-ia-telefonico',
-    path: '/atendimento-ia-telefonico',
-    label: 'IA Telefônica',
-    icon: 'ti-phone-call',
-    tooltip: 'Atendimento IA Telefônico',
-  },
+  { id: 'reports', path: '/reports', label: 'Relatórios', icon: 'ti-chart-bar', tooltip: 'Relatórios' },
   { id: 'tickets', path: '/tickets', label: 'Tickets', icon: 'ti-ticket', tooltip: 'Tickets' },
   {
     id: 'busca-tickets',
@@ -83,6 +77,14 @@ export const NAV_ITEMS = [
     label: 'Busca de Tickets',
     icon: 'ti-search',
     tooltip: 'Busca avançada de tickets',
+  },
+  { id: 'workflow-inbox', path: '/workflow', label: 'Aprovações', icon: 'ti-checkbox', tooltip: 'Console de aprovações' },
+  {
+    id: 'atendimento-ia-telefonico',
+    path: '/atendimento-ia-telefonico',
+    label: 'IA Telefônica',
+    icon: 'ti-phone-call',
+    tooltip: 'Atendimento IA Telefônico',
   },
   {
     id: 'workflow-finalizados',
@@ -141,9 +143,6 @@ export const NAV_ITEMS = [
     tooltip: 'Fila de tickets finalizados (Resolvidos)',
   },
   { id: 'config', path: '/config', label: 'Configurações', icon: 'ti-settings', tooltip: 'Configurações' },
-  { id: 'reports', path: '/reports', label: 'Relatórios', icon: 'ti-chart-bar', tooltip: 'Relatórios' },
-  { id: 'especiais-canais', path: '/especiais', label: 'Canais Especiais', icon: 'ti-star', tooltip: 'Canais Especiais' },
-  { id: 'client-portal', path: '/client-portal', label: 'Portal Cliente', icon: 'ti-external-link', tooltip: 'Portal do Cliente' },
 ];
 
 const LEGACY_PROFILE_MAP = {
@@ -168,7 +167,6 @@ export function getProfileDefaultPath(profileId = 'agent') {
   if (pageId === 'tickets') return '/tickets?desk=v2';
   if (pageId === 'workflow-inbox') return '/workflow';
   if (pageId === 'alteracoes-cadastrais') return '/alteracoes-cadastrais';
-  if (pageId === 'especiais-canais') return '/especiais';
   if (pageId === 'analytics-ia') return '/analytics-ia';
   return `/${pageId}`;
 }

@@ -1,6 +1,6 @@
 /**
- * desk-login.css v1.2.1 — remove estilo hint removido
- * VERSION: v1.2.1 | DATE: 2026-07-22 | AUTHOR: VeloHub Development Team
+ * desk-login.css v1.3.0 — campo senha com botão mostrar/ocultar
+ * VERSION: v1.3.0 | DATE: 2026-08-21 | AUTHOR: VeloHub Development Team
  */
 
 .desk-login-page {
@@ -87,6 +87,56 @@
   cursor: not-allowed;
 }
 
+.desk-login-password-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.desk-login-password-wrap input {
+  padding-right: 2.85rem;
+}
+
+.desk-login-password-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0 8px 8px 0;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.desk-login-password-toggle .ti {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.desk-login-password-toggle:hover:not(:disabled) {
+  color: #1634ff;
+  background: rgba(22, 52, 255, 0.06);
+}
+
+.desk-login-password-toggle:focus-visible {
+  outline: 2px solid #1634ff;
+  outline-offset: -2px;
+}
+
+.desk-login-password-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .desk-login-submit {
   margin-top: 0.25rem;
   padding: 0.7rem 1rem;
@@ -164,6 +214,15 @@ body.velodesk-dark .desk-login-field input {
   background: #151922;
   border-color: #2a3142;
   color: #f3f7fc;
+}
+
+body.velodesk-dark .desk-login-password-toggle {
+  color: #9ca3af;
+}
+
+body.velodesk-dark .desk-login-password-toggle:hover:not(:disabled) {
+  color: #1694ff;
+  background: rgba(22, 148, 255, 0.12);
 }
 
 body.velodesk-dark .desk-login-divider::before,

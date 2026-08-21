@@ -1,6 +1,6 @@
 /**
- * openaiAgent.util v1.0.1 — isAgentsConfigured aceita qualquer vector store configurada
- * VERSION: v1.0.1 | DATE: 2026-08-07
+ * openaiAgent.util v1.1.0 — atendimento usa somente POP vector store
+ * VERSION: v1.1.0 | DATE: 2026-08-21
  */
 import OpenAI from 'openai';
 import { env } from '../../config/env';
@@ -92,12 +92,10 @@ function hasAnyVectorStoreConfigured(): boolean {
 }
 
 export function getAtendimentoVectorStoreIds(): string[] {
-  const ids = [
-    env.openaiPublicVectorStoreId,
-    env.openaiPopVectorStoreId,
-    env.openaiVectorStoreId,
-  ].filter(Boolean);
-  return [...new Set(ids)];
+  const popId = env.openaiPopVectorStoreId?.trim();
+  if (popId) return [popId];
+  const legacy = env.openaiVectorStoreId?.trim();
+  return legacy ? [legacy] : [];
 }
 
 export function getAuditoriaVectorStoreIds(): string[] {

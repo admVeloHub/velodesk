@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.18.2 — loadTicketDetailFromApi ignora rascunho draft-*
- * VERSION: v1.18.2 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.19.0 — discardDraftTicketFromCache ao fechar aba
+ * VERSION: v1.19.0 | DATE: 2026-08-21 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -1232,6 +1232,16 @@ export function createDraftTicketInCache(form) {
   box.tickets.unshift(ticket);
   columns = cols;
   return ticket;
+}
+
+/** Remove rascunho local ao fechar aba — não persiste após descarte. */
+export function discardDraftTicketFromCache(ticketId, userEmail = '') {
+  const id = String(ticketId || '').trim();
+  if (!id || !isDraftTicket({ id })) return false;
+  removeTicketFromColumns(id);
+  persistColumnsToStorage(columns, userEmail);
+  dispatchTicketDetailChanged(id);
+  return true;
 }
 
 export async function persistDraftTicket(ticket, messageOptions = {}) {

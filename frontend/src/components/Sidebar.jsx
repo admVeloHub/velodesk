@@ -1,6 +1,6 @@
 /**
  * Sidebar rail unificada — 3 estados: 10px | hover 52px | chevron fixa 220px
- * VERSION: v1.12.0 | DATE: 2026-08-20
+ * VERSION: v1.12.1 | DATE: 2026-08-21
  * Perfil: VeloHub (sem botÃ£o local na barra)
  */
 import React, { useCallback, useRef, useState } from 'react';
@@ -88,7 +88,7 @@ export default function Sidebar() {
 
   const handleNavClick = useCallback((item) => {
     const path = item.id === 'tickets' ? '/tickets?desk=v2' : item.path;
-    // Canais Especiais usam React Router direto — navigateToPage remove .active cedo demais
+    // Canais especiais (RA, Procon, etc.) usam React Router direto — navigateToPage remove .active cedo demais
     if (isEspeciaisNavId(item.id)) {
       const mainContent = document.querySelector('.main-content');
       if (mainContent) {

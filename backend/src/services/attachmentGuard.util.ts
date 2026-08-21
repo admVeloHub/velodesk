@@ -1,6 +1,6 @@
 /**
- * attachmentGuard.util v1.0.0 — allowlist, magic bytes, teto por tipo, zip com senha
- * VERSION: v1.0.0 | DATE: 2026-08-13
+ * attachmentGuard.util v1.1.0 — skipAntivirusScan p/ anexos outbound do agente
+ * VERSION: v1.1.0 | DATE: 2026-08-21
  */
 
 export type AttachmentKind = 'image' | 'audio' | 'video' | 'pdf' | 'office' | 'zip';
@@ -49,6 +49,11 @@ export interface AttachmentGuardReject {
 }
 
 export type AttachmentGuardResult = AttachmentGuardOk | AttachmentGuardReject;
+
+/** Anexos do agente (outbound): validação estática sem fila ClamAV. */
+export interface AttachmentGuardOptions {
+  skipAntivirusScan?: boolean;
+}
 
 function fileExtension(filename: string): string {
   const base = String(filename || '').trim().split(/[/\\]/).pop() || '';
@@ -181,6 +186,7 @@ export function inspectAttachmentGuard(
   filename: string,
   contentType: string,
   buffer: Buffer,
+  options: AttachmentGuardOptions = {},
 ): AttachmentGuardResult {
   if (!buffer?.length) {
     return { ok: false, code: 'empty', reason: 'Arquivo vazio.' };
@@ -230,7 +236,7 @@ export function inspectAttachmentGuard(
     };
   }
 
-  const needsScan = kind === 'pdf' || kind === 'office' || kind === 'zip';
+  const needsScan = !options.skipAntivirusScan && (kind === 'pdf' || kind === 'office' || kind === 'zip');
   return {
     ok: true,
     kind,

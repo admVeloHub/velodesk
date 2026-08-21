@@ -1,6 +1,6 @@
 /**
- * workflowApprovalData v1.6.0 — console omite finished/cancel e atribuido de outro time
- * VERSION: v1.6.0 | DATE: 2026-08-20
+ * workflowApprovalData v1.7.0 — fila por time sem exigir agentCanDecide na visibilidade
+ * VERSION: v1.7.0 | DATE: 2026-08-21
  */
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { findCadastralRequestByTicketId } from '../cadastral/cadastralRequestStore';
@@ -979,8 +979,8 @@ function collectTeamWorkflowEntries(teamId) {
     if (isWorkflowStatusOffApprovalConsole(ticket)) return;
     if (!isTicketWorkflowActive(ticket)) return;
     const atribuidoNoTime = ticketAtribuidoMatchesWorkflowQueue(ticket, teamId);
-    const atribuidoNoAgente = agentCanDecideTicket(ticket) && ticketMatchesWorkflowTeam(ticket, teamId);
-    if (!atribuidoNoTime && !atribuidoNoAgente) return;
+    const teamMatch = ticketMatchesWorkflowTeam(ticket, teamId);
+    if (!atribuidoNoTime && !teamMatch) return;
     const progress = getWorkflowProgress(ticket);
     items.push({ entry, progress, queueItem: buildQueueItem(entry, teamId) });
   });

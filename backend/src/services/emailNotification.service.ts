@@ -1,4 +1,4 @@
-/** emailNotification.service v2.2.0 — resposta do agente usa o esqueleto padrão */
+/** emailNotification.service v2.3.0 — log estruturado de disparo outbound */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { loadDadosForRef, normalizeEmail } from './cliente.service';
 import { sendOutboundEmail } from './email-outbound.service';
@@ -87,6 +87,7 @@ export async function sendAgentReplyEmail(
   const headers = buildOutboundThreadHeaders(chamado, messageId);
   const emailAttachments = await loadSentAttachmentsForEmail(safeAttachmentUrls);
 
+  const sentAt = new Date();
   const result = await sendOutboundEmail({
     to,
     subject,
@@ -100,9 +101,23 @@ export async function sendAgentReplyEmail(
   });
 
   if (!result.sent) {
-    console.warn('[emailNotification] resposta agente não enviada:', result.reason);
+    console.warn('[emailNotification] resposta agente não enviada:', {
+      protocolo,
+      to,
+      messageId,
+      reason: result.reason,
+    });
     return;
   }
+
+  console.info('[emailNotification] resposta agente enviada', {
+    protocolo,
+    to,
+    messageId,
+    sentAt: sentAt.toISOString(),
+    attachmentCount: emailAttachments.length,
+    registroIndex: registroIndex ?? null,
+  });
 
   persistOutboundEmailMeta(chamado, messageId, registroIndex);
   await chamado.save();

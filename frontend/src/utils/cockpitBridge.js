@@ -1,6 +1,6 @@
 /**
  * Ponte global — navegação e ações do cockpit ↔ React Router
- * VERSION: v2.4.0 | DATE: 2026-08-04
+ * VERSION: v2.4.1 | DATE: 2026-08-21
  */
 const PAGE_ROUTES = {
   workspace: '/workspace',
@@ -22,7 +22,6 @@ const PAGE_ROUTES = {
   reports: '/reports',
   config: '/config',
   'analytics-ia': '/analytics-ia',
-  'client-portal': '/client-portal',
 };
 
 const ESPECIAIS_PAGE_IDS = new Set([

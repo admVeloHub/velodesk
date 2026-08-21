@@ -1,6 +1,6 @@
 /**
- * DeskConversation v1.8.0 — chip verificando/bloqueado conforme scanStatus
- * VERSION: v1.8.0 | DATE: 2026-08-13
+ * DeskConversation v1.9.0 — anexo pending clicável; backend reconcilia no download
+ * VERSION: v1.9.0 | DATE: 2026-08-21
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
@@ -101,7 +101,8 @@ function MessageAttachments({ attachments, scanStatuses }) {
               <button
                 type="button"
                 className={`msg-bubble__attachment-link${hasError || blocked ? ' msg-bubble__attachment-link--error' : ''}${pending ? ' msg-bubble__attachment-link--pending' : ''}`}
-                disabled={isLoading || pending || blocked}
+                disabled={isLoading || blocked}
+                title={pending ? 'Verificação em andamento — clique para tentar abrir' : undefined}
                 onClick={() => { openAttachment(url); }}
               >
                 <i className={`ti ${blocked ? 'ti-shield-x' : attachmentKindIcon(kind)}`} aria-hidden="true" />

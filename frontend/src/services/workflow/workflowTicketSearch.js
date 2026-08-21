@@ -1,7 +1,6 @@
 /**
- * workflowTicketSearch — busca por CPF ou ticket (painel Workflow 360°)
- * VERSION: v1.1.0 | DATE: 2026-08-18
- * — Workflow finished abre no Desk, fora da fila operacional
+ * workflowTicketSearch v1.2.0 — filtro live da fila workflow (paridade Desk)
+ * VERSION: v1.2.0 | DATE: 2026-08-21
  */
 import { ticketsApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
@@ -11,7 +10,12 @@ import {
   getTicketColumns,
   saveTicketColumns,
 } from '../ticketsStorage';
-import { getTicketProtocolLabel, isTicketWorkflowActive, normalizeCpf } from '../desk/utils';
+import {
+  filterEntriesByDeskSearch,
+  getTicketProtocolLabel,
+  isTicketWorkflowActive,
+  normalizeCpf,
+} from '../desk/utils';
 import {
   getWorkflowTeamQueueMeta,
   resolveWorkflowTeamForTicket,
@@ -142,6 +146,30 @@ export async function searchTicketsByQuery(rawQuery) {
   }
 
   return [];
+}
+
+/** Filtra itens da fila workflow por CPF/protocolo (mesma lógica da barra do Desk). */
+export function filterWorkflowQueueBySearch(items, rawQuery) {
+  const q = String(rawQuery || '').trim();
+  if (!q) return items || [];
+
+  return (items || []).filter((item) => {
+    const entry = findTicketEntry(item?.id);
+    if (entry?.ticket) {
+      return filterEntriesByDeskSearch([entry], q).length > 0;
+    }
+
+    const lowerQuery = q.toLowerCase();
+    const hay = [
+      item?.id,
+      item?.clientName,
+      item?.subject,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return hay.includes(lowerQuery);
+  });
 }
 
 export function resolveOpenTarget(ticket, teamQueueId) {

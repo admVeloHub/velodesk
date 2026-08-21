@@ -1,6 +1,6 @@
 ﻿/**
  * Abas de tickets abertos
- * VERSION: v2.1.0 | DATE: 2026-07-13
+ * VERSION: v2.2.0 | DATE: 2026-08-21
  */
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -26,7 +26,11 @@ export default function TicketTabsBar() {
           <span className="ticket-tab__title">{tab.title}</span>
           <span
             className="ticket-tab__close"
-            onClick={(e) => { e.stopPropagation(); closeTicketTab(tab.id); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              window.dispatchEvent(new CustomEvent('velodesk:desk-tab-close', { detail: { id: tab.id } }));
+              closeTicketTab(tab.id);
+            }}
             role="button"
             tabIndex={0}
           >

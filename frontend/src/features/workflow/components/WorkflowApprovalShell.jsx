@@ -1,6 +1,6 @@
 /**
- * WorkflowApprovalShell v1.9.2 — runAction libera busy e sincroniza fila após falha
- * VERSION: v1.9.2 | DATE: 2026-08-20
+ * WorkflowApprovalShell v1.10.1 — remove stepper do topo do detalhe
+ * VERSION: v1.10.1 | DATE: 2026-08-21
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -12,7 +12,6 @@ import deskLog from '../../../utils/deskDebugLog';
 import { subscribeToTicketEvents } from '../../../services/desk/ticketEventsRealtime';
 import { findTicketEntry, loadTicketDetailFromApi } from '../../../services/ticketsStorage';
 import {
-  canInterruptWorkflow,
   hasWorkflowPortalAccess,
   resolveWorkflowTeamQueueForUser,
 } from '../../../services/permissions/permissionService';
@@ -34,11 +33,15 @@ import {
   requestWorkflowInfo,
   resolveComunicacaoResumo,
 } from '../../../services/workflow/workflowDecisionHandlers';
-import { getWorkflowProgress, isTicketWorkflowActive } from '../../../services/desk/utils';
-import { resolveAutomaticaConfig } from '../../config/workflow/workflowConfigData';
-import { ticketsApi } from '../../../api/client';
+import { isTicketWorkflowActive, getDeskSearchNotFoundMessage, getDeskSearchSuccessMessage } from '../../../services/desk/utils';
 import WorkflowApprovalQueue from './WorkflowApprovalQueue';
 import WorkflowApprovalDetail from './WorkflowApprovalDetail';
+import {
+  filterWorkflowQueueBySearch,
+  resolveOpenTarget,
+  searchTicketsByQuery,
+  validateWorkflowTeamAccess,
+} from '../../../services/workflow/workflowTicketSearch';
 
 const EMPTY_SUMMARY = {
   pendingCount: 0,
@@ -58,10 +61,10 @@ export default function WorkflowApprovalShell() {
   const permsCtx = usePermissionsOptional();
   const [selectedId, setSelectedId] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [advancingWorkflow, setAdvancingWorkflow] = useState(false);
-  const [cancelingWorkflow, setCancelingWorkflow] = useState(false);
   const [demoRevision, setDemoRevision] = useState(0);
   const [detailRevision, setDetailRevision] = useState(0);
+  const [searchDraft, setSearchDraft] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
 
   const hasWorkflowAccess = useMemo(
     () => hasWorkflowPortalAccess(permsCtx?.permissions),
@@ -182,6 +185,11 @@ export default function WorkflowApprovalShell() {
     return data;
   }, [hasWorkflowAccess, teamQueueId, normalizedQueueView, refreshKey, demoRevision, workflowDefinitions, workflowConfigLoading]);
 
+  const filteredQueueItems = useMemo(
+    () => filterWorkflowQueueBySearch(queueData.queue, appliedSearch),
+    [queueData.queue, appliedSearch],
+  );
+
   const detail = useMemo(
     () => (selectedId && hasWorkflowAccess ? getWorkflowApprovalDetail(selectedId, teamQueueId) : null),
     [selectedId, teamQueueId, hasWorkflowAccess, refreshKey, demoRevision, detailRevision],
@@ -191,30 +199,6 @@ export default function WorkflowApprovalShell() {
     () => (selectedId ? findTicketEntry(selectedId)?.ticket : null),
     [selectedId, refreshKey, detailRevision],
   );
-
-  const workflowProgress = selectedTicket ? getWorkflowProgress(selectedTicket) : null;
-
-  const canManageWorkflow = useMemo(
-    () => Boolean(
-      selectedTicket
-      && isTicketWorkflowActive(selectedTicket)
-      && canInterruptWorkflow(permsCtx?.permissions),
-    ),
-    [selectedTicket, permsCtx?.permissions],
-  );
-
-  const canAdvanceWorkflow = useMemo(() => {
-    if (!selectedTicket || !isTicketWorkflowActive(selectedTicket)) return false;
-    if (selectedTicket?.workflow?.pendingPersist) return false;
-    if (!workflowProgress || workflowProgress.workflow?.status === 'completed' || workflowProgress.workflow?.status === 'cancelled') return false;
-    const step = workflowProgress.activeStep;
-    if (!step) return false;
-    if (step.acao?.tipo === 'automatica' || step.atribuicao?.tipo === 'sistema') {
-      return resolveAutomaticaConfig(step)?.modo === 'call_to_action';
-    }
-    if (step.acao?.tipo === 'aprovacao') return false;
-    return true;
-  }, [selectedTicket, workflowProgress]);
 
   useEffect(() => {
     if (!detail || !selectedId) return;
@@ -301,6 +285,67 @@ export default function WorkflowApprovalShell() {
     }
     navigate(`/tickets?desk=v2&ticket=${id}`);
   }, [navigate]);
+
+  const openSearchResult = useCallback((result) => {
+    if (!result?.id) return;
+    const access = validateWorkflowTeamAccess(result.ticket, teamQueueId);
+    if (!access.allowed) {
+      showNotification(access.message || 'Ticket não pertence à sua fila de workflow.', 'warning');
+      return;
+    }
+    const target = access.target || resolveOpenTarget(result.ticket, teamQueueId);
+    if (target === 'desk') {
+      handleSearchOpenDesk(result.id);
+      return;
+    }
+    handleSelectTicket(result.id);
+  }, [handleSearchOpenDesk, handleSelectTicket, showNotification, teamQueueId]);
+
+  const handleSearchChange = useCallback((value) => {
+    setSearchDraft(value);
+    setAppliedSearch(String(value || '').trim());
+  }, []);
+
+  const handleSearchSubmit = useCallback(async () => {
+    const trimmed = String(searchDraft || '').trim();
+    if (!trimmed) return;
+
+    setAppliedSearch(trimmed);
+
+    const inQueue = filterWorkflowQueueBySearch(queueData.queue, trimmed);
+    if (inQueue.length === 1) {
+      handleSelectTicket(inQueue[0].id);
+      showNotification(getDeskSearchSuccessMessage(trimmed, 1), 'success');
+      return;
+    }
+    if (inQueue.length > 1) {
+      showNotification(`${inQueue.length} tickets encontrados na fila.`, 'info');
+      return;
+    }
+
+    try {
+      const found = await searchTicketsByQuery(trimmed);
+      if (!found.length) {
+        showNotification(getDeskSearchNotFoundMessage(trimmed), 'warning');
+        return;
+      }
+      if (found.length === 1) {
+        openSearchResult(found[0]);
+        showNotification(getDeskSearchSuccessMessage(trimmed, 1), 'success');
+        return;
+      }
+      openSearchResult(found[0]);
+      showNotification(`${found.length} tickets encontrados — abrindo o primeiro.`, 'info');
+    } catch {
+      showNotification('Não foi possível buscar o ticket.', 'error');
+    }
+  }, [
+    handleSelectTicket,
+    openSearchResult,
+    queueData.queue,
+    searchDraft,
+    showNotification,
+  ]);
 
   const runAction = useCallback(async (actionFn, successMsg, args = []) => {
     if (!selectedId || busy) return { ok: false, result: null };
@@ -397,43 +442,6 @@ export default function WorkflowApprovalShell() {
     }
   }, [busy, refreshTickets, selectedId, selectedTicket, showNotification]);
 
-  const handleAdvanceWorkflow = useCallback(async () => {
-    if (!selectedId || advancingWorkflow) return;
-    setAdvancingWorkflow(true);
-    try {
-      await ticketsApi.advanceWorkflow(selectedId, {});
-      await refreshTickets();
-      setDetailRevision((v) => v + 1);
-      showNotification('Workflow avançado.', 'success');
-    } catch (err) {
-      showNotification(
-        err?.response?.data?.message || 'Não foi possível avançar o workflow.',
-        'warning',
-      );
-    } finally {
-      setAdvancingWorkflow(false);
-    }
-  }, [advancingWorkflow, refreshTickets, selectedId, showNotification]);
-
-  const handleCancelWorkflow = useCallback(async () => {
-    if (!selectedId || cancelingWorkflow) return;
-    setCancelingWorkflow(true);
-    try {
-      const updated = await ticketsApi.cancelWorkflow(selectedId, {});
-      void updated;
-      await refreshTickets();
-      setDetailRevision((v) => v + 1);
-      showNotification('Workflow interrompido.', 'success');
-    } catch (err) {
-      showNotification(
-        err?.response?.data?.message || 'Não foi possível interromper o workflow.',
-        'warning',
-      );
-    } finally {
-      setCancelingWorkflow(false);
-    }
-  }, [cancelingWorkflow, refreshTickets, selectedId, showNotification]);
-
   if (!hasWorkflowAccess) {
     return (
       <div className="wf-approval-shell wf-approval-shell--empty">
@@ -455,12 +463,13 @@ export default function WorkflowApprovalShell() {
     <div className="wf-approval-shell">
       <WorkflowApprovalQueue
         queueLabel={queueLabel}
-        items={queueData.queue}
+        items={filteredQueueItems}
         selectedId={selectedId}
         onSelect={handleSelectTicket}
-        teamQueueId={teamQueueId}
-        onSearchOpenWorkflow={handleSelectTicket}
-        onSearchOpenDesk={handleSearchOpenDesk}
+        searchQuery={searchDraft}
+        searchActive={!!appliedSearch.trim()}
+        onSearchChange={handleSearchChange}
+        onSearchSubmit={handleSearchSubmit}
       />
       <WorkflowApprovalDetail
         detail={detail}
@@ -470,12 +479,6 @@ export default function WorkflowApprovalShell() {
         onFeito={handleFeito}
         onReject={handleReject}
         onRequestInfoSubmit={handleRequestInfoSubmit}
-        canManageWorkflow={canManageWorkflow}
-        canAdvanceWorkflow={canAdvanceWorkflow}
-        onAdvanceWorkflow={handleAdvanceWorkflow}
-        onCancelWorkflow={handleCancelWorkflow}
-        advancingWorkflow={advancingWorkflow}
-        cancelingWorkflow={cancelingWorkflow}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-/** funcaoPermissaoDefaults v1.3.0 — módulo acesso (Módulos de Acesso, visibilidade granular na barra retrátil) */
+/** funcaoPermissaoDefaults v1.3.2 — removido client-portal */
 
 export type PermissoesMap = Record<string, Record<string, boolean>>;
 
@@ -35,8 +35,6 @@ export const ACESSO_MODULO_IDS: string[] = [
   'especiais-bacen',
   'especiais-processos',
   'reports',
-  'especiais-canais',
-  'client-portal',
   'tickets-resolvidos',
 ];
 

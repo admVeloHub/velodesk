@@ -99,8 +99,11 @@ function ensureWorkflowState(chamado: IChamadoN1): IChamadoWorkflow {
 
 function applyAtribuidoForPasso(chamado: IChamadoN1, passo: IWorkflowPassoEnvelope): void {
   const fields = buildTabulationFieldsFromChamado(chamado);
-  const atribuido = resolveAtribuidoForPasso(passo.passo?.atribuicao || { tipo: 'funcao', funcaoSlug: 'atendimento', colaborador: '' }, fields);
+  let atribuido = resolveAtribuidoForPasso(passo.passo?.atribuicao || { tipo: 'funcao', funcaoSlug: 'atendimento', colaborador: '' }, fields);
   if (!atribuido) return;
+  if (atribuido.startsWith('funcao:')) {
+    atribuido = `funcao:${normalizeFuncao(atribuido.slice(7))}`;
+  }
   const tab = readTabulacaoSnapshot(chamado.tabulacao[0]);
   chamado.tabulacao = [{ ...tab, atribuido }];
 }

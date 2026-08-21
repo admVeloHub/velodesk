@@ -254,7 +254,7 @@ export function resolveAtribuidoForStep(step, fields = {}) {
     case 'funcao':
       return atribuicao.funcaoSlug ? `funcao:${atribuicao.funcaoSlug}` : '';
     case 'grupo': {
-      const map = { n1: 'atendimento', n2: 'n2', financeiro: 'financeiro', suporte: 'suporte' };
+      const map = { n1: 'atendimento', n2: 'n2', financeiro: 'financeiro', produtos: 'produtos', suporte: 'suporte' };
       const slug = atribuicao.grupoSlug ? (map[atribuicao.grupoSlug] || atribuicao.grupoSlug) : '';
       return slug ? `funcao:${slug}` : '';
     }

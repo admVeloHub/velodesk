@@ -1,15 +1,20 @@
 /**
- * openaiTicketSuggest.service v1.3.2 — rascunho draft-* ignora lookup Mongo
- * VERSION: v1.3.2 | DATE: 2026-08-20
+ * openaiTicketSuggest.service v1.4.0 — legacy suggest usa POP vector store + catálogo POP
+ * VERSION: v1.4.0 | DATE: 2026-08-21
  */
 import OpenAI from 'openai';
 import { env } from '../config/env';
 import { ChamadoN1, type IChamadoN1 } from '../models/ChamadoN1';
-import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from './tabulation.service';
+import { getActiveTabulation, type TabulationActiveDto } from './tabulation.service';
+import {
+  buildTabulationCatalog,
+  buildTabulationDisplay,
+  validateTabulationResult,
+} from './agents/agentTabulation.util';
 import { getTicketSuggestPersona } from './ticketSuggestPersona';
 import { runAgentPipeline } from './agents/agentOrchestrator.service';
 import { isPersistedMongoTicketId } from '../utils/persistedTicketId';
-import { getAgentsStatus, isAgentsConfigured } from './agents/openaiAgent.util';
+import { getAgentsStatus, getAtendimentoVectorStoreIds, isAgentsConfigured } from './agents/openaiAgent.util';
 import { logAiUsage } from './aiUsage.service';
 import { buildTicketIaMessagesFromChamado, buildTicketIaInternalNotesFromChamado } from './ticketIaAdapter.service';
 
@@ -28,8 +33,6 @@ function createOpenAiClient() {
     fetch: globalThis.fetch,
   });
 }
-
-const VALID_TIPOS = new Set(['Reclamação', 'Solicitação', 'Dúvida', 'Informação']);
 
 export type TicketAiContextSource = 'public' | 'internal';
 
@@ -222,21 +225,6 @@ export function validateTicketAiInput(body: unknown):
   };
 }
 
-function buildTabulationCatalog(config: TabulationActiveDto): string {
-  const lines: string[] = [];
-  for (const p of config.produtos.filter((item) => item.ativo)) {
-    const motivoLines: string[] = [];
-    for (const m of (p.motivos || []).filter((item) => item.ativo !== false)) {
-      const detalhes = (m.detalhes || [])
-        .filter((d) => d.ativo !== false)
-        .map((d) => d.detalhe);
-      motivoLines.push(`    - motivo: "${m.motivo}"${detalhes.length ? ` → detalhes: [${detalhes.map((d) => `"${d}"`).join(', ')}]` : ''}`);
-    }
-    lines.push(`  - produto: "${p.produto}"\n${motivoLines.join('\n') || '    (sem motivos)'}`);
-  }
-  return lines.join('\n');
-}
-
 function formatMessagesBlock(messages: TicketAiMessageInput[]): string {
   return messages
     .map((m, i) => `${i + 1}. [${m.role === 'cliente' ? 'Cliente' : 'Agente'}]: ${m.text}`)
@@ -305,43 +293,6 @@ function buildUserBlock(params: TicketAiSuggestInput, tabulationCatalog: string)
   );
 
   return parts.join('\n');
-}
-
-function buildTabulationDisplay(tab: TicketAiTabulationResult): string {
-  const parts = [tab.tipo, tab.produto, tab.motivo, tab.detalhe].filter(Boolean);
-  return parts.length ? parts.join(' → ') : 'Tabulação incompleta';
-}
-
-function validateTabulationResult(
-  raw: { tipo?: string; produto?: string; motivo?: string; detalhe?: string },
-  config: TabulationActiveDto,
-): TicketAiTabulationResult {
-  let tipo = trimStr(raw.tipo, 64);
-  let produto = trimStr(raw.produto, 200);
-  let motivo = trimStr(raw.motivo, 200);
-  let detalhe = trimStr(raw.detalhe, 200);
-
-  if (tipo && !VALID_TIPOS.has(tipo)) tipo = 'Solicitação';
-  if (!tipo) tipo = 'Solicitação';
-
-  if (produto && config.produtos.length > 0 && !validateComboSoft(config, produto, '', '')) {
-    produto = '';
-    motivo = '';
-    detalhe = '';
-  }
-
-  if (produto && motivo && !validateComboSoft(config, produto, motivo, '')) {
-    motivo = '';
-    detalhe = '';
-  }
-
-  if (produto && motivo && detalhe && !validateComboSoft(config, produto, motivo, detalhe)) {
-    detalhe = '';
-  }
-
-  const incompleta = !produto || !motivo;
-
-  return { tipo, produto, motivo, detalhe, incompleta };
 }
 
 function mapOpenAiErrorMessage(err: unknown): string {
@@ -469,7 +420,7 @@ export async function generateTicketAiSuggest(
       tools: [
         {
           type: 'file_search',
-          vector_store_ids: [env.openaiVectorStoreId],
+          vector_store_ids: getAtendimentoVectorStoreIds(),
         },
       ],
       text: {

@@ -1,6 +1,6 @@
 /**
- * DeskLoginPage v1.5.2 — email/senha + Google SSO + aviso sessão expirada
- * VERSION: v1.5.2 | DATE: 2026-07-22 | AUTHOR: VeloHub Development Team
+ * DeskLoginPage v1.6.0 — toggle mostrar/ocultar senha no login
+ * VERSION: v1.6.0 | DATE: 2026-08-21 | AUTHOR: VeloHub Development Team
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -70,6 +70,7 @@ export default function DeskLoginPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [gsiReady, setGsiReady] = useState(false);
   const buttonRef = useRef(null);
   const initializedRef = useRef(false);
@@ -285,18 +286,32 @@ export default function DeskLoginPage() {
             />
           </label>
 
-          <label className="desk-login-field">
+          <label className="desk-login-field" htmlFor="desk-login-password">
             <span className="desk-login-field__label">Senha</span>
-            <input
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Sua senha de acesso"
-              disabled={loading}
-              required
-            />
+            <div className="desk-login-password-wrap">
+              <input
+                id="desk-login-password"
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Sua senha de acesso"
+                disabled={loading}
+                required
+              />
+              <button
+                type="button"
+                className="desk-login-password-toggle"
+                onClick={() => setShowPassword((current) => !current)}
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                aria-pressed={showPassword}
+                disabled={loading}
+                tabIndex={0}
+              >
+                <i className={`ti ${showPassword ? 'ti-eye-off' : 'ti-eye'}`} aria-hidden="true" />
+              </button>
+            </div>
           </label>
 
           <button type="submit" className="desk-login-submit" disabled={loading}>

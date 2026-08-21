@@ -1,6 +1,6 @@
 /**
- * DeskComposePanel v1.15.0 — revisão de texto aplica envelope como sugestão IA
- * VERSION: v1.15.0 | DATE: 2026-08-20
+ * DeskComposePanel v1.16.0 — Enviar como com gates por opção de status
+ * VERSION: v1.16.0 | DATE: 2026-08-21
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { uploadsApi } from '../../../api/client';
@@ -51,7 +51,14 @@ async function attachImageToEditor(editorRef, file, showNotification) {
   }
 }
 
-export function DeskStatusCommitButton({ sendStatus, onCommitStatus, variant = 'compose', disabled = false }) {
+export function DeskStatusCommitButton({
+  sendStatus,
+  onCommitStatus,
+  variant = 'compose',
+  disabled = false,
+  menuDisabledReason = '',
+  isOptionDisabled = null,
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const { profileId } = useProfile();
@@ -60,6 +67,9 @@ export function DeskStatusCommitButton({ sendStatus, onCommitStatus, variant = '
     return getSendStatusOptions(profileId);
   }, [profileId]);
   const currentStatus = sendStatusOptions.find((o) => o.id === sendStatus) || sendStatusOptions[0];
+  const triggerTitle = disabled
+    ? (menuDisabledReason || 'Corrija os erros ortográficos antes de enviar')
+    : undefined;
 
   useEffect(() => {
     const close = (e) => {
@@ -94,7 +104,7 @@ export function DeskStatusCommitButton({ sendStatus, onCommitStatus, variant = '
         aria-expanded={menuOpen}
         aria-disabled={disabled}
         disabled={disabled}
-        title={disabled ? 'Corrija os erros ortográficos antes de enviar' : undefined}
+        title={triggerTitle}
         onClick={() => {
           if (disabled) return;
           setMenuOpen((v) => !v);
@@ -113,22 +123,29 @@ export function DeskStatusCommitButton({ sendStatus, onCommitStatus, variant = '
         )}
       </button>
       <div className="crm-send-status__menu" id="crmStatusMenu" role="listbox" hidden={!menuOpen || disabled}>
-        {sendStatusOptions.map((opt) => (
-          <button
-            key={opt.id}
-            type="button"
-            className={'crm-send-status__option crm-send-status__option--' + opt.cls}
-            role="option"
-            disabled={disabled}
-            onClick={() => {
-              if (disabled) return;
-              setMenuOpen(false);
-              onCommitStatus(opt.id);
-            }}
-          >
-            {opt.label}
-          </button>
-        ))}
+        {sendStatusOptions.map((opt) => {
+          const optionGate = typeof isOptionDisabled === 'function'
+            ? isOptionDisabled(opt.id)
+            : { disabled: false, reason: '' };
+          const optionBlocked = disabled || optionGate.disabled;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              className={'crm-send-status__option crm-send-status__option--' + opt.cls + (optionBlocked ? ' is-disabled' : '')}
+              role="option"
+              disabled={optionBlocked}
+              title={optionGate.reason || undefined}
+              onClick={() => {
+                if (optionBlocked) return;
+                setMenuOpen(false);
+                onCommitStatus(opt.id);
+              }}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

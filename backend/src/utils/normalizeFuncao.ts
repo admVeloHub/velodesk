@@ -1,4 +1,4 @@
-/** normalizeFuncao v1.3.0 — atuacao objeto/array + aliases produto */
+/** normalizeFuncao v1.3.1 — map grupo produtos em normalizeAtribuidoValue */
 
 export function normalizeFuncao(value: unknown): string {
   const base = String(value ?? '')
@@ -78,6 +78,7 @@ export function normalizeAtribuidoValue(value: unknown): string {
       n1: 'atendimento',
       n2: 'n2',
       financeiro: 'financeiro',
+      produtos: 'produtos',
       suporte: 'suporte',
     };
     const funcao = map[slug.toLowerCase()] || slug;

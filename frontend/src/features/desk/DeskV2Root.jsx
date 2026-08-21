@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.39.2 | DATE: 2026-08-20
- * — Enviar Nota: ticketCacheEpoch alimenta refresh da sugestão IA
+ * VERSION: v3.40.0 | DATE: 2026-08-21
+ * — Enviar como: gates visíveis de tabulação e revisão de texto
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -65,6 +65,7 @@ import {
   persistDraftTicket,
   claimTicketResponsavelViaApi,
   setMergeProtectedTicketIds,
+  discardDraftTicketFromCache,
 } from '../../services/ticketsCache';
 import { apiTicketToCockpit, cockpitTicketToApi } from '../../api/adapters/ticketAdapter';
 import { lookupClient } from '../../services/clientDb';
@@ -116,16 +117,21 @@ import { resolveWorkflowForTicket } from '../../services/desk/workflowEngine';
 import { getRuntimeWorkflows } from '../../services/desk/workflowRuntimeStore';
 import { resolveRequisicaoCamposVisiveis } from '../../services/workflow/workflowRequisicao';
 import { getAutoCloseOnSave } from '../../services/desk/agentDeskPreferences';
-import { parseDeskQueueFromUrl, parseDeskMyTicketsSectionFromUrl, COMPOSE_AI_REVIEW_REQUIRED } from '../../services/desk/constants';
+import { parseDeskQueueFromUrl, parseDeskMyTicketsSectionFromUrl, COMPOSE_AI_REVIEW_REQUIRED, getSendStatusOptions } from '../../services/desk/constants';
+import { shouldViewAllDeskTickets } from '../../services/desk/responsavelSegmentation';
+import { resolveSendCommitMenuState } from '../../services/desk/sendCommitGates';
+import { useProfile } from '../../context/ProfileContext';
 import ProdutosForwardPopover from './components/ProdutosForwardPopover';
 import WorkflowComunicacaoModal from '../workflow/components/WorkflowComunicacaoModal';
 import { replyWorkflowComunicacao } from '../../services/workflow/workflowDecisionHandlers';
 import deskPlatformTrace, { createPlatformTraceCounter } from '../../utils/deskPlatformTrace';
 import { hasPublicThreadChanged, hasWhatsAppThreadChanged, hasPersistedInternalNotesChanged, buildPublicThreadFingerprint } from '../../services/desk/ticketThreadSync';
 import { hasAtendimentoFuncao } from '../../services/desk/atuacaoVision';
+import { attachmentScanStatusesChanged, ticketHasPendingAttachmentScan } from '../../services/desk/attachmentPreview';
 
 /** Respostas de cliente chegam por e-mail a qualquer momento: a thread se atualiza sozinha */
 const AUTO_REFRESH_DETAIL_MS = 15000;
+const AUTO_REFRESH_ATTACHMENT_SCAN_MS = 3000;
 const AUTO_REFRESH_WA_WAIT_MS = 5000;
 const AUTO_REFRESH_WA_CHAT_MS = 3000;
 const AUTO_REFRESH_QUEUES_MS = 60000;
@@ -151,6 +157,9 @@ function mergeThreadField(prevArr, lightArr) {
   const prevLen = prevArr?.length || 0;
   const lightLen = lightArr?.length || 0;
   if (lightLen > prevLen) return lightArr;
+  if (lightLen === prevLen && lightLen > 0 && attachmentScanStatusesChanged(prevArr, lightArr)) {
+    return lightArr;
+  }
   if (prevLen > 0) return prevArr;
   return lightArr ?? prevArr;
 }
@@ -253,6 +262,7 @@ export default function DeskV2Root() {
   } = useTickets();
   const { showNotification } = useNotifications();
   const { user } = useAuth();
+  const { profileId } = useProfile();
   const permsCtx = usePermissionsOptional();
   const { config } = useTabulation();
   const { workflows: runtimeWorkflows } = useWorkflowConfig();
@@ -476,6 +486,28 @@ export default function DeskV2Root() {
     persistComposeDraft({ internalText: html });
   }, [persistComposeDraft]);
 
+  const handleComposeAttachmentsChange = useCallback((next) => {
+    const items = Array.isArray(next) ? next : [];
+    setComposeAttachments(items);
+    persistComposeDraft({ composeAttachments: items });
+  }, [persistComposeDraft]);
+
+  const handleComposeModeChange = useCallback((mode) => {
+    setComposeMode(mode);
+    persistComposeDraft({ composeMode: mode });
+  }, [persistComposeDraft]);
+
+  const discardDraftTabIfNeeded = useCallback((ticketId) => {
+    const id = String(ticketId || '').trim();
+    if (!id) return;
+    const ticketEntry = findTicketEntry(id);
+    if (ticketEntry?.ticket && isDraftTicket(ticketEntry.ticket)) {
+      discardDraftTicketFromCache(id, user?.email || '');
+      void refreshTicketsSilent?.().catch(() => {});
+    }
+    delete tabSessionsRef.current[id];
+  }, [user?.email, refreshTicketsSilent]);
+
   const restoreTabSession = useCallback((ticketId) => {
     const ticketEntry = findTicketEntry(ticketId);
     if (!ticketEntry) return;
@@ -483,10 +515,9 @@ export default function DeskV2Root() {
     normalizeTicketForDeskV2(t);
     const defaults = buildDefaultSessionFromTicket(t, config);
     const saved = tabSessionsRef.current[String(ticketId)];
-    const hasSavedProduto = Boolean((t.lateralForm?.produto || '').trim());
     const session = saved || defaults;
     const nextRightFields = mergeRightFieldsWithDefaults(
-      hasSavedProduto && saved?.rightFields ? saved.rightFields : defaults.rightFields,
+      saved?.rightFields ?? defaults.rightFields,
       t,
       getAgentName,
     );
@@ -504,6 +535,39 @@ export default function DeskV2Root() {
   }, [config]);
 
   const sendDisabledBySpell = composeMode === 'public' && composeSpellErrors.length > 0;
+  const composeMessagePlain = useMemo(
+    () => htmlToPlainText(String(composeText || '').trim()).trim(),
+    [composeText],
+  );
+  const mergedRightFieldsForSend = useMemo(
+    () => (ticket ? mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName) : rightFields),
+    [rightFields, ticket],
+  );
+  const sendStatusOptionsForMenu = useMemo(() => {
+    if (shouldViewAllDeskTickets(profileId)) return getSendStatusOptions('gestao');
+    return getSendStatusOptions(profileId);
+  }, [profileId]);
+  const hasCanceladoSendOption = useMemo(
+    () => sendStatusOptionsForMenu.some((opt) => opt.id === 'cancelado'),
+    [sendStatusOptionsForMenu],
+  );
+  const sendCommitMenuState = useMemo(() => resolveSendCommitMenuState(
+    sendStatusOptionsForMenu,
+    hasCanceladoSendOption,
+    {
+      rightFields: mergedRightFieldsForSend,
+      config,
+      messageText: composeMessagePlain,
+      composeReviewedPlain,
+    },
+  ), [
+    sendStatusOptionsForMenu,
+    hasCanceladoSendOption,
+    mergedRightFieldsForSend,
+    config,
+    composeMessagePlain,
+    composeReviewedPlain,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -669,6 +733,8 @@ export default function DeskV2Root() {
         const threadChanged = hasPublicThreadChanged(prevTicket, merged);
         const waThreadChanged = hasWhatsAppThreadChanged(prevTicket, merged);
         const internalNotesChanged = hasPersistedInternalNotesChanged(prevTicket, merged);
+        const attachmentScanChanged = attachmentScanStatusesChanged(prevTicket?.messages, merged?.messages)
+          || attachmentScanStatusesChanged(prevTicket?.internalNotes, merged?.internalNotes);
         const statusOrWorkflowChanged = ticketStatusWorkflowFingerprint(prevTicket)
           !== ticketStatusWorkflowFingerprint(merged);
 
@@ -690,7 +756,7 @@ export default function DeskV2Root() {
           !cancelled
           && seq === requestSeq
           && !commitInProgressRef.current
-          && (threadChanged || waThreadChanged || internalNotesChanged || statusOrWorkflowChanged)
+          && (threadChanged || waThreadChanged || internalNotesChanged || statusOrWorkflowChanged || attachmentScanChanged)
         ) {
           patchTicket(ticketId, merged);
         }
@@ -705,6 +771,7 @@ export default function DeskV2Root() {
     const resolvePollIntervalMs = () => {
       const current = findTicketEntry(ticketId)?.ticket;
       if (!current) return AUTO_REFRESH_DETAIL_MS;
+      if (ticketHasPendingAttachmentScan(current)) return AUTO_REFRESH_ATTACHMENT_SCAN_MS;
       // Conversa WhatsApp em tela: ciclo mais curto para diálogo em tempo quase real
       if (waChatOpenRef.current) return AUTO_REFRESH_WA_CHAT_MS;
       const waState = getWhatsAppDeskUiState(current);
@@ -798,6 +865,16 @@ export default function DeskV2Root() {
       const last = openTabs[openTabs.length - 1];
       if (last) setActiveTabId(last.id);
   }, [activeTabId, refreshKey, entries.length, openTabs, setActiveTabId, tableQueueBrowsing]);
+
+  useEffect(() => {
+    const onGlobalTabClose = (event) => {
+      const id = event?.detail?.id;
+      if (!id) return;
+      discardDraftTabIfNeeded(id);
+    };
+    window.addEventListener('velodesk:desk-tab-close', onGlobalTabClose);
+    return () => window.removeEventListener('velodesk:desk-tab-close', onGlobalTabClose);
+  }, [discardDraftTabIfNeeded]);
 
   useEffect(() => {
     if (!activeTabId) {
@@ -926,7 +1003,7 @@ export default function DeskV2Root() {
     if (String(id) === String(activeTabId)) {
       persistTabSession(activeTabId);
     }
-    delete tabSessionsRef.current[String(id)];
+    discardDraftTabIfNeeded(id);
     const isLastTab = openTabs.length === 1 && String(openTabs[0].id) === String(id);
     if (isLastTab) suppressAutoSelectRef.current = true;
     const remaining = openTabs.filter((tab) => String(tab.id) !== String(id));
@@ -1110,14 +1187,6 @@ export default function DeskV2Root() {
     const messagePayload = messageHtml || '';
     const internalNotePayload = internalNoteHtml || '';
 
-    deskLog.action('commit → início', {
-      ticketId: ticket.id,
-      status,
-      hasPublic: hasPublicPayload,
-      hasInternal: Boolean(internalNoteText),
-      attachments: attachmentUrls.length,
-    });
-
     const deskPerms = permsCtx?.permissions;
     if (hasPublicPayload && !canSendPublicMessageOnTicket(ticket, deskPerms)) {
       showNotification('Sem permissão para enviar mensagem pública neste ticket.', 'warning');
@@ -1135,12 +1204,15 @@ export default function DeskV2Root() {
       return null;
     }
 
-    const tabulationCheck = validateTabulationForSendStatus(
-      status,
-      mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName),
-      config,
-    );
-    if (!tabulationCheck.ok) {
+    const mergedFieldsForCommit = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
+    const sendStatusOptionsForGate = shouldViewAllDeskTickets(profileId)
+      ? getSendStatusOptions('gestao')
+      : getSendStatusOptions(profileId);
+    const hasCanceladoOption = sendStatusOptionsForGate.some((opt) => opt.id === 'cancelado');
+    const canceladoBypass = status === 'cancelado' && hasCanceladoOption;
+
+    const tabulationCheck = validateTabulationForSendStatus(status, mergedFieldsForCommit, config);
+    if (!tabulationCheck.ok && !canceladoBypass) {
       deskLog.warn('AÇÃO', 'commit → bloqueado (tabulação)', {
         ticketId: ticket.id,
         status,
@@ -1154,6 +1226,7 @@ export default function DeskV2Root() {
     if (messageText) {
       if (
         COMPOSE_AI_REVIEW_REQUIRED
+        && !canceladoBypass
         && normalizeComposePlain(messageText) !== composeReviewedPlain
       ) {
         setComposeMode('public');
@@ -1187,6 +1260,14 @@ export default function DeskV2Root() {
       }
     }
     setComposeSpellErrors([]);
+
+    deskLog.action('commit → início', {
+      ticketId: ticket.id,
+      status,
+      hasPublic: hasPublicPayload,
+      hasInternal: Boolean(internalNoteText),
+      attachments: attachmentUrls.length,
+    });
 
     try {
       if (isDraftTicket(ticket)) {
@@ -1596,7 +1677,17 @@ export default function DeskV2Root() {
 
   const handleFieldChange = (key, value) => {
     if (ticketReadOnly) return;
-    setRightFields((f) => applyCascadeFieldChange(f, key, value));
+    setRightFields((f) => {
+      const next = applyCascadeFieldChange(f, key, value);
+      if (activeTabId) {
+        const sessionKey = String(activeTabId);
+        tabSessionsRef.current[sessionKey] = {
+          ...(tabSessionsRef.current[sessionKey] || {}),
+          rightFields: next,
+        };
+      }
+      return next;
+    });
   };
 
   const handleAssumeTicket = useCallback(async () => {
@@ -1895,7 +1986,10 @@ export default function DeskV2Root() {
         showNotification('Tabulação já preenchida.', 'success');
         return;
       }
-      showNotification('Sugestão de tabulação não preenche os campos obrigatórios.', 'warning');
+      showNotification(
+        'Produto sugerido pela IA não foi encontrado na tabulação ativa. Verifique se o POP está indexado ou preencha manualmente.',
+        'warning',
+      );
       return;
     }
 
@@ -2434,7 +2528,7 @@ export default function DeskV2Root() {
                     composeText={composeText}
                     onComposeTextChange={handleComposeTextChange}
                     composeAttachments={composeAttachments}
-                    onComposeAttachmentsChange={setComposeAttachments}
+                    onComposeAttachmentsChange={handleComposeAttachmentsChange}
                     onUseIaReply={handleUseIaReply}
                     onSend={handleSendWhatsAppMessage}
                     onSendInitial={handleSendWhatsAppInitial}
@@ -2484,8 +2578,8 @@ export default function DeskV2Root() {
                         composeText={composeText}
                         internalText={internalText}
                         composeAttachments={composeAttachments}
-                        onComposeAttachmentsChange={setComposeAttachments}
-                        onComposeModeChange={setComposeMode}
+                        onComposeAttachmentsChange={handleComposeAttachmentsChange}
+                        onComposeModeChange={handleComposeModeChange}
                         onComposeTextChange={handleComposeTextChange}
                         onComposeReviewed={handleComposeReviewed}
                         onInternalTextChange={handleInternalTextChange}
@@ -2554,7 +2648,10 @@ export default function DeskV2Root() {
             sendDisabledBySpell
             || ticketReadOnly
             || (composeMode === 'public' ? !canPublicCompose : !canInternalCompose)
+            || sendCommitMenuState.menuDisabled
           }
+          sendMenuDisabledReason={sendCommitMenuState.menuDisabledReason}
+          isSendStatusOptionDisabled={sendCommitMenuState.isOptionDisabled}
           iaTabulationDisplay={ticketAi.tabulacaoDisplay}
           iaTabulation={ticketAi.tabulacao}
           iaTabulationFonte={ticketAi.tabulacaoFonte}

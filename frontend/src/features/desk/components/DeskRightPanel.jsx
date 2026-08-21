@@ -1,6 +1,6 @@
 /**
- * DeskRightPanel v1.13.1 — botão workflow só se ativo ausente + permissão
- * VERSION: v1.13.1 | DATE: 2026-08-20
+ * DeskRightPanel v1.14.0 — repassa gates do Enviar como
+ * VERSION: v1.14.0 | DATE: 2026-08-21
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { DEFAULT_TIPO, TABULACAO_OPCOES_CATEGORIAS, hasApplyableTabulation, isReclameAquiCanal, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
@@ -59,6 +59,8 @@ export default function DeskRightPanel({
   onCloseChat,
   waChatOpen,
   sendDisabled = false,
+  sendMenuDisabledReason = '',
+  isSendStatusOptionDisabled = null,
   iaTabulationDisplay = '',
   iaTabulation = null,
   iaTabulationFonte = 'atendimento',
@@ -341,6 +343,8 @@ export default function DeskRightPanel({
           onCommitStatus={onCommitStatus}
           variant="panel"
           disabled={sendDisabled || ticketReadOnly}
+          menuDisabledReason={sendMenuDisabledReason}
+          isOptionDisabled={isSendStatusOptionDisabled}
         />
       </div>
     </aside>

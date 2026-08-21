@@ -160,7 +160,7 @@ function WhatsAppMediaAttachments({ attachments, contentTypes, scanStatuses }) {
               {kind !== 'document' && !src && !error && !pending && !blocked ? (
                 <span className="wa-msg__media-loading">Carregando mídia…</span>
               ) : null}
-              {kind === 'document' && !pending && !blocked ? (
+              {kind === 'document' && !blocked ? (
                 <button
                   type="button"
                   className="wa-msg__document"

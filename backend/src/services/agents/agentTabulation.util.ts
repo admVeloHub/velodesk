@@ -1,11 +1,15 @@
 /**
- * agentTabulation.util v1.3.0 — tarefa núcleo only
- * VERSION: v1.3.0 | DATE: 2026-08-10
+ * agentTabulation.util v1.4.0 — catálogo IA restrito aos POPs
+ * VERSION: v1.4.0 | DATE: 2026-08-21
  */
 import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from '../tabulation.service';
 import type { TicketAiMessageInput, TicketAiTabulationResult, AuditoriaInput } from './agentTypes';
 import { getAgentNomeOficial } from './agentRegistry';
 import { resolveClientFirstName, trimStr } from './openaiAgent.util';
+import {
+  filterTabulationConfigToPopProducts,
+  isPopAllowedProduct,
+} from '../processos/popTabulationWhitelist.service';
 
 const VALID_TIPOS = new Set(['Reclamação', 'Solicitação', 'Dúvida', 'Informação']);
 const MAX_MESSAGES = 50;
@@ -32,8 +36,9 @@ export async function loadTabulationConfig(): Promise<TabulationActiveDto> {
 }
 
 export function buildTabulationCatalog(config: TabulationActiveDto): string {
+  const popConfig = filterTabulationConfigToPopProducts(config);
   const lines: string[] = [];
-  for (const p of config.produtos.filter((item) => item.ativo)) {
+  for (const p of popConfig.produtos.filter((item) => item.ativo)) {
     const motivoLines: string[] = [];
     for (const m of (p.motivos || []).filter((item) => item.ativo !== false)) {
       const detalhes = (m.detalhes || [])
@@ -217,6 +222,7 @@ export function validateTabulationResult(
   raw: { tipo?: string; produto?: string; motivo?: string; detalhe?: string },
   config: TabulationActiveDto,
 ): TicketAiTabulationResult {
+  const popConfig = filterTabulationConfigToPopProducts(config);
   let tipo = trimStr(raw.tipo, 64);
   let produto = trimStr(raw.produto, 200);
   let motivo = trimStr(raw.motivo, 200);
@@ -225,18 +231,24 @@ export function validateTabulationResult(
   if (tipo && !VALID_TIPOS.has(tipo)) tipo = 'Solicitação';
   if (!tipo) tipo = 'Solicitação';
 
-  if (produto && config.produtos.length > 0 && !validateComboSoft(config, produto, '', '')) {
+  if (produto && !isPopAllowedProduct(produto)) {
     produto = '';
     motivo = '';
     detalhe = '';
   }
 
-  if (produto && motivo && !validateComboSoft(config, produto, motivo, '')) {
+  if (produto && popConfig.produtos.length > 0 && !validateComboSoft(popConfig, produto, '', '')) {
+    produto = '';
     motivo = '';
     detalhe = '';
   }
 
-  if (produto && motivo && detalhe && !validateComboSoft(config, produto, motivo, detalhe)) {
+  if (produto && motivo && !validateComboSoft(popConfig, produto, motivo, '')) {
+    motivo = '';
+    detalhe = '';
+  }
+
+  if (produto && motivo && detalhe && !validateComboSoft(popConfig, produto, motivo, detalhe)) {
     detalhe = '';
   }
 

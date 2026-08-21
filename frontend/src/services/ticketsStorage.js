@@ -1,6 +1,6 @@
 /**
- * ticketsStorage v1.4.5 — export appendInternalNoteToCachedTicket
- * VERSION: v1.4.5 | DATE: 2026-08-20
+ * ticketsStorage v1.4.6 — export discardDraftTicketFromCache
+ * VERSION: v1.4.6 | DATE: 2026-08-21
  */
 import {
   getCachedColumns,
@@ -18,6 +18,7 @@ import {
   claimTicketResponsavelViaApi,
   clearBoxesLocalCache,
   appendInternalNoteToCachedTicket,
+  discardDraftTicketFromCache,
 } from './ticketsCache';
 import { apiTicketToCockpit } from '../api/adapters/ticketAdapter';
 
@@ -147,6 +148,7 @@ export {
   claimTicketResponsavelViaApi,
   clearBoxesLocalCache,
   appendInternalNoteToCachedTicket,
+  discardDraftTicketFromCache,
 };
 
 export { loadTicketDetailFromApi, patchTicketInCache } from './ticketsCache';

@@ -1,4 +1,4 @@
-/** email-inbound.service v1.19.1 — descarta logo Velotax citado na resposta do cliente */
+/** email-inbound.service v1.20.0 — plain truncado cede ao HTML completo no inbound */
 import { addBrCivilDaysIso } from './dates/brDateTime.util';
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -74,6 +74,37 @@ function plainLooksLikeImagePlaceholders(text: string): boolean {
     || (!text.trim() && false);
 }
 
+/**
+ * Gmail/clients costumam mandar text/plain truncado com htmlBody completo (multipart/alternative).
+ * Ex.: plain "Número t" + html "Número tem acento".
+ */
+export function plainTextLooksTruncatedVsHtml(plain: string, html: string): boolean {
+  const plainTrim = String(plain ?? '').trim();
+  const htmlRaw = String(html ?? '').trim();
+  if (!plainTrim || !htmlRaw) return false;
+
+  const htmlText = stripHtml(htmlRaw).trim();
+  if (!htmlText || htmlText.length <= plainTrim.length) return false;
+
+  if (htmlText.startsWith(plainTrim) && htmlText.length - plainTrim.length >= 3) {
+    return true;
+  }
+
+  const minExtra = 8;
+  if (plainTrim.length < htmlText.length * 0.75 && htmlText.length - plainTrim.length >= minExtra) {
+    return true;
+  }
+
+  return false;
+}
+
+function shouldPreferHtmlBody(text: string, htmlRaw: string): boolean {
+  if (!htmlRaw.trim()) return false;
+  if (!text.trim()) return true;
+  if (plainLooksLikeImagePlaceholders(text)) return true;
+  return plainTextLooksTruncatedVsHtml(text, htmlRaw);
+}
+
 /** Mantém tags básicas + img com src http(s) ou /api — para corpo inbound com fotos inline. */
 export function sanitizeInboundHtmlKeepingImages(html: string): string {
   let result = String(html ?? '');
@@ -110,7 +141,7 @@ export function resolveEmailBody(payload: InboundEmailPayload): string {
   const text = payload.textBody.trim();
   const htmlRaw = String(payload.htmlBody ?? '').trim();
 
-  if (htmlRaw && (!text || plainLooksLikeImagePlaceholders(text))) {
+  if (shouldPreferHtmlBody(text, htmlRaw)) {
     const sanitized = sanitizeInboundHtmlKeepingImages(htmlRaw);
     if (sanitized) {
       return extractEmailReplyContent(sanitized);

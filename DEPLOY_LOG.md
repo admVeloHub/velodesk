@@ -1,10 +1,34 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.90.4 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.91.0 | DATE: 2026-08-21 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — correções QA Desk (Enviar como, CPF, POPs, rascunho, workflow)
+
+- **Data/Hora**: 2026-08-21
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.91.0
+  - **Frontend**: DeskV2Root v3.40.0, sendCommitGates v1.0.0, CreateTicketPanel v2.0.3, DeskComposePanel v1.16.0, DeskRightPanel v1.14.0, ticketsCache v1.19.0, TicketTabsBar v2.2.0, workflowApprovalData v1.7.0, workflowTeamQueues v1.6.0, permissionService v1.9.2, WorkflowApprovalShell/Queue/Search/Detail (busca + remoção stepper)
+  - **Backend**: popTabulationWhitelist v1.0.0, agentTabulation v1.4.0, openaiAgent v1.1.0, openaiTicketSuggest v1.4.0, atendimentoPersona v1.5.0, ticketSuggestPersona v1.3.0, normalizeFuncao v1.3.1
+- **Arquivos principais**:
+  - Item 1: gates visíveis no botão Enviar como (tabulação + revisor de texto; exceção Cancelado)
+  - Item 2: CPF 404 ao criar ticket → RegisterClientModal
+  - Item 3: tabulação IA restrita aos POPs (vector store + whitelist + personas)
+  - Item 4: persistência de rascunho entre abas; descarte total ao fechar aba draft
+  - Item 5: fila console workflow por função atribuída (normalizeFuncao + visibilidade)
+  - Console aprovações: busca CPF/protocolo, remoção stepper do header
+  - Anexos: reconcile/preview, attachmentScanStatus, melhorias inbound/outbound
+  - Login Desk, profiles, Sidebar e CSS ecosystem (workflow search)
+- **Descrição**: Pacote de correções da auditoria QA (planilha 21-08-2026) e melhorias correlatas no Desk, workflow e anexos.
+- **Status**: Push dev
+
+---
 
 ### GitHub Push — fix build TypeScript clients.routes (Cloud Build)
 

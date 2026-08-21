@@ -1,11 +1,13 @@
-/** sentAttachmentStorage v1.3.0 — meta p/ WhatsApp outbound + attachmentGuard na leitura */
+/** sentAttachmentStorage v1.4.0 — outbound do agente sem fila ClamAV (skipAntivirusScan) */
 import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { Readable } from 'stream';
 import { env } from '../config/env';
-import { inspectAttachmentGuard } from './attachmentGuard.util';
+import { inspectAttachmentGuard, type AttachmentGuardOptions } from './attachmentGuard.util';
+
+const AGENT_OUTBOUND_GUARD: AttachmentGuardOptions = { skipAntivirusScan: true };
 import {
   buildGcsObjectUri,
   getSentAttachmentsPrefix,
@@ -75,6 +77,10 @@ export function parseSentAttachmentStorageKeyFromApiUrl(apiUrl: string): string 
   }
 }
 
+export function isSentAttachmentApiUrl(url: string): boolean {
+  return /\/(?:api\/)?uploads\/sent\//i.test(String(url || '').trim());
+}
+
 /** Valida anexo enviado pelo agente antes de repassar ao Twilio WhatsApp. */
 export async function resolveSentAttachmentSendMeta(apiUrl: string): Promise<{
   contentType: string;
@@ -88,12 +94,14 @@ export async function resolveSentAttachmentSendMeta(apiUrl: string): Promise<{
   if (!item) {
     throw new Error('Anexo não encontrado');
   }
-  const guard = inspectAttachmentGuard(item.filename, item.contentType, item.buffer);
+  const guard = inspectAttachmentGuard(
+    item.filename,
+    item.contentType,
+    item.buffer,
+    AGENT_OUTBOUND_GUARD,
+  );
   if (!guard.ok) {
     throw new Error(guard.reason);
-  }
-  if (guard.scanStatus === 'pending') {
-    throw new Error('Anexo ainda em verificação de segurança. Aguarde ou envie imagem/áudio/vídeo.');
   }
   return {
     contentType: guard.detectedMime,
@@ -161,7 +169,12 @@ export async function persistSentAttachment(
     throw new Error(`Anexo excede o limite de ${MAX_SENT_ATTACHMENT_BYTES / (1024 * 1024)}MB`);
   }
 
-  const guard = inspectAttachmentGuard(input.filename, input.contentType, input.buffer);
+  const guard = inspectAttachmentGuard(
+    input.filename,
+    input.contentType,
+    input.buffer,
+    AGENT_OUTBOUND_GUARD,
+  );
   if (!guard.ok) {
     throw new Error(guard.reason);
   }

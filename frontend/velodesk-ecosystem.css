@@ -6205,6 +6205,54 @@ body.desk-v2-mode #aiChatbotModal {
     color: #000058;
 }
 
+.wf-approval-queue .queue-search--workflow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 12px;
+    padding: 6px 8px;
+    background: #f3f4f8;
+    border: 0.5px solid #e4e6ea;
+    border-radius: 8px;
+    color: #6b7280;
+    font-size: var(--desk-fs-caption, 0.75rem);
+    box-sizing: border-box;
+}
+
+.wf-approval-queue .queue-search--workflow input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: #1a1a2e;
+    font-size: var(--desk-fs-caption, 0.75rem);
+    font-family: inherit;
+    min-width: 0;
+}
+
+.wf-approval-queue .queue-search--workflow input::placeholder {
+    color: #9ca3af;
+}
+
+.wf-approval-queue .queue-search--workflow .queue-search__mode {
+    border: 0.5px solid #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+    color: #475569;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.wf-approval-queue .queue-search--workflow .queue-search__mode--detected {
+    background: rgba(22, 52, 255, 0.08);
+    border-color: rgba(22, 52, 255, 0.25);
+    color: #1634FF;
+}
+
 .wf-approval-queue__search {
     margin-top: 12px;
 }
