@@ -1,6 +1,6 @@
 /**
- * inboundAgentPipeline.service v1.3.0 — leva anotações internas como contexto mesmo com msg do cliente
- * VERSION: v1.3.0 | DATE: 2026-08-17
+ * inboundAgentPipeline.service v1.4.0 — e-mail sem contexto aguarda 1ª nota interna do agente
+ * VERSION: v1.4.0 | DATE: 2026-08-21
  */
 import type { IChamadoN1 } from '../../models/ChamadoN1';
 import { env } from '../../config/env';
@@ -10,7 +10,11 @@ import type { TicketAiMessageInput } from './agentTypes';
 import { shouldSkipAgentPipeline } from './casosEspeciais.util';
 import { runCasosEspeciaisTriagem } from './casosEspeciaisTrigger.service';
 import { ChamadoN1 } from '../../models/ChamadoN1';
-import { buildTicketIaInternalNotesFromChamado } from '../ticketIaAdapter.service';
+import {
+  buildTicketIaInternalNotesFromChamado,
+  buildTicketIaMessagesFromChamado,
+  hasMeaningfulClientContextInChamado,
+} from '../ticketIaAdapter.service';
 
 function extractClientName(chamado: IChamadoN1): string {
   const reg = chamado.registro?.[0];
@@ -18,16 +22,10 @@ function extractClientName(chamado: IChamadoN1): string {
 }
 
 function extractMessagesFromChamado(chamado: IChamadoN1): TicketAiMessageInput[] {
-  const messages: TicketAiMessageInput[] = [];
-  for (const reg of chamado.registro || []) {
-    const pub = String(reg.mensagemPublica || '').trim();
-    if (!pub) continue;
-    messages.push({
-      role: reg.origin === 'cliente' ? 'cliente' : 'agente',
-      text: pub,
-    });
-  }
-  return messages;
+  return buildTicketIaMessagesFromChamado(chamado).map((item) => ({
+    role: item.role,
+    text: item.text,
+  }));
 }
 
 function extractCanal(chamado: IChamadoN1): string {
@@ -46,6 +44,11 @@ function findFirstInternalContextNote(chamado: IChamadoN1): string {
     const note = String(reg.anotacaoInterna || '').trim();
     if (note) return note;
   }
+  const isTelephony = (chamado.registro || []).some(
+    (reg) => String(reg.metadados?.source ?? '').trim().toLowerCase() === 'telephony-inbound',
+  );
+  if (!isTelephony) return '';
+
   for (const reg of chamado.registro || []) {
     if (reg.origin === 'cliente') continue;
     const pub = String(reg.mensagemPublica || '').trim();
@@ -68,7 +71,7 @@ export async function runInboundAgentPipeline(
 
   try {
     const messages = extractMessagesFromChamado(chamado);
-    const hasClient = messages.some((m) => m.role === 'cliente');
+    const hasClient = hasMeaningfulClientContextInChamado(chamado);
     // Com msg do cliente, ainda assim leva as anotações internas como contexto adicional
     // (o Agente 1 as usa independente do contextSource) — sem elas, cai no resumo automático
     // de ligação/1ª nota, único contexto disponível quando não há msg do cliente.

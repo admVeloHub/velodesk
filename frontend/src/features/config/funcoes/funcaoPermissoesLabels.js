@@ -1,4 +1,4 @@
-/** Labels do catálogo RBAC por função — v1.3.0 | DATE: 2026-08-17 */
+/** Labels do catálogo RBAC por função — v1.4.0 | DATE: 2026-08-21 */
 import { derivePortalVisivelFromPermissoes } from '../../../services/permissions/permissionService';
 import { NAV_ITEMS } from '../../../config/profiles';
 
@@ -23,10 +23,11 @@ export const MODULO_LABELS = {
 };
 
 export const SUB_LABELS = {
-  ver_todos: 'Ver todos os tickets',
-  ver_meus: 'Ver meus tickets',
+  ver_todos: 'Ver todos os tickets (somente visualização)',
+  ver_meus: 'Ver meus tickets (listas filtradas por responsável/atribuído)',
   atuar_responsavel: 'Atuar como responsável',
   atuar_atribuido: 'Atuar quando atribuído (workflow)',
+  atuar_sempre: 'Atuar sempre (independente de responsável/atribuído)',
   atuar_canal_especial: 'Atuar em canal especial',
   painel_360_proprio: 'Painel 360° — próprios dados',
   painel_360_equipe: 'Painel 360° — equipe',

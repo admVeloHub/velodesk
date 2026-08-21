@@ -1,6 +1,6 @@
 /**
- * WorkflowApprovalShell v1.10.1 — remove stepper do topo do detalhe
- * VERSION: v1.10.1 | DATE: 2026-08-21
+ * WorkflowApprovalShell v1.11.0 — busca WK mantém ticket aberto (sem fallback que troca)
+ * VERSION: v1.11.0 | DATE: 2026-08-21
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -238,22 +238,21 @@ export default function WorkflowApprovalShell() {
         setSelectedId(urlId);
         return;
       }
-      if (entry?.ticket && !ticketMatchesWorkflowTeam(entry.ticket, teamQueueId)) {
-        const otherTeamId = resolveWorkflowTeamForTicket(entry.ticket);
-        const otherTeamMeta = otherTeamId ? getWorkflowTeamQueueMeta(otherTeamId) : null;
-        const myTeamMeta = getWorkflowTeamQueueMeta(teamQueueId);
-        showNotification(
-          otherTeamMeta
-            ? `Este ticket pertence à fila ${otherTeamMeta.name}, não à fila ${myTeamMeta?.name || teamQueueId}.`
-            : `Este ticket não pertence à fila ${myTeamMeta?.name || teamQueueId}.`,
-          'warning',
-        );
-        setSearchParams((prev) => {
-          const next = new URLSearchParams(prev);
-          next.delete('ticket');
-          return next;
-        }, { replace: true });
+      // Ticket da busca / URL: permanece aberto mesmo fora da fila do time (não troca para fallback)
+      if (entry?.ticket) {
+        setSelectedId(urlId);
+        return;
       }
+      if (!entry?.ticket) {
+        // id na URL sem cache local — ainda assim mantém seleção; detalhe carrega à parte
+        setSelectedId(urlId);
+        return;
+      }
+    }
+
+    if (!queueData.queue.length) {
+      setSelectedId(null);
+      return;
     }
 
     const fallbackId = queueData.queue[0].id;

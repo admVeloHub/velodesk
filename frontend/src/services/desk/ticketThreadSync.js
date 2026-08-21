@@ -1,10 +1,22 @@
 /**
- * ticketThreadSync v1.9.1 — fingerprint de notas usa texto plano (sem HTML)
- * VERSION: v1.9.1 | DATE: 2026-08-20
+ * ticketThreadSync v1.10.1 — fingerprint ignora notas automáticas do sistema
+ * VERSION: v1.10.1 | DATE: 2026-08-21
  */
 
 function normalizeMsgText(value) {
   return String(value || '').trim();
+}
+
+const PLACEHOLDER_CLIENT_MESSAGES = new Set([
+  '[e-mail recebido]',
+  '[anexo recebido]',
+]);
+
+/** Texto sintético de inbound sem conteúdo — não conta como contexto do cliente. */
+export function isPlaceholderClientMessageText(text) {
+  const plain = normalizeMsgText(text).toLowerCase();
+  if (!plain) return true;
+  return PLACEHOLDER_CLIENT_MESSAGES.has(plain);
 }
 
 /** Instantâneo comparável — Date, ISO e locale string viram o mesmo epoch. */
@@ -47,11 +59,32 @@ export function buildClientThreadFingerprint(convMsgs) {
     .join(';;');
 }
 
-/** Notas internas persistidas no ticket (sem rascunho local do compose). */
+/** Fingerprint do cliente com conteúdo real (exclui [E-mail recebido] e similares). */
+export function buildMeaningfulClientThreadFingerprint(convMsgs) {
+  return (convMsgs || [])
+    .filter((m) => m?.type === 'client' && !isPlaceholderClientMessageText(m.text))
+    .map((m) => {
+      const ts = fingerprintTime(m.timestamp);
+      const text = normalizeMsgText(m.text);
+      const att = Array.isArray(m.attachments) ? m.attachments.length : 0;
+      return `${ts}|${text}|${att}`;
+    })
+    .join(';;');
+}
+
 /** Notas internas do agente (sem eventos de workflow em registroHistorico). */
 export function buildAgentInternalNotesFingerprint(ticket) {
   if (!ticket) return '';
   return (ticket.internalNotes || [])
+    .filter((note) => {
+      const author = String(note?.author || '').trim().toLowerCase();
+      if (author === 'sistema') return false;
+      const text = String(note.text || note.message || '').trim()
+        .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!text) return false;
+      if (/^novo ticket derivado de/i.test(text)) return false;
+      return true;
+    })
     .map((note) => {
       const raw = String(note.text || note.message || '').trim();
       const text = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();

@@ -1,6 +1,6 @@
 /**
- * ticketAdapter v1.7.6 — responsável exibido como nome/alias (nunca e-mail)
- * VERSION: v1.7.6 | DATE: 2026-08-20
+ * ticketAdapter v1.8.0 — origin sistema / e-mail padrão → bolha system
+ * VERSION: v1.8.0 | DATE: 2026-08-21
  */
 import { getAgentName } from '../../services/clientDb';
 import { stripPendingWorkflowForApiPayload } from '../../services/desk/pendingWorkflowStart';
@@ -27,7 +27,14 @@ const DEFAULT_BOXES = [
 function normalizeMessage(msg) {
   if (!msg) return msg;
   const isInternal = msg.type === 'internal';
-  const isClient = !isInternal && (
+  const isSystem = !isInternal && (
+    msg.type === 'system'
+    || msg.origin === 'sistema'
+    || msg.sender === 'system'
+    || Boolean(msg.metadados?.emailPadraoId)
+    || String(msg.author || msg.autor || '').trim().toLowerCase() === 'e-mail padrão'
+  );
+  const isClient = !isInternal && !isSystem && (
     msg.fromClient === true
     || msg.type === 'client'
     || msg.origin === 'cliente'
@@ -37,9 +44,9 @@ function normalizeMessage(msg) {
     ...msg,
     text: repairUtf8Mojibake(msg.text || msg.message || ''),
     timestamp: msg.timestamp || msg.time || msg.createdAt || '',
-    origin: msg.origin || (msg.sender === 'them' ? 'cliente' : 'agente'),
+    origin: msg.origin || (isSystem ? 'sistema' : (msg.sender === 'them' ? 'cliente' : 'agente')),
     fromClient: isClient,
-    type: isInternal ? 'internal' : (isClient ? 'client' : (msg.type === 'system' ? 'system' : 'agent')),
+    type: isInternal ? 'internal' : (isSystem ? 'system' : (isClient ? 'client' : 'agent')),
     author: msg.author || (isInternal ? '' : msg.sender) || '',
     deliveryStatus: msg.deliveryStatus,
     deliveryErrorMessage: msg.deliveryErrorMessage,

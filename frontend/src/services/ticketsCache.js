@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.19.0 — discardDraftTicketFromCache ao fechar aba
- * VERSION: v1.19.0 | DATE: 2026-08-21 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.21.0 — merge preserva workflow.active no poll; responsável não some
+ * VERSION: v1.21.0 | DATE: 2026-08-21 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -12,7 +12,7 @@ import {
   buildCreatePayload,
   isDraftTicket,
 } from '../api/adapters/ticketAdapter';
-import { readDeskProfileId, shouldUseMeusChamadosFila, ticketBelongsInAgentNovosQueue } from './desk/responsavelSegmentation';
+import { readDeskProfileId, shouldUseMeusChamadosFila, ticketBelongsInAgentNovosQueue, ticketAssignedToCurrentAgent, ticketAtribuidoToCurrentAgent } from './desk/responsavelSegmentation';
 import { isEspeciaisDeskExcludedTicket } from './especiais/especiaisChannelDetection';
 import { getAgentName } from './clientDb';
 import { loadProconTicketsFromApi } from './especiais/proconTicketService';
@@ -222,8 +222,18 @@ function buildComunicacaoResumoForMerge(thread = []) {
 function mergeTicketWorkflow(prev, next) {
   if (!next) return prev;
   if (!prev) return next;
+  const nextStatus = String(next.workflowStatus || '').trim().toLowerCase();
+  const nextFinished = nextStatus === 'finished' || nextStatus === 'cancel' || Boolean(next.completedAt);
+  // Poll/list sem active não pode apagar WF recém-iniciado
+  const preserveActive = nextFinished ? Boolean(next.active) : Boolean(next.active || prev.active);
+
   if (!next.requisicao) {
-    return { ...prev, ...next, requisicao: prev.requisicao };
+    return {
+      ...prev,
+      ...next,
+      active: preserveActive,
+      requisicao: prev.requisicao,
+    };
   }
   const prevReq = prev.requisicao || {};
   const nextReq = next.requisicao || {};
@@ -237,6 +247,7 @@ function mergeTicketWorkflow(prev, next) {
   return {
     ...prev,
     ...next,
+    active: preserveActive,
     requisicao: {
       ...prevReq,
       ...nextReq,
@@ -635,8 +646,11 @@ function filterColumnsForAgent(columns) {
     tickets: (box.tickets || []).filter((ticket) => {
       if (isEspeciaisDeskExcludedTicket(ticket, profileId)) return false;
       if (box.id === 'resolvidos') return true;
+      // Novos: responsável do agente + órfãos
       if (box.id === 'novos') return ticketBelongsInAgentNovosQueue(ticket);
-      return true;
+      // Em andamento / Pendente: dono = responsável (WF não troca responsável).
+      // Atribuído colaborador individual também enxerga; funcao:/grupo: não.
+      return ticketAssignedToCurrentAgent(ticket) || ticketAtribuidoToCurrentAgent(ticket);
     }),
   }));
 }

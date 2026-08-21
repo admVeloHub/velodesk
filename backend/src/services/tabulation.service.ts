@@ -1,4 +1,4 @@
-/** tabulation.service v1.6.0 — remove seed DEFAULT_TABULACAO_PRODUTOS (telecom legado) */
+/** tabulation.service v1.7.0 — CE: skip cascata POP; exige motivo do órgão */
 import type { ITabulacao } from '../models/ChamadoN1';
 import type { ITabulacaoDetalhe, ITabulacaoMotivo, ITabulacaoProduto } from '../models/TabulacaoProduto';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
@@ -13,6 +13,14 @@ export class TabulacaoValidationError extends Error {
 
 const STATUSES_REQUIRING_TABULATION = new Set(['em-aberto', 'em-andamento', 'resolvido']);
 
+function isCasosEspeciaisCanal(canal: string): boolean {
+  const raw = String(canal || '').trim().toLowerCase();
+  if (raw.includes('reclame') && raw.includes('aqui')) return true;
+  if (raw.includes('procon')) return true;
+  if (raw.includes('bacen')) return true;
+  if (raw.includes('consumidor') && (raw.includes('gov') || raw.includes('.gov'))) return true;
+  return false;
+}
 function activeMotivos(config: TabulationActiveDto, produtoName: string): string[] {
   const produto = config.produtos.find((item) => item.produto === produtoName && item.ativo);
   if (!produto) return [];
@@ -181,12 +189,14 @@ export async function assertTabulacaoForStatus(tab: ITabulacao | undefined, stat
   const motivo = String(tab?.motivo ?? '').trim();
   const detalhe = String(tab?.detalhe ?? '').trim();
   const canal = String(tab?.canal ?? '').trim().toLowerCase();
-  const skipTreeMotivo = canal.includes('reclame') && canal.includes('aqui');
+  const skipTreeMotivo = isCasosEspeciaisCanal(canal);
 
   if (!produto) missing.push('Produto');
   if (!tipo) missing.push('Tipo');
 
-  if (produto && !skipTreeMotivo) {
+  if (skipTreeMotivo) {
+    if (!motivo) missing.push('Motivo');
+  } else if (produto) {
     const config = await getActiveTabulation();
     const motivos = activeMotivos(config, produto);
     if (motivos.length > 0 && !motivo) missing.push('Motivo');

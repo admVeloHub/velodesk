@@ -1,6 +1,6 @@
 /**
- * workflowDecisionHandlers v2.5.0 — approve Produtos: msg no BE; reject mantém WF ativo
- * VERSION: v2.5.0 | DATE: 2026-08-20
+ * workflowDecisionHandlers v2.5.1 — comunicacao WK só com workflow.active
+ * VERSION: v2.5.1 | DATE: 2026-08-21
  */
 import { ticketsApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
@@ -270,6 +270,8 @@ export function readTicketComunicacaoWorkflow(ticket) {
 }
 
 export function ticketHasComunicacaoWorkflow(ticket) {
+  // Só ticket com WF realmente ativo entra na área de atualização interna / WK
+  if (!ticket?.workflow?.active && !ticket?.workflow?.pendingPersist) return false;
   if (ticket?.workflow?.requisicao?.comunicacaoPendente === true) return true;
   return readTicketComunicacaoWorkflow(ticket).length > 0;
 }

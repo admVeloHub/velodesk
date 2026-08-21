@@ -1,6 +1,6 @@
 /**
- * ticketIaAdapter.service v1.1.1 — notas internas do registro para contexto IA
- * VERSION: v1.1.1 | DATE: 2026-08-12
+ * ticketIaAdapter.service v1.2.1 — notas internas ignoram entradas automáticas do sistema
+ * VERSION: v1.2.1 | DATE: 2026-08-21
  *
  * A IA deve receber prioritariamente a fala direta do cliente. Em tickets criados
  * manualmente, onde não há mensagem originada pelo cliente, o detalhe informado pelo
@@ -44,6 +44,18 @@ const FORMAL_CASE_SOURCES = new Set([
   'consumidor-gov',
   'consumidor.gov',
 ]);
+
+/** Mensagens sintéticas de inbound sem conteúdo real — não disparam sugestão IA. */
+const PLACEHOLDER_CLIENT_MESSAGES = new Set([
+  '[e-mail recebido]',
+  '[anexo recebido]',
+]);
+
+export function isPlaceholderClientMessageText(raw: string): boolean {
+  const normalized = normalizeText(raw).toLowerCase();
+  if (!normalized) return true;
+  return PLACEHOLDER_CLIENT_MESSAGES.has(normalized);
+}
 
 function registroMetadata(reg: IRegistro): Record<string, unknown> {
   return reg.metadados && typeof reg.metadados === 'object' && !Array.isArray(reg.metadados)
@@ -136,13 +148,23 @@ export function buildTicketIaMessagesFromChamado(chamado: IChamadoN1): TicketIaC
   return items.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 }
 
+/** Cliente falou de fato (texto substantivo) — distinto de e-mail vazio ou só anexo. */
+export function hasMeaningfulClientContextInChamado(chamado: IChamadoN1): boolean {
+  return buildTicketIaMessagesFromChamado(chamado).some(
+    (item) => item.role === 'cliente' && !isPlaceholderClientMessageText(item.text),
+  );
+}
+
 /** Bloco de anotações internas persistidas no chamado (ordem cronológica). */
 export function buildTicketIaInternalNotesFromChamado(chamado: IChamadoN1): string {
   const lines: string[] = [];
   const seen = new Set<string>();
   for (const reg of sortedRegistros(chamado)) {
+    const author = String(reg.autor ?? '').trim().toLowerCase();
+    if (author === 'sistema') continue;
     const note = decodeBasicHtmlEntities(String(reg.anotacaoInterna ?? '').trim());
     if (!note) continue;
+    if (/^novo ticket derivado de/i.test(note)) continue;
     const key = note.toLocaleLowerCase('pt-BR');
     if (seen.has(key)) continue;
     seen.add(key);

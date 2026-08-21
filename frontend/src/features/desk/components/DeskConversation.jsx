@@ -1,6 +1,6 @@
 /**
- * DeskConversation v1.9.0 — anexo pending clicável; backend reconcilia no download
- * VERSION: v1.9.0 | DATE: 2026-08-21
+ * DeskConversation v1.10.0 — Verificando só inbound; MIME preview; brand Velotax completa
+ * VERSION: v1.10.0 | DATE: 2026-08-21
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
@@ -33,15 +33,32 @@ function normalizeAuditScore(value) {
 function isBrandInlineAttachmentUrl(url) {
   const label = attachmentLabelFromUrl(url).toLowerCase();
   return label.includes('simbolo_velotax')
+    || label.includes('velotax_ajustada')
+    || label.includes('velotax_logo')
+    || /velotax.*logo/i.test(label)
     || label.includes('velodesk-brand')
     || /^logo\.(png|jpe?g|gif|webp)$/i.test(label);
 }
 
-function MessageAttachments({ attachments, scanStatuses }) {
+function isInboundMessageOrigin(origin, msgType) {
+  const o = String(origin || '').trim().toLowerCase();
+  if (o === 'cliente' || o === 'client') return true;
+  if (o === 'agente' || o === 'sistema' || o === 'system') return false;
+  return msgType === 'client';
+}
+
+function effectiveScanStatus(rawStatus, isInbound) {
+  const status = String(rawStatus || '').trim().toLowerCase();
+  if (!isInbound && status === 'pending') return 'skipped';
+  return status;
+}
+
+function MessageAttachments({ attachments, scanStatuses, messageOrigin, messageType }) {
+  const inbound = isInboundMessageOrigin(messageOrigin, messageType);
   const items = (attachments || [])
     .map((item, index) => ({
       url: String(item || '').trim(),
-      scanStatus: String(scanStatuses?.[index] || '').trim().toLowerCase(),
+      scanStatus: effectiveScanStatus(scanStatuses?.[index], inbound),
     }))
     .filter((item) => item.url)
     .filter((item) => !isBrandInlineAttachmentUrl(item.url));
@@ -93,7 +110,7 @@ function MessageAttachments({ attachments, scanStatuses }) {
           const url = item.url;
           const isLoading = loadingUrl === url;
           const hasError = errorUrl === url;
-          const pending = item.scanStatus === 'pending';
+          const pending = inbound && item.scanStatus === 'pending';
           const blocked = item.scanStatus === 'infected' || item.scanStatus === 'unscannable';
           const kind = classifyAttachmentKind('', attachmentLabelFromUrl(url));
           return (
@@ -128,7 +145,7 @@ function MessageAttachments({ attachments, scanStatuses }) {
   );
 }
 
-function MessageBubbleText({ text, attachments, scanStatuses }) {
+function MessageBubbleText({ text, attachments, scanStatuses, messageOrigin, messageType }) {
   const raw = normalizeMessageDisplayText(text);
   const hasText = Boolean(String(raw || '').trim());
 
@@ -149,7 +166,12 @@ function MessageBubbleText({ text, attachments, scanStatuses }) {
           />
         )
       ) : null}
-      <MessageAttachments attachments={attachments} scanStatuses={scanStatuses} />
+      <MessageAttachments
+        attachments={attachments}
+        scanStatuses={scanStatuses}
+        messageOrigin={messageOrigin}
+        messageType={messageType}
+      />
     </>
   );
 }
@@ -266,7 +288,7 @@ export default function DeskConversation({
               <div key={i} className="msg-row msg-row--system">
                 <div className="msg-body msg-body--system">
                   <div className="msg-bubble msg-bubble--system">
-                    <MessageBubbleText text={msg.text} attachments={msg.attachments} scanStatuses={msg.attachmentScanStatuses} />
+                    <MessageBubbleText text={msg.text} attachments={msg.attachments} scanStatuses={msg.attachmentScanStatuses} messageOrigin={msg.origin} messageType={msg.type} />
                   </div>
                   {msg.meta ? <div className="msg-meta">{msg.meta}</div> : null}
                 </div>
@@ -279,7 +301,7 @@ export default function DeskConversation({
             <div className={'msg-avatar msg-avatar--' + (msg.type === 'internal' ? 'agent' : msg.type)}>{msg.initials || '?'}</div>
             <div className="msg-body">
               <div className={'msg-bubble msg-bubble--' + msg.type}>
-                <MessageBubbleText text={msg.text} attachments={msg.attachments} scanStatuses={msg.attachmentScanStatuses} />
+                <MessageBubbleText text={msg.text} attachments={msg.attachments} scanStatuses={msg.attachmentScanStatuses} messageOrigin={msg.origin} messageType={msg.type} />
               </div>
               <div className="msg-meta">{msg.meta}</div>
             </div>

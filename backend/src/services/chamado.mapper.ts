@@ -1,4 +1,4 @@
-/** chamado.mapper v2.15.3 — scan outbound skipped + enrich efetivo pós-montagem */
+/** chamado.mapper v2.16.1 — bolha system para e-mail padrão / origin sistema */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -105,13 +105,24 @@ function scanStatusesForPublicAttachments(reg: IRegistro): string[] | undefined 
   items.forEach((raw) => {
     const item = raw && typeof raw === 'object' ? raw as Record<string, unknown> : null;
     if (!item) return;
-    const status = String(item.scanStatus || '').trim();
+    let status = String(item.scanStatus || '').trim();
+    // Mensagem do agente/sistema: pending legado → skipped (outbound sem antivírus)
+    const originRaw = String(reg.origin || '').trim().toLowerCase();
+    if ((originRaw === 'agente' || originRaw === 'sistema') && status === 'pending') {
+      status = 'skipped';
+    }
     const url = String(item.url || '').trim();
     const storageKey = String(item.storageKey || '').trim();
     if (url) map.set(url, status);
     if (storageKey) map.set(`sk:${storageKey}`, status);
   });
-  const aligned = urls.map((url) => scanStatusFromMap(map, url));
+  const aligned = urls.map((url) => {
+    const fromMeta = scanStatusFromMap(map, url);
+    if (fromMeta) return fromMeta;
+    const originRaw = String(reg.origin || '').trim().toLowerCase();
+    if (originRaw === 'agente' || originRaw === 'sistema') return 'skipped';
+    return '';
+  });
   return aligned.some(Boolean) ? aligned : undefined;
 }
 
@@ -1918,13 +1929,16 @@ function buildTicketDtoCore(
             ? extractEmailReplyContent(reg.mensagemPublica)
             : reg.mensagemPublica,
         );
+        const isSystemBubble = String(reg.origin || '').trim().toLowerCase() === 'sistema'
+          || String(reg.autor || '').trim().toLowerCase() === 'e-mail padrão'
+          || Boolean(meta.emailPadraoId);
         messages.push({
           id: `${index}-pub`,
           text: publicText,
-          sender: senderFromOrigin(origin),
+          sender: isSystemBubble ? 'system' : senderFromOrigin(origin),
           origin,
           author: regAutor || undefined,
-          type: 'public',
+          type: isSystemBubble ? 'system' : 'public',
           time: reg.data,
           registroIndex: index,
           attachments: filterRealAttachmentUrls(reg.anexosMensagemPublica),
@@ -2128,7 +2142,8 @@ export function currentResponsavel(chamado: IChamadoN1): string {
 
 export function buildResponsavelCandidates(
   authUser: AuthPayload,
-  dbUser?: { name?: string; email?: string } | null
+  dbUser?: { name?: string; email?: string } | null,
+  colaboradorNome?: string,
 ): string[] {
   const values: string[] = [];
   const push = (raw?: string) => {
@@ -2143,6 +2158,7 @@ export function buildResponsavelCandidates(
   push(dbUser?.name);
   push(dbUser?.email);
   push(emailLocalPart(dbUser?.email));
+  push(colaboradorNome);
 
   return [...new Set(values.map((value) => value.toLowerCase()).filter(Boolean))];
 }
@@ -2346,6 +2362,7 @@ export function workflowActorQueueFilter(
 
 export function buildChamadoQueryFilter(status: string, queue?: string, responsavelCandidates?: string[], extraFilter?: Record<string, unknown>) {
   const filters: Record<string, unknown>[] = [lastStatusFilter(status)];
+  const isCeModuleQueue = queue === 'procon' || queue === 'consumidor-gov';
 
   if (queue === 'procon') {
     filters.push(proconChannelMongoFilter());
@@ -2353,12 +2370,17 @@ export function buildChamadoQueryFilter(status: string, queue?: string, responsa
     filters.push(consumidorGovChannelMongoFilter());
   }
 
+  // Módulo Tickets: CE nunca entra (ver_todos, meus-chamados, funcao-atribuido, default).
+  // Filas procon/consumidor-gov são dos CRMs Especiais — mantêm inclusão do órgão.
+  if (!isCeModuleQueue) {
+    filters.push(excludeEspeciaisChannelsMongoFilter());
+  }
+
   if (queue === 'meus-chamados' && responsavelCandidates?.length && status !== 'resolvido') {
     const responsavelFilter = status === 'novo'
       ? meusChamadosNovosResponsavelFilter(responsavelCandidates)
       : meusChamadosAgentScopeFilter(responsavelCandidates);
     filters.push(responsavelFilter);
-    filters.push(excludeEspeciaisChannelsMongoFilter());
   }
 
   if (queue === 'funcao-atribuido' && extraFilter) {

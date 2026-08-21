@@ -1,6 +1,6 @@
 /**
- * workflowApprovalData v1.7.0 — fila por time sem exigir agentCanDecide na visibilidade
- * VERSION: v1.7.0 | DATE: 2026-08-21
+ * workflowApprovalData v1.8.0 — fila WK inclui por atribuído do passo (sem exigir template)
+ * VERSION: v1.8.0 | DATE: 2026-08-21
  */
 import { getAllCockpitTickets } from '../ticketsStorage';
 import { findCadastralRequestByTicketId } from '../cadastral/cadastralRequestStore';
@@ -978,9 +978,9 @@ function collectTeamWorkflowEntries(teamId) {
     const { ticket } = entry;
     if (isWorkflowStatusOffApprovalConsole(ticket)) return;
     if (!isTicketWorkflowActive(ticket)) return;
+    // Inclusão: atribuído do passo (funcao:<time>) OU match de time — atribuído basta
     const atribuidoNoTime = ticketAtribuidoMatchesWorkflowQueue(ticket, teamId);
-    const teamMatch = ticketMatchesWorkflowTeam(ticket, teamId);
-    if (!atribuidoNoTime && !teamMatch) return;
+    if (!atribuidoNoTime && !ticketMatchesWorkflowTeam(ticket, teamId)) return;
     const progress = getWorkflowProgress(ticket);
     items.push({ entry, progress, queueItem: buildQueueItem(entry, teamId) });
   });

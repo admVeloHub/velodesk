@@ -1,14 +1,35 @@
 /**
- * RaClassificacaoFields — reclassifica rapidamente Produto e Motivo do ticket RA
+ * RaClassificacaoFields v1.1.0 — produto da árvore + motivo do órgão (API)
+ * VERSION: v1.1.0 | DATE: 2026-08-21
  */
-import React, { useState } from 'react';
-import { reclamacoesApi } from '../../../api/client';
+import React, { useEffect, useState } from 'react';
+import { reclamacoesApi, tabulationApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
-import { RA_CLASSIFICACAO_PRODUTOS, RA_MOTIVOS } from '../../../services/especiais/reclameAquiData';
+import { useTabulation } from '../../../context/TabulationContext';
+import { TABULACAO_OPCOES_CATEGORIAS } from '../../../services/tabulationConfig';
+import { RA_MOTIVOS } from '../../../services/especiais/reclameAquiData';
 
 export default function RaClassificacaoFields({ raItem, onSaved }) {
   const { showNotification } = useNotifications();
+  const { getProdutoNames } = useTabulation();
   const [saving, setSaving] = useState(false);
+  const [motivos, setMotivos] = useState(RA_MOTIVOS);
+  const produtoOptions = getProdutoNames();
+
+  useEffect(() => {
+    let cancelled = false;
+    tabulationApi.getOpcoes(TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI, false)
+      .then((doc) => {
+        if (cancelled) return;
+        const list = (doc?.opcoes || [])
+          .filter((item) => item.ativo !== false)
+          .map((item) => item.valor)
+          .filter(Boolean);
+        if (list.length) setMotivos(list);
+      })
+      .catch(() => { /* fallback RA_MOTIVOS */ });
+    return () => { cancelled = true; };
+  }, []);
 
   if (!raItem) return null;
 
@@ -27,6 +48,9 @@ export default function RaClassificacaoFields({ raItem, onSaved }) {
     }
   };
 
+  const produtos = produtoOptions.length ? produtoOptions : [];
+  const motivoList = motivos.length ? motivos : RA_MOTIVOS;
+
   return (
     <section className="ra-ticket__side-card">
       <label htmlFor="ra-classificacao-produto">Produto</label>
@@ -38,9 +62,12 @@ export default function RaClassificacaoFields({ raItem, onSaved }) {
         disabled={saving}
       >
         <option value="">Selecionar</option>
-        {RA_CLASSIFICACAO_PRODUTOS.map((produto) => (
+        {produtos.map((produto) => (
           <option key={produto} value={produto}>{produto}</option>
         ))}
+        {raItem.produto && !produtos.includes(raItem.produto) ? (
+          <option value={raItem.produto}>{raItem.produto}</option>
+        ) : null}
       </select>
 
       <label htmlFor="ra-classificacao-motivo">Motivo</label>
@@ -52,9 +79,12 @@ export default function RaClassificacaoFields({ raItem, onSaved }) {
         disabled={saving}
       >
         <option value="">Selecionar</option>
-        {RA_MOTIVOS.map((motivo) => (
+        {motivoList.map((motivo) => (
           <option key={motivo} value={motivo}>{motivo}</option>
         ))}
+        {raItem.motivo && !motivoList.includes(raItem.motivo) ? (
+          <option value={raItem.motivo}>{raItem.motivo}</option>
+        ) : null}
       </select>
     </section>
   );

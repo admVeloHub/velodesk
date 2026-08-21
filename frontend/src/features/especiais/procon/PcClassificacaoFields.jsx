@@ -1,14 +1,35 @@
 /**
- * PcClassificacaoFields — reclassifica rapidamente Produto e Motivo do ticket Procon
+ * PcClassificacaoFields v1.1.0 — produto da árvore + motivo do órgão (API)
+ * VERSION: v1.1.0 | DATE: 2026-08-21
  */
-import React, { useState } from 'react';
-import { reclamacoesApi } from '../../../api/client';
+import React, { useEffect, useState } from 'react';
+import { reclamacoesApi, tabulationApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
-import { PC_CLASSIFICACAO_PRODUTOS, PC_MOTIVOS } from '../../../services/especiais/proconData';
+import { useTabulation } from '../../../context/TabulationContext';
+import { TABULACAO_OPCOES_CATEGORIAS } from '../../../services/tabulationConfig';
+import { PC_MOTIVOS } from '../../../services/especiais/proconData';
 
 export default function PcClassificacaoFields({ pcItem, onSaved }) {
   const { showNotification } = useNotifications();
+  const { getProdutoNames } = useTabulation();
   const [saving, setSaving] = useState(false);
+  const [motivos, setMotivos] = useState(PC_MOTIVOS);
+  const produtoOptions = getProdutoNames();
+
+  useEffect(() => {
+    let cancelled = false;
+    tabulationApi.getOpcoes(TABULACAO_OPCOES_CATEGORIAS.MOTIVO_PROCON, false)
+      .then((doc) => {
+        if (cancelled) return;
+        const list = (doc?.opcoes || [])
+          .filter((item) => item.ativo !== false)
+          .map((item) => item.valor)
+          .filter(Boolean);
+        if (list.length) setMotivos(list);
+      })
+      .catch(() => { /* fallback PC_MOTIVOS */ });
+    return () => { cancelled = true; };
+  }, []);
 
   if (!pcItem) return null;
 
@@ -27,6 +48,9 @@ export default function PcClassificacaoFields({ pcItem, onSaved }) {
     }
   };
 
+  const produtos = produtoOptions.length ? produtoOptions : [];
+  const motivoList = motivos.length ? motivos : PC_MOTIVOS;
+
   return (
     <section className="ra-ticket__side-card">
       <label htmlFor="pc-classificacao-produto">Produto</label>
@@ -38,9 +62,12 @@ export default function PcClassificacaoFields({ pcItem, onSaved }) {
         disabled={saving}
       >
         <option value="">Selecionar</option>
-        {PC_CLASSIFICACAO_PRODUTOS.map((produto) => (
+        {produtos.map((produto) => (
           <option key={produto} value={produto}>{produto}</option>
         ))}
+        {pcItem.produto && !produtos.includes(pcItem.produto) ? (
+          <option value={pcItem.produto}>{pcItem.produto}</option>
+        ) : null}
       </select>
 
       <label htmlFor="pc-classificacao-motivo">Motivo</label>
@@ -52,9 +79,12 @@ export default function PcClassificacaoFields({ pcItem, onSaved }) {
         disabled={saving}
       >
         <option value="">Selecionar</option>
-        {PC_MOTIVOS.map((motivo) => (
+        {motivoList.map((motivo) => (
           <option key={motivo} value={motivo}>{motivo}</option>
         ))}
+        {pcItem.motivo && !motivoList.includes(pcItem.motivo) ? (
+          <option value={pcItem.motivo}>{pcItem.motivo}</option>
+        ) : null}
       </select>
     </section>
   );

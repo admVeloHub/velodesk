@@ -1,6 +1,6 @@
 /**
- * responsavelSegmentation v1.6.3 — Meus Tickets: match exato responsável/atribuído
- * VERSION: v1.6.3 | DATE: 2026-08-11
+ * responsavelSegmentation v1.7.0 — ver_todos só visualização; sem bypass por slug gestão/supervisor
+ * VERSION: v1.7.0 | DATE: 2026-08-21
  */
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 import { normalizeProfileId } from '../../config/profiles';
@@ -59,14 +59,10 @@ export function isGestaoDeskProfile(profileId = readDeskProfileId()) {
   return normalizeProfileId(profileId) === 'gestao';
 }
 
-/** Gestão / supervisor / ver_todos: todas as categorias (Novos, Em andamento, Pendente, Resolvidos). */
+/** ver_todos: todas as categorias na sidebar (somente visualização — atuação exige override de atuar_*). */
 export function shouldViewAllDeskTickets(profileId = readDeskProfileId()) {
   const perm = readCachedPermissions();
-  if (perm && hasPermission(perm.permissoes, 'tickets', 'ver_todos')) return true;
-  if (perm && (perm.funcaoSlug === 'gestao' || (perm.funcoes || []).includes('gestao'))) return true;
-  if (isGestaoDeskProfile(profileId)) return true;
-  if (readAuthDeskRole() === 'supervisor') return true;
-  return false;
+  return Boolean(perm && hasPermission(perm.permissoes, 'tickets', 'ver_todos'));
 }
 
 export function shouldUseMeusChamadosFila(profileId = readDeskProfileId()) {

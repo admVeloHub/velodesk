@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.40.0 | DATE: 2026-08-21
- * — Enviar como: gates visíveis de tabulação e revisão de texto
+ * VERSION: v3.44.0 | DATE: 2026-08-21
+ * — WF start: POST direto; responsável preservado; sync WK em background
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -68,15 +68,16 @@ import {
   discardDraftTicketFromCache,
 } from '../../services/ticketsCache';
 import { apiTicketToCockpit, cockpitTicketToApi } from '../../api/adapters/ticketAdapter';
-import { lookupClient } from '../../services/clientDb';
+import { lookupClient, upsertClientFromContact } from '../../services/clientDb';
 import { clientsApi, colaboradoresApi, ticketsApi } from '../../api/client';
-import { persistClienteContact, applyClienteDocToTicket, ticketNeedsContactHydration, ticketContactIsComplete } from '../../api/adapters/clienteAdapter';
+import { persistClienteContact, applyClienteDocToTicket, ticketNeedsContactHydration, ticketContactIsComplete, mapClienteDocToContact } from '../../api/adapters/clienteAdapter';
 import { useTickets } from '../../context/TicketsContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissionsOptional } from '../../context/PermissionContext';
 import {
   canAdvanceWorkflowStep,
+  canActOnTicket,
   canInterruptWorkflow,
   canSendInternalNoteOnTicket,
   canSendPublicMessageOnTicket,
@@ -105,10 +106,9 @@ import DeskInternalNotesPanel from './components/DeskInternalNotesPanel';
 import DeskEventsPanel from './components/DeskEventsPanel';
 import DeskConsultasPanel from './components/DeskConsultasPanel';
 import DeskRightPanel from './components/DeskRightPanel';
-import { applyCascadeFieldChange, applyTabulationSuggestion, buildDefaultRightFields, getMotivos, hasApplyableTabulation, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel, validateTabulationForSendStatus } from '../../services/tabulationConfig';
+import { applyCascadeFieldChange, applyTabulationSuggestion, buildDefaultRightFields, getMotivos, hasApplyableTabulation, isCasosEspeciaisCanal, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel, validateTabulationForSendStatus } from '../../services/tabulationConfig';
 import { useTabulation } from '../../context/TabulationContext';
 import { useWorkflowConfig } from '../../context/WorkflowConfigContext';
-import { createSpellContext, loadSpellEngine, scanText } from '../../services/spellcheck/spellEngine';
 import { htmlToPlainText, normalizeComposePlain } from '../../services/desk/composeRichEditor';
 import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
 import DeskAiRevisionModal from './components/DeskAiRevisionModal';
@@ -119,7 +119,7 @@ import { resolveRequisicaoCamposVisiveis } from '../../services/workflow/workflo
 import { getAutoCloseOnSave } from '../../services/desk/agentDeskPreferences';
 import { parseDeskQueueFromUrl, parseDeskMyTicketsSectionFromUrl, COMPOSE_AI_REVIEW_REQUIRED, getSendStatusOptions } from '../../services/desk/constants';
 import { shouldViewAllDeskTickets } from '../../services/desk/responsavelSegmentation';
-import { resolveSendCommitMenuState } from '../../services/desk/sendCommitGates';
+import { resolveSendCommitMenuState, isComposePublicReviewSatisfied } from '../../services/desk/sendCommitGates';
 import { useProfile } from '../../context/ProfileContext';
 import ProdutosForwardPopover from './components/ProdutosForwardPopover';
 import WorkflowComunicacaoModal from '../workflow/components/WorkflowComunicacaoModal';
@@ -242,7 +242,6 @@ function buildDefaultSessionFromTicket(ticket, config) {
     sendStatus: 'em-andamento',
     rightFields: buildDefaultRightFields(config, ticket, getAgentName),
     waChatOpen: false,
-    spellIgnoredWords: [],
   };
 }
 
@@ -294,6 +293,7 @@ export default function DeskV2Root() {
   waChatOpenRef.current = waChatOpen;
   const [historyOpen, setHistoryOpen] = useState(false);
   const contactHydrateRef = useRef(new Set());
+  const [hydratedClientByCpf, setHydratedClientByCpf] = useState({});
   const [mergeInProgress, setMergeInProgress] = useState(false);
   const [ticketCacheEpoch, setTicketCacheEpoch] = useState(0);
   const bumpTicketCacheView = useCallback(() => {
@@ -301,8 +301,6 @@ export default function DeskV2Root() {
   }, []);
   const [aiRevisionOpen, setAiRevisionOpen] = useState(false);
   const [aiRevisionSubmitting, setAiRevisionSubmitting] = useState(false);
-  const [composeSpellErrors, setComposeSpellErrors] = useState([]);
-  const [spellIgnoredWords, setSpellIgnoredWords] = useState(() => new Set());
   const [queueStatuses, setQueueStatuses] = useState(() => getAllQueueStatuses());
   const suppressAutoSelectRef = useRef(true);
   const pendingAdvanceTicketIdRef = useRef(null);
@@ -443,9 +441,15 @@ export default function DeskV2Root() {
   const ticket = entry?.ticket;
   const ticketReadOnly = isTicketReadOnly(ticket);
   const ticketStatus = getTicketStatusBadgeMeta(ticket, entry?.queueId || 'em-andamento');
-  const client = ticket
-    ? lookupClient(getTicketCpfDigits(ticket) || ticket.lateralForm?.cpf || ticket.clientCPF)
-    : null;
+  const ticketCpfDigits = ticket
+    ? (getTicketCpfDigits(ticket) || normalizeCpf(ticket.lateralForm?.cpf || ticket.clientCPF))
+    : '';
+  const client = useMemo(() => {
+    if (!ticket) return null;
+    const fromHydrate = ticketCpfDigits ? hydratedClientByCpf[ticketCpfDigits] : null;
+    if (fromHydrate) return fromHydrate;
+    return lookupClient(ticketCpfDigits);
+  }, [ticket, ticketCpfDigits, hydratedClientByCpf]);
 
   const persistTabSession = useCallback((ticketId) => {
     if (!ticketId) return;
@@ -459,9 +463,8 @@ export default function DeskV2Root() {
       sendStatus,
       rightFields,
       waChatOpen,
-      spellIgnoredWords: Array.from(spellIgnoredWords),
     };
-  }, [mainTab, composeMode, composeText, internalText, composeAttachments, composeReviewedPlain, sendStatus, rightFields, waChatOpen, spellIgnoredWords]);
+  }, [mainTab, composeMode, composeText, internalText, composeAttachments, composeReviewedPlain, sendStatus, rightFields, waChatOpen]);
 
   const persistComposeDraft = useCallback((patch) => {
     if (!activeTabId) return;
@@ -530,15 +533,8 @@ export default function DeskV2Root() {
     setSendStatus(session.sendStatus ?? defaults.sendStatus);
     setRightFields(nextRightFields);
     setWaChatOpen(session.waChatOpen ?? defaults.waChatOpen);
-    setSpellIgnoredWords(new Set(session.spellIgnoredWords ?? defaults.spellIgnoredWords ?? []));
-    setComposeSpellErrors([]);
   }, [config]);
 
-  const sendDisabledBySpell = composeMode === 'public' && composeSpellErrors.length > 0;
-  const composeMessagePlain = useMemo(
-    () => htmlToPlainText(String(composeText || '').trim()).trim(),
-    [composeText],
-  );
   const mergedRightFieldsForSend = useMemo(
     () => (ticket ? mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName) : rightFields),
     [rightFields, ticket],
@@ -551,23 +547,6 @@ export default function DeskV2Root() {
     () => sendStatusOptionsForMenu.some((opt) => opt.id === 'cancelado'),
     [sendStatusOptionsForMenu],
   );
-  const sendCommitMenuState = useMemo(() => resolveSendCommitMenuState(
-    sendStatusOptionsForMenu,
-    hasCanceladoSendOption,
-    {
-      rightFields: mergedRightFieldsForSend,
-      config,
-      messageText: composeMessagePlain,
-      composeReviewedPlain,
-    },
-  ), [
-    sendStatusOptionsForMenu,
-    hasCanceladoSendOption,
-    mergedRightFieldsForSend,
-    config,
-    composeMessagePlain,
-    composeReviewedPlain,
-  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -576,10 +555,6 @@ export default function DeskV2Root() {
     });
     return () => { cancelled = true; };
   }, [user?.email]);
-
-  useEffect(() => {
-    loadSpellEngine().catch(() => {});
-  }, []);
 
   useEffect(() => {
     const openCreate = () => setCreateOpen(true);
@@ -637,7 +612,7 @@ export default function DeskV2Root() {
     };
   }, [activeTabId, patchTicket, showNotification]);
 
-  // Enriquecimento silencioso: só se faltar email ou telefone; Mongo local primeiro, API depois se ainda incompleto
+  // Hidratação só no cadastro (b2c_cadastros) + painel superior — nunca PUT/claim no ticket
   useEffect(() => {
     if (!ticket) return undefined;
 
@@ -656,27 +631,40 @@ export default function DeskV2Root() {
     let cancelled = false;
     contactHydrateRef.current.add(dedupeKey);
 
-    const applyDoc = async (clienteDoc) => {
+    const applyCadastroToPanel = (clienteDoc) => {
       if (cancelled || !clienteDoc) return null;
-      const updated = await updateTicketInCache(ticketId, (t) => {
-        applyClienteDocToTicket(t, clienteDoc);
-        return t;
-      });
-      if (updated) patchTicket(ticketId, updated);
-      return updated;
+      const contact = mapClienteDocToContact(clienteDoc);
+      if (!contact) return null;
+      const panelClient = upsertClientFromContact(contact);
+      setHydratedClientByCpf((prev) => ({
+        ...prev,
+        [cpf]: panelClient || contact,
+      }));
+      return contact;
+    };
+
+    const contactLooksComplete = (contact) => {
+      if (!contact) return false;
+      const hasEmail = Boolean(
+        contact.email || contact.replyEmail || (contact.emails && contact.emails.length),
+      );
+      const hasPhone = Boolean(
+        contact.phone || contact.whatsappPhone || (contact.phones && contact.phones.length),
+      );
+      return hasEmail && hasPhone;
     };
 
     (async () => {
       try {
         const localDoc = await clientsApi.getByCpf(cpf, { hydrateFromApi: 0 });
-        const afterLocal = await applyDoc(localDoc);
+        const afterLocal = applyCadastroToPanel(localDoc);
         if (cancelled) return;
-        if (ticketContactIsComplete(afterLocal || ticket)) return;
+        if (contactLooksComplete(afterLocal) || ticketContactIsComplete(ticket)) return;
 
         const enrichedDoc = await clientsApi.getByCpf(cpf, { hydrateFromApi: 1 });
-        await applyDoc(enrichedDoc);
+        applyCadastroToPanel(enrichedDoc);
       } catch {
-        /* 404 ou API indisponível — painel permanece como está */
+        /* 404 ou API indisponível — painel permanece como está; ticket intacto */
       }
     })();
 
@@ -693,7 +681,6 @@ export default function DeskV2Root() {
     ticket?.lateralForm?.cpf,
     ticket?.lateralForm?.clienteEmail,
     ticket?.lateralForm?.clienteTelefone,
-    patchTicket,
   ]);
 
   // Ticket aberto: recarrega o detalhe em ciclo curto para trazer resposta do cliente sem ação do agente
@@ -909,6 +896,11 @@ export default function DeskV2Root() {
           return prev;
         }
         return defaults;
+      }
+      const canal = prev.canal || lf.canal || entry.ticket?.channel || '';
+      // CE: motivo vem da lista do órgão — não resetar se não estiver na árvore POP
+      if (isCasosEspeciaisCanal(canal)) {
+        return mergeRightFieldsWithDefaults(prev, entry.ticket, getAgentName);
       }
       if (prev.produto === lf.produto && getMotivos(config, prev.produto).includes(prev.motivo || '')) {
         return mergeRightFieldsWithDefaults(prev, entry.ticket, getAgentName);
@@ -1144,14 +1136,6 @@ export default function DeskV2Root() {
     showNotification(getDeskSearchSuccessMessage(q, results.length), 'success');
   };
 
-  const handleIgnoreSpellWord = useCallback((word) => {
-    setSpellIgnoredWords((prev) => new Set([...prev, word]));
-  }, []);
-
-  const handleFlaggedErrorsChange = useCallback((errors) => {
-    setComposeSpellErrors(errors || []);
-  }, []);
-
   const handleQueueCollapse = (collapsed) => {
     localStorage.setItem('velodeskCrmQueueCollapsed', collapsed ? '1' : '0');
     setQueueCollapsed(collapsed);
@@ -1227,39 +1211,20 @@ export default function DeskV2Root() {
       if (
         COMPOSE_AI_REVIEW_REQUIRED
         && !canceladoBypass
-        && normalizeComposePlain(messageText) !== composeReviewedPlain
+        && !isComposePublicReviewSatisfied({
+          composeHtml: messageHtml,
+          composeReviewedPlain,
+          iaRespostaSugerida: ticketAi.respostaSugerida,
+          ticket,
+          agentName: getAgentName(),
+        })
       ) {
         setComposeMode('public');
         showNotification('Use o Revisor de Texto antes de enviar a resposta pública.', 'warning');
         commitInProgressRef.current = false;
         return null;
       }
-      if (composeSpellErrors.length > 0) {
-        showNotification(
-          `Corrija ${composeSpellErrors.length} erro${composeSpellErrors.length > 1 ? 's' : ''} ortográfico${composeSpellErrors.length > 1 ? 's' : ''} antes de enviar.`,
-          'warning',
-        );
-        commitInProgressRef.current = false;
-        return null;
-      }
-      try {
-        const spellCtx = createSpellContext(config, spellIgnoredWords);
-        const errors = await scanText(messageText, spellCtx.whitelist, spellCtx.ignoredWords);
-        if (errors.length > 0) {
-          setComposeSpellErrors(errors);
-          setComposeMode('public');
-          showNotification(
-            `Corrija ${errors.length} erro${errors.length > 1 ? 's' : ''} ortográfico${errors.length > 1 ? 's' : ''} antes de enviar.`,
-            'warning',
-          );
-          commitInProgressRef.current = false;
-          return null;
-        }
-      } catch {
-        /* LT indisponível — modo degradado: não bloqueia envio */
-      }
     }
-    setComposeSpellErrors([]);
 
     deskLog.action('commit → início', {
       ticketId: ticket.id,
@@ -1695,8 +1660,8 @@ export default function DeskV2Root() {
 
     const perm = permsCtx?.permissions;
     if (
-      !hasPermission(perm?.permissoes, 'tickets', 'ver_todos')
-      && !hasPermission(perm?.permissoes, 'tickets', 'atuar_responsavel')
+      !hasPermission(perm?.permissoes, 'tickets', 'atuar_responsavel')
+      && !hasPermission(perm?.permissoes, 'tickets', 'atuar_sempre')
     ) {
       showNotification('Sem permissão para assumir tickets.', 'warning');
       return;
@@ -1719,7 +1684,7 @@ export default function DeskV2Root() {
     if (
       existingResponsavel
       && !ticketAssignedToCurrentAgent(ticket)
-      && !hasPermission(perm?.permissoes, 'tickets', 'ver_todos')
+      && !hasPermission(perm?.permissoes, 'tickets', 'atuar_sempre')
     ) {
       showNotification('Este ticket já possui responsável atribuído.', 'warning');
       return;
@@ -1784,8 +1749,8 @@ export default function DeskV2Root() {
     if (!ticket || ticketReadOnly || assumingTicket) return false;
     const perm = permsCtx?.permissions;
     if (
-      !hasPermission(perm?.permissoes, 'tickets', 'ver_todos')
-      && !hasPermission(perm?.permissoes, 'tickets', 'atuar_responsavel')
+      !hasPermission(perm?.permissoes, 'tickets', 'atuar_responsavel')
+      && !hasPermission(perm?.permissoes, 'tickets', 'atuar_sempre')
     ) {
       return false;
     }
@@ -1794,7 +1759,7 @@ export default function DeskV2Root() {
     if (ticketAssignedToCurrentAgent(preview)) return false;
 
     const existingResponsavel = readTicketResponsavel(ticket);
-    if (existingResponsavel && !hasPermission(perm?.permissoes, 'tickets', 'ver_todos')) {
+    if (existingResponsavel && !hasPermission(perm?.permissoes, 'tickets', 'atuar_sempre')) {
       return false;
     }
 
@@ -1943,6 +1908,29 @@ export default function DeskV2Root() {
 
   const ticketAi = useTicketAiSuggestions(ticket, rightFields, convMsgs, internalText, ticketCacheEpoch);
 
+  const sendCommitMenuState = useMemo(() => resolveSendCommitMenuState(
+    sendStatusOptionsForMenu,
+    hasCanceladoSendOption,
+    {
+      rightFields: mergedRightFieldsForSend,
+      config,
+      composeHtml: composeText,
+      composeReviewedPlain,
+      iaRespostaSugerida: ticketAi.respostaSugerida,
+      ticket,
+      agentName: getAgentName(),
+    },
+  ), [
+    sendStatusOptionsForMenu,
+    hasCanceladoSendOption,
+    mergedRightFieldsForSend,
+    config,
+    composeText,
+    composeReviewedPlain,
+    ticketAi.respostaSugerida,
+    ticket,
+  ]);
+
   const handleApplyTabulation = useCallback(async () => {
     const merged = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
 
@@ -2073,51 +2061,64 @@ export default function DeskV2Root() {
     }
 
     const fields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
+    // Responsável permanece o dono — WF só muda atribuído no backend
+    const preservedResponsavel = sanitizeResponsavel(ticket.lateralForm?.responsavel)
+      || sanitizeResponsavel(ticket.responsibleAgent)
+      || sanitizeResponsavel(fields.responsavel);
+    if (preservedResponsavel) fields.responsavel = preservedResponsavel;
+
     setStartingWorkflow(true);
     try {
       const ticketId = ticket.id || ticket._id;
-      const entry = findTicketEntry(ticketId);
 
-      const tabOnly = { ...(entry?.ticket || ticket) };
+      // Persiste tabulação (sem pending WF) para o gatilho casar no backend
+      const tabOnly = { ...(findTicketEntry(ticketId)?.ticket || ticket) };
       applyRightFieldsToTicket(tabOnly, fields);
       if (tabOnly.lateralForm?.workflow) {
         const nextLf = { ...tabOnly.lateralForm };
         delete nextLf.workflow;
         tabOnly.lateralForm = nextLf;
       }
+      delete tabOnly._pendingWorkflowStart;
+      if (tabOnly.workflow?.pendingPersist) {
+        const wf = { ...tabOnly.workflow };
+        delete wf.pendingPersist;
+        delete wf.active;
+        tabOnly.workflow = Object.keys(wf).length ? wf : undefined;
+      }
       await updateTicketInCache(ticketId, () => tabOnly);
 
-      const entryAfterTab = findTicketEntry(ticketId);
-      const base = { ...(entryAfterTab?.ticket || tabOnly) };
-      applyRightFieldsToTicket(base, fields);
-      if (solicitacaoProdutos) {
-        base.lateralForm = {
-          ...(base.lateralForm || {}),
-          solicitacaoProdutos,
+      // Um persist de WF: POST workflow/start
+      const startBody = {
+        definicaoSlug: template.id,
+        ...(requisicaoValores && Object.keys(requisicaoValores).length
+          ? { requisicao: { valores: requisicaoValores } }
+          : {}),
+        ...(solicitacaoProdutos && Object.keys(solicitacaoProdutos).length
+          ? { solicitacaoProdutos }
+          : {}),
+      };
+      const updated = await ticketsApi.startWorkflow(ticketId, startBody);
+      const merged = normalizeTicketForDeskV2(apiTicketToCockpit(updated));
+      merged.listOnly = false;
+      merged._detailLoaded = true;
+      // Garante responsável local se a API não trouxe (não troca dono)
+      if (preservedResponsavel) {
+        merged.responsibleAgent = preservedResponsavel;
+        merged.lateralForm = {
+          ...(merged.lateralForm || {}),
+          responsavel: preservedResponsavel,
         };
       }
-      applyPendingWorkflowStartToTicket(base, template, requisicaoValores, getAgentName());
-      patchTicket(ticketId, base);
-
-      const flushResult = await flushPendingWorkflowOnSave(ticketId, base, {
-        ticketsApi,
-        apiTicketToCockpit,
-        patchTicket,
-        injectWorkflowSystemMessage,
-      });
-      if (flushResult.error) {
-        showNotification(
-          flushResult.error?.response?.data?.message
-            || 'Não foi possível iniciar o workflow.',
-          'warning',
-        );
-        return false;
-      }
+      injectWorkflowSystemMessage(merged, { title: template.title || 'Workflow' });
+      patchTicket(ticketId, merged);
+      bumpTicketCacheView();
 
       showNotification(`Workflow "${template.title}" iniciado.`, 'success');
       pendingWorkflowTemplateRef.current = null;
       setWorkflowStartTemplate(null);
-      await syncTicketViews();
+      // Lista WK já vê active no cache — sync em background sem bloquear a UI
+      void syncTicketViews();
       return true;
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Não foi possível iniciar o workflow.';
@@ -2135,6 +2136,7 @@ export default function DeskV2Root() {
     workflowStartTemplate,
     patchTicket,
     syncTicketViews,
+    bumpTicketCacheView,
   ]);
 
   const handleOpenComunicacaoModal = useCallback(async () => {
@@ -2177,7 +2179,7 @@ export default function DeskV2Root() {
       return;
     }
 
-    if (!canSendPublicMessageOnTicket(ticket, permsCtx?.permissions)) {
+    if (!canActOnTicket(ticket, permsCtx?.permissions)) {
       showNotification('Sem permissão para iniciar workflow neste ticket.', 'warning');
       return;
     }
@@ -2231,9 +2233,10 @@ export default function DeskV2Root() {
   const deskPermissions = permsCtx?.permissions;
   const canPublicCompose = ticket ? canSendPublicMessageOnTicket(ticket, deskPermissions) : false;
   const canInternalCompose = ticket ? canSendInternalNoteOnTicket(ticket, deskPermissions) : false;
-  const canInitiateWorkflow = canPublicCompose;
+  // Iniciar WF não reutiliza gate do compose público (revisor/canPublicCompose)
+  const canInitiateWorkflow = ticket ? canActOnTicket(ticket, deskPermissions) : false;
   const workflowPublicLocked = ticketReadOnly || !canPublicCompose;
-  const tabulationReadonly = ticketReadOnly || !canPublicCompose;
+  const tabulationReadonly = ticketReadOnly || !canActOnTicket(ticket, deskPermissions);
 
   const canAdvanceWorkflow = (() => {
     if (ticket?.workflow?.pendingPersist) return false;
@@ -2583,9 +2586,6 @@ export default function DeskV2Root() {
                         onComposeTextChange={handleComposeTextChange}
                         onComposeReviewed={handleComposeReviewed}
                         onInternalTextChange={handleInternalTextChange}
-                        spellIgnoredWords={spellIgnoredWords}
-                        onIgnoreSpellWord={handleIgnoreSpellWord}
-                        onFlaggedErrorsChange={handleFlaggedErrorsChange}
                         workflowLocked={workflowPublicLocked}
                         internalComposeLocked={!canInternalCompose || ticketReadOnly}
                         workflowTeamLabel={workflowProgress?.awaitingTeamLabel}
@@ -2645,8 +2645,7 @@ export default function DeskV2Root() {
           onOpenChat={handleOpenChat}
           onCloseChat={() => setWaChatOpen(false)}
           sendDisabled={
-            sendDisabledBySpell
-            || ticketReadOnly
+            ticketReadOnly
             || (composeMode === 'public' ? !canPublicCompose : !canInternalCompose)
             || sendCommitMenuState.menuDisabled
           }

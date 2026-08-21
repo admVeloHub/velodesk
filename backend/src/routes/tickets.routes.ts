@@ -1,4 +1,4 @@
-/** tickets.routes v1.26.1 — GET /:id ignora rascunho draft-* sem CastError */
+/** tickets.routes v1.26.2 — isFirstContextNote ignora placeholders de e-mail vazio */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -31,6 +31,7 @@ import { publishTicketEvent } from '../services/realtime/ticketEventsBroadcast.s
 import { reconcileChamadoAttachmentScanStatuses } from '../services/attachmentScanReconcile.service';
 import { getCachedBoxes } from '../services/boxesCache.service';
 import { runInboundAgentPipeline, runInboundPostCreateHooks } from '../services/agents/inboundAgentPipeline.service';
+import { hasMeaningfulClientContextInChamado } from '../services/ticketIaAdapter.service';
 import {
   advanceWorkflowManual,
   advanceWorkflowWithDecision,
@@ -308,7 +309,7 @@ router.post('/:id/commit', authMiddleware, async (req, res: Response) => {
   /** Ticket sem 1ª msg do cliente e sem nota interna prévia: esta será a nota que dá contexto ao Agente 1. */
   const isFirstContextNote = !String(req.body.text ?? '').trim()
     && Boolean(String(req.body.internalText ?? req.body.anotacaoInterna ?? '').trim())
-    && !(chamado.registro || []).some((r) => r.origin === 'cliente' && String(r.mensagemPublica || '').trim())
+    && !hasMeaningfulClientContextInChamado(chamado)
     && !(chamado.registro || []).some((r) => String(r.anotacaoInterna || '').trim());
 
   try {
@@ -395,7 +396,7 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
   /** Ticket sem 1ª msg do cliente e sem nota interna prévia: esta será a nota que dá contexto ao Agente 1. */
   const isFirstContextNote = isInternalOnly
     && noteText.trim().length > 0
-    && !(chamado.registro || []).some((r) => r.origin === 'cliente' && String(r.mensagemPublica || '').trim())
+    && !hasMeaningfulClientContextInChamado(chamado)
     && !(chamado.registro || []).some((r) => String(r.anotacaoInterna || '').trim());
 
   applyManualResponsavelClaim(chamado, req.user);

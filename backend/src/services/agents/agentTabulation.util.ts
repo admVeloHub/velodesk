@@ -1,6 +1,6 @@
 /**
- * agentTabulation.util v1.4.0 — catálogo IA restrito aos POPs
- * VERSION: v1.4.0 | DATE: 2026-08-21
+ * agentTabulation.util v1.5.0 — resolve fuzzy produto/motivo/detalhe antes de validar
+ * VERSION: v1.5.0 | DATE: 2026-08-21
  */
 import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from '../tabulation.service';
 import type { TicketAiMessageInput, TicketAiTabulationResult, AuditoriaInput } from './agentTypes';
@@ -8,6 +8,7 @@ import { getAgentNomeOficial } from './agentRegistry';
 import { resolveClientFirstName, trimStr } from './openaiAgent.util';
 import {
   filterTabulationConfigToPopProducts,
+  getPopProductLabels,
   isPopAllowedProduct,
 } from '../processos/popTabulationWhitelist.service';
 
@@ -218,38 +219,125 @@ export function buildAuditoriaUserBlock(
   return parts.join('\n');
 }
 
+function normalizeMatchText(value: unknown): string {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+/** Espelha resolveOptionValue do frontend (tabulationConfig.js). */
+function resolveOptionValue(options: string[], rawValue: string): string {
+  const value = String(rawValue || '').trim();
+  if (!value || !options.length) return '';
+
+  if (options.includes(value)) return value;
+
+  const normalized = normalizeMatchText(value);
+  const exact = options.find((option) => normalizeMatchText(option) === normalized);
+  if (exact) return exact;
+
+  const partial = options.find((option) => {
+    const candidate = normalizeMatchText(option);
+    return candidate.includes(normalized) || normalized.includes(candidate);
+  });
+  if (partial) return partial;
+
+  const tokenMatch = options.find((option) => {
+    const candidate = normalizeMatchText(option);
+    const valueTokens = normalized.split(/\s+/).filter(Boolean);
+    return valueTokens.length > 0 && valueTokens.every((token) => candidate.includes(token));
+  });
+
+  return tokenMatch || '';
+}
+
+function resolveTipoValue(raw: string): string {
+  const tipo = trimStr(raw, 64);
+  if (!tipo) return 'Solicitação';
+  if (VALID_TIPOS.has(tipo)) return tipo;
+  const normalized = normalizeMatchText(tipo);
+  for (const valid of VALID_TIPOS) {
+    if (normalizeMatchText(valid) === normalized) return valid;
+  }
+  return 'Solicitação';
+}
+
+function activeProductNames(config: TabulationActiveDto): string[] {
+  return (config.produtos || [])
+    .filter((item) => item.ativo !== false)
+    .map((item) => item.produto)
+    .filter(Boolean);
+}
+
+function activeMotivoNames(config: TabulationActiveDto, produto: string): string[] {
+  const p = (config.produtos || []).find((item) => item.produto === produto && item.ativo !== false);
+  if (!p) return [];
+  return (p.motivos || [])
+    .filter((item) => item.ativo !== false)
+    .map((item) => item.motivo)
+    .filter(Boolean);
+}
+
+function activeDetalheNames(config: TabulationActiveDto, produto: string, motivo: string): string[] {
+  const p = (config.produtos || []).find((item) => item.produto === produto && item.ativo !== false);
+  const m = p?.motivos?.find((item) => item.motivo === motivo && item.ativo !== false);
+  if (!m) return [];
+  return (m.detalhes || [])
+    .filter((item) => item.ativo !== false)
+    .map((item) => item.detalhe)
+    .filter(Boolean);
+}
+
+/** Pontua tabulação para escolher a sugestão mais completa (auditoria vs atendimento). */
+export function tabulationCompletenessScore(tab: TicketAiTabulationResult): number {
+  let score = 0;
+  if (tab.tipo) score += 1;
+  if (tab.produto) score += 2;
+  if (tab.motivo) score += 3;
+  if (tab.detalhe) score += 1;
+  return score;
+}
+
 export function validateTabulationResult(
   raw: { tipo?: string; produto?: string; motivo?: string; detalhe?: string },
   config: TabulationActiveDto,
 ): TicketAiTabulationResult {
   const popConfig = filterTabulationConfigToPopProducts(config);
-  let tipo = trimStr(raw.tipo, 64);
+  const treeConfig = popConfig.produtos.length > 0 ? popConfig : config;
+
+  const tipo = resolveTipoValue(raw.tipo || '');
   let produto = trimStr(raw.produto, 200);
   let motivo = trimStr(raw.motivo, 200);
   let detalhe = trimStr(raw.detalhe, 200);
 
-  if (tipo && !VALID_TIPOS.has(tipo)) tipo = 'Solicitação';
-  if (!tipo) tipo = 'Solicitação';
-
-  if (produto && !isPopAllowedProduct(produto)) {
-    produto = '';
-    motivo = '';
-    detalhe = '';
+  if (produto) {
+    produto = resolveOptionValue(activeProductNames(treeConfig), produto);
+    if (!produto || !validateComboSoft(treeConfig, produto, '', '')) {
+      produto = '';
+      motivo = '';
+      detalhe = '';
+    } else if (getPopProductLabels().length > 0 && !isPopAllowedProduct(produto)) {
+      produto = '';
+      motivo = '';
+      detalhe = '';
+    }
   }
 
-  if (produto && popConfig.produtos.length > 0 && !validateComboSoft(popConfig, produto, '', '')) {
-    produto = '';
-    motivo = '';
-    detalhe = '';
+  if (produto && motivo) {
+    motivo = resolveOptionValue(activeMotivoNames(treeConfig, produto), motivo);
+    if (!motivo || !validateComboSoft(treeConfig, produto, motivo, '')) {
+      motivo = '';
+      detalhe = '';
+    }
   }
 
-  if (produto && motivo && !validateComboSoft(popConfig, produto, motivo, '')) {
-    motivo = '';
-    detalhe = '';
-  }
-
-  if (produto && motivo && detalhe && !validateComboSoft(popConfig, produto, motivo, detalhe)) {
-    detalhe = '';
+  if (produto && motivo && detalhe) {
+    detalhe = resolveOptionValue(activeDetalheNames(treeConfig, produto, motivo), detalhe);
+    if (detalhe && !validateComboSoft(treeConfig, produto, motivo, detalhe)) {
+      detalhe = '';
+    }
   }
 
   return { tipo, produto, motivo, detalhe, incompleta: !produto || !motivo };

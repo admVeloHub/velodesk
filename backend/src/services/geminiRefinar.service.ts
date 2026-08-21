@@ -1,6 +1,6 @@
 /**
- * geminiRefinar.service v1.1.1 — saída núcleo + strip abertura mecânica residual
- * VERSION: v1.1.1 | DATE: 2026-08-20
+ * geminiRefinar.service v1.2.0 — fallback somente para modelo não encontrado
+ * VERSION: v1.2.0 | DATE: 2026-08-21
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from '../config/env';
@@ -57,7 +57,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 function isRetryableGeminiError(err: unknown): boolean {
   const message = (err as Error)?.message || String(err);
-  return /404|not found|no longer available|429|quota|rate limit|503|unavailable|overloaded|500|internal|timeout após/i.test(message);
+  return /404|not found/i.test(message);
 }
 
 export function validateRascunhoInput(rascunho: unknown): { ok: true; text: string } | { ok: false; error: string } {

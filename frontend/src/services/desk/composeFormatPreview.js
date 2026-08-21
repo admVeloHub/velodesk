@@ -1,6 +1,6 @@
 /**
- * composeFormatPreview v1.0.0 — preview visual de formatação no compose (textarea + mirror)
- * VERSION: v1.0.0 | DATE: 2026-07-02
+ * composeFormatPreview v1.1.0 — conversão segura de formatação para exibição
+ * VERSION: v1.1.0 | DATE: 2026-08-21
  */
 
 function escapeHtml(text) {
@@ -32,40 +32,6 @@ export function composeMarkupToSafeHtml(raw) {
   });
 
   return text.replace(/\n/g, '<br />');
-}
-
-export function buildFormattedMirrorHtml(value, errors, activeErrorStartIndex) {
-  const text = String(value || '');
-  if (!text) return '\u00A0';
-
-  const sorted = [...(errors || [])].sort((a, b) => a.startIndex - b.startIndex);
-  if (!sorted.length) {
-    return composeMarkupToSafeHtml(text) || '\u00A0';
-  }
-
-  let html = '';
-  let cursor = 0;
-
-  for (const error of sorted) {
-    if (error.startIndex < cursor) continue;
-    if (error.startIndex > text.length) continue;
-
-    if (error.startIndex > cursor) {
-      html += composeMarkupToSafeHtml(text.slice(cursor, error.startIndex));
-    }
-
-    const end = Math.min(error.endIndex, text.length);
-    const chunk = composeMarkupToSafeHtml(text.slice(error.startIndex, end));
-    const activeClass = error.startIndex === activeErrorStartIndex ? ' spell-textarea-mark--active' : '';
-    html += `<mark class="spell-textarea-mark${activeClass}">${chunk || '\u00A0'}</mark>`;
-    cursor = end;
-  }
-
-  if (cursor < text.length) {
-    html += composeMarkupToSafeHtml(text.slice(cursor));
-  }
-
-  return html || '\u00A0';
 }
 
 export function composeTextHasFormatting(value) {

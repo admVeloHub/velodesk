@@ -1,6 +1,6 @@
 /**
- * useTicketAiSuggestions v1.12.5 — coalesce fetch por ticket; debounce usa hash mais recente
- * VERSION: v1.12.5 | DATE: 2026-08-20
+ * useTicketAiSuggestions v1.13.1 — IA interna só após Enviar Nota (nota persistida)
+ * VERSION: v1.13.1 | DATE: 2026-08-21
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ticketAiApi, agentsApi } from '../api/client';
@@ -9,8 +9,9 @@ import { getClientContactFields, getAgentName, isWhatsAppCustomerSessionOpen, bu
 import { findTicketEntry } from '../services/ticketsStorage';
 import {
   buildAgentInternalNotesFingerprint,
-  buildClientThreadFingerprint,
+  buildMeaningfulClientThreadFingerprint,
   isLastPublicInteractionFromAgent,
+  isPlaceholderClientMessageText,
 } from '../services/desk/ticketThreadSync';
 
 const PUBLIC_DEBOUNCE_MS = 2000;
@@ -73,14 +74,54 @@ function mapConvMsgsToApi(messages) {
     .filter((m) => m.text.length > 0);
 }
 
-function hasClientMessage(messages) {
-  return (messages || []).some((m) => m.type === 'client');
+function hasMeaningfulClientMessage(messages) {
+  return (messages || []).some(
+    (m) => m.type === 'client' && !isPlaceholderClientMessageText(m.text),
+  );
 }
 
 function noteDedupeKey(ts, text) {
   const plain = htmlToPlainText(String(text || '')).trim();
   if (!plain) return '';
   return `${ts || ''}:${plain}`;
+}
+
+function isAgentContextInternalNote(note) {
+  const author = String(note?.author || '').trim().toLowerCase();
+  if (author === 'sistema') return false;
+  const text = htmlToPlainText(String(note?.text || note?.message || '')).trim();
+  if (!text) return false;
+  if (/^novo ticket derivado de/i.test(text)) return false;
+  return true;
+}
+
+function collectPersistedInternalNotesPlain(ticket) {
+  const notes = [];
+  const seen = new Set();
+
+  (ticket?.internalNotes || []).filter(isAgentContextInternalNote).forEach((note) => {
+    const text = htmlToPlainText(String(note.text || note.message || '')).trim();
+    if (!text) return;
+    const key = noteDedupeKey(note.timestamp || note.time, text);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    notes.push({
+      ts: note.timestamp || note.time,
+      text,
+      author: String(note.author || '').trim() || 'Agente',
+    });
+  });
+
+  if (!notes.length) return '';
+
+  notes.sort((a, b) => new Date(a.ts || 0) - new Date(b.ts || 0));
+
+  return notes
+    .map((n, i) => {
+      const label = n.author ? `[${n.author}]` : `[Anotação ${i + 1}]`;
+      return `${i + 1}. ${label}: ${n.text}`;
+    })
+    .join('\n');
 }
 
 function collectInternalNotesPlain(ticket, currentDraftPlain) {
@@ -181,7 +222,8 @@ function mergePublicMessagesForAi(convMsgs, ticket) {
 }
 
 function buildPayload({ ticket, rightFields, convMsgs, internalNotesBlock, contextSource }) {
-  const apiMessages = mapConvMsgsToApi(mergePublicMessagesForAi(convMsgs, ticket));
+  const apiMessages = mapConvMsgsToApi(mergePublicMessagesForAi(convMsgs, ticket))
+    .filter((m) => m.role === 'agente' || !isPlaceholderClientMessageText(m.text));
   const canal = resolveCanal(ticket, rightFields);
   const nomeOperador = String(getAgentName() || '').trim();
   const contact = getClientContactFields(ticket);
@@ -205,7 +247,7 @@ function buildPayload({ ticket, rightFields, convMsgs, internalNotesBlock, conte
     internalNote,
   };
 
-  if (!apiMessages.length) {
+  if (!apiMessages.length || contextSource === 'internal') {
     return base;
   }
 
@@ -284,10 +326,14 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
 
   const internalPlain = useMemo(() => htmlToPlainText(internalText || '').trim(), [internalText]);
   const persistedInternalPlainLen = useMemo(() => (
-    (ticket?.internalNotes || []).reduce((sum, note) => (
+    (ticket?.internalNotes || []).filter(isAgentContextInternalNote).reduce((sum, note) => (
       sum + htmlToPlainText(String(note.text || note.message || '')).trim().length
     ), 0)
   ), [ticket, ticketRevision]);
+  const persistedInternalNotesBlock = useMemo(
+    () => collectPersistedInternalNotesPlain(ticket),
+    [ticket, ticketRevision],
+  );
   const internalNotesBlock = useMemo(
     () => collectInternalNotesPlain(ticket, internalPlain),
     [ticket, internalPlain, ticketRevision],
@@ -298,13 +344,13 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
    * sem histórico do canal), usa a nota interna do agente como contexto da consulta —
    * independente do canal do ticket.
    */
-  const hasClient = hasClientMessage(aiMsgs);
+  const hasClient = hasMeaningfulClientMessage(aiMsgs);
   const ticketIdNow = String(ticket?.id || ticket?._id || '');
   if (ticketIdNow && ticketIdNow !== lastTicketIdRef.current) {
     lastTicketIdRef.current = ticketIdNow;
     stickyClientFpRef.current = '';
   }
-  const liveClientFp = buildClientThreadFingerprint(convMsgs);
+  const liveClientFp = buildMeaningfulClientThreadFingerprint(convMsgs);
   if (liveClientFp) stickyClientFpRef.current = liveClientFp;
   const clientFp = liveClientFp || stickyClientFpRef.current;
   const seenClientForTicket = Boolean(clientFp);
@@ -321,11 +367,12 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
   const canFetch = useMemo(() => {
     if (!ticket) return false;
     if (useInternalContext) {
-      return persistedInternalPlainLen > 0 || internalPlain.length > 0;
+      /** Rascunho no compose não conta — só nota enviada via Enviar Nota. */
+      return persistedInternalPlainLen > 0;
     }
     if (awaitingClientAfterAgentReply) return false;
-    return true;
-  }, [ticket, useInternalContext, persistedInternalPlainLen, internalPlain, awaitingClientAfterAgentReply]);
+    return hasClient;
+  }, [ticket, useInternalContext, persistedInternalPlainLen, awaitingClientAfterAgentReply, hasClient]);
 
   const notesFp = useMemo(
     () => buildAgentInternalNotesFingerprint(ticket),
@@ -346,7 +393,7 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
     ticket,
     rightFields,
     convMsgs,
-    internalNotesBlock,
+    internalNotesBlock: useInternalContext ? persistedInternalNotesBlock : internalNotesBlock,
     contextSource,
   };
 
@@ -364,7 +411,7 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
       return '';
     }
     if (waitingReason === 'awaiting_internal_note') {
-      return 'Adicione um comentário interno para obter a primeira sugestão';
+      return 'Envie uma nota interna (Enviar Nota) para obter a primeira sugestão';
     }
     if (waitingReason === 'service_unconfigured') {
       return error || 'Sugestão IA indisponível no servidor.';
@@ -613,17 +660,15 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
     const id = String(ticket?.id || ticket?._id || '');
     const stored = id ? AI_SUGGESTION_STORE.get(id) : null;
     lastFetchedHashRef.current = stored?.hash || '';
-    if (stored?.result) {
-      applySuggestionResult({
-        setRespostaSugerida,
-        setTabulacao,
-        setTabulacaoDisplay,
-        setTabulacaoFonte,
-        setAuditScore,
-        setAuditAprovado,
-        setAuditComplete,
-      }, stored.result);
-    }
+    setRespostaSugerida('');
+    setTabulacao(null);
+    setTabulacaoDisplay('');
+    setTabulacaoFonte('atendimento');
+    setAuditScore(null);
+    setAuditAprovado(null);
+    setAuditComplete(false);
+    setError(null);
+    setWaitingReason(null);
   }, [ticket?.id, ticket?._id]);
 
   useEffect(() => {
@@ -668,10 +713,25 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
         reason = 'awaiting_client_reply';
       }
       setWaitingReason(reason);
+      if (reason === 'awaiting_internal_note' || reason === 'awaiting_client_message') {
+        setRespostaSugerida('');
+        setTabulacao(null);
+        setTabulacaoDisplay('');
+        setTabulacaoFonte('atendimento');
+        setAuditScore(null);
+        setAuditAprovado(null);
+        setAuditComplete(false);
+        setError(null);
+        if (ticketId) {
+          AI_SUGGESTION_STORE.delete(String(ticketId));
+          lastFetchedHashRef.current = '';
+        }
+      }
       if (reason !== 'awaiting_client_reply') {
         logTicketAi('info', 'Pré-requisito não atendido — sugestão não será solicitada ainda.', {
           ticketId,
           reason,
+          hasMeaningfulClient: hasClient,
           internalPlainChars: internalPlain.length,
           persistedInternalPlainChars: persistedInternalPlainLen,
           persistedNotes: ticket?.internalNotes?.length ?? 0,
@@ -746,6 +806,7 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
     awaitingClientAfterAgentReply,
     ticketRevision,
     persistedInternalPlainLen,
+    hasClient,
   ]);
 
   useEffect(() => () => {

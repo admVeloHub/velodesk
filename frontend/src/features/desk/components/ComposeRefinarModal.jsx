@@ -1,11 +1,12 @@
 /**
- * ComposeRefinarModal v1.0.6 — preview núcleo; envelope aplicado ao substituir
- * VERSION: v1.0.6 | DATE: 2026-08-20
+ * ComposeRefinarModal v1.1.0 — envia somente núcleo textual, sem linhas de anexo
+ * VERSION: v1.1.0 | DATE: 2026-08-21
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
+import { stripComposerOpening } from '../../../services/desk/clientMessageEnvelope';
 
 const MODAL_Z = 11000;
 const REFINAR_REQUEST_TIMEOUT_MS = 25_000;
@@ -66,7 +67,9 @@ export default function ComposeRefinarModal({
   useEffect(() => {
     if (!open) return undefined;
 
-    const texto = String(draftText || '').trim();
+    const texto = stripComposerOpening(String(draftText || ''))
+      .replace(/^\s*\[Anexo:[^\]]*\]\s*$/gim, '')
+      .trim();
     const fetchKey = `${texto}::${nomeOperador}`;
     if (!texto || fetchedForRef.current === fetchKey) return undefined;
 

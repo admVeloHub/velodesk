@@ -1,6 +1,6 @@
 /**
- * agentOrchestrator.service v1.2.1 — rascunho draft-* não consulta Mongo por _id
- * VERSION: v1.2.1 | DATE: 2026-08-20
+ * agentOrchestrator.service v1.2.2 — tabulação desk: preferir sugestão mais completa
+ * VERSION: v1.2.2 | DATE: 2026-08-21
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -19,7 +19,7 @@ import type {
   TabulacaoFonte,
   TicketAiTabulationResult,
 } from './agentTypes';
-import { buildTabulationDisplay } from './agentTabulation.util';
+import { buildTabulationDisplay, tabulationCompletenessScore } from './agentTabulation.util';
 import { composeAtendimento, reviseAtendimento } from './atendimentoAgent.service';
 import { validateAuditoria } from './auditoriaAgent.service';
 import { saveAgentFeedback } from './agentFeedback.service';
@@ -34,12 +34,17 @@ function resolveDeskTabulacao(
   fallbackTab: TicketAiTabulationResult,
   fallbackDisplay?: string,
 ): { tabulacao: TicketAiTabulationResult; tabulacaoDisplay: string; tabulacaoFonte: TabulacaoFonte } {
-  if (audit.tabulacaoSugerida) {
-    return {
-      tabulacao: audit.tabulacaoSugerida,
-      tabulacaoDisplay: audit.tabulacaoDisplay || buildTabulationDisplay(audit.tabulacaoSugerida),
-      tabulacaoFonte: 'auditoria',
-    };
+  const auditTab = audit.tabulacaoSugerida;
+  if (auditTab) {
+    const auditScore = tabulationCompletenessScore(auditTab);
+    const fallbackScore = tabulationCompletenessScore(fallbackTab);
+    if (auditScore >= fallbackScore) {
+      return {
+        tabulacao: auditTab,
+        tabulacaoDisplay: audit.tabulacaoDisplay || buildTabulationDisplay(auditTab),
+        tabulacaoFonte: 'auditoria',
+      };
+    }
   }
   return {
     tabulacao: fallbackTab,

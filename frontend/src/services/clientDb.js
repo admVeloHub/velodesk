@@ -1,6 +1,7 @@
 /**
  * Client DB localStorage
- * VERSION: v1.1.2 | DATE: 2026-07-29
+ * VERSION: v1.2.0 | DATE: 2026-08-21
+ * — upsert a partir do doc b2c_cadastros (painel; sem mutar ticket)
  */
 import { getDeskDisplayName } from '../utils/userDisplayName';
 export function getClientDB() {
@@ -19,6 +20,30 @@ export function lookupClient(cpfRaw) {
   const digits = String(cpfRaw || '').replace(/\D/g, '');
   if (!digits) return null;
   return getClientDB()[digits] || null;
+}
+
+/** Grava contato do cadastro no DB local para o painel superior (não altera chamado). */
+export function upsertClientFromContact(contact) {
+  if (!contact) return null;
+  const digits = String(contact.clientCPF || contact.cpf || '').replace(/\D/g, '');
+  if (!digits) return null;
+  const db = getClientDB();
+  const prev = db[digits] || {};
+  const next = {
+    ...prev,
+    cpf: digits,
+    name: contact.clientName || contact.name || prev.name || '',
+    email: contact.email || contact.replyEmail || contact.emails?.[0] || prev.email || '',
+    telefone: contact.phone || contact.whatsappPhone || contact.phones?.[0] || prev.telefone || '',
+    emails: contact.emails || prev.emails,
+    phones: contact.phones || prev.phones,
+    replyEmail: contact.replyEmail || prev.replyEmail,
+    whatsappPhone: contact.whatsappPhone || prev.whatsappPhone,
+    clienteId: contact.clienteId || prev.clienteId,
+  };
+  db[digits] = next;
+  saveClientDB(db);
+  return next;
 }
 
 export function searchClients(query) {

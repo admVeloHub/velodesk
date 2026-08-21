@@ -1,6 +1,6 @@
 /**
- * openaiTicketSuggest.service v1.4.0 — legacy suggest usa POP vector store + catálogo POP
- * VERSION: v1.4.0 | DATE: 2026-08-21
+ * openaiTicketSuggest.service v1.4.2 — contexto internal usa só nota persistida, sem thread placeholder
+ * VERSION: v1.4.2 | DATE: 2026-08-21
  */
 import OpenAI from 'openai';
 import { env } from '../config/env';
@@ -16,7 +16,11 @@ import { runAgentPipeline } from './agents/agentOrchestrator.service';
 import { isPersistedMongoTicketId } from '../utils/persistedTicketId';
 import { getAgentsStatus, getAtendimentoVectorStoreIds, isAgentsConfigured } from './agents/openaiAgent.util';
 import { logAiUsage } from './aiUsage.service';
-import { buildTicketIaMessagesFromChamado, buildTicketIaInternalNotesFromChamado } from './ticketIaAdapter.service';
+import {
+  buildTicketIaMessagesFromChamado,
+  buildTicketIaInternalNotesFromChamado,
+  isPlaceholderClientMessageText,
+} from './ticketIaAdapter.service';
 
 const MAX_MESSAGES = 50;
 const MAX_MESSAGE_CHARS = 8_000;
@@ -128,8 +132,9 @@ function normalizeMessages(raw: unknown): TicketAiMessageInput[] {
       text: trimStr(m?.text, MAX_MESSAGE_CHARS),
     }))
     .filter((m) => m.text.length > 0);
-  // Mantém as mensagens mais recentes (não as mais antigas).
-  return mapped.slice(-MAX_MESSAGES);
+  return mapped
+    .filter((m) => m.role === 'agente' || !isPlaceholderClientMessageText(m.text))
+    .slice(-MAX_MESSAGES);
 }
 
 async function resolveMessagesForSuggest(
@@ -147,6 +152,7 @@ async function resolveMessagesForSuggest(
         text: trimStr(item.text, MAX_MESSAGE_CHARS),
       }))
       .filter((item) => item.text.length > 0)
+      .filter((item) => item.role === 'agente' || !isPlaceholderClientMessageText(item.text))
       .slice(-MAX_MESSAGES);
     if (fromDb.length) return fromDb;
   } catch (err) {
@@ -198,7 +204,9 @@ export function validateTicketAiInput(body: unknown):
   const internalNote = trimStr(b.internalNote, MAX_INTERNAL_NOTE_CHARS);
 
   if (contextSource === 'public') {
-    const hasClientMsg = messages.some((m) => m.role === 'cliente');
+    const hasClientMsg = messages.some(
+      (m) => m.role === 'cliente' && !isPlaceholderClientMessageText(m.text),
+    );
     if (!hasClientMsg) {
       return { ok: false, error: 'Informe ao menos uma mensagem do cliente para contextSource public' };
     }
@@ -361,8 +369,19 @@ export async function generateTicketAiSuggest(
     internalNote: resolvedInternalNote || params.internalNote,
   };
 
+  if (enrichedParams.contextSource === 'internal') {
+    const note = trimStr(enrichedParams.internalNote, MAX_INTERNAL_NOTE_CHARS);
+    if (!note) {
+      return { success: false, error: 'internalNote é obrigatório para contextSource internal' };
+    }
+    enrichedParams.internalNote = note;
+    enrichedParams.messages = undefined;
+  }
+
   if (enrichedParams.contextSource === 'public') {
-    const hasClientMsg = (enrichedParams.messages || []).some((m) => m.role === 'cliente');
+    const hasClientMsg = (enrichedParams.messages || []).some(
+      (m) => m.role === 'cliente' && !isPlaceholderClientMessageText(m.text),
+    );
     if (!hasClientMsg) {
       return { success: false, error: 'Informe ao menos uma mensagem do cliente para contextSource public' };
     }

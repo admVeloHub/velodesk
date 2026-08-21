@@ -1,10 +1,8 @@
 /**
- * funcaoPermissao.service v1.2.0 — backfill preferencias.visualizar em seeds existentes
- * VERSION: v1.2.0 | DATE: 2026-07-30
+ * funcaoPermissao.service v1.3.0 — permissões só via overrides Mongo (sem seed)
+ * VERSION: v1.3.0 | DATE: 2026-08-21
  */
 import {
-  ACESSO_MODULO_IDS,
-  DEFAULT_FUNCOES_PERMISSOES,
   derivePortalVisivelFromPermissoes,
   PERMISSION_CATALOG,
   type PermissoesMap,
@@ -95,14 +93,6 @@ export async function getEffectivePermissionsForSlug(slug: string): Promise<{
   };
 }
 
-function defaultPreferenciasVisualizar(slug: string): boolean {
-  const item = DEFAULT_FUNCOES_PERMISSOES.find((entry) => entry.slug === slug);
-  if (item?.permissoes?.preferencias?.visualizar === false) return false;
-  if (item?.permissoes?.preferencias?.visualizar === true) return true;
-  // Funções de atendimento/gestão (e herdeiras) ganham acesso; só workflow puro nega no default.
-  return slug !== 'financeiro' && slug !== 'produtos';
-}
-
 async function backfillPreferenciasVisualizar(): Promise<number> {
   const Model = getDeskFuncaoPermissaoModel();
   const docs = await Model.find({
@@ -116,7 +106,7 @@ async function backfillPreferenciasVisualizar(): Promise<number> {
   for (const doc of docs) {
     if (!doc.permissoes) doc.permissoes = {};
     if (!doc.permissoes.preferencias) doc.permissoes.preferencias = {};
-    doc.permissoes.preferencias.visualizar = defaultPreferenciasVisualizar(doc.slug);
+    doc.permissoes.preferencias.visualizar = true;
     doc.markModified('permissoes');
     await doc.save();
     updated += 1;
@@ -124,61 +114,21 @@ async function backfillPreferenciasVisualizar(): Promise<number> {
   return updated;
 }
 
-/**
- * Módulos de Acesso é novo (2026-08-17): funções já seedadas antes dele não têm
- * permissoes.acesso — preenche a partir do default hardcoded da própria função (mesma
- * segmentação por órgão/portal que o seed usaria hoje), sem sobrescrever quem já foi
- * configurado manualmente via a nova seção do editor de overrides.
- */
-async function backfillAcessoModulos(): Promise<number> {
-  const Model = getDeskFuncaoPermissaoModel();
-  const docs = await Model.find({
-    $or: [
-      { 'permissoes.acesso': { $exists: false } },
-      ...ACESSO_MODULO_IDS.map((id) => ({ [`permissoes.acesso.${id}`]: { $exists: false } })),
-    ],
-  });
-
-  let updated = 0;
-  for (const doc of docs) {
-    const defaults = DEFAULT_FUNCOES_PERMISSOES.find((entry) => entry.slug === doc.slug);
-    const acessoDefault = defaults?.permissoes?.acesso;
-    if (!acessoDefault) continue;
-
-    if (!doc.permissoes) doc.permissoes = {};
-    doc.permissoes.acesso = { ...acessoDefault, ...(doc.permissoes.acesso || {}) };
-    doc.markModified('permissoes');
-    await doc.save();
-    updated += 1;
-  }
-  return updated;
-}
-
+/** Não insere funções default — permissões são configuradas manualmente no editor. */
 export async function seedFuncoesPermissoes(): Promise<void> {
   const Model = getDeskFuncaoPermissaoModel();
   const count = await Model.countDocuments();
   if (count === 0) {
-    await Model.insertMany(
-      DEFAULT_FUNCOES_PERMISSOES.map((item) => ({
-        ...item,
-        updatedBy: 'seed',
-      })),
+    console.log(
+      'Permissões Desk: coleção vazia — configure funções e overrides em Config → Funções (sem seed automático).',
     );
-    invalidateFuncaoPermissaoCache();
-    console.log(`Seed: ${DEFAULT_FUNCOES_PERMISSOES.length} função(ões) de permissão Desk criadas`);
     return;
   }
 
   const backfilled = await backfillPreferenciasVisualizar();
   if (backfilled > 0) {
     invalidateFuncaoPermissaoCache();
-    console.log(`Seed: backfill preferencias.visualizar em ${backfilled} função(ões)`);
-  }
-
-  const acessoBackfilled = await backfillAcessoModulos();
-  if (acessoBackfilled > 0) {
-    invalidateFuncaoPermissaoCache();
-    console.log(`Seed: backfill permissoes.acesso (Módulos de Acesso) em ${acessoBackfilled} função(ões)`);
+    console.log(`Permissões Desk: backfill preferencias.visualizar em ${backfilled} função(ões)`);
   }
 }
 
@@ -228,7 +178,6 @@ export async function replaceFuncaoPermissao(
     permissoes: payload.permissoes ?? buildEmptyPermissoes(),
   };
 
-  // MongoDB rejects the same path in both $set and $setOnInsert.
   for (const key of Object.keys($set)) {
     delete $setOnInsert[key];
   }
@@ -238,14 +187,19 @@ export async function replaceFuncaoPermissao(
     { $set, $setOnInsert },
     { new: true, upsert: true, runValidators: true },
   ).lean();
+
   invalidateFuncaoPermissaoCache();
   return doc as unknown as IDeskFuncaoPermissao | null;
 }
 
-export function getNivelMap(funcoes: IDeskFuncaoPermissao[]): Map<string, number> {
+export function getNivelMap(
+  funcoes: Array<{ slug: string; nivel?: number }>,
+): Map<string, number> {
   return new Map(funcoes.map((f) => [f.slug, f.nivel ?? 1]));
 }
 
-export function getPermissionCatalog() {
+export function getPermissionCatalog(): typeof PERMISSION_CATALOG {
   return PERMISSION_CATALOG;
 }
+
+export { PERMISSION_CATALOG, buildEmptyPermissoes };

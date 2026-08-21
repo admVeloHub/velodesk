@@ -1,4 +1,4 @@
-/** funcoesPermissoes.routes v1.0.1 — lista garante seed se coleção vazia */
+/** funcoesPermissoes.routes v1.0.2 — catálogo RBAC; sem seed automático de permissões */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { requireGestaoOrPermission } from '../middleware/permission';

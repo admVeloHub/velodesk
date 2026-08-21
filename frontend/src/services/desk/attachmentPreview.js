@@ -1,6 +1,6 @@
 /**
- * attachmentPreview v1.3.0 — helpers p/ scan pending + poll acelerado
- * VERSION: v1.3.0 | DATE: 2026-08-21
+ * attachmentPreview v1.4.0 — força MIME por extensão quando header é genérico/x-msdownload
+ * VERSION: v1.4.0 | DATE: 2026-08-21
  */
 
 const OFFICE_MIME = new Set([
@@ -110,14 +110,54 @@ export async function fetchAuthenticatedAttachment(url) {
   return response;
 }
 
+function mimeFromFilename(filename) {
+  const name = String(filename || '').toLowerCase();
+  if (/\.pdf$/i.test(name)) return 'application/pdf';
+  if (/\.png$/i.test(name)) return 'image/png';
+  if (/\.jpe?g$/i.test(name)) return 'image/jpeg';
+  if (/\.gif$/i.test(name)) return 'image/gif';
+  if (/\.webp$/i.test(name)) return 'image/webp';
+  if (/\.mp4$/i.test(name)) return 'video/mp4';
+  if (/\.webm$/i.test(name)) return 'video/webm';
+  if (/\.ogg$/i.test(name)) return 'audio/ogg';
+  if (/\.mp3$/i.test(name)) return 'audio/mpeg';
+  if (/\.docx$/i.test(name)) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  if (/\.xlsx$/i.test(name)) {
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  }
+  if (/\.pptx$/i.test(name)) {
+    return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  }
+  if (/\.doc$/i.test(name)) return 'application/msword';
+  if (/\.xls$/i.test(name)) return 'application/vnd.ms-excel';
+  return '';
+}
+
+function isGenericMime(type) {
+  const t = normalizeMime(type);
+  return !t
+    || t === 'application/octet-stream'
+    || t === 'application/x-msdownload'
+    || t === 'binary/octet-stream'
+    || t === 'application/force-download';
+}
+
 export async function loadAttachmentForPreview(url, knownContentType = '') {
   const response = await fetchAuthenticatedAttachment(url);
   const rawBlob = await response.blob();
   const headerType = normalizeMime(response.headers.get('content-type'));
   const blobType = normalizeMime(rawBlob.type);
-  const contentType = headerType || blobType || normalizeMime(knownContentType) || 'application/octet-stream';
   const dispositionName = parseFilenameFromDisposition(response.headers.get('content-disposition'));
   const filename = dispositionName || attachmentLabelFromUrl(url);
+  const fromName = mimeFromFilename(filename);
+  const known = normalizeMime(knownContentType);
+  // Header genérico/x-msdownload → força MIME pelo filename (PDF/imagem/Office)
+  let contentType = headerType || blobType || known || fromName || 'application/octet-stream';
+  if (isGenericMime(contentType) && (fromName || known)) {
+    contentType = fromName || known;
+  }
   const blob = rawBlob.type === contentType
     ? rawBlob
     : new Blob([rawBlob], { type: contentType });
@@ -139,6 +179,9 @@ export function downloadObjectUrl(objectUrl, filename) {
 function isBrandInlineAttachmentUrl(url) {
   const label = attachmentLabelFromUrl(url).toLowerCase();
   return label.includes('simbolo_velotax')
+    || label.includes('velotax_ajustada')
+    || label.includes('velotax_logo')
+    || /velotax.*logo/i.test(label)
     || label.includes('velodesk-brand')
     || /^logo\.(png|jpe?g|gif|webp)$/i.test(label);
 }

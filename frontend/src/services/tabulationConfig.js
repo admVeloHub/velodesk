@@ -1,6 +1,6 @@
 /**
- * tabulationConfig v1.10.2 — RA: produto e motivo na sidebar; motivo do órgão
- * VERSION: v1.10.2 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
+ * tabulationConfig v1.11.0 — CE: produto da árvore + motivo do órgão (sem cascata POP)
+ * VERSION: v1.11.0 | DATE: 2026-08-21 | AUTHOR: VeloHub Development Team
  */
 
 /** Rótulos de visão/perfil e termos genéricos nunca representam atribuição real. */
@@ -68,6 +68,36 @@ export const DEFAULT_TIPO = 'Solicitação';
 export function isReclameAquiCanal(canal) {
   const raw = String(canal ?? '').trim().toLowerCase();
   return raw.includes('reclame') && raw.includes('aqui');
+}
+
+export function isProconCanal(canal) {
+  return String(canal ?? '').trim().toLowerCase().includes('procon');
+}
+
+export function isBacenCanal(canal) {
+  return String(canal ?? '').trim().toLowerCase().includes('bacen');
+}
+
+export function isConsumidorGovCanal(canal) {
+  const raw = String(canal ?? '').trim().toLowerCase();
+  return raw.includes('consumidor') && (raw.includes('gov') || raw.includes('.gov'));
+}
+
+/** Canais CE: tabulação = produto (árvore) + motivo (lista do órgão), sem cascata POP. */
+export function isCasosEspeciaisCanal(canal) {
+  return isReclameAquiCanal(canal)
+    || isProconCanal(canal)
+    || isBacenCanal(canal)
+    || isConsumidorGovCanal(canal);
+}
+
+/** Categoria TabulacaoOpcoes do motivo do órgão (ou null se não for CE). */
+export function resolveOrgaoMotivoCategoria(canal) {
+  if (isReclameAquiCanal(canal)) return TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI;
+  if (isProconCanal(canal)) return TABULACAO_OPCOES_CATEGORIAS.MOTIVO_PROCON;
+  if (isBacenCanal(canal)) return TABULACAO_OPCOES_CATEGORIAS.MOTIVO_BACEN;
+  if (isConsumidorGovCanal(canal)) return TABULACAO_OPCOES_CATEGORIAS.MOTIVO_CONSUMIDOR_GOV;
+  return null;
 }
 
 export function getActiveProdutos(config) {
@@ -186,7 +216,7 @@ function hasSavedTabulationValue(value) {
 export function buildDefaultRightFields(_config, ticket, getAgentName) {
   const lf = ticket?.lateralForm || {};
   const canal = lf.canal || ticket?.channel || 'Portal';
-  const skipTreeMotivo = isReclameAquiCanal(canal);
+  const skipTreeMotivo = isCasosEspeciaisCanal(canal);
   const produto = hasSavedTabulationValue(lf.produto) ? String(lf.produto).trim() : '';
   const savedMotivo = String(lf.motivo || lf.reclameAqui?.motivo || '').trim();
   const motivo = (skipTreeMotivo || produto) && hasSavedTabulationValue(savedMotivo)
@@ -239,7 +269,7 @@ export function resolveEffectiveTabulationFields(rightFields, ticket, getAgentNa
 export function applyCascadeFieldChange(prev, key, value) {
   const next = { ...prev, [key]: value };
   const canal = String((key === 'canal' ? value : prev?.canal) || '').toLowerCase();
-  const skipTreeMotivo = isReclameAquiCanal(canal);
+  const skipTreeMotivo = isCasosEspeciaisCanal(canal);
   if (key === 'produto' && !skipTreeMotivo) {
     next.motivo = '';
     next.detalhe = '';
@@ -374,12 +404,15 @@ export function validateTabulationForSendStatus(statusId, rightFields, config) {
   const detalhe = String(rightFields?.detalhe ?? '').trim();
   const tipo = String(rightFields?.tipo ?? rightFields?.classificacaoTipo ?? rightFields?.tipoChamado ?? DEFAULT_TIPO).trim() || DEFAULT_TIPO;
   const canal = String(rightFields?.canal ?? '').trim().toLowerCase();
-  const skipTreeMotivo = isReclameAquiCanal(canal);
+  const skipTreeMotivo = isCasosEspeciaisCanal(canal);
 
   if (!produto) missing.push('Produto');
   if (!tipo) missing.push('Tipo');
 
-  if (produto && !skipTreeMotivo) {
+  if (skipTreeMotivo) {
+    // CE: motivo do órgão é obrigatório; detalhe POP não se aplica
+    if (!motivo) missing.push('Motivo');
+  } else if (produto) {
     const motivos = getMotivos(config, produto);
     if (motivos.length > 0 && !motivo) missing.push('Motivo');
     if (motivo) {

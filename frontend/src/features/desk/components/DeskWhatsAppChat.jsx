@@ -1,6 +1,6 @@
 /**
- * DeskWhatsAppChat v1.13.0 — picker de emojis WhatsApp no compose
- * VERSION: v1.13.0 | DATE: 2026-08-17
+ * DeskWhatsAppChat v1.14.0 — Verificando… só em mídia inbound (outbound = skipped)
+ * VERSION: v1.14.0 | DATE: 2026-08-21
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { uploadsApi } from '../../../api/client';
@@ -31,12 +31,16 @@ function mediaKind(contentType, url) {
   return 'document';
 }
 
-function WhatsAppMediaAttachments({ attachments, contentTypes, scanStatuses }) {
-  const items = (attachments || []).map((url, index) => ({
-    url: String(url || '').trim(),
-    contentType: String(contentTypes?.[index] || ''),
-    scanStatus: String(scanStatuses?.[index] || '').trim().toLowerCase(),
-  })).filter((item) => item.url);
+function WhatsAppMediaAttachments({ attachments, contentTypes, scanStatuses, isOutbound = false }) {
+  const items = (attachments || []).map((url, index) => {
+    let scanStatus = String(scanStatuses?.[index] || '').trim().toLowerCase();
+    if (isOutbound && scanStatus === 'pending') scanStatus = 'skipped';
+    return {
+      url: String(url || '').trim(),
+      contentType: String(contentTypes?.[index] || ''),
+      scanStatus,
+    };
+  }).filter((item) => item.url);
   const fingerprint = items.map((item) => `${item.url}|${item.contentType}|${item.scanStatus}`).join(';;');
   const [inlineUrls, setInlineUrls] = useState({});
   const [errors, setErrors] = useState({});
@@ -538,6 +542,7 @@ export default function DeskWhatsAppChat({
                   attachments={msg.attachments}
                   contentTypes={msg.mediaContentTypes}
                   scanStatuses={msg.attachmentScanStatuses}
+                  isOutbound={isOut}
                 />
                 <span className="wa-msg__text">{msg.text}</span>
                 {msg.transcriptionStatus === 'processing' || msg.transcriptionStatus === 'pending' ? (

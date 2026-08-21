@@ -1,4 +1,4 @@
-/** attachmentFilter.util v1.2.1 — logo velotax_ajustada também é marca, não anexo do cliente */
+/** attachmentFilter.util v1.3.0 — fingerprints incluem anexosMensagemPublica outbound */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 
 const BRAND_INLINE_FILENAME_PATTERNS = [
@@ -45,7 +45,28 @@ export function attachmentSizeNameFingerprint(filename: string, bytes: number): 
   return `size:${bytes}|name:${String(filename || '').trim().toLowerCase()}`;
 }
 
-/** Coleta fingerprints já presentes no ticket (hash e tamanho+nome — não só nome). */
+export function attachmentUrlNameFingerprint(filename: string): string {
+  return `urlname:${String(filename || '').trim().toLowerCase()}`;
+}
+
+export function attachmentUrlFingerprint(url: string): string {
+  return `url:${String(url || '').trim().toLowerCase()}`;
+}
+
+function addUrlListFingerprints(fingerprints: Set<string>, urls: unknown): void {
+  if (!Array.isArray(urls)) return;
+  for (const raw of urls) {
+    const url = String(raw ?? '').trim();
+    if (!url) continue;
+    fingerprints.add(attachmentUrlFingerprint(url));
+    const label = attachmentLabelFromUrl(url);
+    if (label && label !== 'Anexo') {
+      fingerprints.add(attachmentUrlNameFingerprint(label));
+    }
+  }
+}
+
+/** Coleta fingerprints já presentes no ticket (inbound meta + outbound anexosMensagemPublica). */
 export function collectChamadoAttachmentFingerprints(chamado: IChamadoN1 | null | undefined): Set<string> {
   const fingerprints = new Set<string>();
   if (!chamado?.registro?.length) return fingerprints;
@@ -63,24 +84,33 @@ export function collectChamadoAttachmentFingerprints(chamado: IChamadoN1 | null 
       if (filename && Number.isFinite(bytes) && bytes > 0) {
         fingerprints.add(attachmentSizeNameFingerprint(filename, bytes));
       }
+      if (filename) fingerprints.add(attachmentUrlNameFingerprint(filename));
+      const itemUrl = String(item.url ?? item.gcsUri ?? item.storageKey ?? '').trim();
+      if (itemUrl) fingerprints.add(attachmentUrlFingerprint(itemUrl));
     }
+    // Outbound do agente (e inbound sem meta): URLs em anexosMensagemPublica
+    addUrlListFingerprints(fingerprints, reg.anexosMensagemPublica);
   }
 
   return fingerprints;
 }
 
 export function attachmentMatchesKnownFingerprints(
-  item: { filename?: string; contentHash?: string; bytes?: number },
+  item: { filename?: string; contentHash?: string; bytes?: number; url?: string },
   known: Set<string>,
 ): boolean {
   const filename = String(item.filename || '').trim();
   const contentHash = String(item.contentHash || '').trim();
   const bytes = Number(item.bytes);
+  const url = String(item.url || '').trim();
 
   if (contentHash && known.has(attachmentHashFingerprint(contentHash))) return true;
   if (filename && Number.isFinite(bytes) && bytes > 0
     && known.has(attachmentSizeNameFingerprint(filename, bytes))) {
     return true;
   }
+  // Eco de anexo já enviado pelo agente (só URL/nome no histórico)
+  if (filename && known.has(attachmentUrlNameFingerprint(filename))) return true;
+  if (url && known.has(attachmentUrlFingerprint(url))) return true;
   return false;
 }

@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.21.4 | DATE: 2026-08-20
- * — CPF do workflow alinhado ao perfil do cliente (client lookup)
+ * VERSION: v3.22.0 | DATE: 2026-08-21
+ * — Busca Desk sempre une API (CPF/protocolo); sem early-return no cache
  */
 import {
   formatDateBr,
@@ -640,8 +640,8 @@ export function isTicketWorkflowActive(ticket) {
   if (ticket?.workflow?.active) return true;
   if (ticket?.workflow?.pendingPersist) return true;
   if (ticket?._pendingWorkflowStart?.definicaoSlug) return true;
-  const wf = readTicketLateralWorkflow(ticket);
-  return wf?.status === 'active';
+  // Não usar lateralForm.workflow.status === 'active' stale — escondia o botão Iniciar WF
+  return false;
 }
 
 export function getWorkflowTemplateForTicket(ticket) {
@@ -1271,7 +1271,8 @@ function cockpitEntryFromApiTicket(apiTicket) {
 }
 
 /**
- * Busca Desk com fallback na API — barra de busca ignora overrides de visão do agente.
+ * Busca Desk — sempre consulta API para CPF/protocolo e une com o cache local.
+ * Não é a fila ver_meus: devolve todas as ocorrências (exceto CE, que ficam no módulo do órgão).
  */
 export async function resolveDeskSearchEntriesAsync(
   rawQuery,
@@ -1283,21 +1284,29 @@ export async function resolveDeskSearchEntriesAsync(
   if (!trimmed) return [];
 
   const local = resolveDeskSearchEntries(rawQuery, activeSort, entrySortOldestFirst, searchMode);
-  if (local.length) return local;
-
-  if (!isApiMode() || !localStorage.getItem('velodesk_token')) return [];
-
-  const mode = searchMode || inferDeskSearchMode(trimmed);
   const entries = [];
   const seen = new Set();
 
-  const pushApiTicket = (apiTicket) => {
-    if (!apiTicket) return;
-    const entry = cockpitEntryFromApiTicket(apiTicket);
+  const pushEntry = (entry) => {
+    if (!entry?.ticket) return;
+    if (shouldExcludeEspeciaisFromDesk(entry.ticket)) return;
     const id = String(entry.ticket?.id || entry.ticket?._id || '');
     if (!id || seen.has(id)) return;
     seen.add(id);
     entries.push(entry);
+  };
+
+  local.forEach(pushEntry);
+
+  if (!isApiMode() || !localStorage.getItem('velodesk_token')) {
+    return sortTicketEntries(entries, activeSort, 'desc', entrySortOldestFirst);
+  }
+
+  const mode = searchMode || inferDeskSearchMode(trimmed);
+
+  const pushApiTicket = (apiTicket) => {
+    if (!apiTicket) return;
+    pushEntry(cockpitEntryFromApiTicket(apiTicket));
   };
 
   const protocolQuery = trimmed.replace(/^#/, '').trim();

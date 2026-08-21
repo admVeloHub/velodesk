@@ -1,10 +1,36 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.91.0 | DATE: 2026-08-21 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.92.0 | DATE: 2026-08-21 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — planilha QA Workflow/E-mail/Painel 360 (25 apontamentos)
+
+- **Data/Hora**: 2026-08-21
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.92.0
+  - **Frontend**: DeskV2Root v3.44.0, ticketsCache v1.21.0, desk/utils v3.22.0, tabulationConfig v1.11.0, DeskComposePanel v1.17.0, DeskConversation v1.10.0, DeskWhatsAppChat v1.14.0, DeskRightPanel v1.15.0, attachmentPreview v1.4.0, ticketAdapter v1.8.0, clientDb v1.2.0, especiaisChannelDetection v1.2.0, workflowApprovalData v1.8.0, workflowDecisionHandlers v2.5.1, WorkflowApprovalShell v1.11.0, Ra/Pc/Bc/CgClassificacaoFields v1.1.0
+  - **Backend**: chamado.mapper v2.16.1, tabulation.service v1.7.0, attachmentFilter.util v1.3.0, emailTrigger.service v1.1.0, geminiRefinar.service (retry só 404)
+- **Arquivos principais**:
+  - Onda 0: Casos Especiais (RA/Bacen/Procon/C.Gov) nunca no módulo Tickets — exclusão absoluta no front e em toda query de boxes
+  - Onda 1A: hidratação de contato só em `b2c_cadastros.clientes` + painel superior (sem PUT/claim no ticket)
+  - Onda 1B: caixas Em andamento/Pendente filtram por responsável (WF não tira o ticket do dono)
+  - Onda 1C: busca por CPF/protocolo sempre une API + cache (fim do early-return "achou 1 de 3")
+  - Onda 1D: botão Iniciar Workflow sem gate de compose público; `isTicketWorkflowActive` só com workflow real; busca no console WK mantém o ticket aberto
+  - Onda 1E: start do WF em um único persist (POST /workflow/start), responsável preservado, cache marca active na hora; merge do poll não apaga `workflow.active`
+  - Onda 2: tabulação CE com Produto da árvore + Motivo do órgão (sem cascata POP); save exige os dois
+  - Onda 3: "Chamado aberto"/e-mail padrão como bolha de sistema; substituição de `{client_name}` no template
+  - Onda 4: dedupe de anexos inclui outbound (reply não ecoa anexo do agente), MIME forçado no preview, "Verificando…" só em inbound
+  - Onda 5: SpellCheck removido do compose (hook, UI e engines); permanece apenas o Revisor de Texto
+- **Descrição**: Correção dos 25 apontamentos da planilha de testes Workflow/E-mail/Painel 360 (21-08-2026), agrupados por causa raiz.
+- **Status**: Push dev
+
+---
 
 ### GitHub Push — correções QA Desk (Enviar como, CPF, POPs, rascunho, workflow)
 

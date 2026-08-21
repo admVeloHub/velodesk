@@ -1,26 +1,20 @@
 /**
- * DeskComposePanel v1.16.0 — Enviar como com gates por opção de status
- * VERSION: v1.16.0 | DATE: 2026-08-21
+ * DeskComposePanel v1.18.0 — remove integração legada de correção ortográfica
+ * VERSION: v1.18.0 | DATE: 2026-08-21
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { uploadsApi } from '../../../api/client';
 import { getSendStatusOptions } from '../../../services/desk/constants';
 import { useProfile } from '../../../context/ProfileContext';
 import { shouldViewAllDeskTickets } from '../../../services/desk/responsavelSegmentation';
-import { useComposeSpellCheck } from '../../../hooks/useComposeSpellCheck';
-import { useTabulation } from '../../../context/TabulationContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useNotifications } from '../../../context/NotificationContext';
 import { getDeskDisplayName } from '../../../utils/userDisplayName';
 import { htmlToPlainText, normalizePlainToHtml, COMPOSE_IMAGE_MAX_BYTES } from '../../../services/desk/composeRichEditor';
-import SpellSuggestionBar, { SpellErrorsPanel } from './SpellSuggestionBar';
 import ComposeRichEditor from './ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
 import ComposeRefinarModal from './ComposeRefinarModal';
-import {
-  stripComposerOpening,
-  wrapComposerOpeningForTicket,
-} from '../../../services/desk/clientMessageEnvelope';
+import { stripComposerOpening } from '../../../services/desk/clientMessageEnvelope';
 
 function readImageFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -68,7 +62,7 @@ export function DeskStatusCommitButton({
   }, [profileId]);
   const currentStatus = sendStatusOptions.find((o) => o.id === sendStatus) || sendStatusOptions[0];
   const triggerTitle = disabled
-    ? (menuDisabledReason || 'Corrija os erros ortográficos antes de enviar')
+    ? (menuDisabledReason || 'Complete os requisitos antes de enviar')
     : undefined;
 
   useEffect(() => {
@@ -294,9 +288,6 @@ function InternalNoteFields({
   ticketId,
   internalText,
   onInternalTextChange,
-  tabulationConfig,
-  spellIgnoredWords,
-  onIgnoreSpellWord,
   placeholder = 'Digite uma anotação interna...',
   attachDisabled = false,
   showNotification,
@@ -312,21 +303,6 @@ function InternalNoteFields({
   const tid = String(ticketId);
   const localEditorRef = useRef(null);
   const internalEditorRef = externalEditorRef || localEditorRef;
-  const internalPlainText = useMemo(() => htmlToPlainText(internalText), [internalText]);
-
-  const handleInternalReplace = useCallback((startIndex, deleteCount, insertText) => {
-    internalEditorRef.current?.replacePlainRange(startIndex, deleteCount, insertText);
-  }, []);
-
-  const spell = useComposeSpellCheck({
-    text: internalPlainText,
-    onTextChange: onInternalTextChange,
-    onReplaceRange: handleInternalReplace,
-    tabulationConfig,
-    ignoredWords: spellIgnoredWords,
-    onIgnoreWord: onIgnoreSpellWord,
-    trackFlaggedErrors: false,
-  });
 
   const internalFormat = useComposeFormat({
     richEditorRef: internalEditorRef,
@@ -357,48 +333,28 @@ function InternalNoteFields({
   }, [onInternalTextChange]);
 
   const handleInternalKeyDown = (event) => {
-    if (internalFormat.handleKeyDown(event)) return;
-    spell.handleKeyDown({
-      ...event,
-      target: {
-        ...event.target,
-        selectionStart: internalEditorRef.current?.getCursor?.() ?? internalPlainText.length,
-        value: internalPlainText,
-      },
-    });
+    internalFormat.handleKeyDown(event);
   };
 
   return (
     <div className={
-      'crm-compose-editor-zone response-form internal-form crm-notes-compose__form spell-compose-wrap'
+      'crm-compose-editor-zone response-form internal-form crm-notes-compose__form'
       + (overlayFooter ? ' crm-compose-editor-zone--overlay-footer' : '')
     }>
       <div className="crm-notes-compose__header">
         <i className="fas fa-lock" aria-hidden="true" />
         <span>Nota interna — não enviada ao cliente</span>
       </div>
-      <SpellSuggestionBar
-        suggestion={spell.activeSuggestion}
-        loading={spell.spellLoading}
-        loadError={spell.spellLoadError}
-        onApply={spell.applySuggestion}
-        onDismiss={spell.dismissSuggestion}
-        onIgnore={spell.ignoreSuggestion}
-      />
       <ComposeRichEditor
         ref={internalEditorRef}
         id={'internalResponse-' + tid}
         className="response-textarea crm-notes-compose__textarea"
         placeholder={placeholder}
         value={internalText}
-        hasSpellErrors={spell.flaggedErrors.length > 0}
         readOnly={readOnly}
         onFormatStateChange={handleInternalFormatStateChange}
         onChange={handleInternalChange}
         onKeyDown={handleInternalKeyDown}
-        onBlur={spell.handleBlur}
-        onSelect={spell.handleSelect}
-        onClick={spell.handleClick}
       />
       {includeBottomBar ? (
       <ComposeBottomBar
@@ -435,9 +391,6 @@ export default function DeskComposePanel({
   onComposeTextChange,
   onComposeReviewed,
   onInternalTextChange,
-  spellIgnoredWords,
-  onIgnoreSpellWord,
-  onFlaggedErrorsChange,
   variant = 'full',
   workflowLocked = false,
   internalComposeLocked = false,
@@ -452,7 +405,6 @@ export default function DeskComposePanel({
   const [internalFormatState, setInternalFormatState] = useState(null);
   const useSharedBottomBar = variant === 'full';
   const composePlainText = useMemo(() => htmlToPlainText(composeText), [composeText]);
-  const { config: tabulationConfig } = useTabulation();
   const { user, colaborador } = useAuth();
   const { showNotification } = useNotifications();
   const [refinarOpen, setRefinarOpen] = useState(false);
@@ -482,21 +434,6 @@ export default function DeskComposePanel({
     [user, colaborador],
   );
 
-  const handlePublicReplace = useCallback((startIndex, deleteCount, insertText) => {
-    publicEditorRef.current?.replacePlainRange(startIndex, deleteCount, insertText);
-  }, []);
-
-  const spell = useComposeSpellCheck({
-    text: composePlainText,
-    onTextChange: onComposeTextChange,
-    onReplaceRange: handlePublicReplace,
-    tabulationConfig,
-    ignoredWords: spellIgnoredWords,
-    onIgnoreWord: onIgnoreSpellWord,
-    onFlaggedErrorsChange,
-    trackFlaggedErrors: true,
-  });
-
   const publicFormat = useComposeFormat({
     richEditorRef: publicEditorRef,
     mode: 'rich',
@@ -507,19 +444,13 @@ export default function DeskComposePanel({
   }, [onComposeTextChange]);
 
   const handlePublicKeyDown = (event) => {
-    if (publicFormat.handleKeyDown(event)) return;
-    spell.handleKeyDown({
-      ...event,
-      target: {
-        ...event.target,
-        selectionStart: publicEditorRef.current?.getCursor?.() ?? composePlainText.length,
-        value: composePlainText,
-      },
-    });
+    publicFormat.handleKeyDown(event);
   };
 
   const handleOpenRefinar = () => {
-    const texto = composePlainText.trim();
+    const texto = stripComposerOpening(composePlainText)
+      .replace(/^\s*\[Anexo:[^\]]*\]\s*$/gim, '')
+      .trim();
     if (!texto) {
       showNotification('Rascunho não localizado', 'warning');
       return;
@@ -664,36 +595,20 @@ export default function DeskComposePanel({
               {showPublic ? (
               <div className={'response-tab-content' + (variant === 'full' && composeMode !== 'public' ? '' : ' active')} id={'public-' + tid}>
                 <div className={
-                  'crm-compose-editor-zone response-form spell-compose-wrap'
+                  'crm-compose-editor-zone response-form'
                   + (useSharedBottomBar ? '' : ' crm-compose-editor-zone--overlay-footer')
                 }>
-                  <SpellErrorsPanel
-                    errors={spell.flaggedErrors}
-                    onApplyFix={spell.applyErrorFix}
-                  />
-                  <SpellSuggestionBar
-                    suggestion={spell.activeSuggestion}
-                    loading={spell.spellLoading}
-                    loadError={spell.spellLoadError}
-                    onApply={spell.applySuggestion}
-                    onDismiss={spell.dismissSuggestion}
-                    onIgnore={spell.ignoreSuggestion}
-                  />
                   <ComposeRichEditor
                     ref={publicEditorRef}
                     id={'publicResponse-' + tid}
                     className="response-textarea"
                     placeholder={publicPlaceholder}
                     value={composeText}
-                    hasSpellErrors={spell.flaggedErrors.length > 0}
                     expandable
                     readOnly={ticketReadOnly || publicLocked}
                     onFormatStateChange={publicFormat.handleFormatStateChange}
                     onChange={handlePublicChange}
                     onKeyDown={handlePublicKeyDown}
-                    onBlur={spell.handleBlur}
-                    onSelect={spell.handleSelect}
-                    onClick={spell.handleClick}
                   />
                   <ComposePendingAttachments
                     items={composeAttachments}
@@ -737,9 +652,6 @@ export default function DeskComposePanel({
                   ticketId={ticketId}
                   internalText={internalText}
                   onInternalTextChange={internalLocked ? () => {} : onInternalTextChange}
-                  tabulationConfig={tabulationConfig}
-                  spellIgnoredWords={spellIgnoredWords}
-                  onIgnoreSpellWord={onIgnoreSpellWord}
                   placeholder={internalPlaceholder}
                   showNotification={showNotification}
                   readOnly={internalLocked}

@@ -1,4 +1,7 @@
-/** permission.service v1.13.0 — atribuição do passo ativo quando tabulacao.atribuido vazio */
+/**
+ * permission.service v1.15.0 — VER vs ATUAR via overrides; atuar_sempre; sem seed/slug bypass
+ * VERSION: v1.15.0 | DATE: 2026-08-21
+ */
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { findColaboradorByEmail } from './colaboradoresCadastro.service';
@@ -17,7 +20,7 @@ import {
   normalizeStatusValue,
   readTabulacaoSnapshot,
 } from './chamado.mapper';
-import { sanitizeResponsavel } from './responsavel.util';
+import { sanitizeResponsavel, isRealResponsavel } from './responsavel.util';
 import {
   CANAL_ORIGEM_BY_FUNCAO,
   derivePortalVisivelFromPermissoes,
@@ -101,13 +104,7 @@ export async function resolveUserFuncoes(authUser: AuthPayload): Promise<string[
   }
 
   const funcoes = [...new Set(funcoesCollected.filter(Boolean))];
-
-  if (String(authUser.role || '').toLowerCase() === 'supervisor' && !funcoes.includes('gestao')) {
-    funcoes.push('gestao');
-  }
-
-  if (!funcoes.length) funcoes.push('atendimento');
-  return [...new Set(funcoes)];
+  return funcoes;
 }
 
 /** Bypass por conta — Configurações sempre visível, independente da função. */
@@ -177,7 +174,11 @@ async function resolveUserPermissionsUncached(authUser: AuthPayload): Promise<Re
 
   applyConfigAlwaysVisibleBypass(permissoes, authUser.email);
 
-  const candidates = buildResponsavelCandidates(authUser, dbUser);
+  const candidates = buildResponsavelCandidates(
+    authUser,
+    dbUser,
+    colaborador?.colaboradorNome || authUser.name || '',
+  );
 
   return {
     funcaoSlug,
@@ -215,7 +216,25 @@ function normalizeText(value: unknown): string {
 }
 
 function readTicketTabulacao(chamado: IChamadoN1) {
-  return readTabulacaoSnapshot(chamado.tabulacao?.[0]);
+  const tabulacao = chamado.tabulacao ?? [];
+  if (!tabulacao.length) return readTabulacaoSnapshot(null);
+  return readTabulacaoSnapshot(tabulacao[tabulacao.length - 1]);
+}
+
+function ticketSemResponsavelReal(chamado: IChamadoN1): boolean {
+  const tab = readTicketTabulacao(chamado);
+  return !isRealResponsavel(sanitizeResponsavel(tab.responsavel));
+}
+
+/** Escopo "ver_meus": responsável ou atribuído (colaborador/função) igual ao agente. */
+function matchesMeusTicketsView(
+  resolved: ResolvedUserPermissions,
+  chamado: IChamadoN1,
+): boolean {
+  if (matchesResponsavel(chamado, resolved.responsavelCandidates)) return true;
+  if (matchesAtribuidoColaborador(resolved, chamado)) return true;
+  if (matchesAtribuidoAnyUserFuncao(resolved, chamado)) return true;
+  return false;
 }
 
 function ticketCanalMatches(chamado: IChamadoN1, canalSlug: string): boolean {
@@ -364,12 +383,9 @@ function matchesAtribuidoColaborador(
   const raw = normalizeAtribuidoValue(tab.atribuido);
   if (!raw || raw.startsWith('funcao:') || raw.startsWith('grupo:')) return false;
   const atribuido = raw.toLowerCase();
-  return resolved.responsavelCandidates.some((candidate) => {
-    const normalized = candidate.toLowerCase();
-    return normalized === atribuido
-      || atribuido.includes(normalized)
-      || normalized.includes(atribuido);
-  });
+  return resolved.responsavelCandidates.some(
+    (candidate) => candidate.toLowerCase() === atribuido,
+  );
 }
 
 function matchesAssigneeValueForUser(
@@ -389,12 +405,9 @@ function matchesAssigneeValueForUser(
     return false;
   }
 
-  return resolved.responsavelCandidates.some((candidate) => {
-    const normalized = candidate.toLowerCase();
-    return normalized === atribuido
-      || atribuido.includes(normalized)
-      || normalized.includes(atribuido);
-  });
+  return resolved.responsavelCandidates.some(
+    (candidate) => candidate.toLowerCase() === atribuido,
+  );
 }
 
 async function matchesActiveWorkflowStepAssignee(
@@ -535,8 +548,7 @@ async function canActOnTicketAsync(
   if (teamQueue && !(await ticketMatchesWorkflowTeamAsync(chamado, teamQueue))) {
     return false;
   }
-  if (canActOnTicket(resolved, chamado)) return true;
-  return matchesWorkflowDefinitionTeam(resolved, chamado);
+  return canActOnTicket(resolved, chamado);
 }
 
 export function canActOnTicket(
@@ -545,7 +557,7 @@ export function canActOnTicket(
 ): boolean {
   const { permissoes, funcoes, responsavelCandidates } = resolved;
 
-  if (hasPermission(permissoes, 'tickets', 'ver_todos')) {
+  if (hasPermission(permissoes, 'tickets', 'atuar_sempre')) {
     return true;
   }
 
@@ -556,20 +568,18 @@ export function canActOnTicket(
     }
   }
 
-  if (matchesResponsavel(chamado, responsavelCandidates)) {
-    return hasPermission(permissoes, 'tickets', 'atuar_responsavel');
+  if (hasPermission(permissoes, 'tickets', 'atuar_responsavel')) {
+    if (matchesResponsavel(chamado, responsavelCandidates)) return true;
+    if (
+      ticketSemResponsavelReal(chamado)
+      && normalizeText(currentStatus(chamado)) === 'novo'
+    ) {
+      return true;
+    }
   }
 
-  // Atuação por atribuição / time do passo — guiada por overrides, não por slug fixo
   if (
     hasPermission(permissoes, 'tickets', 'atuar_atribuido')
-    && matchesWorkflowScope(resolved, chamado)
-  ) {
-    return true;
-  }
-
-  if (
-    hasPermission(permissoes, 'portal', 'workflow')
     && matchesWorkflowScope(resolved, chamado)
   ) {
     return true;
@@ -583,7 +593,13 @@ export function canViewTicket(
   chamado: IChamadoN1,
 ): boolean {
   if (hasPermission(resolved.permissoes, 'tickets', 'ver_todos')) return true;
-  if (isGestaoFuncao(resolved)) return true;
+
+  if (
+    hasPermission(resolved.permissoes, 'tickets', 'ver_meus')
+    && matchesMeusTicketsView(resolved, chamado)
+  ) {
+    return true;
+  }
 
   if (funcaoSlugCanal(resolved) && ticketCanalMatches(chamado, funcaoSlugCanal(resolved)!)) {
     return true;
@@ -596,10 +612,6 @@ export function canViewTicket(
     return true;
   }
 
-  if (hasPermission(resolved.permissoes, 'tickets', 'ver_meus')) {
-    return matchesResponsavel(chamado, resolved.responsavelCandidates);
-  }
-
   return canActOnTicket(resolved, chamado);
 }
 
@@ -610,13 +622,8 @@ function funcaoSlugCanal(resolved: ResolvedUserPermissions): string | null {
   return resolved.canalOrigem || null;
 }
 
-function isGestaoFuncao(resolved: ResolvedUserPermissions): boolean {
-  return resolved.funcaoSlug === 'gestao' || resolved.funcoes.includes('gestao');
-}
-
 export function shouldUseMeusChamadosFilter(resolved: ResolvedUserPermissions): boolean {
   if (hasPermission(resolved.permissoes, 'tickets', 'ver_todos')) return false;
-  if (isGestaoFuncao(resolved)) return false;
   if (shouldUseAtribuidoFuncaoQueue(resolved)) return false;
   return hasPermission(resolved.permissoes, 'tickets', 'ver_meus');
 }
@@ -632,7 +639,7 @@ export function resolveWorkflowTeamQueueForUser(
   resolved: ResolvedUserPermissions,
 ): string | null {
   if (
-    hasPermission(resolved.permissoes, 'tickets', 'ver_todos')
+    hasPermission(resolved.permissoes, 'tickets', 'atuar_sempre')
     && canApproveWorkflow(resolved)
   ) {
     return null;
@@ -723,10 +730,7 @@ export async function canWorkflowComunicacao(
   }
 
   if (await canActOnTicketAsync(resolved, chamado)) return true;
-  if (
-    canApproveWorkflow(resolved)
-    && hasPermission(resolved.permissoes, 'tickets', 'ver_todos')
-  ) {
+  if (canApproveWorkflow(resolved) && hasPermission(resolved.permissoes, 'tickets', 'atuar_sempre')) {
     return true;
   }
   return false;
@@ -737,8 +741,8 @@ export function canClaimTicketResponsavel(
   resolved: ResolvedUserPermissions,
   chamado: IChamadoN1,
 ): boolean {
+  if (hasPermission(resolved.permissoes, 'tickets', 'atuar_sempre')) return true;
   if (!hasPermission(resolved.permissoes, 'tickets', 'atuar_responsavel')) return false;
-  if (hasPermission(resolved.permissoes, 'tickets', 'ver_todos')) return true;
 
   const tab = readTicketTabulacao(chamado);
   const existing = sanitizeResponsavel(tab.responsavel);
@@ -910,7 +914,7 @@ export async function canUserActOnWorkflowStep(
   // Gestão / visão global em etapa de aprovação.
   if (
     isApprovalStep
-    && hasPermission(resolved.permissoes, 'tickets', 'ver_todos')
+    && hasPermission(resolved.permissoes, 'tickets', 'atuar_sempre')
     && canApproveWorkflow(resolved)
   ) {
     return true;

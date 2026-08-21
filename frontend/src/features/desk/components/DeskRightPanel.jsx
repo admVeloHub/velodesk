@@ -1,9 +1,9 @@
 /**
- * DeskRightPanel v1.14.0 — repassa gates do Enviar como
- * VERSION: v1.14.0 | DATE: 2026-08-21
+ * DeskRightPanel v1.15.0 — CE: motivo do órgão para RA/Procon/Bacen/C.Gov
+ * VERSION: v1.15.0 | DATE: 2026-08-21
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { DEFAULT_TIPO, TABULACAO_OPCOES_CATEGORIAS, hasApplyableTabulation, isReclameAquiCanal, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
+import { DEFAULT_TIPO, hasApplyableTabulation, isCasosEspeciaisCanal, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, resolveOrgaoMotivoCategoria, sanitizeResponsavel } from '../../../services/tabulationConfig';
 import { useTabulation } from '../../../context/TabulationContext';
 import { tabulationApi } from '../../../api/client';
 import { DeskStatusCommitButton } from './DeskComposePanel';
@@ -99,16 +99,17 @@ export default function DeskRightPanel({
   }, [rightFields.responsavel, ticket?.responsibleAgent, ticket?.lateralForm?.responsavel]);
 
   const canalValue = String(effectiveRightFields.canal || '').toLowerCase();
-  const skipTreeMotivo = isReclameAquiCanal(canalValue);
+  const skipTreeMotivo = isCasosEspeciaisCanal(canalValue);
+  const orgaoMotivoCategoria = resolveOrgaoMotivoCategoria(canalValue);
   const [orgaoMotivos, setOrgaoMotivos] = useState([]);
 
   useEffect(() => {
-    if (!skipTreeMotivo) {
+    if (!skipTreeMotivo || !orgaoMotivoCategoria) {
       setOrgaoMotivos([]);
       return undefined;
     }
     let cancelled = false;
-    tabulationApi.getOpcoes(TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI, false)
+    tabulationApi.getOpcoes(orgaoMotivoCategoria, false)
       .then((doc) => {
         if (cancelled) return;
         const list = (doc?.opcoes || [])
@@ -121,7 +122,7 @@ export default function DeskRightPanel({
         if (!cancelled) setOrgaoMotivos([]);
       });
     return () => { cancelled = true; };
-  }, [skipTreeMotivo]);
+  }, [skipTreeMotivo, orgaoMotivoCategoria]);
 
   const treeMotivoOptions = effectiveRightFields.produto ? getMotivos(effectiveRightFields.produto) : [];
   const motivoOptions = skipTreeMotivo ? orgaoMotivos : treeMotivoOptions;

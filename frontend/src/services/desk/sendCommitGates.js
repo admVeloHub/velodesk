@@ -1,31 +1,81 @@
 /**
- * sendCommitGates v1.0.0 — regras visíveis do botão Enviar como
- * VERSION: v1.0.0 | DATE: 2026-08-21
+ * sendCommitGates v1.2.0 — gates limitados a tabulação, revisão e permissão
+ * VERSION: v1.2.0 | DATE: 2026-08-21
  */
 import { COMPOSE_AI_REVIEW_REQUIRED } from './constants';
 import { normalizeComposePlain } from './composeRichEditor';
 import { validateTabulationForSendStatus } from '../tabulationConfig';
+import {
+  stripComposerOpening,
+  wrapComposerOpeningForTicket,
+} from './clientMessageEnvelope';
 
 export const SEND_GATE_REASON_TABULATION = 'tabulation';
 export const SEND_GATE_REASON_REVIEW = 'review';
-export const SEND_GATE_REASON_SPELL = 'spell';
 export const SEND_GATE_REASON_PERMISSION = 'permission';
+
+/**
+ * Revisor de Texto OU sugestão de resposta da IA no compose liberam envio público.
+ * @param {object} params
+ * @param {string} [params.composeHtml]
+ * @param {string} [params.composeReviewedPlain]
+ * @param {string} [params.iaRespostaSugerida]
+ * @param {object|null} [params.ticket]
+ * @param {string} [params.agentName]
+ */
+export function isComposePublicReviewSatisfied({
+  composeHtml,
+  composeReviewedPlain,
+  iaRespostaSugerida,
+  ticket,
+  agentName,
+}) {
+  const plain = normalizeComposePlain(composeHtml);
+  if (!plain) return true;
+  if (!COMPOSE_AI_REVIEW_REQUIRED) return true;
+
+  const reviewed = normalizeComposePlain(composeReviewedPlain);
+  if (reviewed && plain === reviewed) return true;
+
+  const iaNucleo = normalizeComposePlain(iaRespostaSugerida);
+  if (!iaNucleo) return false;
+
+  if (plain === iaNucleo) return true;
+  if (normalizeComposePlain(stripComposerOpening(plain)) === iaNucleo) return true;
+
+  if (ticket) {
+    const wrapped = wrapComposerOpeningForTicket({
+      nucleo: iaRespostaSugerida,
+      ticket,
+      agentName,
+    });
+    if (plain === normalizeComposePlain(wrapped)) return true;
+  }
+
+  return false;
+}
 
 /**
  * @param {object} params
  * @param {string} params.statusId
  * @param {object} params.rightFields
  * @param {object|null} params.config
- * @param {string} params.messageText — texto público plain
- * @param {string} params.composeReviewedPlain
+ * @param {string} [params.composeHtml]
+ * @param {string} [params.composeReviewedPlain]
+ * @param {string} [params.iaRespostaSugerida]
+ * @param {object|null} [params.ticket]
+ * @param {string} [params.agentName]
  * @param {boolean} params.hasCanceladoOption — perfil tem opção Cancelado
  */
 export function getSendCommitGateState({
   statusId,
   rightFields,
   config,
-  messageText,
+  composeHtml,
   composeReviewedPlain,
+  iaRespostaSugerida,
+  ticket,
+  agentName,
   hasCanceladoOption,
 }) {
   const status = String(statusId || '').trim();
@@ -34,11 +84,14 @@ export function getSendCommitGateState({
   const tabulation = validateTabulationForSendStatus(status, rightFields, config);
   const tabulationOk = bypass || tabulation.ok;
 
-  const hasPublicText = Boolean(String(messageText || '').trim());
-  const needsReview = hasPublicText
-    && COMPOSE_AI_REVIEW_REQUIRED
-    && normalizeComposePlain(messageText) !== String(composeReviewedPlain || '');
-  const reviewOk = bypass || !needsReview;
+  const hasPublicText = Boolean(normalizeComposePlain(composeHtml));
+  const reviewOk = bypass || !hasPublicText || isComposePublicReviewSatisfied({
+    composeHtml,
+    composeReviewedPlain,
+    iaRespostaSugerida,
+    ticket,
+    agentName,
+  });
 
   /** @type {string[]} */
   const reasons = [];

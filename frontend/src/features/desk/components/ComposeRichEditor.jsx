@@ -1,6 +1,6 @@
 /**
- * ComposeRichEditor v1.2.1 — insertImage aceita data-gcs-key
- * VERSION: v1.2.1 | DATE: 2026-08-20
+ * ComposeRichEditor v1.3.0 — remove estado de erros ortográficos legado
+ * VERSION: v1.3.0 | DATE: 2026-08-21
  */
 import React, {
   forwardRef,
@@ -29,11 +29,7 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
   value,
   onChange,
   onKeyDown,
-  onBlur,
-  onSelect,
-  onClick,
   onFormatStateChange,
-  hasSpellErrors = false,
   expandable = false,
   readOnly = false,
 }, ref) {
@@ -115,8 +111,7 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
     setExpanded(false);
   }, [id]);
 
-  const wrapClass = 'compose-rich-editor-wrap spell-textarea-wrap'
-    + (hasSpellErrors ? ' spell-textarea-wrap--has-errors' : '')
+  const wrapClass = 'compose-rich-editor-wrap'
     + (expandable ? ' compose-rich-editor-wrap--expandable' : '')
     + (expanded ? ' compose-rich-editor-wrap--expanded' : '');
 
@@ -126,7 +121,7 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
         <div
           ref={editorRef}
           id={id}
-          className={'compose-rich-editor response-textarea spell-textarea-input '
+          className={'compose-rich-editor response-textarea '
             + className
             + (expanded ? ' compose-rich-editor--expanded' : '')}
           contentEditable={!readOnly}
@@ -136,7 +131,6 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
           aria-readonly={readOnly || undefined}
           data-placeholder={placeholder || ''}
           data-ai-skip="true"
-          spellCheck={!readOnly}
           lang="pt-BR"
           onInput={() => {
             if (readOnly) return;
@@ -147,7 +141,7 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
           onMouseUp={readOnly ? undefined : notifyFormatState}
           onFocus={readOnly ? undefined : notifyFormatState}
           onKeyDown={readOnly ? undefined : onKeyDown}
-          onBlur={readOnly ? undefined : ((event) => {
+          onBlur={readOnly ? undefined : (() => {
             emitChange();
             onFormatStateChange?.({
               bold: false,
@@ -156,34 +150,12 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
               bulletList: false,
               numberedList: false,
             });
-            onBlur?.({
-              ...event,
-              target: {
-                ...event.target,
-                selectionStart: getPlainOffset(editorRef.current),
-                value: htmlToPlainText(readEditorHtml(editorRef.current)),
-              },
-            });
           })}
-          onSelect={readOnly ? undefined : ((event) => {
+          onSelect={readOnly ? undefined : (() => {
             notifyFormatState();
-            onSelect?.({
-              ...event,
-              target: {
-                ...event.target,
-                selectionStart: getPlainOffset(editorRef.current),
-              },
-            });
           })}
-          onClick={readOnly ? undefined : ((event) => {
+          onClick={readOnly ? undefined : (() => {
             notifyFormatState();
-            onClick?.({
-              ...event,
-              target: {
-                ...event.target,
-                selectionStart: getPlainOffset(editorRef.current),
-              },
-            });
           })}
         />
         {expandable ? (

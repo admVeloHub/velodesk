@@ -1,11 +1,11 @@
 /**
- * permissionService v1.9.2 — userFuncaoSlugs com normalizeFuncao
- * VERSION: v1.9.2 | DATE: 2026-08-21
+ * permissionService v1.11.0 — VER vs ATUAR via overrides; atuar_sempre; sem seed/slug bypass
+ * VERSION: v1.11.0 | DATE: 2026-08-21
  */
 import api from '../../api/client';
 import { normalizeProfileId } from '../../config/profiles';
 import { isWorkflowTeamQueueId } from '../workflow/workflowTeamQueues';
-import { sanitizeResponsavel } from '../tabulationConfig';
+import { sanitizeResponsavel, isRealResponsavel } from '../tabulationConfig';
 import { normalizeFuncao } from '../desk/atuacaoVision';
 
 const STORAGE_KEY = 'velodesk_permissions';
@@ -105,10 +105,6 @@ export function getAllowedProfilePortals(perm = readCachedPermissions()) {
     ),
   ].filter((id) => ALL_PROFILE_PORTALS.includes(id));
 
-  const isGestaoFuncao = sources.some(
-    (source) => source?.funcaoSlug === 'gestao' || (source?.funcoes || []).includes('gestao'),
-  );
-
   const hasGestaoPortal = merged.includes('gestao');
 
   const hasFullPortalFlags = sources.some((source) => {
@@ -116,7 +112,7 @@ export function getAllowedProfilePortals(perm = readCachedPermissions()) {
     return portal.gestao === true && portal.workflow === true && portal.especiais === true;
   });
 
-  if (isGestaoFuncao || hasGestaoPortal || hasFullPortalFlags) {
+  if (hasGestaoPortal || hasFullPortalFlags) {
     return [...ALL_PROFILE_PORTALS];
   }
 
@@ -207,7 +203,6 @@ export function hasWorkflowPortalAccess(perm = readCachedPermissions()) {
 export function shouldUseMeusChamadosFila(perm = readCachedPermissions()) {
   if (!perm) return true;
   if (hasPermission(perm.permissoes, 'tickets', 'ver_todos')) return false;
-  if (perm.funcaoSlug === 'gestao' || (perm.funcoes || []).includes('gestao')) return false;
   if (
     hasPermission(perm.permissoes, 'tickets', 'atuar_atribuido')
     && hasPermission(perm.permissoes, 'portal', 'workflow')
@@ -298,6 +293,20 @@ function matchesAtribuidoColaborador(ticket, perm) {
   return candidates.includes(raw);
 }
 
+function ticketSemResponsavelReal(ticket) {
+  const responsavel = sanitizeResponsavel(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
+  return !isRealResponsavel(responsavel);
+}
+
+function matchesMeusTicketsView(ticket, perm) {
+  const candidates = buildResponsavelCandidatesFromSession();
+  const responsavel = sanitizeResponsavel(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
+  if (responsavel && candidates.includes(normalizeText(responsavel))) return true;
+  if (matchesAtribuidoColaborador(ticket, perm)) return true;
+  if (matchesAtribuidoAnyUserFuncao(ticket, perm)) return true;
+  return false;
+}
+
 function matchesWorkflowScope(ticket, perm) {
   return matchesAtribuidoAnyUserFuncao(ticket, perm)
     || matchesAtribuidoColaborador(ticket, perm)
@@ -308,7 +317,9 @@ export function canActOnTicket(ticket, perm = readCachedPermissions()) {
   if (!perm) return false;
   const { permissoes, funcoes = [] } = perm;
 
-  if (hasPermission(permissoes, 'tickets', 'ver_todos')) return true;
+  if (hasPermission(permissoes, 'tickets', 'atuar_sempre')) {
+    return true;
+  }
 
   for (const cf of funcoes) {
     if (CANAL_ORIGEM_BY_FUNCAO[cf] && hasPermission(permissoes, 'tickets', 'atuar_canal_especial')) {
@@ -316,33 +327,18 @@ export function canActOnTicket(ticket, perm = readCachedPermissions()) {
     }
   }
 
-  const responsavel = sanitizeResponsavel(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
   const candidates = buildResponsavelCandidatesFromSession();
+  const responsavel = sanitizeResponsavel(ticket?.lateralForm?.responsavel || ticket?.responsibleAgent);
 
-  if (!responsavel) {
-    if (
-      hasPermission(permissoes, 'tickets', 'atuar_atribuido')
-      && matchesWorkflowScope(ticket, perm)
-    ) {
+  if (hasPermission(permissoes, 'tickets', 'atuar_responsavel')) {
+    if (responsavel && candidates.some((c) => c === normalizeText(responsavel))) return true;
+    if (ticketSemResponsavelReal(ticket) && normalizeText(ticket?.status || '') === 'novo') {
       return true;
     }
-    return false;
-  }
-
-  const normalizedResp = normalizeText(responsavel);
-  if (candidates.some((c) => c === normalizedResp) && hasPermission(permissoes, 'tickets', 'atuar_responsavel')) {
-    return true;
   }
 
   if (
     hasPermission(permissoes, 'tickets', 'atuar_atribuido')
-    && matchesWorkflowScope(ticket, perm)
-  ) {
-    return true;
-  }
-
-  if (
-    hasPermission(permissoes, 'portal', 'workflow')
     && matchesWorkflowScope(ticket, perm)
   ) {
     return true;
@@ -416,9 +412,7 @@ function ticketAtribuidoMatchesSession(ticket, perm) {
   if (!raw || raw.startsWith('funcao:') || raw.startsWith('grupo:')) return false;
   const atribuido = normalizeText(raw);
   const candidates = buildResponsavelCandidatesFromSession();
-  if (candidates.includes(atribuido)) return true;
-  const agent = normalizeText(perm?.colaboradorNome);
-  return Boolean(agent && (atribuido === agent || atribuido.includes(agent) || agent.includes(atribuido)));
+  return candidates.includes(atribuido);
 }
 
 export function ticketMatchesAgentResponsavel(ticket, perm = readCachedPermissions()) {
@@ -438,8 +432,13 @@ export function ticketMatchesAgentResponsavel(ticket, perm = readCachedPermissio
 
 export function filterTicketForUser(ticket, perm = readCachedPermissions()) {
   if (hasPermission(perm?.permissoes, 'tickets', 'ver_todos')) return true;
-  if (canActOnTicket(ticket, perm)) return true;
-  return ticketMatchesAgentResponsavel(ticket, perm);
+  if (
+    hasPermission(perm?.permissoes, 'tickets', 'ver_meus')
+    && matchesMeusTicketsView(ticket, perm)
+  ) {
+    return true;
+  }
+  return canActOnTicket(ticket, perm);
 }
 
 /**
@@ -449,7 +448,7 @@ export function filterTicketForUser(ticket, perm = readCachedPermissions()) {
 export function resolveWorkflowTeamQueueForUser(perm = readCachedPermissions()) {
   if (!perm) return null;
   if (
-    hasPermission(perm.permissoes, 'tickets', 'ver_todos')
+    hasPermission(perm.permissoes, 'tickets', 'atuar_sempre')
     && canApproveWorkflow(perm)
   ) {
     return null;
@@ -460,8 +459,8 @@ export function resolveWorkflowTeamQueueForUser(perm = readCachedPermissions()) 
   return slugs.find((slug) => isWorkflowTeamQueueId(slug)) || null;
 }
 
-/** Gestão (ver_todos) ou perfil com fila de atribuição no Workflow. */
+/** Console consolidado de aprovação — atuar_sempre + aprovar ou fila de time. */
 export function canAccessWorkflowApprovalConsole(perm = readCachedPermissions()) {
   if (resolveWorkflowTeamQueueForUser(perm)) return true;
-  return canApproveWorkflow(perm) && hasPermission(perm?.permissoes, 'tickets', 'ver_todos');
+  return canApproveWorkflow(perm) && hasPermission(perm?.permissoes, 'tickets', 'atuar_sempre');
 }
