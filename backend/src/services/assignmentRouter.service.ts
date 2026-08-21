@@ -1,4 +1,4 @@
-/** assignmentRouter.service v1.4.2 — provisionalResponsavel nunca grava rótulo genérico */
+/** assignmentRouter.service v1.4.3 — responsável gravado só como nome/alias (nunca login/e-mail) */
 import { env } from '../config/env';
 import type { AuthPayload } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -8,7 +8,11 @@ import { listAgentesDesk } from './agenteDesk.service';
 import { listColaboradoresDesk } from './colaboradoresCadastro.service';
 import { extractFuncoes } from '../utils/normalizeFuncao';
 import { currentStatus, isConsumidorGovChamado, isProconChamado } from './chamado.mapper';
-import { isRealResponsavel } from './responsavel.util';
+import {
+  isRealResponsavel,
+  looksLikeNonDisplayResponsavelToken,
+  resolveResponsavelDisplayNameSync,
+} from './responsavel.util';
 
 type RoletaPoolAgent = {
   email: string;
@@ -34,12 +38,16 @@ function emailLocalPart(email?: string): string {
   return normalized.split('@')[0] ?? '';
 }
 
-/** Identificador do agente — nome real preferido; fallback e-mail local. Nunca retorna rótulo genérico. */
+/** Identificador do agente — alias ou primeiro+último; nunca e-mail/login. */
 export function provisionalResponsavelFromUser(user: { name?: string; email?: string }): string {
   const name = String(user.name ?? '').trim();
-  if (name && isRealResponsavel(name)) return name;
-  const fromEmail = emailLocalPart(user.email);
-  if (fromEmail && isRealResponsavel(fromEmail)) return fromEmail;
+  if (name && isRealResponsavel(name) && !looksLikeNonDisplayResponsavelToken(name)) {
+    const resolved = resolveResponsavelDisplayNameSync(name);
+    if (resolved) return resolved;
+    return name;
+  }
+  const fromEmail = resolveResponsavelDisplayNameSync(user.email);
+  if (fromEmail) return fromEmail;
   return '';
 }
 

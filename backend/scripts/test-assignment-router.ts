@@ -18,12 +18,12 @@ function assert(condition: boolean, message: string) {
 
 function testProvisionalResponsavel() {
   assert(
-    provisionalResponsavelFromUser({ email: 'lucas.gravina@velodesk.local' }) === 'lucas.gravina',
-    'deve usar prefixo do e-mail'
+    provisionalResponsavelFromUser({ email: 'lucas.gravina@velodesk.local' }) === '',
+    'não deve usar prefixo do e-mail como responsável'
   );
   assert(
     provisionalResponsavelFromUser({ name: 'Ana Silva' }) === 'Ana Silva',
-    'fallback para nome quando sem e-mail'
+    'deve usar nome quando informado'
   );
 }
 
@@ -114,8 +114,12 @@ function testSessionResponsavel() {
 
 function testProvisionalFromAuth() {
   assert(
-    provisionalResponsavelFromAuth({ userId: '1', email: 'lucas@x.com', role: 'agent' }) === 'lucas',
-    'auth usa prefixo do e-mail'
+    provisionalResponsavelFromAuth({ userId: '1', email: 'lucas@x.com', role: 'agent', name: 'Lucas Silva' }) === 'Lucas Silva',
+    'auth usa nome do token, não prefixo do e-mail'
+  );
+  assert(
+    provisionalResponsavelFromAuth({ userId: '1', email: 'lucas@x.com', role: 'agent' }) === '',
+    'auth sem nome não usa prefixo do e-mail'
   );
 }
 

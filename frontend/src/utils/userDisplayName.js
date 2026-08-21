@@ -1,6 +1,6 @@
 /**
- * userDisplayName v1.2.0 — nome do operador só via cadastro do colaborador logado
- * VERSION: v1.2.0 | DATE: 2026-07-29
+ * userDisplayName v1.3.0 — responsável: alias ou primeiro+último (nunca login/e-mail)
+ * VERSION: v1.3.0 | DATE: 2026-08-20
  *
  * Regra (funcionarios_cadastroColaboradores):
  * - aliasColaborador preenchido → aliasColaborador
@@ -49,4 +49,71 @@ export function isLegacyDeskUser(user) {
   if (email === 'admin@velodesk.local') return true;
   if (user.source === 'dev-local') return true;
   return false;
+}
+
+function normalizeLookupKey(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function emailLocalPart(email) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized.includes('@')) return normalized;
+  return normalized.split('@')[0] ?? '';
+}
+
+/** E-mail, login ou token sem espaço — nunca exibir como responsável. */
+export function looksLikeNonDisplayResponsavelToken(value) {
+  const v = String(value ?? '').trim();
+  if (!v) return false;
+  if (v.includes('@')) return true;
+  if (/^[a-z0-9._-]+$/i.test(v) && !/\s/.test(v)) return true;
+  return false;
+}
+
+/** Mapa chave (email, login, nome) → nome exibido a partir da lista de colaboradores Desk. */
+export function buildResponsavelDisplayIndex(colaboradores = []) {
+  const map = new Map();
+  (colaboradores || []).forEach((col) => {
+    const raw = col?.raw || col;
+    const display = resolveAgentDisplayName({
+      aliasColaborador: raw?.aliasColaborador,
+      colaboradorNome: raw?.colaboradorNome || col?.colaboradorNome,
+    });
+    if (!display) return;
+    const keys = new Set();
+    const push = (value) => {
+      const trimmed = String(value || '').trim();
+      if (!trimmed) return;
+      keys.add(trimmed.toLowerCase());
+      keys.add(normalizeLookupKey(trimmed));
+    };
+    push(raw?.userMail || col?.email);
+    push(emailLocalPart(raw?.userMail || col?.email));
+    push(raw?.colaboradorNome || col?.colaboradorNome);
+    push(resolveFirstLastName(raw?.colaboradorNome || col?.colaboradorNome));
+    push(display);
+    keys.forEach((key) => map.set(key, display));
+  });
+  return map;
+}
+
+/** Formata valor persistido de responsável para exibição (alias ou primeiro+último). */
+export function formatResponsavelDisplay(raw, colaboradores = []) {
+  const stored = String(raw ?? '').trim();
+  if (!stored) return '';
+
+  const index = buildResponsavelDisplayIndex(colaboradores);
+  const keys = [normalizeLookupKey(stored), stored.toLowerCase()];
+  for (let i = 0; i < keys.length; i += 1) {
+    const hit = index.get(keys[i]);
+    if (hit) return hit;
+  }
+
+  if (looksLikeNonDisplayResponsavelToken(stored)) return '';
+  return stored;
 }

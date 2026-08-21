@@ -1,4 +1,4 @@
-/** tickets.routes v1.26.0 — workflow cancel ao encerrar ticket (contrato workflowStatus) */
+/** tickets.routes v1.26.1 — GET /:id ignora rascunho draft-* sem CastError */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -71,6 +71,7 @@ import {
 import { requestWhatsAppAudioTranscription } from '../services/twilio/whatsappAudioTranscription.service';
 import { resolveSentAttachmentSendMeta } from '../services/sentAttachmentStorage.service';
 import { notifyWorkflowMensagemToResponsavel } from '../services/workflowNotificacao.service';
+import { isDraftTicketId } from '../utils/persistedTicketId';
 
 const router = Router();
 
@@ -153,6 +154,9 @@ router.post('/:sourceId/merge-into/:targetId', authMiddleware, async (req, res: 
 });
 
 router.get('/:id', authMiddleware, async (req, res: Response) => {
+  if (isDraftTicketId(req.params.id)) {
+    return res.status(404).json({ message: 'Ticket não encontrado' });
+  }
   let chamado = await ChamadoN1.findById(req.params.id);
   if (!chamado) return res.status(404).json({ message: 'Ticket não encontrado' });
   await reconcileChamadoAttachmentScanStatuses(String(chamado._id));

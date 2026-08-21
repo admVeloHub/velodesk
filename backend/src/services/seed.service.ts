@@ -1,12 +1,9 @@
-/** seed.service v1.9.0 — seed e-mails de saída */
+/** seed.service v1.10.0 — tabulação sem produtos telecom hardcoded */
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { getClienteModel } from '../models/Cliente';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
 import { getDeskFuncaoPermissaoModel } from '../models/DeskFuncaoPermissao';
-import {
-  DEFAULT_TABULACAO_PRODUTOS,
-  invalidateTabulationCache,
-} from './tabulation.service';
+import { invalidateTabulationCache } from './tabulation.service';
 import { ensureOrgaoMotivoCategorias } from './tabulationOpcoes.service';
 import { seedWorkflowConfig } from './workflowConfigSeed.service';
 import { seedFuncoesPermissoes, invalidateFuncaoPermissaoCache } from './funcaoPermissao.service';
@@ -32,7 +29,6 @@ export async function purgeAllMockTickets(): Promise<{ tickets: number; clients:
       { chamadoTitulo: { $regex: /^\[TESTE\]/i } },
       { 'cliente.clienteCpf': { $in: ALL_DEMO_CPFS } },
       { chamadoTitulo: { $regex: /maria silva|teste persistencia|lentidão internet fibra/i } },
-      { chamadoTitulo: 'Lentidão Internet Fibra' },
       { 'registro.metadados.seedSource': 'workflow-test-seed' },
     ],
   };
@@ -106,14 +102,7 @@ async function seedTabulationConfig() {
   const Produto = getTabulacaoProdutoModel();
   const produtoCount = await Produto.countDocuments();
   if (produtoCount === 0) {
-    await Produto.insertMany(
-      DEFAULT_TABULACAO_PRODUTOS.map((item) => ({
-        ...item,
-        ativo: true,
-        updatedBy: 'seed',
-      })),
-    );
-    console.log(`Seed: ${DEFAULT_TABULACAO_PRODUTOS.length} produto(s) de tabulação criados`);
+    console.log('Seed: nenhum produto de tabulação — configure em Configurações > Tabulação');
   }
 
   await ensureOrgaoMotivoCategorias();

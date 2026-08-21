@@ -1,18 +1,18 @@
 /**
- * useTicketAiSuggestions v1.12.1 — cache por ticket; não refaz POST no flicker de thread/permissões
- * VERSION: v1.12.1 | DATE: 2026-08-20
+ * useTicketAiSuggestions v1.12.5 — coalesce fetch por ticket; debounce usa hash mais recente
+ * VERSION: v1.12.5 | DATE: 2026-08-20
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ticketAiApi, agentsApi } from '../api/client';
 import { htmlToPlainText } from '../services/desk/composeRichEditor';
 import { getClientContactFields, getAgentName, isWhatsAppCustomerSessionOpen, buildWhatsAppConvMsgs } from '../services/desk/utils';
+import { findTicketEntry } from '../services/ticketsStorage';
 import {
   buildAgentInternalNotesFingerprint,
   buildClientThreadFingerprint,
   isLastPublicInteractionFromAgent,
 } from '../services/desk/ticketThreadSync';
 
-export const TICKET_AI_INTERNAL_NOTE_MIN_CHARS = 80;
 const PUBLIC_DEBOUNCE_MS = 2000;
 const INTERNAL_DEBOUNCE_MS = 1500;
 const LOG_PREFIX = '[ticket-ai-desk]';
@@ -77,6 +77,12 @@ function hasClientMessage(messages) {
   return (messages || []).some((m) => m.type === 'client');
 }
 
+function noteDedupeKey(ts, text) {
+  const plain = htmlToPlainText(String(text || '')).trim();
+  if (!plain) return '';
+  return `${ts || ''}:${plain}`;
+}
+
 function collectInternalNotesPlain(ticket, currentDraftPlain) {
   const notes = [];
   const seen = new Set();
@@ -84,8 +90,8 @@ function collectInternalNotesPlain(ticket, currentDraftPlain) {
   (ticket?.internalNotes || []).forEach((note) => {
     const text = String(note.text || note.message || '').trim();
     if (!text) return;
-    const key = `${note.timestamp || note.time || ''}:${text}`;
-    if (seen.has(key)) return;
+    const key = noteDedupeKey(note.timestamp || note.time, text);
+    if (!key || seen.has(key)) return;
     seen.add(key);
     notes.push({
       ts: note.timestamp || note.time,
@@ -97,8 +103,8 @@ function collectInternalNotesPlain(ticket, currentDraftPlain) {
   (ticket?.registroHistorico || ticket?.registroAlteracoes || []).forEach((entry) => {
     const text = String(entry.anotacaoInterna ?? '').trim();
     if (!text) return;
-    const key = `${entry.time || entry.timestamp || ''}:${text}`;
-    if (seen.has(key)) return;
+    const key = noteDedupeKey(entry.time || entry.timestamp, text);
+    if (!key || seen.has(key)) return;
     seen.add(key);
     notes.push({
       ts: entry.time || entry.timestamp,
@@ -235,8 +241,15 @@ function formatSuggestError(err) {
  * @param {object} rightFields
  * @param {Array} convMsgs — thread pública (buildRegistroThread)
  * @param {string} internalText — HTML da anotação interna
+ * @param {number} ticketRevision — incrementar após patch local (ex.: Enviar Nota em rascunho)
  */
-export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalText) {
+export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, internalText, ticketRevision = 0) {
+  const ticket = useMemo(() => {
+    void ticketRevision;
+    const id = String(ticketProp?.id || ticketProp?._id || '').trim();
+    if (!id) return ticketProp;
+    return findTicketEntry(id)?.ticket || ticketProp;
+  }, [ticketProp, ticketRevision]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [respostaSugerida, setRespostaSugerida] = useState('');
@@ -263,11 +276,21 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
   const lastTicketIdRef = useRef('');
   const stickyClientFpRef = useRef('');
   const scheduledHashRef = useRef('');
+  const currentAiRefreshKeyRef = useRef('');
+  const suggestInFlightCountRef = useRef(0);
+  const suggestGenerationRef = useRef(0);
+  const inFlightTicketIdRef = useRef('');
+  const pendingHashAfterFlightRef = useRef('');
 
   const internalPlain = useMemo(() => htmlToPlainText(internalText || '').trim(), [internalText]);
+  const persistedInternalPlainLen = useMemo(() => (
+    (ticket?.internalNotes || []).reduce((sum, note) => (
+      sum + htmlToPlainText(String(note.text || note.message || '')).trim().length
+    ), 0)
+  ), [ticket, ticketRevision]);
   const internalNotesBlock = useMemo(
     () => collectInternalNotesPlain(ticket, internalPlain),
-    [ticket, internalPlain],
+    [ticket, internalPlain, ticketRevision],
   );
   const aiMsgs = useMemo(() => mergePublicMessagesForAi(convMsgs, ticket), [convMsgs, ticket]);
   /**
@@ -298,13 +321,16 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
   const canFetch = useMemo(() => {
     if (!ticket) return false;
     if (useInternalContext) {
-      return internalNotesBlock.length >= TICKET_AI_INTERNAL_NOTE_MIN_CHARS;
+      return persistedInternalPlainLen > 0 || internalPlain.length > 0;
     }
     if (awaitingClientAfterAgentReply) return false;
     return true;
-  }, [ticket, useInternalContext, internalNotesBlock, awaitingClientAfterAgentReply]);
+  }, [ticket, useInternalContext, persistedInternalPlainLen, internalPlain, awaitingClientAfterAgentReply]);
 
-  const notesFp = buildAgentInternalNotesFingerprint(ticket);
+  const notesFp = useMemo(
+    () => buildAgentInternalNotesFingerprint(ticket),
+    [ticket, ticketRevision],
+  );
   const aiRefreshKey = (!ticket || !canFetch)
     ? ''
     : [
@@ -313,6 +339,8 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       useInternalContext ? 'internal-context' : 'client',
       useInternalContext ? notesFp : clientFp,
     ].join('::');
+
+  currentAiRefreshKeyRef.current = aiRefreshKey;
 
   fetchContextRef.current = {
     ticket,
@@ -383,15 +411,24 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       return;
     }
 
-    if (inFlightHashRef.current === hash) {
-      logTicketAi('info', 'Fetch ignorado — mesmo contexto já em andamento.', {
-        ticketId: payload.ticketId,
-        contextHash: hashPreview(hash),
+    const ticketId = String(payload.ticketId || '');
+    if (inFlightTicketIdRef.current === ticketId) {
+      if (inFlightHashRef.current === hash) {
+        logTicketAi('info', 'Fetch ignorado — mesmo contexto já em andamento.', {
+          ticketId: payload.ticketId,
+          contextHash: hashPreview(hash),
+        });
+        return;
+      }
+      pendingHashAfterFlightRef.current = hash;
+      logTicketAi('info', 'Fetch coalesced — aguardando requisição em andamento para o ticket.', {
+        ticketId,
+        pendingHash: hashPreview(hash),
+        inFlightHash: hashPreview(inFlightHashRef.current),
       });
       return;
     }
 
-    const ticketId = String(payload.ticketId || '');
     const stored = AI_SUGGESTION_STORE.get(ticketId);
     const cached = cacheRef.current.get(hash) || (stored?.hash === hash ? stored.result : null);
     if (cached) {
@@ -419,10 +456,12 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       return;
     }
 
-    abortRef.current?.abort();
+    const generation = suggestGenerationRef.current;
     const controller = new AbortController();
     abortRef.current = controller;
     inFlightHashRef.current = hash;
+    inFlightTicketIdRef.current = ticketId;
+    suggestInFlightCountRef.current += 1;
 
     setLoading(true);
     setError(null);
@@ -449,6 +488,17 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     try {
       const data = await ticketAiApi.suggest(payload, { signal: controller.signal });
       if (controller.signal.aborted) return;
+      if (generation !== suggestGenerationRef.current) return;
+
+      if (hash !== currentAiRefreshKeyRef.current) {
+        logTicketAi('info', 'Sugestão ignorada — contexto do ticket mudou durante o fetch.', {
+          ticketId: payload.ticketId,
+          fetched: hashPreview(hash),
+          current: hashPreview(currentAiRefreshKeyRef.current),
+        });
+        pendingHashAfterFlightRef.current = currentAiRefreshKeyRef.current;
+        return;
+      }
 
       const auditDone = isAuditComplete(data, agentsEnabledRef.current);
       const result = {
@@ -497,6 +547,7 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       });
     } catch (err) {
       if (controller.signal.aborted) return;
+      if (err?.code === 'ERR_CANCELED' || err?.message === 'canceled') return;
       const status = err?.response?.status;
       const msg = formatSuggestError(err);
       if (status === 503) {
@@ -522,16 +573,39 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
       if (inFlightHashRef.current === hash) {
         inFlightHashRef.current = '';
       }
-      if (!controller.signal.aborted) {
+      if (inFlightTicketIdRef.current === ticketId) {
+        inFlightTicketIdRef.current = '';
+      }
+      suggestInFlightCountRef.current = Math.max(0, suggestInFlightCountRef.current - 1);
+      if (suggestInFlightCountRef.current === 0) {
         setLoading(false);
+      }
+      const pending = pendingHashAfterFlightRef.current;
+      if (
+        pending
+        && pending !== lastFetchedHashRef.current
+        && pending === currentAiRefreshKeyRef.current
+        && !serviceUnavailableRef.current
+      ) {
+        pendingHashAfterFlightRef.current = '';
+        void fetchSuggestions(pending, buildPayload(fetchContextRef.current));
+      } else if (pendingHashAfterFlightRef.current === pending) {
+        pendingHashAfterFlightRef.current = '';
       }
     }
   }, []);
 
   useEffect(() => {
+    suggestGenerationRef.current += 1;
     abortRef.current?.abort();
+    abortRef.current = null;
+    suggestInFlightCountRef.current = 0;
+    setLoading(false);
     inFlightHashRef.current = '';
+    inFlightTicketIdRef.current = '';
+    pendingHashAfterFlightRef.current = '';
     scheduledHashRef.current = '';
+    currentAiRefreshKeyRef.current = '';
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
@@ -599,6 +673,8 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
           ticketId,
           reason,
           internalPlainChars: internalPlain.length,
+          persistedInternalPlainChars: persistedInternalPlainLen,
+          persistedNotes: ticket?.internalNotes?.length ?? 0,
         });
       } else {
         logTicketAi('info', 'Agente respondeu por último — sugestão IA pausada até nova mensagem do cliente.', {
@@ -646,7 +722,9 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     scheduledHashRef.current = aiRefreshKey;
     debounceRef.current = setTimeout(() => {
       scheduledHashRef.current = '';
-      fetchSuggestions(aiRefreshKey, buildPayload(fetchContextRef.current));
+      const latestHash = currentAiRefreshKeyRef.current;
+      if (!latestHash || latestHash === lastFetchedHashRef.current) return;
+      fetchSuggestions(latestHash, buildPayload(fetchContextRef.current));
     }, debounceMs);
 
     return () => {
@@ -666,6 +744,8 @@ export function useTicketAiSuggestions(ticket, rightFields, convMsgs, internalTe
     useInternalContext,
     fetchSuggestions,
     awaitingClientAfterAgentReply,
+    ticketRevision,
+    persistedInternalPlainLen,
   ]);
 
   useEffect(() => () => {

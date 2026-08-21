@@ -212,6 +212,12 @@ async function connectFuncionarios(): Promise<void> {
 export async function tryConnectFuncionarios(): Promise<boolean> {
   try {
     await connectFuncionarios();
+    if (isFuncionariosConnected()) {
+      const { warmResponsavelDisplayCache } = await import('../services/colaboradoresCadastro.service');
+      void warmResponsavelDisplayCache(true).catch((err) => {
+        console.warn('[responsavel] Falha ao aquecer índice de nomes:', (err as Error).message);
+      });
+    }
     return isFuncionariosConnected();
   } catch (err) {
     console.error(

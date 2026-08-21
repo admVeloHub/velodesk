@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.16.0 — proteção in-flight no merge /boxes + serialização de detalhe por ticket
- * VERSION: v1.16.0 | DATE: 2026-08-19 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.18.2 — loadTicketDetailFromApi ignora rascunho draft-*
+ * VERSION: v1.18.2 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -90,6 +90,69 @@ let loadBoxesFromApiChain = Promise.resolve();
 const detailLoadInFlight = new Set();
 const mergeProtectedTicketIds = new Set();
 const detailLoadChains = new Map();
+
+function collectTicketIdsFromColumns(cols) {
+  const ids = new Set();
+  (cols || []).forEach((box) => {
+    (box.tickets || []).forEach((ticket) => {
+      const id = ticketIdKey(ticket);
+      if (id) ids.add(id);
+    });
+  });
+  return ids;
+}
+
+/**
+ * Após GET /boxes: remove do cache tickets que a API não devolveu (ex.: apagados no Mongo).
+ * Mantém rascunhos locais e workflow pendente de persistência.
+ */
+function pruneTicketsAbsentFromApi(mergedCols, apiCols) {
+  const apiIds = collectTicketIdsFromColumns(apiCols);
+  const evictedIds = [];
+  const pruned = (mergedCols || []).map((box) => ({
+    ...box,
+    tickets: (box.tickets || []).filter((ticket) => {
+      if (isDraftTicket(ticket)) return true;
+      if (hasPendingWorkflowPersist(ticket)) return true;
+      const id = ticketIdKey(ticket);
+      if (!id) return false;
+      if (apiIds.has(id)) return true;
+      evictedIds.push(id);
+      mergeProtectedTicketIds.delete(id);
+      detailLoadInFlight.delete(id);
+      detailLoadChains.delete(id);
+      return false;
+    }),
+  }));
+  if (evictedIds.length) {
+    deskLog.tickets('pruneTicketsAbsentFromApi → fantasmas removidos', {
+      count: evictedIds.length,
+      ids: evictedIds,
+      apiTickets: apiIds.size,
+    });
+    evictedIds.forEach((id) => dispatchTicketEvicted(id));
+  }
+  return pruned;
+}
+
+/** Limpa cache local de filas (localStorage + memória) — útil após purge no Mongo. */
+export function clearBoxesLocalCache() {
+  columns = DEFAULT_BOXES.map((box) => ({ ...box, tickets: [] }));
+  mergeProtectedTicketIds.clear();
+  detailLoadInFlight.clear();
+  detailLoadChains.clear();
+  try {
+    localStorage.removeItem(BOXES_CACHE_KEY);
+  } catch {
+    /* ignore */
+  }
+  deskLog.tickets('clearBoxesLocalCache → cache de filas zerado');
+  try {
+    window.dispatchEvent(new CustomEvent('velodesk:tickets-cache-cleared'));
+  } catch {
+    /* ignore */
+  }
+}
 
 export { isDraftTicket };
 
@@ -260,6 +323,43 @@ function ticketHasClientContactData(ticket) {
     || Boolean(String(ticket.clientEmail || '').trim());
 }
 
+function shouldReinsertPreservedTicket(ticket, id) {
+  if (detailLoadInFlight.has(id)) return true;
+  if (hasPendingWorkflowPersist(ticket)) return true;
+  if (isDraftTicket(ticket)) return true;
+  return false;
+}
+
+function dispatchTicketEvicted(ticketId) {
+  try {
+    window.dispatchEvent(new CustomEvent('velodesk:ticket-evicted', {
+      detail: { ticketId: String(ticketId) },
+    }));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Remove ticket do cache local (Mongo apagou ou 404) — some das filas/caixas personalizadas. */
+export function evictTicketFromCache(ticketId, userEmail = '') {
+  const id = String(ticketId || '').trim();
+  if (!id || isDraftTicket({ id })) return false;
+  if (!findInColumns(id)) return false;
+  removeTicketFromColumns(id);
+  mergeProtectedTicketIds.delete(id);
+  detailLoadInFlight.delete(id);
+  detailLoadChains.delete(id);
+  persistColumnsToStorage(columns, userEmail);
+  dispatchTicketEvicted(id);
+  deskLog.tickets('evictTicketFromCache → removido', { ticketId: id });
+  return true;
+}
+
+export function isTicketMissingFromApiError(err) {
+  const status = err?.response?.status;
+  return status === 404 || status === 410;
+}
+
 function ticketIdKey(ticket) {
   return String(ticket?.id || ticket?._id || '').trim();
 }
@@ -348,6 +448,7 @@ function mergePreservedDetails(prevCols, nextCols) {
 
   preserved.forEach((ticket, id) => {
     if (presentIds.has(id)) return;
+    if (!shouldReinsertPreservedTicket(ticket, id)) return;
     const boxId = resolveBoxIdForTicketStatus(ticket.status);
     const box = merged.find((col) => col.id === boxId) || merged[0];
     if (!box) return;
@@ -482,6 +583,10 @@ async function loadTicketDetailFromApiOnce(ticketId) {
     });
     return full;
   } catch (err) {
+    if (isTicketMissingFromApiError(err)) {
+      evictTicketFromCache(id);
+      return null;
+    }
     deskLog.error('TICKETS', 'loadTicketDetailFromApi → falhou', {
       ticketId: id,
       status: err?.response?.status,
@@ -496,6 +601,10 @@ async function loadTicketDetailFromApiOnce(ticketId) {
 export async function loadTicketDetailFromApi(ticketId) {
   const id = String(ticketId || '').trim();
   if (!id) return null;
+  if (isDraftTicket({ id })) {
+    deskLog.tickets('loadTicketDetailFromApi → ignorado (rascunho local)', { ticketId: id });
+    return findInColumns(id)?.ticket || null;
+  }
   const run = () => loadTicketDetailFromApiOnce(id);
   const prev = detailLoadChains.get(id) || Promise.resolve();
   const next = prev.then(run, run);
@@ -564,7 +673,12 @@ async function loadBoxesFromApiOnce(userEmail = '') {
     );
     // Usa columns no momento do merge (não snapshot no início) — evita apagar detalhe
     // carregado via GET /:id enquanto a listagem /boxes ainda estava em voo.
-    columns = filterColumnsForAgent(mergePreservedDetails(columns, nextCols));
+    columns = filterColumnsForAgent(
+      pruneTicketsAbsentFromApi(
+        mergePreservedDetails(columns, nextCols),
+        nextCols,
+      ),
+    );
     persistColumnsToStorage(columns, userEmail);
     const ticketCount = columns.reduce((n, box) => n + (box.tickets?.length || 0), 0);
     const withRequisicao = columns.flatMap((b) => b.tickets || [])
@@ -726,7 +840,32 @@ export async function commitTicketViaApi(ticketId, payload) {
     assertApiReady('salvar ticket');
     const prevTicket = findInColumns(apiId)?.ticket;
     const hadPendingWorkflow = hasPendingWorkflowPersist(prevTicket);
-    await ticketsApi.commit(apiId, payload);
+    try {
+      await ticketsApi.commit(apiId, payload);
+      deskLog.action('commitTicketViaApi → ok', {
+        ticketId: apiId,
+        sendStatus: payload?.status,
+        hasText: Boolean(payload?.text),
+        hasInternal: Boolean(payload?.internalText),
+      });
+    } catch (err) {
+      const status = err?.response?.status;
+      const message = err?.response?.data?.message || err?.message || 'Erro ao salvar ticket';
+      if (isTicketMissingFromApiError(err)) {
+        evictTicketFromCache(apiId);
+      }
+      deskLog.error('TICKETS', 'commitTicketViaApi → falhou', {
+        ticketId: apiId,
+        status,
+        message,
+        sendStatus: payload?.status,
+      });
+      console.warn(`[VeloDesk] commit falhou (${status || '?'}): ${message}`, {
+        ticketId: apiId,
+        status: payload?.status,
+      });
+      throw err;
+    }
     const detailed = await loadTicketDetailFromApi(apiId);
     void loadBoxesFromApi()
       .then(() => {
@@ -847,6 +986,62 @@ function applyAddMessageResponseToTicket(ticket, response) {
     next.messages = messages;
   }
 
+  return next;
+}
+
+/** Adiciona nota interna só no cache local (rascunho ou patch otimista) — sem GET /boxes. */
+export function appendInternalNoteToCachedTicket(ticketId, { text, author } = {}) {
+  const apiId = String(ticketId || '').trim();
+  const noteText = String(text || '').trim();
+  if (!apiId || !noteText) return null;
+
+  const entry = findInColumns(apiId);
+  if (!entry?.ticket) return null;
+
+  const regKey = Date.now();
+  const ts = new Date().toISOString();
+  const noteAuthor = String(author || getAgentName() || '').trim();
+  const note = {
+    id: `${regKey}-int`,
+    type: 'internal',
+    origin: 'agente',
+    text: noteText,
+    timestamp: ts,
+    time: ts,
+    author: noteAuthor,
+    sender: 'me',
+    fromClient: false,
+  };
+
+  const prev = entry.ticket;
+  const notes = [...(prev.internalNotes || []), note];
+  const draftOnly = isDraftTicket(prev);
+  const next = {
+    ...prev,
+    internalNotes: notes,
+    updatedAt: ts,
+    listOnly: false,
+    _detailLoaded: true,
+  };
+
+  if (!draftOnly) {
+    const hist = [...(prev.registroHistorico || prev.registroAlteracoes || [])];
+    const regIdx = hist.length;
+    hist.push({
+      id: `${regIdx}-reg`,
+      registroIndex: regIdx,
+      time: ts,
+      timestamp: ts,
+      origin: 'agente',
+      autor: noteAuthor,
+      anotacaoInterna: noteText,
+      status: prev.status || 'novo',
+    });
+    next.registroHistorico = hist;
+  }
+
+  if (!patchTicketInCache(apiId, next)) return null;
+  dispatchTicketDetailChanged(apiId);
   return next;
 }
 

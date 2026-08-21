@@ -1,4 +1,4 @@
-/** clients.routes v1.0.6 — GET por cpf com fallback Customer Data API (hydrateFromApi) */
+/** clients.routes v1.0.7 — POST exige e-mail no cadastro manual */
 import { Router, Response } from 'express';
 import mongoose from 'mongoose';
 import { authMiddleware } from '../middleware/auth';
@@ -83,6 +83,13 @@ router.post('/', authMiddleware, async (req, res: Response) => {
   }
 
   const cpf = normalizeCpf(dados[0]?.clienteCpf);
+  const emailList = Array.isArray(dados[0]?.clienteEmail?.lista)
+    ? dados[0].clienteEmail.lista.map((item) => String(item ?? '').trim()).filter(Boolean)
+    : [];
+  if (!emailList.length) {
+    return res.status(400).json({ message: 'E-mail é obrigatório no cadastro do cliente.' });
+  }
+
   if (cpf) {
     const exists = await findClienteByCpf(cpf);
     if (exists) {

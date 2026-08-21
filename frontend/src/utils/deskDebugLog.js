@@ -1,10 +1,10 @@
 /**
- * deskDebugLog v1.0.1 — console de diagnóstico forçável (usa console.log, não debug)
- * VERSION: v1.0.1 | DATE: 2026-07-27
+ * deskDebugLog v2.3.0 — logs legíveis (sem Array(2) no console)
+ * VERSION: v2.3.0 | DATE: 2026-08-20
  *
- * Ativar:  localStorage.setItem('velodesk:debug', '1'); location.reload();
- * Desativar: localStorage.removeItem('velodesk:debug'); location.reload();
- * Ou no console: velodeskDebug.enable() / velodeskDebug.disable()
+ * Por padrão: API, tickets, workflow, permissões e erros logam no console (nível Default).
+ * Desativar: velodeskDebug.disable() + F5  ou  localStorage.setItem('velodesk:debug','0') + F5
+ * Reativar:   velodeskDebug.enable() + F5  ou  localStorage.setItem('velodesk:debug','1') + F5
  */
 import { setDeskTraceIngestUrl, getDeskTraceIngestUrl } from './deskTraceIngestConfig';
 
@@ -13,40 +13,42 @@ const PREFIX = '[VeloDesk]';
 
 let bannerPrinted = false;
 
-function readStorageFlag() {
+function readStorageRaw() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw === '1' || raw === 'true' || raw === 'on';
+    return String(localStorage.getItem(STORAGE_KEY) ?? '').trim().toLowerCase();
   } catch {
-    return false;
+    return '';
   }
 }
 
 function writeStorageFlag(enabled) {
   try {
-    if (enabled) localStorage.setItem(STORAGE_KEY, '1');
-    else localStorage.removeItem(STORAGE_KEY);
+    localStorage.setItem(STORAGE_KEY, enabled ? '1' : '0');
   } catch {
     /* ignore */
   }
 }
 
+/** true por padrão — só desliga com velodesk:debug = 0|false|off */
 export function isDeskDebugEnabled() {
-  if (readStorageFlag()) return true;
-  try {
-    return Boolean(import.meta.env?.DEV);
-  } catch {
-    return false;
-  }
+  const raw = readStorageRaw();
+  if (raw === '0' || raw === 'false' || raw === 'off') return false;
+  return true;
 }
 
 function emit(level, tag, message, detail) {
   if (!isDeskDebugEnabled()) return;
   const label = tag ? `${PREFIX} ${tag}` : PREFIX;
-  const payload = detail === undefined ? message : [message, detail];
-  if (level === 'warn') console.warn(label, payload);
-  else if (level === 'error') console.error(label, payload);
-  else console.log(label, payload);
+  const text = String(message ?? '');
+  if (detail === undefined) {
+    if (level === 'warn') console.warn(label, text);
+    else if (level === 'error') console.error(label, text);
+    else console.info(label, text);
+    return;
+  }
+  if (level === 'warn') console.warn(label, text, detail);
+  else if (level === 'error') console.error(label, text, detail);
+  else console.info(label, text, detail);
 }
 
 export const deskLog = {
@@ -77,6 +79,10 @@ export const deskLog = {
   perm(message, detail) {
     emit('log', 'PERMISSOES', message, detail);
   },
+  /** Ação do usuário / commit / navegação — sempre visível quando debug ativo (padrão). */
+  action(message, detail) {
+    emit('log', 'AÇÃO', message, detail);
+  },
 };
 
 export function initDeskDebug() {
@@ -86,11 +92,11 @@ export function initDeskDebug() {
     isEnabled: isDeskDebugEnabled,
     enable() {
       writeStorageFlag(true);
-      console.log(`${PREFIX} debug ATIVADO — recarregue a página (F5)`);
+      console.log(`${PREFIX} console operacional ATIVADO — recarregue a página (F5)`);
     },
     disable() {
       writeStorageFlag(false);
-      console.log(`${PREFIX} debug DESATIVADO — recarregue a página (F5)`);
+      console.log(`${PREFIX} console operacional DESATIVADO — recarregue a página (F5)`);
     },
     toggle() {
       if (isDeskDebugEnabled()) window.velodeskDebug.disable();
@@ -101,17 +107,32 @@ export function initDeskDebug() {
       console.log(`${PREFIX} trace ingest →`, getDeskTraceIngestUrl() || '(desativado — só console)');
     },
     getTraceIngest: getDeskTraceIngestUrl,
+    clearTicketCache() {
+      import('../services/ticketsCache')
+        .then(({ clearBoxesLocalCache }) => {
+          clearBoxesLocalCache();
+          console.warn(`${PREFIX} cache local de tickets limpo — F5 ou aguarde refresh de filas`);
+        })
+        .catch((err) => console.error(`${PREFIX} clearTicketCache falhou`, err));
+    },
   };
 
-  if (!isDeskDebugEnabled() || bannerPrinted) return;
+  if (bannerPrinted) return;
   bannerPrinted = true;
 
-  console.log(
-    `%c${PREFIX} diagnóstico ATIVO`,
-    'color:#1634FF;font-weight:bold',
-    '\n→ API, tickets, workflow e requisição logam aqui (console.log, nível Default).\n'
-    + '→ Desativar: velodeskDebug.disable() + F5\n'
-    + '→ Forçar sempre: localStorage.setItem("velodesk:debug","1") + F5',
+  if (!isDeskDebugEnabled()) {
+    console.warn(
+      `${PREFIX} console operacional DESLIGADO`,
+      '→ Reativar: velodeskDebug.enable() + F5',
+    );
+    return;
+  }
+
+  console.warn(
+    `${PREFIX} console operacional ATIVO`,
+    'API, tickets, workflow, permissões e ações aparecem aqui.',
+    'DevTools → Console → marque Info + Warnings + Errors (não só Errors).',
+    'Desativar: velodeskDebug.disable() + F5',
   );
 }
 

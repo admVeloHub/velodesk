@@ -15,6 +15,7 @@
     "clear:demo-chamados": "tsx scripts/clear-demo-chamados.ts",
     "purge:bot-evaluation": "tsx scripts/purge-bot-evaluation-tickets.ts",
     "seed:email-transport": "tsx scripts/seed-email-transport.ts",
+    "seed:orgao-motivos": "tsx scripts/seed-orgao-motivos.ts",
     "update:email-mailbox": "tsx scripts/update-email-mailbox.ts",
     "test:mongo": "tsx scripts/test-mongo-connection.ts",
     "test:assignment-router": "tsx scripts/test-assignment-router.ts",

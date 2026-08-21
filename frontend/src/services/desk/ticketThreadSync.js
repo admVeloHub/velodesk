@@ -1,6 +1,6 @@
 /**
- * ticketThreadSync v1.9.0 — fingerprint estável (epoch) e IA só com msg do cliente / nota do agente
- * VERSION: v1.9.0 | DATE: 2026-08-20
+ * ticketThreadSync v1.9.1 — fingerprint de notas usa texto plano (sem HTML)
+ * VERSION: v1.9.1 | DATE: 2026-08-20
  */
 
 function normalizeMsgText(value) {
@@ -53,7 +53,8 @@ export function buildAgentInternalNotesFingerprint(ticket) {
   if (!ticket) return '';
   return (ticket.internalNotes || [])
     .map((note) => {
-      const text = normalizeMsgText(note.text || note.message);
+      const raw = String(note.text || note.message || '').trim();
+      const text = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
       if (!text) return '';
       const ts = fingerprintTime(note.timestamp || note.time);
       return `${ts}|${text}`;

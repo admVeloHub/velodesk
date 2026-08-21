@@ -1,13 +1,13 @@
 /**
- * EmailAssinaturaSection v1.2.0 — preview com despedida injetada
- * VERSION: v1.2.0 | DATE: 2026-08-20
+ * EmailAssinaturaSection v1.3.0 — persiste imagem e prévia integral do e-mail
+ * VERSION: v1.3.0 | DATE: 2026-08-20
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { emailOutboundApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
 import ComposeRichEditor from '../../desk/components/ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from '../../desk/components/ComposeFormatToolbar';
-import { wrapPreviewDocument, buildFarewellPreviewHtml } from './emailPreviewHtml';
+import { buildOutboundPreviewHtml } from './emailPreviewHtml';
 
 const MAX_BYTES = 4 * 1024 * 1024;
 
@@ -21,16 +21,30 @@ function fileToDataUrl(file) {
 }
 
 function bufferToDataUrl(buffer, contentType) {
-  const bytes = new Uint8Array(buffer);
+  const bytes = buffer instanceof Uint8Array
+    ? buffer
+    : new Uint8Array(buffer);
   let binary = '';
-  bytes.forEach((b) => { binary += String.fromCharCode(b); });
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
   return `data:${contentType || 'image/png'};base64,${btoa(binary)}`;
+}
+
+function extractImgKey(img) {
+  const attr = String(img.getAttribute('data-gcs-key') || '').trim();
+  if (attr) return attr;
+  const src = String(img.getAttribute('src') || '').trim();
+  const desk = src.match(/^desk-sig:([a-zA-Z0-9._-]+)$/i);
+  return desk?.[1] || '';
 }
 
 async function hydrateSignatureHtml(html, imagens) {
   let next = String(html || '');
-  const keys = Array.from(next.matchAll(/desk-sig:([a-zA-Z0-9._-]+)/g)).map((match) => match[1]);
-  const unique = Array.from(new Set(keys));
+  const fromDesk = Array.from(next.matchAll(/desk-sig:([a-zA-Z0-9._-]+)/g)).map((match) => match[1]);
+  const fromMeta = (imagens || []).map((item) => item.objectKey).filter(Boolean);
+  const unique = Array.from(new Set([...fromDesk, ...fromMeta]));
   for (const key of unique) {
     try {
       const res = await emailOutboundApi.signatureAsset(key);
@@ -53,7 +67,7 @@ function persistableHtml(html, imagens) {
   const div = document.createElement('div');
   div.innerHTML = String(html || '');
   div.querySelectorAll('img').forEach((img) => {
-    const key = img.getAttribute('data-gcs-key') || '';
+    const key = extractImgKey(img);
     if (!key || !known.has(key)) {
       img.remove();
       return;
@@ -61,7 +75,12 @@ function persistableHtml(html, imagens) {
     img.setAttribute('src', `desk-sig:${key}`);
     img.setAttribute('data-gcs-key', key);
   });
-  return { html: div.innerHTML, imagens: (imagens || []).filter((item) => known.has(item.objectKey) && div.querySelector(`img[data-gcs-key="${item.objectKey}"]`)) };
+  return {
+    html: div.innerHTML,
+    imagens: (imagens || []).filter((item) => (
+      known.has(item.objectKey) && div.querySelector(`img[data-gcs-key="${item.objectKey}"]`)
+    )),
+  };
 }
 
 export default function EmailAssinaturaSection() {
@@ -69,7 +88,7 @@ export default function EmailAssinaturaSection() {
   const editorRef = useRef(null);
   const [html, setHtml] = useState('');
   const [imagens, setImagens] = useState([]);
-  const [layout, setLayout] = useState({ headerHtml: '', farewellHtml: '' });
+  const [layout, setLayout] = useState({ headerHtml: '', farewellHtml: '', signatureHtml: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -88,11 +107,15 @@ export default function EmailAssinaturaSection() {
         emailOutboundApi.layout(),
       ]);
       setImagens(assinatura.imagens || []);
-      const hydrated = await hydrateSignatureHtml(assinatura.html || '', assinatura.imagens || []);
+      const hydrated = await hydrateSignatureHtml(
+        assinatura.previewHtml || assinatura.html || '',
+        assinatura.imagens || [],
+      );
       setHtml(hydrated);
       setLayout({
-        headerHtml: nextLayout.headerHtml,
+        headerHtml: nextLayout.headerHtml || '',
         farewellHtml: nextLayout.farewellHtml || '',
+        signatureHtml: nextLayout.signatureHtml || hydrated,
       });
     } catch (err) {
       showNotification(err?.response?.data?.message || 'Erro ao carregar a assinatura.', 'error');
@@ -117,19 +140,15 @@ export default function EmailAssinaturaSection() {
     try {
       const uploaded = await emailOutboundApi.uploadAssinaturaImagem(file);
       const dataUrl = await fileToDataUrl(file);
-      const inserted = editorRef.current?.insertImage?.(dataUrl, file.name);
+      const inserted = editorRef.current?.insertImage?.(dataUrl, file.name, {
+        'data-gcs-key': uploaded.objectKey,
+      });
       if (!inserted) {
         showNotification('Não foi possível inserir a imagem no editor.', 'warning');
         return;
       }
-      requestAnimationFrame(() => {
-        const root = document.getElementById('emailAssinaturaEditor');
-        const imgs = root ? Array.from(root.querySelectorAll('img')) : [];
-        const last = imgs[imgs.length - 1];
-        if (last) last.setAttribute('data-gcs-key', uploaded.objectKey);
-        setHtml(editorRef.current?.getHtml?.() || html);
-      });
       setImagens((prev) => [...prev, uploaded]);
+      setHtml(editorRef.current?.getHtml?.() || html);
     } catch (err) {
       showNotification(err?.response?.data?.message || 'Não foi possível enviar a imagem.', 'error');
     }
@@ -140,8 +159,17 @@ export default function EmailAssinaturaSection() {
     try {
       const currentHtml = editorRef.current?.getHtml?.() || html;
       const payload = persistableHtml(currentHtml, imagens);
-      await emailOutboundApi.saveAssinatura(payload);
-      showNotification('Assinatura salva.', 'success');
+      if (/<img\b/i.test(currentHtml) && payload.imagens.length === 0) {
+        showNotification('A imagem da assinatura não pôde ser gravada. Insira de novo e salve.', 'warning');
+        return;
+      }
+      const saved = await emailOutboundApi.saveAssinatura(payload);
+      showNotification(
+        saved?.imagens?.length
+          ? `Assinatura salva com ${saved.imagens.length} imagem(ns).`
+          : 'Assinatura salva.',
+        'success',
+      );
       await load();
     } catch (err) {
       showNotification(err?.response?.data?.message || 'Não foi possível salvar a assinatura.', 'error');
@@ -150,11 +178,15 @@ export default function EmailAssinaturaSection() {
     }
   };
 
-  const previewHtml = wrapPreviewDocument(`
-    <p style="margin:0 0 12px 0;font-size:14px;color:#333;">Prévia da assinatura como ela entra no e-mail.</p>
-    ${buildFarewellPreviewHtml(layout.farewellHtml)}
-    <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;">${html}</div>
-  `, layout.headerHtml || '');
+  const previewHtml = buildOutboundPreviewHtml({
+    headerHtml: layout.headerHtml,
+    saudacao: 'Olá,',
+    corpo: 'Prévia da assinatura como ela entra no e-mail ao cliente.',
+    farewellHtml: layout.farewellHtml,
+    signatureHtml: html || layout.signatureHtml,
+    protocolo: '0100000001',
+    titulo: 'Exemplo de assunto do atendimento',
+  });
 
   if (loading) return <p className="config-placeholder-msg">Carregando assinatura…</p>;
 

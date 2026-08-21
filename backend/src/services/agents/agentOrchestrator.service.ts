@@ -1,6 +1,6 @@
 /**
- * agentOrchestrator.service v1.2.0 — agentSuggestion via updateOne evita race scanStatus
- * VERSION: v1.2.0 | DATE: 2026-08-18
+ * agentOrchestrator.service v1.2.1 — rascunho draft-* não consulta Mongo por _id
+ * VERSION: v1.2.1 | DATE: 2026-08-20
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -27,6 +27,7 @@ import { evaluateAutonomy } from './autonomyRules.service';
 import { executeGestaoHandoff } from './gestaoChamadosHandoff.service';
 import { hasCasosEspeciaisTriagem } from './casosEspeciais.util';
 import { getAgentNomeOficial } from './agentRegistry';
+import { isPersistedMongoTicketId } from '../../utils/persistedTicketId';
 
 function resolveDeskTabulacao(
   audit: AuditoriaResult,
@@ -123,7 +124,7 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
   let revisoesRealizadas = 0;
 
   let chamado: IChamadoN1 | null = null;
-  if (input.ticketId) {
+  if (isPersistedMongoTicketId(input.ticketId)) {
     chamado = await ChamadoN1.findById(input.ticketId);
   }
 

@@ -1,6 +1,6 @@
 /**
- * ComposeRichEditor v1.2.0 — não sobrescreve o DOM enquanto o agente está digitando
- * VERSION: v1.2.0 | DATE: 2026-08-17
+ * ComposeRichEditor v1.2.1 — insertImage aceita data-gcs-key
+ * VERSION: v1.2.1 | DATE: 2026-08-20
  */
 import React, {
   forwardRef,
@@ -74,8 +74,8 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
       insertPlainTextInEditor(editorRef.current, text);
       emitChange();
     },
-    insertImage: (src, alt) => {
-      const ok = insertImageInEditor(editorRef.current, src, alt);
+    insertImage: (src, alt, attrs) => {
+      const ok = insertImageInEditor(editorRef.current, src, alt, attrs);
       if (ok) emitChange();
       return ok;
     },

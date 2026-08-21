@@ -1,4 +1,4 @@
-/** ticketAi.routes v1.0.4 — nomeOperador resolvido no servidor pelo colaborador logado */
+/** ticketAi.routes v1.0.5 — try/catch no suggest; rascunhos draft-* */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { env } from '../config/env';
@@ -25,52 +25,60 @@ router.get('/status', authMiddleware, (_req: Request, res: Response) => {
 });
 
 router.post('/suggest', authMiddleware, async (req: Request, res: Response) => {
-  const parsed = validateTicketAiInput(req.body);
-  if (!parsed.ok) {
-    return res.status(400).json({ success: false, error: parsed.error });
-  }
+  try {
+    const parsed = validateTicketAiInput(req.body);
+    if (!parsed.ok) {
+      return res.status(400).json({ success: false, error: parsed.error });
+    }
 
-  const configStatus = getOpenAiTicketSuggestStatus();
-  if (!configStatus.configured) {
-    console.warn('[ticket-ai-suggest] 503 — variáveis ausentes no servidor:', configStatus.missing.join(', '));
-    return res.status(503).json({
+    const configStatus = getOpenAiTicketSuggestStatus();
+    if (!configStatus.configured) {
+      console.warn('[ticket-ai-suggest] 503 — variáveis ausentes no servidor:', configStatus.missing.join(', '));
+      return res.status(503).json({
+        success: false,
+        error: 'Serviço OpenAI não configurado no servidor.',
+        missing: configStatus.missing,
+        hint: 'Defina OPENAI_API_KEY e OPENAI_VECTOR_STORE_ID (ou VECTOR_STORE_PATH) no Cloud Run / backend.',
+      });
+    }
+
+    const userId = req.user?.email || req.user?.userId || 'anonymous';
+    const nomeOperador = await resolveOperadorDisplayNameForAuthEmail(req.user?.email || '');
+    const aiResult = await generateTicketAiSuggest(
+      { ...parsed.data, nomeOperador: nomeOperador || undefined },
+      String(userId),
+    );
+
+    if (!aiResult.success) {
+      return res.status(statusForOpenAiError(aiResult.error)).json({
+        success: false,
+        error: aiResult.error || 'Não foi possível gerar sugestão',
+      });
+    }
+
+    return res.json({
+      success: true,
+      respostaSugerida: aiResult.respostaSugerida,
+      tabulacao: aiResult.tabulacao,
+      tabulacaoDisplay: aiResult.tabulacaoDisplay,
+      tabulacaoFonte: aiResult.tabulacaoFonte || 'atendimento',
+      auditScore: aiResult.auditScore,
+      auditAprovado: aiResult.auditAprovado,
+      auditDecisao: aiResult.auditDecisao,
+      auditComplete: aiResult.auditComplete ?? false,
+      confidence: aiResult.confidence,
+      revisoesRealizadas: aiResult.revisoesRealizadas,
+      aiProvider: 'OpenAI',
+      model: aiResult.model,
+      source: 'ticket_ai_suggest',
+    });
+  } catch (err) {
+    console.error('[ticket-ai-suggest] erro não tratado:', err);
+    return res.status(500).json({
       success: false,
-      error: 'Serviço OpenAI não configurado no servidor.',
-      missing: configStatus.missing,
-      hint: 'Defina OPENAI_API_KEY e OPENAI_VECTOR_STORE_ID (ou VECTOR_STORE_PATH) no Cloud Run / backend.',
+      error: 'Falha ao gerar sugestão da IA.',
     });
   }
-
-  const userId = req.user?.email || req.user?.userId || 'anonymous';
-  const nomeOperador = await resolveOperadorDisplayNameForAuthEmail(req.user?.email || '');
-  const aiResult = await generateTicketAiSuggest(
-    { ...parsed.data, nomeOperador: nomeOperador || undefined },
-    String(userId),
-  );
-
-  if (!aiResult.success) {
-    return res.status(statusForOpenAiError(aiResult.error)).json({
-      success: false,
-      error: aiResult.error || 'Não foi possível gerar sugestão',
-    });
-  }
-
-  return res.json({
-    success: true,
-    respostaSugerida: aiResult.respostaSugerida,
-    tabulacao: aiResult.tabulacao,
-    tabulacaoDisplay: aiResult.tabulacaoDisplay,
-    tabulacaoFonte: aiResult.tabulacaoFonte || 'atendimento',
-    auditScore: aiResult.auditScore,
-    auditAprovado: aiResult.auditAprovado,
-    auditDecisao: aiResult.auditDecisao,
-    auditComplete: aiResult.auditComplete ?? false,
-    confidence: aiResult.confidence,
-    revisoesRealizadas: aiResult.revisoesRealizadas,
-    aiProvider: 'OpenAI',
-    model: aiResult.model,
-    source: 'ticket_ai_suggest',
-  });
 });
 
 export default router;

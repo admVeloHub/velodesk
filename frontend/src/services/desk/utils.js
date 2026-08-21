@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.19.1 | DATE: 2026-08-20
- * — stepper denied após reprovação workflow
+ * VERSION: v3.21.4 | DATE: 2026-08-20
+ * — CPF do workflow alinhado ao perfil do cliente (client lookup)
  */
 import {
   formatDateBr,
@@ -12,7 +12,7 @@ import {
   parseApiInstant,
 } from '../../utils/dateTimeBr';
 import { getTicketColumns, saveTicketColumns, getAllCockpitTickets, mapTicketQueueId } from '../ticketsStorage';
-import { getDeskQueueDisplayCount, markTicketResolvedOptimistic } from './queueCounts';
+import { getDeskQueueOptimisticDelta, markTicketResolvedOptimistic } from './queueCounts';
 import { getWorkflowInfoRequestsForTicket } from '../workflow/workflowInfoNotifications';
 import { ticketBelongsInMeusTicketsList, ticketBelongsInAgentNovosQueue, ticketMatchesAgentResponsavel, shouldUseMeusChamadosFila, shouldViewAllDeskTickets, readDeskProfileId } from './responsavelSegmentation';
 import { isEspeciaisDeskExcludedTicket } from '../especiais/especiaisChannelDetection';
@@ -1061,6 +1061,14 @@ function shouldFilterByAgentResponsavel(queueId) {
   return queueId !== 'resolvidos' && queueId !== MEUS_TICKETS_QUEUE_ID;
 }
 
+/** ver_todos: fila por status. ver_meus: backend já filtra (meus-chamados). Demais: responsável do agente. */
+function shouldApplyAgentResponsavelFilter(queueId) {
+  if (!shouldFilterByAgentResponsavel(queueId)) return false;
+  if (shouldViewAllDeskTickets()) return false;
+  if (shouldUseMeusChamadosFila()) return false;
+  return true;
+}
+
 export function isMeusTicketsQueue(queueId) {
   return queueId === MEUS_TICKETS_QUEUE_ID;
 }
@@ -1191,22 +1199,12 @@ function matchesMyTicketsStatusSection(entry, sectionId) {
   return entry.queueId === sectionId;
 }
 
-function ticketVisibleForCustomQueue(entry) {
-  if (shouldViewAllDeskTickets()) return true;
-  // /boxes?fila=meus-chamados já segmenta — não re-filtrar como nas filas fixas (trustBackendQueues).
-  if (shouldUseMeusChamadosFila()) return true;
-  const status = normalizeTicketStatusKey(entry.ticket?.status);
-  if (TERMINAL_TICKET_STATUSES.has(status)) return true;
-  return ticketMatchesAgentResponsavel(entry.ticket);
-}
-
 function filterCustomQueueEntries(customBox, searchQuery) {
   const q = String(searchQuery || '').trim();
   return getAllCockpitTickets().filter((entry) => {
     if (shouldExcludeEspeciaisFromDesk(entry.ticket)) return false;
     if (isFusaoAbsorvido(entry.ticket)) return false;
-    if (!ticketVisibleForCustomQueue(entry)) return false;
-    if (!ticketMatchesQueueCriterios(entry.ticket, customBox.criterios, { queueId: entry.queueId })) {
+    if (!ticketMatchesQueueCriterios(entry.ticket, customBox.criterios)) {
       return false;
     }
     return matchesTicketSearch(entry, q);
@@ -1227,15 +1225,14 @@ export function filterTickets(activeQueue, searchQuery, activeSort, entrySortOld
       entrySortOldestFirst,
     );
   }
-  const filterByResponsavel = shouldFilterByAgentResponsavel(activeQueue);
-  const trustBackendQueues = shouldUseMeusChamadosFila();
+  const filterByResponsavel = shouldApplyAgentResponsavelFilter(activeQueue);
   const filtered = getAllCockpitTickets()
     .filter((entry) => {
       if (shouldExcludeEspeciaisFromDesk(entry.ticket)) return false;
       if (isFusaoAbsorvido(entry.ticket)) return false;
       if (entry.queueId !== activeQueue) return false;
       if (activeQueue === 'novos' && !ticketBelongsInAgentNovosQueue(entry.ticket)) return false;
-      if (filterByResponsavel && !trustBackendQueues && !ticketMatchesAgentResponsavel(entry.ticket)) {
+      if (filterByResponsavel && !ticketMatchesAgentResponsavel(entry.ticket)) {
         return false;
       }
       return matchesTicketSearch(entry, q);
@@ -1337,23 +1334,9 @@ export function countByQueue(queueId) {
     return filterCustomQueueEntries(customBox, '').length;
   }
 
-  const authoritativeCount = getDeskQueueDisplayCount(queueId);
-  if (typeof authoritativeCount === 'number') {
-    return authoritativeCount;
-  }
-
-  const filterByResponsavel = shouldFilterByAgentResponsavel(queueId);
-  const trustBackendQueues = shouldUseMeusChamadosFila();
-  return getAllCockpitTickets().filter((e) => {
-    if (shouldExcludeEspeciaisFromDesk(e.ticket)) return false;
-    if (isFusaoAbsorvido(e.ticket)) return false;
-    if (e.queueId !== queueId) return false;
-    if (queueId === 'novos' && !ticketBelongsInAgentNovosQueue(e.ticket)) return false;
-    if (filterByResponsavel && !trustBackendQueues && !ticketMatchesAgentResponsavel(e.ticket)) {
-      return false;
-    }
-    return true;
-  }).length;
+  const baseCount = filterTickets(queueId, '', 'data', false).length;
+  const delta = getDeskQueueOptimisticDelta(queueId);
+  return Math.max(0, baseCount + delta);
 }
 
 /** Fila com tickets visíveis — prioriza Novos (maior volume no Atlas). */
@@ -1777,7 +1760,7 @@ export function getTicketStatusBadgeMeta(ticket, queueId) {
   return statusMeta(queueId || 'em-andamento');
 }
 
-export function getTicketCpfDigits(ticket) {
+export function getTicketCpfDigits(ticket, client = null) {
   const lf = ticket?.lateralForm || {};
   const clienteRef = Array.isArray(ticket?.cliente) ? ticket.cliente[0] : ticket?.cliente;
   return normalizeCpf(
@@ -1786,6 +1769,8 @@ export function getTicketCpfDigits(ticket) {
     || ticket?.clientCPF
     || clienteRef?.clienteCpf
     || clienteRef?.cpf
+    || client?.cpf
+    || client?.clientCPF
     || '',
   );
 }
@@ -1869,9 +1854,9 @@ export function isClientIdentifiedForHistory(cpf) {
 }
 
 /** CPF completo no ticket — obrigatório para iniciar workflow. */
-export function isClientIdentifiedForWorkflow(ticket) {
+export function isClientIdentifiedForWorkflow(ticket, client = null) {
   if (!ticket) return false;
-  return isValidCpfDigits(getTicketCpfDigits(ticket));
+  return isValidCpfDigits(getTicketCpfDigits(ticket, client));
 }
 
 export function collectClientTickets(cpf, _clientName) {

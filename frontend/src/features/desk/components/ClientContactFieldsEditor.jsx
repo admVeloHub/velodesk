@@ -1,6 +1,6 @@
 /**
- * ClientContactFieldsEditor v1.3.0 — seleção de e-mail para resposta ao cliente
- * VERSION: v1.3.0 | DATE: 2026-08-06 | AUTHOR: VeloHub Development Team
+ * ClientContactFieldsEditor v1.3.1 — e-mail obrigatório no cadastro manual
+ * VERSION: v1.3.1 | DATE: 2026-08-20
  */
 import React from 'react';
 import { isValidEmailFormat, maskCpfInput, maskPhoneInput, normalizePhone } from '../../../services/desk/utils';
@@ -44,6 +44,7 @@ export default function ClientContactFieldsEditor({
   cpfLookupLoading = false,
   emailErrors = {},
   onEmailBlur,
+  emailRequired = false,
 }) {
   const emailRows = ensureMinOne(emails);
   const phoneRows = ensureMinOne(phones);
@@ -141,7 +142,10 @@ export default function ClientContactFieldsEditor({
 
       <div className="client-contact-fields__group">
         <div className="client-contact-fields__group-head">
-          <span className="client-contact-fields__label">E-mails</span>
+          <span className="client-contact-fields__label">
+            E-mails
+            {emailRequired ? <span className="client-contact-fields__required" aria-hidden="true"> *</span> : null}
+          </span>
           <button type="button" className="client-contact-fields__add-btn" onClick={addEmail}>
             <i className="ti ti-plus" aria-hidden="true" />
             Adicionar
@@ -161,6 +165,8 @@ export default function ClientContactFieldsEditor({
                 onBlur={() => onEmailBlur?.(index, email)}
                 placeholder="nome@dominio.com"
                 autoComplete={index === 0 ? 'email' : 'off'}
+                required={emailRequired && index === 0}
+                aria-required={emailRequired && index === 0 ? 'true' : undefined}
               />
               <label
                 className={'client-contact-fields__reply' + (!trimmed ? ' is-disabled' : '')}
@@ -189,7 +195,9 @@ export default function ClientContactFieldsEditor({
           );
         })}
         <p className="client-contact-fields__hint">
-          Marque qual e-mail será usado para enviar respostas ao cliente.
+          {emailRequired
+            ? 'Informe ao menos um e-mail válido. Marque qual será usado para responder ao cliente.'
+            : 'Marque qual e-mail será usado para enviar respostas ao cliente.'}
         </p>
       </div>
 
@@ -258,7 +266,7 @@ export function validateClientContactDraft({
   phones,
   whatsappPhone,
   replyEmail,
-}, { requireName = true } = {}) {
+}, { requireName = true, requireEmail = false } = {}) {
   const nome = String(name || '').trim();
   const cpfDigits = String(cpf || '').replace(/\D/g, '').slice(0, 11);
   if (requireName && !nome) {
@@ -266,6 +274,9 @@ export function validateClientContactDraft({
   }
 
   const emailList = (emails || []).map((item) => String(item || '').trim()).filter(Boolean);
+  if (requireEmail && !emailList.length) {
+    return { ok: false, message: 'Informe o e-mail do cliente.', emailIndex: 0 };
+  }
   for (let i = 0; i < (emails || []).length; i += 1) {
     const value = String(emails[i] || '').trim();
     if (value && !isValidEmailFormat(value)) {

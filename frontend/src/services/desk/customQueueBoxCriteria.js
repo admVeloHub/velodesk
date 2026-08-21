@@ -1,14 +1,12 @@
 /**
  * Match de critérios de caixas personalizadas (AND entre linhas, OR dentro de valores[])
- * VERSION: v1.2.1 | DATE: 2026-08-11
+ * VERSION: v1.3.0 | DATE: 2026-08-20
  */
 import {
   buildResponsavelCandidates,
   ticketAtribuidoToCurrentAgent,
   ticketAssignedToCurrentAgent,
-  ticketBelongsInMeusTicketsList,
 } from './responsavelSegmentation';
-import { readCachedPermissions } from '../permissions/permissionService';
 
 const TAB_FIELDS = new Set(['tipoChamado', 'tipo', 'produto', 'motivo', 'detalhe']);
 
@@ -59,26 +57,12 @@ function normalizeStatus(ticket) {
   return String(ticket?.status || '').trim().toLowerCase().replace(/\s+/g, '-');
 }
 
-function queueIdStatusHints(queueId) {
-  const q = String(queueId || '').trim().toLowerCase();
-  if (q === 'em-andamento') return ['em-andamento', 'em-aberto'];
-  if (q === 'pendente') return ['pendente', 'em-espera'];
-  if (q === 'novos') return ['novo'];
-  if (q === 'resolvidos') return ['resolvido', 'resolvidos', 'fechado', 'cancelado'];
-  return [];
+function readTicketStatus(ticket) {
+  return normalizeStatus(ticket);
 }
 
-/** Status efetivo: campo do ticket + caixa física onde ele está no cache. */
-function ticketStatusKeys(ticket, queueId) {
-  const keys = new Set();
-  const fromTicket = normalizeStatus(ticket);
-  if (fromTicket) keys.add(fromTicket);
-  queueIdStatusHints(queueId).forEach((hint) => keys.add(hint));
-  return [...keys];
-}
-
-function statusMatches(ticketStatus, wanted) {
-  const a = String(ticketStatus || '').toLowerCase().replace(/\s+/g, '-');
+function statusMatches(actualStatus, wanted) {
+  const a = String(actualStatus || '').toLowerCase().replace(/\s+/g, '-');
   const b = String(wanted || '').toLowerCase().replace(/\s+/g, '-');
   if (!b) return true;
   if (a === b) return true;
@@ -92,40 +76,24 @@ function statusMatches(ticketStatus, wanted) {
   return false;
 }
 
-function matchAtribuidoFuncaoForCurrentAgent(ticket) {
-  const atribuido = String(ticket?.lateralForm?.atribuido || '').trim().toLowerCase();
-  if (!atribuido.startsWith('funcao:')) return false;
-  const slug = atribuido.slice(7);
-  const perm = readCachedPermissions();
-  if (!perm) return false;
-  const slugs = [
-    perm.funcaoSlug,
-    ...(perm.funcoes || []),
-  ].map((item) => String(item || '').trim().toLowerCase()).filter(Boolean);
-  return slugs.includes(slug);
-}
-
 function matchAtribuidoMe(ticket) {
-  if (ticketBelongsInMeusTicketsList(ticket)) return true;
-  if (matchAtribuidoFuncaoForCurrentAgent(ticket)) return true;
-  const actual = String(ticket?.lateralForm?.atribuido || '').trim().toLowerCase();
-  if (!actual || actual.startsWith('funcao:') || actual.startsWith('grupo:')) return false;
-  const candidates = buildResponsavelCandidates();
-  return candidates.some((candidate) => (
-    actual === candidate
-    || actual.includes(candidate)
-    || candidate.includes(actual)
-  ));
+  // __me__ = agente logado (responsável ou atribuído colaborador) — não funcao:/grupo:
+  if (ticketAssignedToCurrentAgent(ticket)) return true;
+  if (ticketAtribuidoToCurrentAgent(ticket)) return true;
+  return false;
 }
 
 function isWorkflowActive(ticket) {
-  if (!ticket?.workflow?.active && !ticket?.workflow?.pendingPersist && !ticket?._pendingWorkflowStart?.definicaoSlug) {
-    return false;
-  }
-  if (ticket?.workflow?.completedAt) return false;
-  const wf = ticket?.lateralForm?.workflow;
-  if (wf?.status === 'completed') return false;
-  return true;
+  const wf = ticket?.workflow || {};
+  const lateralWf = ticket?.lateralForm?.workflow || {};
+  const workflowStatus = String(wf.workflowStatus || lateralWf.workflowStatus || '').trim().toLowerCase();
+  if (workflowStatus === 'finished' || workflowStatus === 'cancel') return false;
+  const status = String(wf.status || lateralWf.status || '').trim().toLowerCase();
+  if (status === 'completed' || status === 'cancelled') return false;
+  if (wf.completedAt || lateralWf.completedAt) return false;
+  if (wf.active === true || lateralWf.active === true) return true;
+  if (wf.pendingPersist || ticket?._pendingWorkflowStart?.definicaoSlug) return true;
+  return false;
 }
 
 function slaTone(ticket) {
@@ -178,16 +146,13 @@ export function ticketMatchesQueueCriterio(ticket, criterio, context = {}) {
   if (!criterio || !ticket) return false;
   const tipo = String(criterio.tipo || '').trim().toLowerCase();
   const valores = criterioValores(criterio);
-  const queueId = context?.queueId;
 
   switch (tipo) {
     case 'tabulacao':
       return matchTabulacao(ticket, criterio);
     case 'status':
       if (!valores.length) return false;
-      return valores.some((wanted) => (
-        ticketStatusKeys(ticket, queueId).some((actual) => statusMatches(actual, wanted))
-      ));
+      return valores.some((wanted) => statusMatches(readTicketStatus(ticket), wanted));
     case 'workflow': {
       const active = isWorkflowActive(ticket);
       if (!valores.length) return false;

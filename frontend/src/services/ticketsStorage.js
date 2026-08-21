@@ -1,6 +1,6 @@
 /**
- * ticketsStorage v1.4.3 — mapTicketQueueId cobre pendente e colunas meus-*
- * VERSION: v1.4.3 | DATE: 2026-08-20
+ * ticketsStorage v1.4.5 — export appendInternalNoteToCachedTicket
+ * VERSION: v1.4.5 | DATE: 2026-08-20
  */
 import {
   getCachedColumns,
@@ -16,6 +16,8 @@ import {
   isDraftTicket,
   isApiMode,
   claimTicketResponsavelViaApi,
+  clearBoxesLocalCache,
+  appendInternalNoteToCachedTicket,
 } from './ticketsCache';
 import { apiTicketToCockpit } from '../api/adapters/ticketAdapter';
 
@@ -143,6 +145,8 @@ export {
   persistDraftTicket,
   isDraftTicket,
   claimTicketResponsavelViaApi,
+  clearBoxesLocalCache,
+  appendInternalNoteToCachedTicket,
 };
 
 export { loadTicketDetailFromApi, patchTicketInCache } from './ticketsCache';

@@ -1,7 +1,7 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.37.9 | DATE: 2026-08-20
- * — abrir ticket vazio não entra em loop de detalhe (tela branca)
+ * VERSION: v3.39.2 | DATE: 2026-08-20
+ * — Enviar Nota: ticketCacheEpoch alimenta refresh da sugestão IA
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -37,6 +37,7 @@ import {
   getDeskSearchSuccessMessage,
   isFusaoAbsorvido,
   isClientIdentifiedForWorkflow,
+  getTicketCpfDigits,
   toWhatsAppChatIdDigits,
 } from '../../services/desk/utils';
 import { fundirTickets } from '../../services/desk/ticketFusaoService';
@@ -57,6 +58,7 @@ import {
   loadTicketDetailFromApi,
   sendWhatsAppMessageViaApi,
   sendInternalNote,
+  appendInternalNoteToCachedTicket,
 } from '../../services/ticketsStorage';
 import {
   isDraftTicket,
@@ -82,6 +84,7 @@ import {
 import { ticketAssignedToCurrentAgent, readTicketResponsavel } from '../../services/desk/responsavelSegmentation';
 import { getAllQueueStatuses, fetchAndHydrateCustomQueues } from '../../services/desk/customQueueBoxes';
 import { refreshQueueCountsFromApi } from '../../services/desk/queueCounts';
+import deskLog from '../../utils/deskDebugLog';
 import CreateTicketPanel from './components/CreateTicketPanel';
 import DeskQueuePanel from './components/DeskQueuePanel';
 import DeskTicketList from './components/DeskTicketList';
@@ -282,6 +285,10 @@ export default function DeskV2Root() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const contactHydrateRef = useRef(new Set());
   const [mergeInProgress, setMergeInProgress] = useState(false);
+  const [ticketCacheEpoch, setTicketCacheEpoch] = useState(0);
+  const bumpTicketCacheView = useCallback(() => {
+    setTicketCacheEpoch((value) => value + 1);
+  }, []);
   const [aiRevisionOpen, setAiRevisionOpen] = useState(false);
   const [aiRevisionSubmitting, setAiRevisionSubmitting] = useState(false);
   const [composeSpellErrors, setComposeSpellErrors] = useState([]);
@@ -419,11 +426,16 @@ export default function DeskV2Root() {
   const isResolvedQueue = activeQueue === 'resolvidos';
   const isMyTicketsQueue = isMeusTicketsQueue(activeQueue);
   const myTicketsExpandedSection = parseDeskMyTicketsSectionFromUrl(searchParams.get('section'));
-  const entry = activeTabId ? findTicketEntry(activeTabId) : null;
+  const entry = useMemo(() => {
+    void ticketCacheEpoch;
+    return activeTabId ? findTicketEntry(activeTabId) : null;
+  }, [activeTabId, ticketCacheEpoch, refreshKey]);
   const ticket = entry?.ticket;
   const ticketReadOnly = isTicketReadOnly(ticket);
   const ticketStatus = getTicketStatusBadgeMeta(ticket, entry?.queueId || 'em-andamento');
-  const client = ticket ? lookupClient(ticket.lateralForm?.cpf || ticket.clientCPF) : null;
+  const client = ticket
+    ? lookupClient(getTicketCpfDigits(ticket) || ticket.lateralForm?.cpf || ticket.clientCPF)
+    : null;
 
   const persistTabSession = useCallback((ticketId) => {
     if (!ticketId) return;
@@ -853,6 +865,7 @@ export default function DeskV2Root() {
   }, [activeTabId, openTicket, persistTabSession, showNotification, syncUrlTicketParam]);
 
   const selectTicket = (id) => {
+    deskLog.action('ticket → abrir', { ticketId: id, fila: activeQueueRef.current });
     suppressAutoSelectRef.current = true;
     setTableQueueBrowsing(false);
     persistTabSession(activeTabId);
@@ -994,6 +1007,7 @@ export default function DeskV2Root() {
   };
 
   const selectQueue = (queueId) => {
+    deskLog.action('fila → trocada', { de: activeQueueRef.current, para: queueId });
     suppressAutoSelectRef.current = true;
     setActiveQueue(queueId);
     activeQueueRef.current = queueId;
@@ -1096,6 +1110,14 @@ export default function DeskV2Root() {
     const messagePayload = messageHtml || '';
     const internalNotePayload = internalNoteHtml || '';
 
+    deskLog.action('commit → início', {
+      ticketId: ticket.id,
+      status,
+      hasPublic: hasPublicPayload,
+      hasInternal: Boolean(internalNoteText),
+      attachments: attachmentUrls.length,
+    });
+
     const deskPerms = permsCtx?.permissions;
     if (hasPublicPayload && !canSendPublicMessageOnTicket(ticket, deskPerms)) {
       showNotification('Sem permissão para enviar mensagem pública neste ticket.', 'warning');
@@ -1119,6 +1141,11 @@ export default function DeskV2Root() {
       config,
     );
     if (!tabulationCheck.ok) {
+      deskLog.warn('AÇÃO', 'commit → bloqueado (tabulação)', {
+        ticketId: ticket.id,
+        status,
+        message: tabulationCheck.message,
+      });
       showNotification(tabulationCheck.message, 'warning');
       commitInProgressRef.current = false;
       return null;
@@ -1259,6 +1286,7 @@ export default function DeskV2Root() {
             .catch(() => {});
         }
         advanceAfterSaveIfEnabled(newId, plannedNextId, draftId);
+        deskLog.action('commit → ok (rascunho)', { ticketId: newId, status });
         return newId;
       }
 
@@ -1335,12 +1363,19 @@ export default function DeskV2Root() {
           .catch(() => {});
       }
       advanceAfterSaveIfEnabled(ticket.id, plannedNextId, savedListTicketId);
+      deskLog.action('commit → ok', { ticketId: ticket.id, status });
       return ticket.id;
     } catch (err) {
       if (commitRollbackTicket && ticket?.id) {
         patchTicket(ticket.id, commitRollbackTicket);
       }
       const msg = err?.response?.data?.message || err?.message || 'Erro ao salvar ticket.';
+      deskLog.error('AÇÃO', 'commit → falhou', {
+        ticketId: ticket?.id,
+        status,
+        message: msg,
+        httpStatus: err?.response?.status,
+      });
       showNotification(msg, 'error');
       return null;
     } finally {
@@ -1370,55 +1405,46 @@ export default function DeskV2Root() {
 
     sendInternalNoteInProgressRef.current = true;
     setSendInternalNoteBusy(true);
-    try {
-      const author = getAgentName();
 
-      if (isDraftTicket(ticket)) {
-        const draftId = String(ticket.id);
-        const session = tabSessionsRef.current[draftId];
-        const persisted = await persistDraftTicket(ticket, {
-          internalText: internalNoteHtml,
-          author,
-        });
-        const newId = persisted.id || persisted._id;
-        delete tabSessionsRef.current[draftId];
+    const ticketId = String(ticket.id);
+    const author = getAgentName();
+    const clearComposeAfterSend = () => {
+      setInternalText('');
+      if (activeTabId) {
+        const sessionKey = String(activeTabId);
+        const session = tabSessionsRef.current[sessionKey];
         if (session) {
-          tabSessionsRef.current[String(newId)] = {
+          tabSessionsRef.current[sessionKey] = {
             ...session,
             internalText: '',
           };
         }
-        replaceOpenTabId(draftId, newId, {
-          title: persisted.title || ticket.title,
-          clientName: persisted.clientName || ticket.clientName,
-          ticketLabel: getTicketProtocolLabel(persisted) || 'Rascunho',
+      }
+    };
+
+    try {
+      if (isDraftTicket(ticket)) {
+        const appended = appendInternalNoteToCachedTicket(ticketId, {
+          text: internalNoteHtml,
+          author,
         });
-        patchTicket(newId, persisted);
-        setActiveTabId(newId);
-        syncUrlTicketParam(newId);
-      } else {
-        const ticketId = String(ticket.id);
-        const updated = await sendInternalNote(ticketId, internalNoteHtml, author);
-        if (updated) {
-          patchTicket(ticketId, updated);
-        } else {
-          void loadTicketDetailFromApi(ticketId)
-            .then((loaded) => { if (loaded) patchTicket(ticketId, loaded); })
-            .catch(() => {});
+        if (!appended) {
+          showNotification('Não foi possível registrar a nota no rascunho.', 'error');
+          return;
         }
-        if (activeTabId) {
-          const sessionKey = String(activeTabId);
-          const session = tabSessionsRef.current[sessionKey];
-          if (session) {
-            tabSessionsRef.current[sessionKey] = {
-              ...session,
-              internalText: '',
-            };
-          }
-        }
+        bumpTicketCacheView();
+        clearComposeAfterSend();
+        showNotification('Nota interna registrada.', 'success');
+        return;
       }
 
-      setInternalText('');
+      const updated = await sendInternalNote(ticketId, internalNoteHtml, author);
+      bumpTicketCacheView();
+      clearComposeAfterSend();
+      if (!updated) {
+        showNotification('Nota enviada, mas não foi possível atualizar a tela local.', 'warning');
+        return;
+      }
       showNotification('Nota interna enviada.', 'success');
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Erro ao enviar nota interna.';
@@ -1824,7 +1850,7 @@ export default function DeskV2Root() {
     });
   }, [activeTicketId, threadLen, refreshKey]);
 
-  const ticketAi = useTicketAiSuggestions(ticket, rightFields, convMsgs, internalText);
+  const ticketAi = useTicketAiSuggestions(ticket, rightFields, convMsgs, internalText, ticketCacheEpoch);
 
   const handleApplyTabulation = useCallback(async () => {
     const merged = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
@@ -1911,20 +1937,43 @@ export default function DeskV2Root() {
   );
 
   const matchedWorkflowTemplate = useMemo(() => {
-    if (!ticket || isDraftTicket(ticket) || isTicketInWorkflow(ticket)) return null;
-    if (!isClientIdentifiedForWorkflow(ticket)) return null;
+    if (!ticket || isDraftTicket(ticket) || isTicketWorkflowActive(ticket)) return null;
+    if (!isClientIdentifiedForWorkflow(ticket, client)) return null;
     const fields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
     return resolveWorkflowForTicket(ticket, fields, workflowDefinitions);
-  }, [ticket, rightFields, workflowDefinitions]);
+  }, [ticket, rightFields, workflowDefinitions, client]);
+
+  useEffect(() => {
+    if (!ticket) return;
+    const fields = mergeRightFieldsWithDefaults(rightFields, ticket, getAgentName);
+    const cpfDigits = getTicketCpfDigits(ticket, client);
+    const template = resolveWorkflowForTicket(ticket, fields, workflowDefinitions);
+    const blockers = [];
+    if (isDraftTicket(ticket)) blockers.push('rascunho');
+    if (isTicketWorkflowActive(ticket)) blockers.push('workflow_ativo');
+    if (!isClientIdentifiedForWorkflow(ticket, client)) blockers.push('cpf_invalido_ou_ausente');
+    if (!workflowDefinitions?.length) blockers.push('definicoes_workflow_vazias');
+    if (!blockers.length && !template) blockers.push('tabulacao_sem_match');
+    deskLog.workflow('Iniciar Workflow → gate', {
+      ticketId: ticket.id,
+      protocolo: getTicketProtocolLabel(ticket),
+      podeMostrarBotao: Boolean(template) && blockers.length === 0,
+      blockers,
+      cpfDigits: cpfDigits || null,
+      tabulacao: fields,
+      workflowsCarregados: workflowDefinitions?.length ?? 0,
+      templateId: template?.id || null,
+    });
+  }, [ticket, rightFields, workflowDefinitions, client]);
 
   const executeWorkflowStart = useCallback(async (payload) => {
     const template = pendingWorkflowTemplateRef.current || workflowStartTemplate;
-    if (!ticket || !template || startingWorkflow || isTicketInWorkflow(ticket)) return false;
+    if (!ticket || !template || startingWorkflow || isTicketWorkflowActive(ticket)) return false;
 
     const requisicaoValores = payload?.valores ?? payload;
     const solicitacaoProdutos = payload?.solicitacaoProdutos ?? null;
 
-    if (!isClientIdentifiedForWorkflow(ticket)) {
+    if (!isClientIdentifiedForWorkflow(ticket, client)) {
       showNotification(WORKFLOW_REQUIRES_CLIENT_MESSAGE, 'warning');
       return;
     }
@@ -1984,6 +2033,7 @@ export default function DeskV2Root() {
       setStartingWorkflow(false);
     }
   }, [
+    client,
     rightFields,
     showNotification,
     startingWorkflow,
@@ -2027,7 +2077,7 @@ export default function DeskV2Root() {
   }, [comunicacaoBusy, showNotification, syncTicketViews, ticket]);
 
   const handleStartWorkflow = useCallback(() => {
-    if (!ticket || isDraftTicket(ticket) || startingWorkflow || isTicketInWorkflow(ticket)) return;
+    if (!ticket || isDraftTicket(ticket) || startingWorkflow || isTicketWorkflowActive(ticket)) return;
     if (isTicketReadOnly(ticket)) {
       showNotification('Ticket fechado — não aceita modificações.', 'warning');
       return;
@@ -2038,7 +2088,7 @@ export default function DeskV2Root() {
       return;
     }
 
-    if (!isClientIdentifiedForWorkflow(ticket)) {
+    if (!isClientIdentifiedForWorkflow(ticket, client)) {
       showNotification(WORKFLOW_REQUIRES_CLIENT_MESSAGE, 'warning');
       return;
     }
@@ -2061,6 +2111,7 @@ export default function DeskV2Root() {
 
     setWorkflowStartModalOpen(true);
   }, [
+    client,
     executeWorkflowStart,
     permsCtx?.permissions,
     workflowDefinitions,

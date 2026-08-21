@@ -1,11 +1,11 @@
 /**
  * API client v1.27.0 — e-mails de saída configuráveis
- * VERSION: v1.27.0 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.28.0 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
 import { isPublicAuthApiPath } from '../utils/authSession';
-import deskLog, { isDeskDebugEnabled } from '../utils/deskDebugLog';
+import deskLog from '../utils/deskDebugLog';
 
 const api = axios.create({
   baseURL: '/api',
@@ -17,40 +17,34 @@ let handling401 = false;
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('velodesk_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
-  if (isDeskDebugEnabled()) {
-    config.metadata = { startedAt: Date.now() };
-    deskLog.api(config.method, config.url, {
-      params: config.params,
-      hasBody: Boolean(config.data),
-    });
-  }
+  config.metadata = { startedAt: Date.now() };
+  deskLog.api(config.method, config.url, {
+    params: config.params,
+    hasBody: Boolean(config.data),
+  });
   return config;
 });
 
 api.interceptors.response.use(
   (response) => {
-    if (isDeskDebugEnabled()) {
-      const startedAt = response.config?.metadata?.startedAt;
-      deskLog.api(response.config?.method, response.config?.url, {
-        status: response.status,
-        ms: startedAt ? Date.now() - startedAt : undefined,
-        size: JSON.stringify(response.data || '').length,
-      });
-    }
+    const startedAt = response.config?.metadata?.startedAt;
+    deskLog.api(response.config?.method, response.config?.url, {
+      status: response.status,
+      ms: startedAt ? Date.now() - startedAt : undefined,
+      size: JSON.stringify(response.data || '').length,
+    });
     return response;
   },
   (error) => {
     const status = error?.response?.status;
     const requestUrl = String(error?.config?.url || '');
-    if (isDeskDebugEnabled()) {
-      const startedAt = error?.config?.metadata?.startedAt;
-      deskLog.apiError(error?.config?.method, requestUrl, {
-        status,
-        ms: startedAt ? Date.now() - startedAt : undefined,
-        message: error?.response?.data?.message || error?.message,
-        data: error?.response?.data,
-      });
-    }
+    const startedAt = error?.config?.metadata?.startedAt;
+    deskLog.apiError(error?.config?.method, requestUrl, {
+      status,
+      ms: startedAt ? Date.now() - startedAt : undefined,
+      message: error?.response?.data?.message || error?.message,
+      data: error?.response?.data,
+    });
     if (status === 401 && !isPublicAuthApiPath(requestUrl) && !handling401) {
       handling401 = true;
       clearDeskAuthSession();
@@ -169,9 +163,14 @@ export const agentQueueBoxesApi = {
 };
 
 export const clientsApi = {
-  getByCpf: (cpf, options = {}) => api.get('/clients', {
-    params: { cpf, hydrateFromApi: options.hydrateFromApi ?? 1 },
-  }).then((r) => r.data),
+  getByCpf: async (cpf, options = {}) => {
+    const res = await api.get('/clients', {
+      params: { cpf, hydrateFromApi: options.hydrateFromApi ?? 1 },
+      validateStatus: (status) => status === 200 || status === 404,
+    });
+    if (res.status === 404) return null;
+    return res.data;
+  },
   getByEmail: (email) => api.get('/clients', { params: { email } }).then((r) => r.data),
   getById: (id) => api.get(`/clients/${encodeURIComponent(id)}`).then((r) => r.data),
   create: (payload) => api.post('/clients', payload).then((r) => r.data),

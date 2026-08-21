@@ -1,8 +1,8 @@
 /**
- * AuthContext v1.8.3 — nome de exibição só via cadastro do colaborador
- * VERSION: v1.8.3 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team
+ * AuthContext v1.8.4 — aquece índice de exibição do responsável na sessão
+ * VERSION: v1.8.4 | DATE: 2026-08-20
  */
-import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
+import React, { createContext, useContext, useMemo, useState, useCallback, useEffect } from 'react';
 import { isGoogleDeskAuthMode, isGoogleDeskSession } from '../config/deskAuthMode';
 import { isLocalDevBypass } from '../config/devAuth';
 import { isHubSessionActive, readHubSession } from '../config/hubSession';
@@ -11,6 +11,7 @@ import { getDeskDisplayName, resolveAgentDisplayName, isLegacyDeskUser } from '.
 import { clearDeskAuthSession, isBackendJwtUsable } from '../utils/backendJwt';
 import { clearCachedPermissions } from '../services/permissions/permissionService';
 import { notifyAgentOfflineAndStop } from '../services/agentPresence';
+import { setResponsavelDisplayColaboradores } from '../services/desk/responsavelDisplay';
 
 const AuthContext = createContext(null);
 
@@ -104,6 +105,12 @@ export function AuthProvider({ children }) {
   const [colaborador, setColaborador] = useState(initial.colaborador);
   const [token, setToken] = useState(initial.token);
 
+  useEffect(() => {
+    if (initial.authStatus === 'authorized') {
+      setResponsavelDisplayColaboradores([]);
+    }
+  }, [initial.authStatus]);
+
   const bootstrapFromGate = useCallback(async (result) => {
     setUser(result.user);
     setColaborador(result.colaborador || null);
@@ -111,6 +118,7 @@ export function AuthProvider({ children }) {
     if (result.colaborador) {
       localStorage.setItem('velodesk_colaborador', JSON.stringify(result.colaborador));
     }
+    setResponsavelDisplayColaboradores([]);
     localStorage.setItem('velodesk_gate_authorized', '1');
     localStorage.setItem('velodesk_auth_mode', 'velohub');
     setApiMode(true);
@@ -151,6 +159,7 @@ export function AuthProvider({ children }) {
     );
     setApiMode(true);
     setAuthStatus('authorized');
+    setResponsavelDisplayColaboradores([]);
   }, []);
 
   const logout = useCallback(() => {

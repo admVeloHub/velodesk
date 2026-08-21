@@ -1,6 +1,6 @@
 /**
  * Formulário lateral de ticket
- * VERSION: v2.1.0 | DATE: 2026-06-18
+ * VERSION: v2.1.1 | DATE: 2026-08-20
  */
 import React, { useState } from 'react';
 import { updateTicketInCache } from '../../services/ticketsStorage';
@@ -13,7 +13,7 @@ export default function TicketLateralForm({ ticket, onClose }) {
   const [form, setForm] = useState({
     canal: lf.canal || ticket?.channel || 'WhatsApp',
     classificacaoTipo: lf.classificacaoTipo || 'Solicitação',
-    produto: lf.produto || 'Internet Fibra',
+    produto: lf.produto || '',
     motivo: lf.motivo || 'Em análise',
     responsavel: lf.responsavel || ticket?.responsibleAgent || 'Ana Silva',
   });

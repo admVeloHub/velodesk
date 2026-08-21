@@ -1,9 +1,10 @@
 /**
- * ticketAdapter v1.7.5 — timestamp estável (sem Date.now() em mensagem sem data)
- * VERSION: v1.7.5 | DATE: 2026-08-20
+ * ticketAdapter v1.7.6 — responsável exibido como nome/alias (nunca e-mail)
+ * VERSION: v1.7.6 | DATE: 2026-08-20
  */
 import { getAgentName } from '../../services/clientDb';
 import { stripPendingWorkflowForApiPayload } from '../../services/desk/pendingWorkflowStart';
+import { applyResponsavelDisplayToTicket } from '../../services/desk/responsavelDisplay';
 import { DEFAULT_TIPO, sanitizeResponsavel } from '../../services/tabulationConfig';
 import { repairUtf8Mojibake } from '../../services/desk/utils';
 
@@ -60,7 +61,7 @@ export function apiTicketToCockpit(ticket) {
   const title = repairUtf8Mojibake(
     ticket.title || ticket.chamadoTitulo || ticket.chamadoProtocolo || 'Sem título',
   );
-  return {
+  return applyResponsavelDisplayToTicket({
     ...ticket,
     id,
     _id: id,
@@ -85,7 +86,7 @@ export function apiTicketToCockpit(ticket) {
     updatedAt: ticket.updatedAt || ticket.createdAt || new Date().toISOString(),
     listOnly: ticket.listOnly === true,
     queueEntryAt: ticket.queueEntryAt,
-  };
+  });
 }
 
 export function adaptColumnsFromApi(columns, options = {}) {

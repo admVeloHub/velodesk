@@ -1,6 +1,6 @@
 /**
- * openaiTicketSuggest.service v1.3.1 — últimas 50 msgs + notas internas do Mongo
- * VERSION: v1.3.1 | DATE: 2026-08-12
+ * openaiTicketSuggest.service v1.3.2 — rascunho draft-* ignora lookup Mongo
+ * VERSION: v1.3.2 | DATE: 2026-08-20
  */
 import OpenAI from 'openai';
 import { env } from '../config/env';
@@ -8,6 +8,7 @@ import { ChamadoN1, type IChamadoN1 } from '../models/ChamadoN1';
 import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from './tabulation.service';
 import { getTicketSuggestPersona } from './ticketSuggestPersona';
 import { runAgentPipeline } from './agents/agentOrchestrator.service';
+import { isPersistedMongoTicketId } from '../utils/persistedTicketId';
 import { getAgentsStatus, isAgentsConfigured } from './agents/openaiAgent.util';
 import { logAiUsage } from './aiUsage.service';
 import { buildTicketIaMessagesFromChamado, buildTicketIaInternalNotesFromChamado } from './ticketIaAdapter.service';
@@ -132,7 +133,7 @@ async function resolveMessagesForSuggest(
   params: TicketAiSuggestInput,
 ): Promise<TicketAiMessageInput[]> {
   const fromClient = normalizeMessages(params.messages);
-  if (!params.ticketId) return fromClient;
+  if (!isPersistedMongoTicketId(params.ticketId)) return fromClient;
 
   try {
     const chamado = await ChamadoN1.findById(params.ticketId).lean();
@@ -155,7 +156,7 @@ async function resolveInternalNoteForSuggest(
   params: TicketAiSuggestInput,
 ): Promise<string | undefined> {
   const fromClient = trimStr(params.internalNote, MAX_INTERNAL_NOTE_CHARS);
-  if (!params.ticketId) return fromClient || undefined;
+  if (!isPersistedMongoTicketId(params.ticketId)) return fromClient || undefined;
 
   try {
     const chamado = await ChamadoN1.findById(params.ticketId).lean();

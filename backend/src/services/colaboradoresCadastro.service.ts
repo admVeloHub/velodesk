@@ -1,7 +1,7 @@
 /**
- * colaboradoresCadastro.service v1.3.1 — nome do operador só via alias ou colaboradorNome
+ * colaboradoresCadastro.service v1.4.0 — índice responsável → nome/alias para exibição
  * Campos de login: userMail, password, CPF, colaboradorNome, aliasColaborador
- * VERSION: v1.3.1 | DATE: 2026-07-29 | AUTHOR: VeloHub Development Team
+ * VERSION: v1.4.0 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team
  */
 import { env } from '../config/env';
 import { getFuncionariosConnection, isFuncionariosConnected } from '../config/database';
@@ -81,11 +81,70 @@ export function resolveColaboradorPassword(
   return buildDefaultColaboradorPassword(colaboradorNome, cpf);
 }
 
-function resolveFirstLastName(colaboradorNome: string): string {
+export function resolveFirstLastName(colaboradorNome: string): string {
   const parts = String(colaboradorNome || '').trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return '';
   if (parts.length === 1) return parts[0];
   return `${parts[0]} ${parts[parts.length - 1]}`;
+}
+
+function emailLocalPart(email: string): string {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized.includes('@')) return normalized;
+  return normalized.split('@')[0] ?? '';
+}
+
+function normalizeLookupKey(value: string): string {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+let responsavelDisplayIndexCache: Map<string, string> | null = null;
+let responsavelDisplayIndexAt = 0;
+const RESPONSAVEL_INDEX_TTL_MS = 5 * 60 * 1000;
+
+/** Mapa chave (email, login, nome) → nome exibido (alias ou primeiro+último). */
+export function buildResponsavelDisplayIndex(
+  colaboradores: ColaboradorDeskPublico[],
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const col of colaboradores) {
+    const display = resolveColaboradorDisplayName(col);
+    if (!display) continue;
+    const keys = new Set<string>();
+    const push = (raw?: string) => {
+      const trimmed = String(raw ?? '').trim();
+      if (!trimmed) return;
+      keys.add(trimmed.toLowerCase());
+      keys.add(normalizeLookupKey(trimmed));
+    };
+    push(col.userMail);
+    push(emailLocalPart(col.userMail));
+    push(col.colaboradorNome);
+    push(resolveFirstLastName(col.colaboradorNome));
+    push(display);
+    keys.forEach((key) => map.set(key, display));
+  }
+  return map;
+}
+
+export async function warmResponsavelDisplayCache(force = false): Promise<void> {
+  const now = Date.now();
+  if (!force && responsavelDisplayIndexCache && now - responsavelDisplayIndexAt < RESPONSAVEL_INDEX_TTL_MS) {
+    return;
+  }
+  if (!isFuncionariosConnected()) return;
+  const list = await listColaboradoresDesk();
+  responsavelDisplayIndexCache = buildResponsavelDisplayIndex(list);
+  responsavelDisplayIndexAt = now;
+}
+
+export function getResponsavelDisplayIndexSync(): Map<string, string> {
+  return responsavelDisplayIndexCache ?? new Map();
 }
 
 /** Nome exibido em atendimentos — aliasColaborador ou primeiro+último de colaboradorNome. */

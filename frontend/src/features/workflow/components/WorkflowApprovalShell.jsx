@@ -1,6 +1,6 @@
 /**
- * WorkflowApprovalShell v1.9.1 — console não atua em workflow cancel/finished
- * VERSION: v1.9.1 | DATE: 2026-08-20
+ * WorkflowApprovalShell v1.9.2 — runAction libera busy e sincroniza fila após falha
+ * VERSION: v1.9.2 | DATE: 2026-08-20
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -317,11 +317,17 @@ export default function WorkflowApprovalShell() {
         message: err?.response?.data?.message || err?.message,
       });
       showNotification(err?.response?.data?.message || 'Não foi possível concluir a ação.', 'error');
+      try {
+        await refreshTicketsSilent();
+        setDetailRevision((v) => v + 1);
+      } catch {
+        // ignora falha de sync pós-erro
+      }
       return { ok: false, result: null };
     } finally {
       setBusy(false);
     }
-  }, [busy, refreshTickets, selectedId, showNotification]);
+  }, [busy, refreshTickets, refreshTicketsSilent, selectedId, showNotification]);
 
   const handleApprove = useCallback(
     (options) => runAction(

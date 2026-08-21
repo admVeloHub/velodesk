@@ -1,4 +1,4 @@
-/** workflowTicket.service v1.9.0 — reprovação: sem auto-resposta; approve Produtos envia msg no BE */
+/** workflowTicket.service v1.10.1 — resolveTeamApprovalStepIndex inclui funcaoSlug */
 import { isAutomaticaStep, resolveAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
@@ -26,6 +26,7 @@ import {
 import {
   canApproveWorkflow,
   canUserActOnWorkflowStep,
+  matchesWorkflowDefinitionTeam,
   resolveUserPermissions,
   resolveWorkflowTeamQueueForUser,
   ticketMatchesWorkflowTeamAsync,
@@ -38,6 +39,7 @@ import {
   WorkflowRequisicaoError,
 } from './workflowRequisicao.service';
 import type { IChamadoWorkflowRequisicao } from '../config/workflowRequisicaoDefaults';
+import { normalizeFuncao } from '../utils/normalizeFuncao';
 
 export class WorkflowAdvanceError extends Error {
   status: number;
@@ -63,11 +65,14 @@ export function resolveDevolutivaStepIndex(definicao: IWorkflowDefinicao): numbe
   return idx >= 0 ? idx : passos.length - 1;
 }
 
-function resolveTeamApprovalStepIndex(definicao: IWorkflowDefinicao, grupoSlug: string): number | null {
+function resolveTeamApprovalStepIndex(definicao: IWorkflowDefinicao, teamSlug: string): number | null {
+  const team = normalizeFuncao(teamSlug);
   const passos = sortPassos(definicao);
   const idx = passos.findIndex((p) => {
-    const slug = String(p.passo?.atribuicao?.grupoSlug || '').toLowerCase();
-    return slug === grupoSlug && p.passo?.acao?.tipo === 'aprovacao';
+    if (p.passo?.acao?.tipo !== 'aprovacao') return false;
+    const grupo = normalizeFuncao(p.passo?.atribuicao?.grupoSlug || '');
+    const funcao = normalizeFuncao(p.passo?.atribuicao?.funcaoSlug || '');
+    return grupo === team || funcao === team;
   });
   return idx >= 0 ? idx : null;
 }
@@ -626,8 +631,12 @@ export async function advanceWorkflowWithDecision(
   if (authUser) {
     const resolved = await resolveUserPermissions(authUser);
     const teamQueue = resolveWorkflowTeamQueueForUser(resolved);
-    if (teamQueue === 'produtos' && await ticketMatchesWorkflowTeamAsync(chamado, 'produtos')) {
-      return advanceWorkflowProdutosQueueDecision(chamado, decision, authUser);
+    if (teamQueue === 'produtos') {
+      const belongsToProdutos = await ticketMatchesWorkflowTeamAsync(chamado, 'produtos')
+        || await matchesWorkflowDefinitionTeam(resolved, chamado);
+      if (belongsToProdutos) {
+        return advanceWorkflowProdutosQueueDecision(chamado, decision, authUser);
+      }
     }
   }
 

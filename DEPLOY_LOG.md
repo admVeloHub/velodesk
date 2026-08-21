@@ -1,10 +1,30 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.90.2 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.90.3 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — IA em rascunho, Enviar Nota, cadastro cliente e melhorias Desk
+
+- **Data/Hora**: 2026-08-20
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.90.3
+  - **Backend**: persistedTicketId v1.0.0, ticketAi.routes v1.0.5, tickets.routes v1.26.1, agentOrchestrator v1.2.1, openaiTicketSuggest v1.3.2, clients.routes v1.0.7
+  - **Frontend**: useTicketAiSuggestions v1.12.5, ticketsCache v1.18.2, DeskV2Root v3.39.x, ClientContactFieldsEditor v1.3.1, RegisterClientModal v1.2.1, ticketThreadSync v1.9.1, deskDebugLog, responsavelDisplay
+- **Arquivos principais**:
+  - **IA rascunho**: `findById('draft-*')` causava CastError no orquestrador — sugestão IA nunca retornava; util `persistedTicketId`, skip Mongo para rascunhos locais, try/catch no `/ticket-ai/suggest`
+  - **Enviar Nota**: append só no cache em rascunho, sem save completo nem refresh global; hook IA relê ticket via `ticketCacheEpoch` e coalesce de POST duplicado
+  - **Cadastro manual**: e-mail obrigatório quando CPF não encontrado (frontend + POST `/clients`)
+  - **Desk/workflow**: stepper, polling leve, exibição responsável, debug operacional, melhorias colaboradores e filas
+- **Descrição**: Corrige ~2 min de espera sem resposta do Agente 1 em tickets rascunho, regressão do botão Enviar Nota e validação de e-mail no cadastro manual, sem alterar contratos de API ou schemas MongoDB existentes.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — fix CSS hub de cards do módulo E-mail (config)
 

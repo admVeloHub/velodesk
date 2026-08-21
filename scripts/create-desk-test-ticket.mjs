@@ -26,9 +26,9 @@ const TEST_TICKET = {
     clienteTelefone: [TEST_CLIENT.telefone],
     classificacaoTipo: 'Solicitação',
     tipoChamado: 'Solicitação',
-    produto: 'Internet Fibra',
-    motivo: 'Lentidão',
-    detalhe: 'Em análise',
+    produto: 'Conta Velotax',
+    motivo: 'Alteração cadastral',
+    detalhe: 'Telefone',
     responsavel: DEV_EMAIL,
   },
 };
@@ -111,7 +111,7 @@ async function main() {
   console.log(`  Protocolo: ${ticket.chamadoProtocolo || TEST_TICKET.chamadoProtocolo}`);
   console.log(`  ID: ${ticket.id || ticket._id}`);
   console.log(`  Cliente: ${TEST_CLIENT.nome} (CPF ${TEST_CLIENT.cpf})`);
-  console.log(`  Tabulação: Solicitação · Internet Fibra · Lentidão · Em análise`);
+  console.log(`  Tabulação: Solicitação · Conta Velotax · Alteração cadastral · Telefone`);
   console.log('');
   console.log('Abra no Desk:');
   console.log('  http://localhost:8000/tickets?desk=v2');

@@ -1,6 +1,6 @@
 /**
- * queueCounts v1.1.0 — delta otimista em qualquer troca de fila (não só Resolvidos)
- * VERSION: v1.1.0 | DATE: 2026-08-20
+ * queueCounts v1.2.0 — contador sidebar deriva da listagem; API só sincroniza cache
+ * VERSION: v1.2.0 | DATE: 2026-08-20
  */
 import { boxesApi } from '../../api/client';
 import { isBackendJwtUsable } from '../../utils/backendJwt';
@@ -98,6 +98,13 @@ export function getDeskQueueDisplayCount(queueId) {
   const delta = Number(optimisticDeltas[normalized] || 0);
   if (!Number.isFinite(base)) return null;
   return Math.max(0, base + delta);
+}
+
+/** Delta otimista entre pollings — somado ao countByQueue (mesma base da listagem). */
+export function getDeskQueueOptimisticDelta(queueId) {
+  const normalized = toDeskQueueCountId(queueId);
+  if (!normalized) return 0;
+  return Number(optimisticDeltas[normalized] || 0);
 }
 
 function toDeskQueueCountId(queueId) {

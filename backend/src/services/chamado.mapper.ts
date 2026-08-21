@@ -1,4 +1,4 @@
-/** chamado.mapper v2.15.1 — isEspeciaisChamado + narrow workflow no list DTO */
+/** chamado.mapper v2.15.2 — em-espera não inclui em-andamento (contagem/listagem alinhadas) */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -19,7 +19,7 @@ import { buildComunicacaoResumo } from './workflowRequisicao.service';
 import type { IChamadoWorkflowComunicacaoResumo } from '../config/workflowRequisicaoDefaults';
 import { getWorkflowsByIds } from './workflowDefinicao.service';
 import { extractEmailReplyContent } from './emailReplyContent.util';
-import { sanitizeResponsavel, inferResponsavelFromAgentRegistro, isRealResponsavel } from './responsavel.util';
+import { sanitizeResponsavel, inferResponsavelFromAgentRegistro, isRealResponsavel, resolveResponsavelDisplayNameSync, normalizeResponsavelForStorage } from './responsavel.util';
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { filterRealAttachmentUrls } from './attachmentFilter.util';
 import { parseInboundAttachmentStorageKeyFromApiUrl } from './inboundAttachmentStorage.service';
@@ -878,7 +878,7 @@ const STATUS_VARIANTS: Record<string, string[]> = {
   resolvido: ['resolvido', 'fechado', 'cancelado'],
   cancelado: ['cancelado'],
   fechado: ['fechado'],
-  'em-espera': ['em-espera', 'em espera', 'em-andamento', 'em andamento'],
+  'em-espera': ['em-espera', 'em espera'],
 };
 
 /**
@@ -1406,9 +1406,14 @@ export async function prepareChamadoFromBody(
     };
     // Claim/roleta preenche responsável antes do merge; o Desk envia vazio (campo readonly).
     const existingResponsavel = sanitizeResponsavel(beforeTab.responsavel);
-    const incomingResponsavel = sanitizeResponsavel(bodyLf.responsavel ?? body.responsibleAgent);
+    let incomingResponsavel = sanitizeResponsavel(bodyLf.responsavel ?? body.responsibleAgent);
+    if (incomingResponsavel) {
+      incomingResponsavel = await normalizeResponsavelForStorage(incomingResponsavel);
+    }
     if (!incomingResponsavel && existingResponsavel) {
       lateralFormMerged.responsavel = existingResponsavel;
+    } else if (incomingResponsavel) {
+      lateralFormMerged.responsavel = incomingResponsavel;
     }
 
     const merged = readTabulacaoSnapshot(tabulacaoFromBody(
@@ -1946,6 +1951,7 @@ function buildTicketDtoCore(
   if (!responsavel) {
     responsavel = inferResponsavelFromAgentRegistro(chamado.registro);
   }
+  responsavel = resolveResponsavelDisplayNameSync(responsavel);
 
   let lateralWorkflow: Record<string, unknown> | undefined = extras.lateralWorkflow;
   const persistedWorkflow = chamado.workflow;

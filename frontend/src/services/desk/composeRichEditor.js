@@ -1,6 +1,6 @@
 /**
- * composeRichEditor v1.0.4 — sanitize HTML sem crash em e-mail aninhado
- * VERSION: v1.0.4 | DATE: 2026-08-20
+ * composeRichEditor v1.0.5 — preserva data-gcs-key e desk-sig nas imagens
+ * VERSION: v1.0.5 | DATE: 2026-08-20
  */
 
 const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'DIV', 'P', 'UL', 'OL', 'LI', 'IMG']);
@@ -10,7 +10,8 @@ export const COMPOSE_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
 export function isAllowedComposeImageSrc(src) {
   const value = String(src || '').trim();
   return /^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(value)
-    || /^https:\/\/.+/i.test(value);
+    || /^https:\/\/.+/i.test(value)
+    || /^desk-sig:[a-zA-Z0-9._-]+$/i.test(value);
 }
 
 const FORMAT_COMMANDS = {
@@ -69,10 +70,17 @@ export function sanitizeComposeHtml(html) {
               return;
             }
             const alt = String(el.getAttribute('alt') || 'Imagem anexada').slice(0, 200);
+            const gcsKey = String(el.getAttribute('data-gcs-key') || '').trim();
             [...el.attributes].forEach((attr) => el.removeAttribute(attr.name));
             el.setAttribute('src', src);
             el.setAttribute('alt', alt);
             el.className = 'compose-inline-image';
+            if (/^[a-zA-Z0-9._-]+$/.test(gcsKey)) {
+              el.setAttribute('data-gcs-key', gcsKey);
+            } else {
+              const fromSrc = src.match(/^desk-sig:([a-zA-Z0-9._-]+)$/i);
+              if (fromSrc?.[1]) el.setAttribute('data-gcs-key', fromSrc[1]);
+            }
             return;
           }
           if (!ALLOWED_TAGS.has(el.tagName)) {
@@ -274,7 +282,7 @@ export function insertPlainTextInEditor(root, text) {
   }
 }
 
-export function insertImageInEditor(root, src, alt = 'Imagem anexada') {
+export function insertImageInEditor(root, src, alt = 'Imagem anexada', attrs = {}) {
   if (!root || !isAllowedComposeImageSrc(src)) return false;
 
   root.focus();
@@ -282,6 +290,10 @@ export function insertImageInEditor(root, src, alt = 'Imagem anexada') {
   img.src = src;
   img.alt = String(alt || 'Imagem anexada').slice(0, 200);
   img.className = 'compose-inline-image';
+  const gcsKey = String(attrs?.['data-gcs-key'] || '').trim();
+  if (/^[a-zA-Z0-9._-]+$/.test(gcsKey)) {
+    img.setAttribute('data-gcs-key', gcsKey);
+  }
 
   const selection = window.getSelection();
   if (selection?.rangeCount) {

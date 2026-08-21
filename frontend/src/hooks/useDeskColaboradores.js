@@ -1,6 +1,6 @@
 /**
- * useDeskColaboradores v1.1.0 — pool Desk via GET /api/colaboradores (Mongo direto)
- * VERSION: v1.1.0 | DATE: 2026-07-15 | AUTHOR: VeloHub Development Team
+ * useDeskColaboradores v1.2.0 — label via alias ou primeiro+último
+ * VERSION: v1.2.0 | DATE: 2026-08-20
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { colaboradoresApi } from '../api/client';
@@ -10,12 +10,18 @@ import {
   getDeskVisionLabel,
   resolveDeskVisionFromAtuacao,
 } from '../services/desk/atuacaoVision';
+import { resolveAgentDisplayName } from '../utils/userDisplayName';
+import { setResponsavelDisplayColaboradores } from '../services/desk/responsavelDisplay';
 
 function mapColaboradorToAgent(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const email = String(raw.userMail || raw.userEmail || raw.email || '').trim().toLowerCase();
   const nome = String(raw.colaboradorNome || '').trim();
-  const value = nome || email;
+  const displayName = resolveAgentDisplayName({
+    aliasColaborador: raw.aliasColaborador,
+    colaboradorNome: nome,
+  });
+  const value = displayName || nome || email;
   if (!value) return null;
 
   const atuacao = Array.isArray(raw.atuacao) ? raw.atuacao : [];
@@ -25,7 +31,8 @@ function mapColaboradorToAgent(raw) {
     id: raw._id || raw.id || email || value,
     email,
     value,
-    label: nome || email,
+    label: displayName || nome || email,
+    displayName: displayName || nome || email,
     colaboradorNome: nome,
     role: vision,
     vision,
@@ -61,6 +68,7 @@ export function useDeskColaboradores() {
         .filter(Boolean)
         .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
       setColaboradores(mapped);
+      setResponsavelDisplayColaboradores(mapped);
     } catch (err) {
       setColaboradores([]);
       setError(err?.response?.data?.message || err?.message || 'Falha ao carregar colaboradores');
@@ -87,6 +95,7 @@ export function useDeskColaboradores() {
           .filter(Boolean)
           .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
         setColaboradores(mapped);
+      setResponsavelDisplayColaboradores(mapped);
       })
       .catch((err) => {
         if (cancelled) return;

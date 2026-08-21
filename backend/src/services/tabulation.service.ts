@@ -1,4 +1,4 @@
-/** tabulation.service v1.5.1 — RA não exige motivo/detalhe da árvore produto */
+/** tabulation.service v1.6.0 — remove seed DEFAULT_TABULACAO_PRODUTOS (telecom legado) */
 import type { ITabulacao } from '../models/ChamadoN1';
 import type { ITabulacaoDetalhe, ITabulacaoMotivo, ITabulacaoProduto } from '../models/TabulacaoProduto';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
@@ -219,78 +219,3 @@ export function validateComboSoft(
   return (m.detalhes || []).some((item) => item.detalhe === detalhe && item.ativo);
 }
 
-export const DEFAULT_TABULACAO_PRODUTOS: Array<{
-  produto: string;
-  ordem: number;
-  motivos: ITabulacaoMotivo[];
-}> = [
-  {
-    produto: 'Internet Fibra',
-    ordem: 0,
-    motivos: [
-      {
-        motivo: 'Lentidão',
-        ordem: 0,
-        ativo: true,
-        detalhes: [
-          { detalhe: 'Em análise', ordem: 0, ativo: true },
-          { detalhe: 'Aguardando técnico', ordem: 1, ativo: true },
-        ],
-      },
-      {
-        motivo: 'Queda de sinal',
-        ordem: 1,
-        ativo: true,
-        detalhes: [{ detalhe: 'Em análise', ordem: 0, ativo: true }],
-      },
-      {
-        motivo: 'Sem conexão',
-        ordem: 2,
-        ativo: true,
-        detalhes: [{ detalhe: 'Em análise', ordem: 0, ativo: true }],
-      },
-    ],
-  },
-  {
-    produto: 'TV',
-    ordem: 1,
-    motivos: [
-      {
-        motivo: 'Cancelamento',
-        ordem: 0,
-        ativo: true,
-        detalhes: [{ detalhe: 'Em análise', ordem: 0, ativo: true }],
-      },
-      {
-        motivo: 'Cobrança',
-        ordem: 1,
-        ativo: true,
-        detalhes: [{ detalhe: 'Em análise', ordem: 0, ativo: true }],
-      },
-    ],
-  },
-  {
-    produto: 'Telefone',
-    ordem: 2,
-    motivos: [
-      {
-        motivo: 'Financeiro',
-        ordem: 0,
-        ativo: true,
-        detalhes: [{ detalhe: 'Em análise', ordem: 0, ativo: true }],
-      },
-    ],
-  },
-  {
-    produto: 'Combo',
-    ordem: 3,
-    motivos: [
-      {
-        motivo: 'Cancelamento',
-        ordem: 0,
-        ativo: true,
-        detalhes: [{ detalhe: 'Em análise', ordem: 0, ativo: true }],
-      },
-    ],
-  },
-];

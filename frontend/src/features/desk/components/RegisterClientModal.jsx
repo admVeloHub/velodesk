@@ -1,6 +1,6 @@
 /**
- * Modal — cadastro cliente b2c_cadastros.clientes
- * VERSION: v1.2.0 | DATE: 2026-08-06
+ * Modal — cadastro manual cliente b2c_cadastros.clientes (e-mail obrigatório)
+ * VERSION: v1.2.1 | DATE: 2026-08-20
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -51,7 +51,7 @@ export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
       replyEmail,
       phones,
       whatsappPhone,
-    });
+    }, { requireName: true, requireEmail: true });
     if (!validation.ok) {
       if (validation.emailIndex != null) {
         setEmailErrors({ [validation.emailIndex]: true });
@@ -126,6 +126,7 @@ export default function RegisterClientModal({ open, cpf, onClose, onSaved }) {
           </div>
           <ClientContactFieldsEditor
             idPrefix="registerClient"
+            emailRequired
             name={nome}
             onNameChange={setNome}
             emails={emails}

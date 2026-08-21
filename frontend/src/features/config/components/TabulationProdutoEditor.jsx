@@ -1,6 +1,6 @@
 /**
- * TabulationProdutoEditor v1.3.1 — árvore motivo → detalhe por produto
- * VERSION: v1.3.1 | DATE: 2026-06-30
+ * TabulationProdutoEditor v1.3.2 — placeholder sem produto telecom legado
+ * VERSION: v1.3.2 | DATE: 2026-08-20
  */
 import React, { useEffect, useState } from 'react';
 import { tabulationApi } from '../../../api/client';
@@ -117,7 +117,7 @@ export default function TabulationProdutoEditor({ produtoId, onClose, onSaved })
               className="config-field__input"
               value={produto}
               onChange={(e) => setProduto(e.target.value)}
-              placeholder="Ex.: Internet Fibra"
+              placeholder="Ex.: Conta Velotax"
             />
           </label>
           <div className="config-field config-field--ativo-toggle">

@@ -1,6 +1,6 @@
 /**
- * TicketsContext v1.8.4 — evento de permissões não força refresh se a listagem não mudou
- * VERSION: v1.8.4 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.8.6 — log openTicket no console
+ * VERSION: v1.8.6 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi, loadTicketDetailFromApi } from '../services/ticketsStorage';
@@ -220,6 +220,20 @@ export function TicketsProvider({ children }) {
   }, [isAuthenticated, refreshTicketsSilent, user?.email]);
 
   useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    const onTicketEvicted = (event) => {
+      const ticketId = String(event?.detail?.ticketId || '').trim();
+      if (!ticketId) return;
+      deskLog.tickets('TicketsContext: ticket evictado — fechar aba e atualizar filas', { ticketId });
+      setOpenTabs((prev) => prev.filter((tab) => String(tab.id) !== ticketId));
+      setActiveTabId((current) => (String(current) === ticketId ? null : current));
+      setRefreshKey((k) => k + 1);
+    };
+    window.addEventListener('velodesk:ticket-evicted', onTicketEvicted);
+    return () => window.removeEventListener('velodesk:ticket-evicted', onTicketEvicted);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
     setOpenTabs((prev) => {
       const next = prev
         .map((tab) => {
@@ -228,10 +242,11 @@ export function TicketsProvider({ children }) {
             if (isDraftTicket({ id: tab.id }) || String(tab.id).startsWith('draft-')) {
               return tab;
             }
-            return tab;
+            return null;
           }
           return { ...tab, ...buildTabMeta(entry) };
-        });
+        })
+        .filter(Boolean);
       setActiveTabId((current) => {
         if (!current) return current;
         if (next.some((tab) => String(tab.id) === String(current))) return current;
@@ -244,6 +259,7 @@ export function TicketsProvider({ children }) {
   const openTicket = useCallback((ticketId) => {
     const id = String(ticketId || '').trim();
     if (!id) return;
+    deskLog.action('openTicket', { ticketId: id });
 
     const applyOpen = () => {
       const entry = findTicketEntry(id);
@@ -265,7 +281,8 @@ export function TicketsProvider({ children }) {
     if (applyOpen()) return;
 
     void loadTicketDetailFromApi(id)
-      .then(() => {
+      .then((loaded) => {
+        if (!loaded) return;
         if (applyOpen()) return;
         setRefreshKey((k) => k + 1);
         applyOpen();
@@ -273,6 +290,7 @@ export function TicketsProvider({ children }) {
       .catch((err) => {
         deskLog.error('TICKETS', 'openTicket: falha ao carregar detalhe', {
           ticketId: id,
+          status: err?.response?.status,
           message: err?.response?.data?.message || err?.message,
         });
       });

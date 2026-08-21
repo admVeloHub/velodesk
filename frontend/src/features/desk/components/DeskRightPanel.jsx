@@ -1,6 +1,6 @@
 /**
- * DeskRightPanel v1.12.8 — Iniciar workflow some se já há WF (ativo/cancel/finished)
- * VERSION: v1.12.8 | DATE: 2026-08-20
+ * DeskRightPanel v1.13.1 — botão workflow só se ativo ausente + permissão
+ * VERSION: v1.13.1 | DATE: 2026-08-20
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { DEFAULT_TIPO, TABULACAO_OPCOES_CATEGORIAS, hasApplyableTabulation, isReclameAquiCanal, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel } from '../../../services/tabulationConfig';
@@ -11,6 +11,8 @@ import ProcessosPopover from './ProcessosPopover';
 import { DESK_THERMOMETER_UI_ENABLED } from '../../../services/desk/constants';
 import { isTicketInWorkflow, isTicketWorkflowActive } from '../../../services/desk/utils';
 import { resolveComunicacaoResumo, ticketHasComunicacaoWorkflow } from '../../../services/workflow/workflowDecisionHandlers';
+import { useDeskColaboradores } from '../../../hooks/useDeskColaboradores';
+import { formatResponsavelForDisplay } from '../../../services/desk/responsavelDisplay';
 
 const CANAL_OPTIONS_FALLBACK = ['WhatsApp', 'Telefone', 'E-mail', 'Portal'];
 const TIPO_OPTIONS_FALLBACK = ['Reclamação', 'Solicitação', 'Dúvida', 'Informação'];
@@ -70,6 +72,7 @@ export default function DeskRightPanel({
   ticketReadOnly = false,
 }) {
   const { loading, config, getMotivos, getDetalhes, getProdutoNames, getTipoChamadoOptions, getCanalContatoOptions } = useTabulation();
+  useDeskColaboradores();
   const [processosOpen, setProcessosOpen] = useState(false);
 
   const tipoOptions = getTipoChamadoOptions();
@@ -85,6 +88,13 @@ export default function DeskRightPanel({
     () => mergeRightFieldsWithDefaults(rightFields, ticket, () => ''),
     [rightFields, ticket],
   );
+
+  const responsavelDisplay = useMemo(() => {
+    const raw = sanitizeResponsavel(rightFields.responsavel)
+      || sanitizeResponsavel(ticket?.responsibleAgent)
+      || sanitizeResponsavel(ticket?.lateralForm?.responsavel);
+    return formatResponsavelForDisplay(raw);
+  }, [rightFields.responsavel, ticket?.responsibleAgent, ticket?.lateralForm?.responsavel]);
 
   const canalValue = String(effectiveRightFields.canal || '').toLowerCase();
   const skipTreeMotivo = isReclameAquiCanal(canalValue);
@@ -135,7 +145,7 @@ export default function DeskRightPanel({
   );
   const inWorkflow = isTicketWorkflowActive(ticket);
   const showThermoUi = DESK_THERMOMETER_UI_ENABLED;
-  const showStartWorkflow = canStartWorkflow && !isTicketInWorkflow(ticket) && !ticketReadOnly;
+  const showStartWorkflow = canStartWorkflow && canInitiateWorkflow && !isTicketWorkflowActive(ticket) && !ticketReadOnly;
   const showReplyWorkflow = inWorkflow && ticketHasComunicacaoWorkflow(ticket) && typeof onReplyWorkflowRequest === 'function';
   // Última mensagem enviada pelo time de workflow ("WF:") = ainda não respondida pelo agente responsável.
   const hasUnreadWorkflowMessage = showReplyWorkflow && resolveComunicacaoResumo(ticket)?.ultimaOrigem === 'workflow';
@@ -219,11 +229,7 @@ export default function DeskRightPanel({
             id="selResponsavel"
             label="Responsável"
             fieldKey="responsavel"
-            value={
-              sanitizeResponsavel(rightFields.responsavel)
-              || sanitizeResponsavel(ticket?.responsibleAgent)
-              || sanitizeResponsavel(ticket?.lateralForm?.responsavel)
-            }
+            value={responsavelDisplay}
             readonly
             onFieldChange={onFieldChange}
           />

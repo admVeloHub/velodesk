@@ -1,4 +1,4 @@
-/** permission.service v1.11.0 — comunicação/aprovação bloqueadas em workflow cancel */
+/** permission.service v1.13.0 — atribuição do passo ativo quando tabulacao.atribuido vazio */
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { findColaboradorByEmail } from './colaboradoresCadastro.service';
@@ -30,6 +30,7 @@ import {
   resolvePrimaryFuncao,
 } from '../utils/normalizeFuncao';
 import { getWorkflowById, workflowDefinitionMatchesFuncao } from './workflowDefinicao.service';
+import { buildTabulationFieldsFromChamado, resolveAtribuidoForPasso } from './workflowMatcher.service';
 import { provisionalResponsavelFromAuth } from './assignmentRouter.service';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
@@ -371,6 +372,57 @@ function matchesAtribuidoColaborador(
   });
 }
 
+function matchesAssigneeValueForUser(
+  resolved: ResolvedUserPermissions,
+  atribuidoRaw: string,
+): boolean {
+  const atribuido = normalizeAtribuidoValue(atribuidoRaw).toLowerCase();
+  if (!atribuido) return false;
+
+  if (atribuido.startsWith('funcao:')) {
+    if (!hasPermission(resolved.permissoes, 'tickets', 'atuar_atribuido')) return false;
+    const slug = normalizeFuncao(atribuido.slice(7));
+    return userFuncaoSlugs(resolved).includes(slug);
+  }
+
+  if (atribuido.startsWith('grupo:')) {
+    return false;
+  }
+
+  return resolved.responsavelCandidates.some((candidate) => {
+    const normalized = candidate.toLowerCase();
+    return normalized === atribuido
+      || atribuido.includes(normalized)
+      || normalized.includes(atribuido);
+  });
+}
+
+async function matchesActiveWorkflowStepAssignee(
+  resolved: ResolvedUserPermissions,
+  chamado: IChamadoN1,
+): Promise<boolean> {
+  const wf = chamado.workflow;
+  if (!wf?.active || !wf.workflowId) return false;
+
+  try {
+    const definicao = await getWorkflowById(String(wf.workflowId));
+    if (!definicao) return false;
+
+    const passos = [...(definicao.passos || [])].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+    const passo = passos[wf.step ?? 0];
+    if (!passo) return false;
+
+    const fields = buildTabulationFieldsFromChamado(chamado);
+    const expected = resolveAtribuidoForPasso(
+      passo.passo?.atribuicao || { tipo: 'funcao', funcaoSlug: '', colaborador: '' },
+      fields,
+    );
+    return matchesAssigneeValueForUser(resolved, expected);
+  } catch {
+    return false;
+  }
+}
+
 /** Atribuído do passo ativo do workflow — não confundir com responsável N1. */
 export function matchesWorkflowStepAssignee(
   resolved: ResolvedUserPermissions,
@@ -378,21 +430,8 @@ export function matchesWorkflowStepAssignee(
 ): boolean {
   const tab = readTicketTabulacao(chamado);
   const atribuido = normalizeAtribuidoValue(tab.atribuido).toLowerCase();
-
-  if (!atribuido) {
-    return false;
-  }
-
-  if (atribuido.startsWith('funcao:')) {
-    if (!hasPermission(resolved.permissoes, 'tickets', 'atuar_atribuido')) return false;
-    return matchesAtribuidoAnyUserFuncao(resolved, chamado);
-  }
-
-  if (atribuido.startsWith('grupo:')) {
-    return false;
-  }
-
-  return matchesAtribuidoColaborador(resolved, chamado);
+  if (!atribuido) return false;
+  return matchesAssigneeValueForUser(resolved, atribuido);
 }
 
 function bodyHasPublicPayload(body: Record<string, unknown>): boolean {
@@ -847,5 +886,44 @@ export async function canUserActOnWorkflowStep(
     return false;
   }
 
-  return matchesWorkflowStepAssignee(resolved, chamado);
+  if (matchesWorkflowStepAssignee(resolved, chamado)) {
+    return true;
+  }
+
+  if (await matchesActiveWorkflowStepAssignee(resolved, chamado)) {
+    return true;
+  }
+
+  const tab = readTicketTabulacao(chamado);
+  const atribuido = normalizeAtribuidoValue(tab.atribuido).toLowerCase();
+
+  // Espelha frontend agentCanDecideTicket: responsável quando atribuido vazio.
+  if (!atribuido && chamado.workflow?.active) {
+    if (
+      matchesResponsavel(chamado, resolved.responsavelCandidates)
+      && hasPermission(resolved.permissoes, 'tickets', 'atuar_responsavel')
+    ) {
+      return true;
+    }
+  }
+
+  // Gestão / visão global em etapa de aprovação.
+  if (
+    isApprovalStep
+    && hasPermission(resolved.permissoes, 'tickets', 'ver_todos')
+    && canApproveWorkflow(resolved)
+  ) {
+    return true;
+  }
+
+  const teamQueue = resolveWorkflowTeamQueueForUser(resolved);
+  if (teamQueue && await ticketMatchesWorkflowTeamAsync(chamado, teamQueue)) {
+    return true;
+  }
+
+  if (await matchesWorkflowDefinitionTeam(resolved, chamado)) {
+    return true;
+  }
+
+  return false;
 }

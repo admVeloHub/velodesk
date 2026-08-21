@@ -1,4 +1,4 @@
-/** tabulationOpcoes.service v1.1.0 — motivos por órgão + seed RA */
+/** tabulationOpcoes.service v1.2.0 — motivos por órgão + seed RA/Procon/Bacen */
 import { Types } from 'mongoose';
 import {
   getTabulacaoOpcoesModel,
@@ -126,6 +126,44 @@ export const MOTIVO_RECLAME_AQUI_SEED = [
   'Quitação automática sem chave pix',
 ];
 
+/** Motivos oficiais Procon e Bacen (casos especiais). */
+export const MOTIVO_PROCON_BACEN_SEED = [
+  'Liberação Chave Pix',
+  'Portabilidade Chave Pix',
+  'Abatimento de Juros',
+  'Juros Abusivos',
+  'Cancelamento Até 7 Dias',
+  'Cancelamento Superior a 7 Dias',
+  'Quitação de Contrato',
+  'Quitação Automática Sem Chave Pix',
+  'Em Cobrança',
+  'Alega Fraude',
+  'Erro App',
+  'Elegibilidade',
+  'Encerramento Cta Celcoin',
+  'Encerramento Cta App',
+  'Superendividamento',
+];
+
+function mapSeedToOpcoes(valores: string[]): ITabulacaoOpcaoItem[] {
+  return valores.map((valor, ordem) => ({
+    valor,
+    ordem,
+    ativo: true,
+  })) as ITabulacaoOpcaoItem[];
+}
+
+async function seedOrgaoMotivosIfEmpty(
+  doc: ITabulacaoOpcoes,
+  valores: string[],
+): Promise<boolean> {
+  if (doc.opcoes?.length) return false;
+  doc.opcoes = mapSeedToOpcoes(valores);
+  doc.updatedBy = 'seed';
+  await doc.save();
+  return true;
+}
+
 const ORGAO_MOTIVO_CATEGORIAS: TabulacaoOpcoesCategoria[] = [
   TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI,
   TABULACAO_OPCOES_CATEGORIAS.MOTIVO_PROCON,
@@ -133,22 +171,24 @@ const ORGAO_MOTIVO_CATEGORIAS: TabulacaoOpcoesCategoria[] = [
   TABULACAO_OPCOES_CATEGORIAS.MOTIVO_BACEN,
 ];
 
-export async function ensureOrgaoMotivoCategorias(): Promise<void> {
+export async function ensureOrgaoMotivoCategorias(): Promise<{ seeded: string[] }> {
+  const seeded: string[] = [];
   for (const categoria of ORGAO_MOTIVO_CATEGORIAS) {
     const doc = await getOrCreateDoc(categoria);
-    if (
-      categoria === TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI
-      && (!doc.opcoes || doc.opcoes.length === 0)
-    ) {
-      doc.opcoes = MOTIVO_RECLAME_AQUI_SEED.map((valor, ordem) => ({
-        valor,
-        ordem,
-        ativo: true,
-      })) as ITabulacaoOpcaoItem[];
-      doc.updatedBy = 'seed';
-      await doc.save();
+    let didSeed = false;
+
+    if (categoria === TABULACAO_OPCOES_CATEGORIAS.MOTIVO_RECLAME_AQUI) {
+      didSeed = await seedOrgaoMotivosIfEmpty(doc, MOTIVO_RECLAME_AQUI_SEED);
+    } else if (categoria === TABULACAO_OPCOES_CATEGORIAS.MOTIVO_PROCON) {
+      didSeed = await seedOrgaoMotivosIfEmpty(doc, MOTIVO_PROCON_BACEN_SEED);
+    } else if (categoria === TABULACAO_OPCOES_CATEGORIAS.MOTIVO_BACEN) {
+      didSeed = await seedOrgaoMotivosIfEmpty(doc, MOTIVO_PROCON_BACEN_SEED);
     }
+
+    if (didSeed) seeded.push(categoria);
   }
+  if (seeded.length) invalidateTabulationOpcoesCache();
+  return { seeded };
 }
 
 export async function listOpcoes(includeInactive = true): Promise<TabulacaoOpcoesDto[]> {
@@ -313,7 +353,7 @@ export const DEFAULT_TABULACAO_OPCOES: Array<{
   },
   {
     categoria: TABULACAO_OPCOES_CATEGORIAS.MOTIVO_PROCON,
-    opcoes: [],
+    opcoes: MOTIVO_PROCON_BACEN_SEED.map((valor, ordem) => ({ valor, ordem, ativo: true })),
   },
   {
     categoria: TABULACAO_OPCOES_CATEGORIAS.MOTIVO_CONSUMIDOR_GOV,
@@ -321,6 +361,6 @@ export const DEFAULT_TABULACAO_OPCOES: Array<{
   },
   {
     categoria: TABULACAO_OPCOES_CATEGORIAS.MOTIVO_BACEN,
-    opcoes: [],
+    opcoes: MOTIVO_PROCON_BACEN_SEED.map((valor, ordem) => ({ valor, ordem, ativo: true })),
   },
 ];
