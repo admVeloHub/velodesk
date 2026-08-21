@@ -1,4 +1,4 @@
-/** clients.routes v1.0.7 — POST exige e-mail no cadastro manual */
+/** clients.routes v1.0.8 — tipagem explícita no map de e-mails (tsc Cloud Build) */
 import { Router, Response } from 'express';
 import mongoose from 'mongoose';
 import { authMiddleware } from '../middleware/auth';
@@ -84,7 +84,7 @@ router.post('/', authMiddleware, async (req, res: Response) => {
 
   const cpf = normalizeCpf(dados[0]?.clienteCpf);
   const emailList = Array.isArray(dados[0]?.clienteEmail?.lista)
-    ? dados[0].clienteEmail.lista.map((item) => String(item ?? '').trim()).filter(Boolean)
+    ? dados[0].clienteEmail.lista.map((item: unknown) => String(item ?? '').trim()).filter(Boolean)
     : [];
   if (!emailList.length) {
     return res.status(400).json({ message: 'E-mail é obrigatório no cadastro do cliente.' });

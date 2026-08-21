@@ -1,10 +1,26 @@
 # DEPLOY LOG — Velodesk React
 
-<!-- VERSION: v1.90.3 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team -->
+<!-- VERSION: v1.90.4 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team -->
 
 ---
 
 ## Deploys e pushes realizados
+
+### GitHub Push — fix build TypeScript clients.routes (Cloud Build)
+
+- **Data/Hora**: 2026-08-20
+- **Tipo**: GitHub Push
+- **Repositório**: https://github.com/admVeloHub/velodesk
+- **Branch**: dev + main
+- **Versão (componentes)**:
+  - DEPLOY_LOG v1.90.4
+  - **Backend**: clients.routes v1.0.8
+- **Arquivos principais**:
+  - Tipagem explícita `(item: unknown)` no map de `clienteEmail.lista` — corrige TS7006 no `npm run build` do Docker/Cloud Build
+- **Descrição**: Hotfix pós d5c969e; build GCP falhava no stage api-build sem alterar contrato da API.
+- **Status**: Push dev + main
+
+---
 
 ### GitHub Push — IA em rascunho, Enviar Nota, cadastro cliente e melhorias Desk
 
