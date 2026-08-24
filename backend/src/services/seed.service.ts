@@ -83,8 +83,9 @@ async function purgeLegacyEscalonarPermissao(): Promise<void> {
 export async function runDeskConfigMigrations(): Promise<void> {
   await purgeLegacyEscalonarPermissao();
   await migrateGrupoToFuncao();
-  const { seedEmailConteudosIfEmpty } = await import('./emailConteudo.service');
+  const { seedEmailConteudosIfEmpty, seedCsatEmailConteudosIfMissing } = await import('./emailConteudo.service');
   await seedEmailConteudosIfEmpty();
+  await seedCsatEmailConteudosIfMissing();
 }
 
 export async function seedDevelopmentData() {

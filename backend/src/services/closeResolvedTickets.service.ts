@@ -5,6 +5,7 @@
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { env } from '../config/env';
 import { appendStatusTransition } from './chamado.mapper';
+import { sendCsatEmailAsync } from './csatEmail.service';
 
 export interface CloseResolvedResult {
   scanned: number;
@@ -59,6 +60,9 @@ export async function closeResolvedTicketsPastWindow(
       });
       await chamado.save();
       closed += 1;
+
+      // Disparo do e-mail de CSAT (fail-soft — nunca impede o fechamento)
+      await sendCsatEmailAsync(chamado);
     } catch (err) {
       errors += 1;
       console.warn(

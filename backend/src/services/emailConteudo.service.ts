@@ -135,3 +135,34 @@ export async function listActiveEmailConteudos() {
   const Model = getEmailConteudoModel();
   return Model.find({ ativo: true }).lean().exec();
 }
+
+export async function getEmailConteudoByNome(nome: string) {
+  const Model = getEmailConteudoModel();
+  return Model.findOne({ nome, ativo: true }).lean().exec();
+}
+
+/** Preenche os dois templates de CSAT se ainda estiverem vazios/inativos. */
+export async function seedCsatEmailConteudosIfMissing(): Promise<void> {
+  const csatSeeds = EMAIL_CONTEUDO_SEED.filter(
+    (item) => item.nome === 'Encerramento mais satisfação' || item.nome === 'Repescagem da satisfação',
+  );
+  const Model = getEmailConteudoModel();
+  for (const seed of csatSeeds) {
+    const existing = await Model.findOne({ nome: seed.nome }).lean().exec();
+    if (existing && (existing.ativo || String(existing.corpo || '').trim())) continue;
+    await Model.updateOne(
+      { nome: seed.nome },
+      {
+        $set: {
+          ativo: seed.ativo,
+          saudacao: seed.saudacao,
+          corpo: seed.corpo,
+          gatilho: seed.gatilho,
+          updatedBy: 'csat-migration',
+        },
+      },
+      { upsert: true },
+    );
+    console.info(`[emailConteudo] CSAT seed — ${seed.nome}`);
+  }
+}

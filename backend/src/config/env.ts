@@ -290,6 +290,10 @@ export const env = {
   resolvedCloseAfterMs: parseInt(process.env.RESOLVED_CLOSE_AFTER_MS || '172800000', 10),
   /** Idade mínima em Pendente antes de virar Resolvido (default 48h) */
   pendenteResolveAfterMs: parseInt(process.env.PENDENTE_RESOLVE_AFTER_MS || '172800000', 10),
+  /** Intervalo do job que envia repescagem de CSAT (default 1h) */
+  csatRepescagemIntervalMs: parseInt(process.env.CSAT_REPESCAGEM_INTERVAL_MS || '3600000', 10),
+  /** Idade mínima após envio do CSAT para repescagem (default 48h) */
+  csatRepescagemAfterMs: parseInt(process.env.CSAT_REPESCAGEM_AFTER_MS || '172800000', 10),
   inboundTelephonyEnabled: process.env.INBOUND_TELEPHONY_ENABLED !== 'false',
   inboundTelephonyWebhookSecret: (process.env.INBOUND_TELEPHONY_WEBHOOK_SECRET || '').trim(),
   telephonyAutoCreateTicket: process.env.TELEPHONY_AUTO_CREATE_TICKET === 'true',
