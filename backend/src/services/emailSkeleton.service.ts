@@ -1,4 +1,4 @@
-/** emailSkeleton.service v1.3.0 — despedida também na resposta do agente */
+/** emailSkeleton.service v1.4.0 — showTicketBox opcional (CSAT usa linha compacta própria) */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { EMAIL_BRAND_COLORS, buildStandardEmailHeaderHtml, emailHeaderStatusLabel, loadVelotaxHeaderLogoInline } from './emailBrand.util';
 import { composeHtmlToEmailHtml, escapeHtmlAttribute, htmlToPlainTextForEmail } from './emailHtml.util';
@@ -177,12 +177,15 @@ export function buildSkeletonInnerHtml(params: {
   ticket: EmailSkeletonTicket;
   corpoHtml: string;
   assinaturaHtml?: string;
+  showTicketBox?: boolean;
 }): string {
   const parts: string[] = [];
   if (params.mode === 'template' && params.saudacaoHtml) {
     parts.push(params.saudacaoHtml);
   }
-  parts.push(buildTicketBoxHtml(params.ticket));
+  if (params.showTicketBox !== false) {
+    parts.push(buildTicketBoxHtml(params.ticket));
+  }
   if (params.corpoHtml) parts.push(params.corpoHtml);
   parts.push(buildFarewellHtml());
   if (params.assinaturaHtml) {
@@ -197,6 +200,7 @@ export async function assembleClientEmail(params: {
   saudacao?: string;
   corpo: string;
   corpoAlreadyHtml?: boolean;
+  showTicketBox?: boolean;
 }): Promise<EmailSkeletonParts> {
   const logo = loadVelotaxHeaderLogoInline();
   const headerHtml = buildStandardEmailHeaderHtml(emailHeaderStatusLabel(currentStatus(params.chamado)), Boolean(logo));
@@ -213,12 +217,15 @@ export async function assembleClientEmail(params: {
     ticket,
     corpoHtml,
     assinaturaHtml: assinatura.html,
+    showTicketBox: params.showTicketBox,
   });
 
   const textParts: string[] = [];
   if (params.mode === 'template' && params.saudacao) textParts.push(String(params.saudacao).trim());
-  textParts.push(`Protocolo: ${ticket.protocolo}`);
-  if (ticket.titulo) textParts.push(`Assunto: ${ticket.titulo}`);
+  if (params.showTicketBox !== false) {
+    textParts.push(`Protocolo: ${ticket.protocolo}`);
+    if (ticket.titulo) textParts.push(`Assunto: ${ticket.titulo}`);
+  }
   textParts.push(htmlToPlainTextForEmail(params.corpo || ''));
   textParts.push(buildFarewellPlain());
   if (assinatura.html) textParts.push(htmlToPlainTextForEmail(assinatura.html));

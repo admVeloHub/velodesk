@@ -1,6 +1,6 @@
 /**
- * csatEmail.service v1.3.0 — titulo/subtitulo das estrelas maiores (proporcional)
- * VERSION: v1.3.0 | DATE: 2026-08-24
+ * csatEmail.service v1.4.0 — remove card grande duplicado (usa so a linha compacta)
+ * VERSION: v1.4.0 | DATE: 2026-08-24
  */
 import fs from 'fs';
 import path from 'path';
@@ -134,6 +134,10 @@ async function composeAndSendCsatEmail(
     saudacao,
     corpo,
     corpoAlreadyHtml: true,
+    // CSAT usa a linha compacta "Avaliação referente ao protocolo X." (dentro de
+    // `corpo`, via buildCsatProtocoloLineHtml) no lugar do card grande "Atendimento"
+    // que os demais e-mails de saída usam — evita duplicar a referência ao protocolo.
+    showTicketBox: false,
   });
 
   const messageId = buildOutboundMessageId(protocolo);
