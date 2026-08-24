@@ -1,6 +1,6 @@
 /**
- * emailPreviewHtml v1.2.1 — simulação ocupa a coluna e cabe na largura
- * VERSION: v1.2.1 | DATE: 2026-08-20
+ * emailPreviewHtml v1.3.0 — bloco de estrelas do CSAT só na simulação
+ * VERSION: v1.3.0 | DATE: 2026-08-24
  */
 
 const BLUE = '#1634FF';
@@ -39,6 +39,33 @@ export function buildTicketBoxPreviewHtml(protocolo, titulo) {
       <p style="margin:0;font-size:13px;color:#64748b;line-height:1.5;">Assunto: ${safeTitulo}</p>
     </td>
   </tr>
+</table>`;
+}
+
+/**
+ * Bloco visual das 5 estrelas do e-mail de CSAT — usado SÓ na simulação.
+ * No envio real esse bloco é gerado pelo backend (csatEmail.service.ts,
+ * buildCsatStarsHtml) com links de verdade; aqui é só uma representação
+ * estática (sem link) para a prévia mostrar como o e-mail final vai ficar.
+ */
+export function buildCsatStarsPreviewHtml() {
+  const stars = [1, 2, 3, 4, 5]
+    .map((n) => `<td align="center" valign="top" style="padding:0 4px;">
+      <span style="text-decoration:none;display:inline-block;">
+        <span style="font-size:32px;line-height:1;color:#FFB800;">★</span>
+        <br>
+        <span style="font-size:11px;color:#9AA0AE;">${n}</span>
+      </span>
+    </td>`)
+    .join('\n');
+
+  return `
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
+  <tr><td colspan="5" style="text-align:center;padding:0 0 6px 0;">
+    <p style="margin:0;font-size:14px;font-weight:700;color:#272A30;font-family:Arial,sans-serif;">Como foi o seu atendimento?</p>
+    <p style="margin:4px 0 12px 0;font-size:12px;color:#9AA0AE;font-family:Arial,sans-serif;">Clique nas estrelas para dar sua nota — de 1 a 5.</p>
+  </td></tr>
+  <tr>${stars}</tr>
 </table>`;
 }
 
@@ -98,13 +125,15 @@ export function buildOutboundPreviewHtml({
   signatureHtml,
   protocolo,
   titulo,
+  showCsatStars = false,
 }) {
   const parts = [
     plainTextToPreviewHtml(saudacao),
     buildTicketBoxPreviewHtml(protocolo, titulo),
     plainTextToPreviewHtml(corpo),
-    buildFarewellPreviewHtml(farewellHtml),
   ];
+  if (showCsatStars) parts.push(buildCsatStarsPreviewHtml());
+  parts.push(buildFarewellPreviewHtml(farewellHtml));
   if (signatureHtml) {
     parts.push(`<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;">${signatureHtml}</div>`);
   }

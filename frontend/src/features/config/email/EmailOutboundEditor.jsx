@@ -1,6 +1,6 @@
 /**
- * EmailOutboundEditor v1.1.1 — preview usa despedida injetada
- * VERSION: v1.1.1 | DATE: 2026-08-20
+ * EmailOutboundEditor v1.2.0 — simulação do CSAT mostra bloco de estrelas
+ * VERSION: v1.2.0 | DATE: 2026-08-24
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { emailOutboundApi } from '../../../api/client';
@@ -131,6 +131,12 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
     return Array.from(new Set([...fromApi, ...fromTab])).map((value) => ({ value, label: value }));
   }, [opcoes.canais, getCanalContatoOptions]);
 
+  // "Encerramento mais satisfação" e "Repescagem da satisfação" recebem, no envio
+  // real, um bloco de 5 estrelas gerado pelo backend (csatEmail.service.ts) — ele
+  // não faz parte do campo Corpo. Mostramos aqui uma versão estática só para a
+  // simulação refletir como o e-mail final chega ao cliente.
+  const isCsatTemplate = draft.nome === 'Encerramento mais satisfação' || draft.nome === 'Repescagem da satisfação';
+
   const previewHtml = useMemo(() => buildOutboundPreviewHtml({
     headerHtml: layout.headerHtml,
     saudacao: draft.saudacao,
@@ -139,7 +145,8 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
     signatureHtml: layout.signatureHtml,
     protocolo: '0100000001',
     titulo: draft.nome || 'Exemplo de assunto do atendimento',
-  }), [draft.saudacao, draft.corpo, draft.nome, layout]);
+    showCsatStars: isCsatTemplate,
+  }), [draft.saudacao, draft.corpo, draft.nome, layout, isCsatTemplate]);
 
   const warning = overlapWarning(draft, items || []);
 
