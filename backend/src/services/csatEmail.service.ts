@@ -1,6 +1,6 @@
 /**
- * csatEmail.service v1.2.0 — linha compacta "Avaliação referente ao protocolo X."
- * VERSION: v1.2.0 | DATE: 2026-08-24
+ * csatEmail.service v1.3.0 — titulo/subtitulo das estrelas maiores (proporcional)
+ * VERSION: v1.3.0 | DATE: 2026-08-24
  */
 import fs from 'fs';
 import path from 'path';
@@ -83,9 +83,9 @@ function buildCsatStarsHtml(protocolo: string): string {
 
   return `
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
-  <tr><td colspan="5" style="text-align:center;padding:0 0 6px 0;">
-    <p style="margin:0;font-size:14px;font-weight:700;color:#272A30;font-family:Arial,sans-serif;">Como foi o seu atendimento?</p>
-    <p style="margin:4px 0 12px 0;font-size:12px;color:#9AA0AE;font-family:Arial,sans-serif;">Clique nas estrelas para dar sua nota — de 1 a 5.</p>
+  <tr><td colspan="5" style="text-align:center;padding:0 0 10px 0;">
+    <p style="margin:0;font-size:19px;font-weight:700;color:#272A30;font-family:Arial,sans-serif;">Como foi o seu atendimento?</p>
+    <p style="margin:6px 0 16px 0;font-size:16px;color:#9AA0AE;font-family:Arial,sans-serif;">Clique nas estrelas para dar sua nota — de 1 a 5.</p>
   </td></tr>
   <tr>${stars}</tr>
 </table>`;
