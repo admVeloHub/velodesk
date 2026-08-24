@@ -21,6 +21,13 @@ router.get('/csat', (_req, res: Response) => {
   if (!filePath) {
     return res.status(404).send('Página não encontrada.');
   }
+  // helmet() aplica um CSP padrão (script-src 'self') que bloqueia o <script>
+  // inline desta página pública. Relaxamos o CSP só aqui, mantendo o restante
+  // da API sob a política padrão.
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';",
+  );
   res.type('html').sendFile(filePath);
 });
 
