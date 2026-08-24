@@ -1,6 +1,7 @@
 /**
- * TicketsContext v1.8.6 — log openTicket no console
- * VERSION: v1.8.6 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team
+ * TicketsContext v1.8.7 — poll de contagens busca conteúdo de verdade quando muda
+ * VERSION: v1.8.7 | DATE: 2026-08-24 | AUTHOR: VeloHub Development Team
+ * — antes só forçava re-render do cache antigo (lista ficava presa até refresh não-silencioso)
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { findTicketEntry, getTicketColumns, refreshTicketsFromApi, loadTicketDetailFromApi } from '../services/ticketsStorage';
@@ -171,7 +172,11 @@ export function TicketsProvider({ children }) {
         await refreshQueueCountsFromApi(user?.email);
         const after = fingerprintQueueCounts();
         if (before !== after) {
-          setRefreshKey((k) => k + 1);
+          // Contagem mudou → algum ticket entrou/saiu de uma fila. setRefreshKey sozinho só
+          // forçava um re-render do `columns` em memória, que continuava vindo do fetch antigo
+          // (a lista visível ficava presa até um refresh não-silencioso, ex.: trocar de tela e
+          // voltar). refreshTicketsSilent busca o conteúdo de verdade e já cuida do refreshKey.
+          void refreshTicketsSilent();
         }
       } catch {
         /* poll silencioso */
@@ -181,7 +186,7 @@ export function TicketsProvider({ children }) {
     };
 
     const onCountsChanged = () => {
-      setRefreshKey((k) => k + 1);
+      void refreshTicketsSilent();
     };
 
     const timer = window.setInterval(pollQueueCounts, QUEUE_COUNTS_POLL_MS);
@@ -190,7 +195,7 @@ export function TicketsProvider({ children }) {
       window.clearInterval(timer);
       window.removeEventListener('velodesk:queue-counts-changed', onCountsChanged);
     };
-  }, [isAuthenticated, user?.email]);
+  }, [isAuthenticated, user?.email, refreshTicketsSilent]);
 
   const listingScopeRef = useRef('');
 
