@@ -93,6 +93,24 @@ export default function WorkflowConfigEditor({
       showNotification('Complete os critérios do gatilho antes de salvar.', 'error');
       return;
     }
+    const passosDraft = draft?.passos || [];
+    const passosById = new Map(passosDraft.map((envelope) => [String(envelope._id), envelope]));
+    for (const envelope of passosDraft) {
+      const acao = envelope?.passo?.acao;
+      if (acao?.tipo !== 'aprovacao') continue;
+      const rejeitar = (acao.rotas || []).find((r) => r.variavel === 'reject');
+      if (!rejeitar) continue;
+      const nome = envelope.passo?.nome || 'Etapa de aprovação';
+      if (!rejeitar.proximoPassoId) {
+        showNotification(`Etapa "${nome}": selecione a etapa de destino para "Reprovar" antes de salvar.`, 'error');
+        return;
+      }
+      const destino = passosById.get(String(rejeitar.proximoPassoId));
+      if (destino?.passo?.acao?.tipo === 'automatica') {
+        showNotification(`Etapa "${nome}": a etapa de destino para "Reprovar" não pode ser uma etapa automática (resposta ao cliente/ação de sistema).`, 'error');
+        return;
+      }
+    }
     try {
       await onSave?.({
         ...draft,
@@ -102,8 +120,8 @@ export default function WorkflowConfigEditor({
         passos: normalizePassosOrdem(draft.passos || []),
       });
       showNotification(isNew ? 'Workflow criado.' : 'Workflow salvo.', 'success');
-    } catch {
-      showNotification('Erro ao salvar workflow.', 'error');
+    } catch (err) {
+      showNotification(err?.response?.data?.message || 'Erro ao salvar workflow.', 'error');
     }
   }, [draft, isNew, onSave, showNotification]);
 

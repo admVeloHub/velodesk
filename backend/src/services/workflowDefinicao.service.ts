@@ -57,6 +57,38 @@ function normalizeGatilho(gatilho?: Partial<IWorkflowGatilho> | null): IWorkflow
   };
 }
 
+/**
+ * Toda etapa de aprovação com rota "Reprovar" precisa de um destino explícito:
+ * sem isso o motor de execução (workflowTicket.service) não sabe para onde
+ * mandar o ticket reprovado, e por segurança nunca cai numa etapa automática
+ * (resposta ao cliente/ação de sistema não pode ser disparada por reprovação).
+ */
+function validateWorkflowPassos(passos: IWorkflowPassoEnvelope[]): void {
+  const passosById = new Map(passos.map((p) => [String(p._id), p]));
+
+  passos.forEach((envelope, index) => {
+    const acao = envelope.passo?.acao;
+    if (!acao || acao.tipo !== 'aprovacao') return;
+    const nome = envelope.passo?.nome || `Etapa ${index + 1}`;
+
+    const rejectRota = (acao.rotas || []).find((r) => r.variavel === 'reject');
+    if (!rejectRota) return;
+
+    const destinoId = rejectRota.proximoPassoId ? String(rejectRota.proximoPassoId) : '';
+    if (!destinoId) {
+      throw new Error(`Etapa "${nome}": selecione a etapa de destino para "Reprovar" antes de salvar o workflow.`);
+    }
+
+    const destino = passosById.get(destinoId);
+    if (!destino) {
+      throw new Error(`Etapa "${nome}": a etapa de destino configurada para "Reprovar" não existe mais neste workflow.`);
+    }
+    if (destino.passo?.acao?.tipo === 'automatica') {
+      throw new Error(`Etapa "${nome}": a etapa de destino para "Reprovar" não pode ser uma etapa automática (resposta ao cliente/ação de sistema).`);
+    }
+  });
+}
+
 export async function listWorkflows(includeInactive = false): Promise<IWorkflowDefinicao[]> {
   const Model = getWorkflowDefinicaoModel();
   const filter = includeInactive ? {} : { ativo: true };
@@ -116,6 +148,7 @@ export async function createWorkflow(
   if (exists) throw new Error('Workflow já cadastrado.');
 
   const passos = ensurePassoIds(payload.passos || []);
+  validateWorkflowPassos(passos);
   const passoInicialId = normalizePassoInicialId(passos, payload.passoInicialId);
   const gatilho = normalizeGatilho(payload.gatilho);
 
@@ -142,6 +175,7 @@ export async function replaceWorkflow(
 ): Promise<IWorkflowDefinicao | null> {
   const Model = getWorkflowDefinicaoModel();
   const passos = ensurePassoIds(payload.passos || []);
+  validateWorkflowPassos(passos);
   const passoInicialId = normalizePassoInicialId(passos, payload.passoInicialId);
   const gatilho = normalizeGatilho(payload.gatilho);
 

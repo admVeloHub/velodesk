@@ -59,10 +59,23 @@ function passoAtIndex(definicao: IWorkflowDefinicao, step: number): IWorkflowPas
   return passos[step] ?? null;
 }
 
-export function resolveDevolutivaStepIndex(definicao: IWorkflowDefinicao): number {
+/**
+ * Resolve a etapa de destino configurada para uma decisão (approve/reject) na
+ * etapa de aprovação atual (acao.rotas[].proximoPassoId). Etapa de reprovação
+ * é obrigatória na configuração do workflow (ver workflowDefinicao.service) —
+ * se ainda assim vier ausente/inválida (dado legado), retorna null e quem
+ * chamou decide o que fazer.
+ */
+function resolveRotaProximoPassoIndex(
+  definicao: IWorkflowDefinicao,
+  passo: IWorkflowPassoEnvelope | null,
+  variavel: 'approve' | 'reject',
+): number | null {
+  const rota = (passo?.passo?.acao?.rotas || []).find((r) => r.variavel === variavel);
+  if (!rota?.proximoPassoId) return null;
   const passos = sortPassos(definicao);
-  const idx = passos.findIndex((p) => isDevolutivaPasso(p.passo?.nome || ''));
-  return idx >= 0 ? idx : passos.length - 1;
+  const idx = passos.findIndex((p) => String(p._id) === String(rota.proximoPassoId));
+  return idx >= 0 ? idx : null;
 }
 
 function resolveTeamApprovalStepIndex(definicao: IWorkflowDefinicao, teamSlug: string): number | null {
@@ -488,10 +501,15 @@ export async function advanceWorkflowManual(
   const currentStep = wf.step ?? 0;
 
   if (acaoTipo === 'aprovacao' && wf.pendingDecision === 'reject') {
-    const devolutivaIdx = resolveDevolutivaStepIndex(definicao);
-    await advanceToStep(chamado, definicao, devolutivaIdx, autor, {
+    const targetIdx = resolveRotaProximoPassoIndex(definicao, passo, 'reject');
+    if (targetIdx == null) {
+      throw new WorkflowAdvanceError(
+        'Etapa de destino para "Reprovar" não está configurada neste workflow. Ajuste a configuração antes de reprovar.',
+        400,
+      );
+    }
+    await advanceToStep(chamado, definicao, targetIdx, autor, {
       trigger: 'decision-reject',
-      skipped: devolutivaIdx > currentStep + 1,
       decision: 'reject',
       skipSistema: true,
     });
@@ -600,10 +618,16 @@ async function advanceWorkflowProdutosQueueDecision(
       return chamado;
     }
 
-    const devolutivaIdx = resolveDevolutivaStepIndex(definicao);
-    await advanceToStep(chamado, definicao, devolutivaIdx, autor, {
+    const produtosPasso = passoAtIndex(definicao, produtosStepIdx);
+    const targetIdx = resolveRotaProximoPassoIndex(definicao, produtosPasso, 'reject');
+    if (targetIdx == null) {
+      throw new WorkflowAdvanceError(
+        'Etapa de destino para "Reprovar" não está configurada neste workflow. Ajuste a configuração antes de reprovar.',
+        400,
+      );
+    }
+    await advanceToStep(chamado, definicao, targetIdx, autor, {
       trigger: 'decision-reject',
-      skipped: devolutivaIdx > produtosStepIdx + 1,
       decision: 'reject',
       skipSistema: true,
     });
