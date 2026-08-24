@@ -1,4 +1,4 @@
-/** tickets.routes v1.26.2 — isFirstContextNote ignora placeholders de e-mail vazio */
+/** tickets.routes v1.26.3 — claim de responsável também nas rotas de workflow (start/advance/cancel) */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -624,6 +624,7 @@ router.post('/:id/workflow/start', authMiddleware, async (req, res: Response) =>
       definicaoSlug,
       solicitacaoProdutos,
     );
+    applyManualResponsavelClaim(chamado, req.user);
     await chamado.save();
     void publishTicketEvent(chamado._id.toString(), 'workflow');
     const boxes = await loadBoxes();
@@ -649,6 +650,7 @@ router.post('/:id/workflow/advance', authMiddleware, async (req, res: Response) 
     } else {
       await advanceWorkflowManual(chamado, req.user);
     }
+    applyManualResponsavelClaim(chamado, req.user);
     await chamado.save();
     void publishTicketEvent(chamado._id.toString(), 'workflow');
     const boxes = await loadBoxes();
@@ -669,6 +671,7 @@ router.post('/:id/workflow/cancel', authMiddleware, async (req, res: Response) =
     assertChamadoModifiable(chamado);
     await assertCanInterruptWorkflow(req.user!, chamado);
     await cancelWorkflowForChamado(chamado, req.user, motivo || undefined);
+    applyManualResponsavelClaim(chamado, req.user);
     await chamado.save();
     void publishTicketEvent(chamado._id.toString(), 'workflow');
     const boxes = await loadBoxes();

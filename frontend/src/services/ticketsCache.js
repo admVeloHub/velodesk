@@ -1,6 +1,6 @@
 /**
- * ticketsCache v1.21.0 — merge preserva workflow.active no poll; responsável não some
- * VERSION: v1.21.0 | DATE: 2026-08-21 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.21.1 — fingerprint do poll silencioso considera updatedAt (não só status)
+ * VERSION: v1.21.1 | DATE: 2026-08-24 | AUTHOR: VeloHub Development Team
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -177,12 +177,16 @@ export function getCachedColumns() {
   return columns;
 }
 
-/** Assinatura das filas (id + status por box) — poll silencioso só re-renderiza se mudou. */
+/**
+ * Assinatura das filas (id + status + updatedAt por box) — poll silencioso só re-renderiza se mudou.
+ * updatedAt cobre mudanças que não alteram `status` (ex.: encaminhar para workflow), que senão
+ * ficavam invisíveis para o refresh silencioso até uma ação não-silenciosa forçar o re-render.
+ */
 export function fingerprintQueueColumns(cols) {
   return (cols || [])
     .map((box) => {
       const sig = (box.tickets || [])
-        .map((t) => `${String(t.id || t._id)}:${String(t.status || 'novo').trim().toLowerCase()}`)
+        .map((t) => `${String(t.id || t._id)}:${String(t.status || 'novo').trim().toLowerCase()}:${String(t.updatedAt || '')}`)
         .sort()
         .join(',');
       return `${box.id}=${sig}`;

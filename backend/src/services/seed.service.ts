@@ -1,4 +1,4 @@
-/** seed.service v1.10.0 — tabulação sem produtos telecom hardcoded */
+/** seed.service v1.10.1 — remove regex de purge não-ancorada que podia apagar dados reais (ex.: cliente real "Maria Silva") */
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { getClienteModel } from '../models/Cliente';
 import { getTabulacaoProdutoModel } from '../models/TabulacaoProduto';
@@ -28,7 +28,6 @@ export async function purgeAllMockTickets(): Promise<{ tickets: number; clients:
       { chamadoProtocolo: { $regex: `^${WORKFLOW_TEST_PROTOCOL_PREFIX}` } },
       { chamadoTitulo: { $regex: /^\[TESTE\]/i } },
       { 'cliente.clienteCpf': { $in: ALL_DEMO_CPFS } },
-      { chamadoTitulo: { $regex: /maria silva|teste persistencia|lentidão internet fibra/i } },
       { 'registro.metadados.seedSource': 'workflow-test-seed' },
     ],
   };
@@ -39,7 +38,6 @@ export async function purgeAllMockTickets(): Promise<{ tickets: number; clients:
   const clients = await Cliente.deleteMany({
     $or: [
       { 'clienteDados.clienteCpf': { $in: ALL_DEMO_CPFS } },
-      { 'clienteDados.clienteNome': { $regex: /maria silva|teste de cadastro/i } },
       { 'clienteDados.clienteEmail.lista': { $regex: /@email-teste\.com$/i } },
     ],
   });

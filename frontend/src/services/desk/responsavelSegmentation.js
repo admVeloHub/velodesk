@@ -1,6 +1,6 @@
 /**
- * responsavelSegmentation v1.7.0 — ver_todos só visualização; sem bypass por slug gestão/supervisor
- * VERSION: v1.7.0 | DATE: 2026-08-21
+ * responsavelSegmentation v1.7.1 — buildResponsavelCandidates inclui aliasColaborador
+ * VERSION: v1.7.1 | DATE: 2026-08-24
  */
 import { getDeskDisplayName } from '../../utils/userDisplayName';
 import { normalizeProfileId } from '../../config/profiles';
@@ -96,7 +96,8 @@ export function buildResponsavelCandidates() {
   push(colaborador?.nome);
   push(colaborador?.colaboradorNome);
   push(colaborador?.email);
-  push(getDeskDisplayName(user));
+  push(colaborador?.aliasColaborador);
+  push(getDeskDisplayName(user, colaborador));
 
   return [...new Set(values.filter(Boolean))];
 }

@@ -1,6 +1,6 @@
 /**
- * permissionService v1.11.0 — VER vs ATUAR via overrides; atuar_sempre; sem seed/slug bypass
- * VERSION: v1.11.0 | DATE: 2026-08-21
+ * permissionService v1.11.1 — buildResponsavelCandidatesFromSession inclui aliasColaborador
+ * VERSION: v1.11.1 | DATE: 2026-08-24
  */
 import api from '../../api/client';
 import { normalizeProfileId } from '../../config/profiles';
@@ -237,6 +237,7 @@ function buildResponsavelCandidatesFromSession() {
     push(colaborador?.colaboradorNome);
     push(colaborador?.nome);
     push(colaborador?.email);
+    push(colaborador?.aliasColaborador);
     return [...new Set(values)];
   } catch {
     return [];

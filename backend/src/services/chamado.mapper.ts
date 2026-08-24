@@ -1,4 +1,4 @@
-/** chamado.mapper v2.16.1 — bolha system para e-mail padrão / origin sistema */
+/** chamado.mapper v2.16.2 — buildResponsavelCandidates inclui alias/nome resolvido do colaborador */
 import mongoose from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IRegistro, ITabulacao, IClienteRef } from '../models/ChamadoN1';
@@ -2159,6 +2159,12 @@ export function buildResponsavelCandidates(
   push(dbUser?.email);
   push(emailLocalPart(dbUser?.email));
   push(colaboradorNome);
+  // Responsável é gravado como alias/primeiro+último via cadastro de colaboradores (funcionarios) —
+  // sem isso, quem tem alias configurado nunca bate no próprio filtro dos tickets que assumiu.
+  push(resolveResponsavelDisplayNameSync(authUser.email));
+  push(resolveResponsavelDisplayNameSync(authUser.name));
+  push(resolveResponsavelDisplayNameSync(dbUser?.email));
+  push(resolveResponsavelDisplayNameSync(dbUser?.name));
 
   return [...new Set(values.map((value) => value.toLowerCase()).filter(Boolean))];
 }

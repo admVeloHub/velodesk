@@ -1,7 +1,9 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.44.0 | DATE: 2026-08-21
- * — WF start: POST direto; responsável preservado; sync WK em background
+ * VERSION: v3.44.1 | DATE: 2026-08-24
+ * — handleCommitWithStatus/handleSendInternalNote: try/finally cobre toda a função,
+ *   sem gap entre travar o lock (commitInProgressRef/sendInternalNoteInProgressRef) e o try;
+ *   exceção antes do try deixava o lock preso pra sempre (todos os canais de envio) sem erro visível.
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -1154,7 +1156,15 @@ export default function DeskV2Root() {
     }
     commitInProgressRef.current = true;
     let commitRollbackTicket = null;
-    const status = statusId || sendStatus;
+    // status é lido no catch (log/rollback) — precisa viver fora do try para não virar
+    // ReferenceError ali (const dentro do try não é visível no catch).
+    let status;
+    // Tudo a partir daqui roda dentro do try/catch/finally abaixo — qualquer exceção
+    // (validação, montagem de payload, etc.) precisa exibir erro e liberar commitInProgressRef,
+    // senão o envio trava silenciosamente em todos os canais (público, nota interna, WhatsApp
+    // compartilham esse mesmo lock).
+    try {
+    status = statusId || sendStatus;
     const savedListTicketId = getEntryTicketId(entry);
     const workingListBeforeSave = resolveDeskWorkingEntries(activeQueue, appliedSearch, activeSort, entrySortOldestFirst);
     const plannedNextId = getAutoCloseOnSave()
@@ -1234,7 +1244,6 @@ export default function DeskV2Root() {
       attachments: attachmentUrls.length,
     });
 
-    try {
       if (isDraftTicket(ticket)) {
         const draftId = String(ticket.id);
         const session = tabSessionsRef.current[draftId];
@@ -1449,26 +1458,28 @@ export default function DeskV2Root() {
       return;
     }
 
-    sendInternalNoteInProgressRef.current = true;
-    setSendInternalNoteBusy(true);
-
-    const ticketId = String(ticket.id);
-    const author = getAgentName();
-    const clearComposeAfterSend = () => {
-      setInternalText('');
-      if (activeTabId) {
-        const sessionKey = String(activeTabId);
-        const session = tabSessionsRef.current[sessionKey];
-        if (session) {
-          tabSessionsRef.current[sessionKey] = {
-            ...session,
-            internalText: '',
-          };
-        }
-      }
-    };
-
     try {
+      // Lock setado dentro do try — se algo aqui lançar, o finally abaixo ainda libera
+      // sendInternalNoteInProgressRef, em vez de travar o canal de nota interna pro resto da sessão.
+      sendInternalNoteInProgressRef.current = true;
+      setSendInternalNoteBusy(true);
+
+      const ticketId = String(ticket.id);
+      const author = getAgentName();
+      const clearComposeAfterSend = () => {
+        setInternalText('');
+        if (activeTabId) {
+          const sessionKey = String(activeTabId);
+          const session = tabSessionsRef.current[sessionKey];
+          if (session) {
+            tabSessionsRef.current[sessionKey] = {
+              ...session,
+              internalText: '',
+            };
+          }
+        }
+      };
+
       if (isDraftTicket(ticket)) {
         const appended = appendInternalNoteToCachedTicket(ticketId, {
           text: internalNoteHtml,
