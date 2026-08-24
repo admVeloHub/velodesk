@@ -55,13 +55,13 @@ function loadCsatStarDataUri(): string | null {
 }
 
 /** Linha discreta "Avaliação referente ao protocolo X." — formato compacto, não o card grande padrão. */
-function buildCsatProtocoloLineHtml(protocolo: string): string {
+export function buildCsatProtocoloLineHtml(protocolo: string): string {
   const safeProtocolo = escapeHtmlAttribute(protocolo);
   return `<p style="margin:0 0 16px 0;font-size:13px;color:#5A6472;font-family:Arial,sans-serif;">Avaliação referente ao protocolo <strong style="color:#1634FF;">${safeProtocolo}</strong>.</p>`;
 }
 
 /** Monta o bloco HTML das 5 estrelas clicáveis (cada uma é um <a href> com nota na URL). */
-function buildCsatStarsHtml(protocolo: string): string {
+export function buildCsatStarsHtml(protocolo: string): string {
   const base = env.twilioWebhookPublicBaseUrl.replace(/\/+$/, '');
   const safeProtocolo = encodeURIComponent(protocolo);
   const starDataUri = loadCsatStarDataUri();
