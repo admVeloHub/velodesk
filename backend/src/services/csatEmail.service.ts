@@ -1,7 +1,9 @@
 /**
- * csatEmail.service v1.0.0 — disparo de e-mail CSAT (encerramento + repescagem)
- * VERSION: v1.0.0 | DATE: 2026-08-24
+ * csatEmail.service v1.1.0 — estrela ilustrada (imagem) no lugar do glifo ★
+ * VERSION: v1.1.0 | DATE: 2026-08-24
  */
+import fs from 'fs';
+import path from 'path';
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { env } from '../config/env';
 import { isEspeciaisChamado, currentStatus } from './chamado.mapper';
@@ -18,16 +20,54 @@ import {
   persistOutboundEmailMeta,
 } from './emailThread.service';
 
+const CSAT_STAR_FILENAME = 'csat-star.png';
+
+function resolveCsatStarPath(): string | null {
+  const candidates = [
+    path.join(process.cwd(), 'assets', 'email', CSAT_STAR_FILENAME),
+    path.join(__dirname, '..', '..', 'assets', 'email', CSAT_STAR_FILENAME),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+let cachedCsatStarDataUri: string | null | undefined;
+
+/** Estrela ilustrada (imagem, não glifo ★) embutida como data URI — cacheada em memória. */
+function loadCsatStarDataUri(): string | null {
+  if (cachedCsatStarDataUri !== undefined) return cachedCsatStarDataUri;
+  const starPath = resolveCsatStarPath();
+  if (!starPath) {
+    console.warn('[csatEmail] imagem da estrela não encontrada — usando fallback ★');
+    cachedCsatStarDataUri = null;
+    return null;
+  }
+  try {
+    const buffer = fs.readFileSync(starPath);
+    cachedCsatStarDataUri = `data:image/png;base64,${buffer.toString('base64')}`;
+  } catch (err) {
+    console.warn('[csatEmail] falha ao ler imagem da estrela:', (err as Error).message);
+    cachedCsatStarDataUri = null;
+  }
+  return cachedCsatStarDataUri;
+}
+
 /** Monta o bloco HTML das 5 estrelas clicáveis (cada uma é um <a href> com nota na URL). */
 function buildCsatStarsHtml(protocolo: string): string {
   const base = env.twilioWebhookPublicBaseUrl.replace(/\/+$/, '');
   const safeProtocolo = encodeURIComponent(protocolo);
+  const starDataUri = loadCsatStarDataUri();
   const stars = [1, 2, 3, 4, 5]
     .map((n) => {
       const href = escapeHtmlAttribute(`${base}/csat?protocolo=${safeProtocolo}&nota=${n}`);
+      const starVisual = starDataUri
+        ? `<img src="${starDataUri}" width="32" height="32" alt="★" style="display:inline-block;width:32px;height:32px;border:0;">`
+        : `<span style="font-size:32px;line-height:1;color:#FFB800;">★</span>`;
       return `<td align="center" valign="top" style="padding:0 4px;">
       <a href="${href}" target="_blank" style="text-decoration:none;display:inline-block;">
-        <span style="font-size:32px;line-height:1;color:#FFB800;">★</span>
+        ${starVisual}
         <br>
         <span style="font-size:11px;color:#9AA0AE;">${n}</span>
       </a>
