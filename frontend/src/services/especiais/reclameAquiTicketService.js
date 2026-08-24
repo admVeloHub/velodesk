@@ -1,7 +1,7 @@
 /**
  * reclameAquiTicketService — bridge Reclame Aqui ↔ API tickets
- * VERSION: v1.2.2 | DATE: 2026-08-19
- * — produto e motivo na tabulação Desk; motivo da lista do órgão
+ * VERSION: v1.2.3 | DATE: 2026-08-24
+ * — createReclamacaoFromCpf sinaliza clienteNotFound explicitamente (404 nunca chega como err.response)
  */
 import { ticketsApi, reclamacoesApi, clientsApi } from '../../api/client';
 import { apiTicketToCockpit } from '../../api/adapters/ticketAdapter';
@@ -104,7 +104,13 @@ export async function createReclamacaoFromCliente(doc) {
 
 export async function createReclamacaoFromCpf(cpfRaw) {
   const cpf = normalizeCpf(cpfRaw);
+  // getByCpf resolve `null` em 404 (não lança) — sinaliza explicitamente pro chamador em vez de
+  // deixar cair no erro genérico "Dados do cliente inválidos" de createReclamacaoFromCliente,
+  // que não tem como o catch de UI distinguir de "cliente não encontrado" (err.response é undefined).
   const cliente = await clientsApi.getByCpf(cpf);
+  if (!cliente) {
+    throw Object.assign(new Error('Cliente não encontrado.'), { clienteNotFound: true });
+  }
   return createReclamacaoFromCliente(cliente);
 }
 

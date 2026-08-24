@@ -220,7 +220,11 @@ export async function createDemandaFromCliente(doc) {
 
 export async function createDemandaFromCpf(cpfRaw) {
   const cpf = normalizeCpf(cpfRaw);
+  // getByCpf resolve `null` em 404 (não lança) — sinaliza explicitamente pro chamador.
   const cliente = await clientsApi.getByCpf(cpf);
+  if (!cliente) {
+    throw Object.assign(new Error('Cliente não encontrado.'), { clienteNotFound: true });
+  }
   return createDemandaFromCliente(cliente);
 }
 

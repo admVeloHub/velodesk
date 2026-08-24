@@ -1,6 +1,7 @@
 /**
  * Painel compacto — criar ticket draft por CPF
- * VERSION: v2.0.3 | DATE: 2026-08-21
+ * VERSION: v2.0.4 | DATE: 2026-08-24
+ * — lookup local (hydrateFromApi:0) antes de oferecer cadastro manual
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { clientsApi } from '../../../api/client';
@@ -54,7 +55,10 @@ export default function CreateTicketPanel({ onClose, onSaved }) {
     }
     setLoading(true);
     try {
-      const cliente = await clientsApi.getByCpf(cpf);
+      // hydrateFromApi:0 — checagem local rápida primeiro. Sem isso, um CPF não cadastrado
+      // dispara consulta externa (até ~30s) antes de oferecer o cadastro manual: o botão
+      // parecia travado quando o cliente simplesmente ainda não existe.
+      const cliente = await clientsApi.getByCpf(cpf, { hydrateFromApi: 0 });
       if (!cliente) {
         setPendingCpf(cpf);
         setRegisterOpen(true);

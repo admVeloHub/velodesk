@@ -1,4 +1,4 @@
-/** tickets.routes v1.26.3 — claim de responsável também nas rotas de workflow (start/advance/cancel) */
+/** tickets.routes v1.26.4 — by-protocol com try/catch (Express 4 não captura rejeicao async sem isso) */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -133,15 +133,23 @@ router.get('/by-protocol/:protocolo', authMiddleware, async (req, res: Response)
   const protocolo = String(req.params.protocolo ?? '').trim();
   if (!protocolo) return res.status(400).json({ message: 'Protocolo inválido' });
 
-  let chamado = await ChamadoN1.findOne({ chamadoProtocolo: protocolo });
-  if (!chamado) return res.status(404).json({ message: 'Chamado não encontrado' });
+  try {
+    let chamado = await ChamadoN1.findOne({ chamadoProtocolo: protocolo });
+    if (!chamado) return res.status(404).json({ message: 'Chamado não encontrado' });
 
-  await reconcileChamadoAttachmentScanStatuses(String(chamado._id));
-  chamado = await ChamadoN1.findOne({ chamadoProtocolo: protocolo });
-  if (!chamado) return res.status(404).json({ message: 'Chamado não encontrado' });
+    await reconcileChamadoAttachmentScanStatuses(String(chamado._id));
+    chamado = await ChamadoN1.findOne({ chamadoProtocolo: protocolo });
+    if (!chamado) return res.status(404).json({ message: 'Chamado não encontrado' });
 
-  const boxes = await loadBoxes();
-  res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+    const boxes = await loadBoxes();
+    res.json(await chamadoToTicket(chamado, await resolveBoxIdForChamado(chamado, boxes)));
+  } catch (err) {
+    // Express 4 não encaminha rejeições de handler async para o error middleware —
+    // sem este catch, uma falha aqui (ex.: reconcile de anexo, workflow ref quebrada)
+    // deixa a requisição pendurada pra sempre (sem resposta), e a busca "falha" sem erro visível.
+    console.error('[tickets] by-protocol falhou:', protocolo, (err as Error).message);
+    res.status(500).json({ message: 'Erro ao buscar chamado por protocolo' });
+  }
 });
 
 router.post('/:sourceId/merge-into/:targetId', authMiddleware, async (req, res: Response) => {

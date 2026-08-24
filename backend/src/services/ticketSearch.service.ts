@@ -1,7 +1,7 @@
 /**
  * Busca avançada de tickets — builder Mongo + escopo de permissão
- * VERSION: v1.4.0 | DATE: 2026-08-18
- * — filtros date-only alinhados ao dia civil BRT
+ * VERSION: v1.4.1 | DATE: 2026-08-24
+ * — match de CPF tolera máscara/separadores no valor salvo (registros antigos/outros canais)
  */
 import mongoose from 'mongoose';
 import { ChamadoN1, type IChamadoN1 } from '../models/ChamadoN1';
@@ -161,6 +161,15 @@ function digitsOnly(value: string): string {
   return String(value || '').replace(/\D/g, '');
 }
 
+/**
+ * CPF pode estar salvo com máscara em registros antigos/de outros canais (ex.: "123.456.789-01")
+ * em vez de dígitos puros. Um regex de substring nos dígitos puros não bate contra isso — monta
+ * um padrão que tolera qualquer separador não-dígito entre os dígitos do CPF buscado.
+ */
+function cpfToleranceRegex(digits: string): string {
+  return digits.split('').map(escapeRegex).join('\\D*');
+}
+
 function parseDateBound(raw: string, endOfDay = false): Date | null {
   const s = String(raw || '').trim();
   if (!s) return null;
@@ -227,16 +236,9 @@ function buildCriterioClause(criterio: SearchCriterio): Record<string, unknown> 
       if (!valores.length) return null;
       const digitVals = valores.map(digitsOnly).filter(Boolean);
       if (!digitVals.length) return null;
-      if (operador === 'contains') {
-        return {
-          $or: digitVals.map((d) => ({
-            'cliente.clienteCpf': { $regex: escapeRegex(d) },
-          })),
-        };
-      }
       return {
         $or: digitVals.map((d) => ({
-          'cliente.clienteCpf': { $regex: escapeRegex(d) },
+          'cliente.clienteCpf': { $regex: cpfToleranceRegex(d) },
         })),
       };
     }
@@ -689,7 +691,7 @@ export async function searchTicketsByCpf(
     {
       $or: [
         { 'cliente.clienteCpf': cpf },
-        { 'cliente.clienteCpf': { $regex: escapeRegex(cpf) } },
+        { 'cliente.clienteCpf': { $regex: cpfToleranceRegex(cpf) } },
       ],
     },
     excludeFusaoAbsorvidosFilter(),
@@ -732,7 +734,7 @@ export async function searchTicketsByCpfDeskBar(
       {
         $or: [
           { 'cliente.clienteCpf': cpf },
-          { 'cliente.clienteCpf': { $regex: escapeRegex(cpf) } },
+          { 'cliente.clienteCpf': { $regex: cpfToleranceRegex(cpf) } },
         ],
       },
       excludeFusaoAbsorvidosFilter(),

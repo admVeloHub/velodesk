@@ -1667,7 +1667,11 @@ export default function DeskV2Root() {
   };
 
   const handleAssumeTicket = useCallback(async () => {
-    if (!ticket || assumingTicket || isTicketReadOnly(ticket)) return;
+    if (!ticket || assumingTicket) return;
+    if (isTicketReadOnly(ticket)) {
+      showNotification('Ticket fechado — não é possível assumir.', 'warning');
+      return;
+    }
 
     const perm = permsCtx?.permissions;
     if (

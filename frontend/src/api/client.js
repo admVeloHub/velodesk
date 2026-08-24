@@ -1,6 +1,6 @@
 /**
- * API client v1.27.0 — e-mails de saída configuráveis
- * VERSION: v1.28.0 | DATE: 2026-08-20 | AUTHOR: VeloHub Development Team
+ * API client v1.28.1 — timeout default (45s) na instância axios
+ * VERSION: v1.28.1 | DATE: 2026-08-24 | AUTHOR: VeloHub Development Team
  */
 import axios from 'axios';
 import { clearDeskAuthSession } from '../utils/backendJwt';
@@ -10,6 +10,10 @@ import deskLog from '../utils/deskDebugLog';
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
+  // Sem isso o axios espera para sempre (default 0 = sem timeout) — qualquer travamento no
+  // backend (ex.: chamada externa sem resposta) deixava spinner/botão presos pra sempre, sem
+  // erro. Chamadas legitimamente mais lentas (ex.: import Hugme) já sobrescrevem por chamada.
+  timeout: 45_000,
 });
 
 let handling401 = false;

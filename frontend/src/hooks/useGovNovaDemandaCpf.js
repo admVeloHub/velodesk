@@ -45,7 +45,7 @@ export function useGovNovaDemandaCpf({ onSuccess, onClose } = {}) {
       showNotification('Demanda registrada e ticket criado.', 'success');
       onSuccess?.(result.id);
     } catch (err) {
-      if (err?.response?.status === 404) {
+      if (err?.response?.status === 404 || err?.clienteNotFound) {
         setPendingCpf(cpf);
         setRegisterOpen(true);
         return;
