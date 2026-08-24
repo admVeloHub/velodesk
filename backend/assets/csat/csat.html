@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sua avaliação · Velotax</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;background:#F3F7FC;font-family:'Poppins',Arial,Helvetica,sans-serif;color:#272A30;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;}
+  .card{background:#fff;border:1px solid #E1E7F0;border-radius:16px;padding:40px 36px;max-width:440px;width:100%;text-align:center;box-shadow:0 8px 28px rgba(20,30,60,.06);}
+  .logo{font-weight:700;font-size:18px;color:#000058;letter-spacing:.02em;margin-bottom:26px;}
+  h1{font-size:19px;margin:0 0 8px 0;color:#272A30;}
+  .protocolo{font-size:12.5px;color:#9AA0AE;margin:0 0 26px 0;}
+  .stars{font-size:34px;letter-spacing:6px;margin:0 0 22px 0;}
+  .msg{font-size:14.5px;line-height:1.6;color:#5A6472;margin:0 0 22px 0;}
+  textarea{width:100%;min-height:96px;border:1px solid #E1E7F0;border-radius:10px;padding:12px 14px;font-family:inherit;font-size:14px;resize:vertical;margin-bottom:16px;}
+  textarea:focus{outline:none;border-color:#1634FF;}
+  button{background:#1634FF;color:#fff;border:0;border-radius:8px;padding:13px 22px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;width:100%;}
+  button:hover{background:#0f24d1;}
+  button:disabled{opacity:.6;cursor:default;}
+  .done{display:none;}
+  .done .check{font-size:40px;margin-bottom:10px;}
+  .skip{background:none;color:#9AA0AE;font-size:12.5px;margin-top:10px;text-decoration:underline;cursor:pointer;border:0;padding:0;width:auto;}
+  .error{background:#fff;padding:60px 30px;text-align:center;color:#9AA0AE;}
+  .net-error{color:#e74c3c;font-size:13px;margin-top:10px;display:none;}
+</style>
+</head>
+<body>
+
+<div class="card" id="card">
+  <div class="logo">VELOTAX</div>
+  <div id="conteudoAvaliacao">
+    <h1 id="tituloNota">Obrigado pela sua avaliação!</h1>
+    <p class="protocolo" id="protocoloLinha">Protocolo —</p>
+    <div class="stars" id="estrelasView">★★★★★</div>
+    <p class="msg" id="mensagemNota"></p>
+
+    <div id="blocoFeedback" style="display:none;">
+      <textarea id="comentario" placeholder="Conta pra gente o que aconteceu (opcional)"></textarea>
+      <button id="btnEnviar" onclick="enviarFeedback()">Enviar</button>
+      <div><button class="skip" id="btnPular" onclick="pularFeedback()">Prefiro não comentar</button></div>
+      <p class="net-error" id="netError">Ocorreu um erro ao enviar. Tente novamente.</p>
+    </div>
+  </div>
+
+  <div class="done" id="blocoDone">
+    <div class="check">✅</div>
+    <h1>Recebemos, obrigado!</h1>
+    <p class="msg">Sua opinião foi registrada no protocolo <strong id="protocoloDone"></strong>. Muito obrigado!</p>
+  </div>
+</div>
+
+<script>
+// ---------- 1) lê protocolo e nota da URL ----------
+var params = new URLSearchParams(window.location.search);
+var protocolo = params.get('protocolo');
+var nota = parseInt(params.get('nota'), 10);
+
+var mensagens = {
+  1: 'Sentimos muito 💙 Vamos usar isso para melhorar — conta pra gente o que houve?',
+  2: 'Obrigado pela sinceridade. Queremos entender melhor — o que podemos fazer diferente?',
+  3: 'Obrigado pela nota! O que deixaria a sua experiência ainda melhor?',
+  4: 'Que bom saber! Se quiser contar mais alguma coisa, é só escrever abaixo.',
+  5: 'Que alegria! Obrigado por avaliar a gente. 💛'
+};
+var estrelasPorNota = {1:'★', 2:'★★', 3:'★★★', 4:'★★★★', 5:'★★★★★'};
+
+function iniciar(){
+  if(!protocolo || !nota || nota < 1 || nota > 5){
+    document.getElementById('card').innerHTML =
+      '<div class="error">Link inválido ou expirado.<br>Se precisar, é só responder ao e-mail original.</div>';
+    return;
+  }
+
+  document.getElementById('protocoloLinha').textContent = 'Protocolo ' + protocolo;
+  document.getElementById('estrelasView').textContent = estrelasPorNota[nota];
+  document.getElementById('mensagemNota').textContent = mensagens[nota];
+
+  // nota baixa (1 ou 2) -> pede feedback opcional
+  if(nota <= 2){
+    document.getElementById('blocoFeedback').style.display = 'block';
+  } else {
+    // nota 3-5: já registra direto
+    registrarNota(null);
+  }
+}
+
+// ---------- 2) envia para o backend ----------
+var enviando = false;
+function registrarNota(comentario){
+  if(enviando) return;
+  enviando = true;
+  document.getElementById('netError').style.display = 'none';
+  var btn = document.getElementById('btnEnviar');
+  var btnPular = document.getElementById('btnPular');
+  if(btn) btn.disabled = true;
+  if(btnPular) btnPular.disabled = true;
+
+  fetch(window.location.origin + '/api/csat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      protocolo: protocolo,
+      nota: nota,
+      comentario: comentario || null
+    })
+  })
+  .then(function(r){
+    if(!r.ok) throw new Error('status ' + r.status);
+    return r.json();
+  })
+  .then(function(){
+    document.getElementById('protocoloDone').textContent = protocolo;
+    document.getElementById('conteudoAvaliacao').style.display = 'none';
+    document.getElementById('blocoDone').style.display = 'block';
+  })
+  .catch(function(){
+    enviando = false;
+    if(btn) btn.disabled = false;
+    if(btnPular) btnPular.disabled = false;
+    document.getElementById('netError').style.display = 'block';
+  });
+}
+
+function enviarFeedback(){
+  var texto = document.getElementById('comentario').value.trim();
+  registrarNota(texto);
+}
+function pularFeedback(){
+  registrarNota(null);
+}
+
+iniciar();
+</script>
+
+</body>
+</html>

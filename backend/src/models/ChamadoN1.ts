@@ -46,6 +46,17 @@ export interface IChamadoWorkflow {
   requisicao?: IChamadoWorkflowRequisicao;
 }
 
+export interface IChamadoCsat {
+  enviado: boolean;
+  enviadoEm: Date | null;
+  nota: number | null;
+  comentario: string;
+  respondido: boolean;
+  respondidoEm: Date | null;
+  repescagemEnviada: boolean;
+  repescagemEnviadaEm: Date | null;
+}
+
 export interface IClienteRef {
   clienteCpf: string;
   clienteId: Types.ObjectId | null;
@@ -84,6 +95,7 @@ export interface IChamadoN1 extends Document {
   registro: IRegistro[];
   workflow?: IChamadoWorkflow;
   fusao?: IChamadoFusao;
+  csat?: IChamadoCsat;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -194,6 +206,20 @@ const ChamadoFusaoSchema = new Schema<IChamadoFusao>(
   { _id: false },
 );
 
+const ChamadoCsatSchema = new Schema<IChamadoCsat>(
+  {
+    enviado: { type: Boolean, default: false },
+    enviadoEm: { type: Date, default: null },
+    nota: { type: Number, min: 1, max: 5, default: null },
+    comentario: { type: String, default: '' },
+    respondido: { type: Boolean, default: false },
+    respondidoEm: { type: Date, default: null },
+    repescagemEnviada: { type: Boolean, default: false },
+    repescagemEnviadaEm: { type: Date, default: null },
+  },
+  { _id: false },
+);
+
 const ChamadoN1Schema = new Schema<IChamadoN1>(
   {
     chamadoProtocolo: { type: String },
@@ -203,6 +229,7 @@ const ChamadoN1Schema = new Schema<IChamadoN1>(
     registro: { type: [RegistroSchema], default: [] },
     workflow: { type: ChamadoWorkflowSchema, default: undefined },
     fusao: { type: ChamadoFusaoSchema, default: undefined },
+    csat: { type: ChamadoCsatSchema, default: undefined },
   },
   {
     timestamps: true,

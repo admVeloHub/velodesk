@@ -22,7 +22,7 @@ import {
 
 export type TriggerPass = 'event' | 'sla';
 
-function resolveChamadoClientName(chamado: IChamadoN1): string {
+export function resolveChamadoClientName(chamado: IChamadoN1): string {
   const tab = Array.isArray(chamado.tabulacao) ? chamado.tabulacao[chamado.tabulacao.length - 1] : null;
   const fromCliente = (chamado.cliente?.[0] as { clienteNome?: string } | undefined)?.clienteNome;
   return String(fromCliente || chamado.chamadoTitulo || tab?.motivo || '').trim();

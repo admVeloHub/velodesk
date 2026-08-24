@@ -52,6 +52,8 @@ import reclamacoesRoutes from './routes/reclamacoes.routes';
 import internalAttachmentScanRoutes from './routes/internalAttachmentScan.routes';
 import reclameAquiHugmeRoutes from './routes/reclameAquiHugme.routes';
 import processosRoutes from './routes/processos.routes';
+import csatPageRoutes from './routes/csatPage.routes';
+import csatRoutes from './routes/csat.routes';
 import { logPopCatalogStartup } from './services/processos/popCatalog.service';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
@@ -64,6 +66,7 @@ import { seedDevelopmentData, purgeAllMockTickets, runDeskConfigMigrations } fro
 import { getAgentsStatus } from './services/agents/openaiAgent.util';
 import { startGestaoChamadosJob } from './jobs/gestaoChamados.job';
 import { startCloseResolvedTicketsJob } from './jobs/closeResolvedTickets.job';
+import { startCsatRepescagemJob } from './jobs/csatRepescagem.job';
 import { startEmailSlaTriggerJob } from './jobs/emailSlaTrigger.job';
 import { startResolvePendenteTicketsJob } from './jobs/resolvePendenteTickets.job';
 import { startChamadoIaAnaliseJob } from './jobs/chamadoIaAnalise.job';
@@ -87,6 +90,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(blockNoticiarioRoutes);
 
+app.use(csatPageRoutes);
 app.use('/api/inbound', inboundRoutes);
 app.use('/api/spellcheck', spellcheckRoutes);
 app.use('/api/compose', composeRoutes);
@@ -191,6 +195,7 @@ app.use('/api/realtime', realtimeRoutes);
 app.use('/api/reclamacoes', reclamacoesRoutes);
 app.use('/api/reclame-aqui/hugme', reclameAquiHugmeRoutes);
 app.use('/api/processos', processosRoutes);
+app.use('/api/csat', csatRoutes);
 
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -324,6 +329,7 @@ async function start() {
       // Independente do programa de agentes autônomos — controlado só por CHAMADO_IA_ANALISE_ENABLED.
       startChamadoIaAnaliseJob();
       startCloseResolvedTicketsJob();
+      startCsatRepescagemJob();
       startEmailSlaTriggerJob();
       startResolvePendenteTicketsJob();
       startWhatsAppAudioTranscriptionWorker();
