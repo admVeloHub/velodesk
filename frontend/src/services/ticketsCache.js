@@ -1,6 +1,8 @@
 /**
- * ticketsCache v1.21.1 — fingerprint do poll silencioso considera updatedAt (não só status)
- * VERSION: v1.21.1 | DATE: 2026-08-24 | AUTHOR: VeloHub Development Team
+ * ticketsCache v1.21.2 — pruneTicketsAbsentFromApi não fecha mais a aba aberta
+ * VERSION: v1.21.2 | DATE: 2026-08-24 | AUTHOR: VeloHub Development Team
+ * — ausência na resposta de /boxes (fila sem coluna pra status terminal) não é 404: só
+ *   evictTicketFromCache (404/410 real) deve fechar a aba
  */
 import { boxesApi, ticketsApi } from '../api/client';
 import { isBackendJwtUsable } from '../utils/backendJwt';
@@ -130,7 +132,11 @@ function pruneTicketsAbsentFromApi(mergedCols, apiCols) {
       ids: evictedIds,
       apiTickets: apiIds.size,
     });
-    evictedIds.forEach((id) => dispatchTicketEvicted(id));
+    // NÃO despacha 'ticket-evicted' aqui (fecharia a aba aberta do ticket). Ausência na
+    // resposta de /boxes só significa "não está no quadro ativo desta fila" — ex.: ticket
+    // virou Cancelado/Resolvido e a fila de equipe aberta não tem coluna pra status terminal.
+    // Isso não indica que o ticket foi apagado. O fechamento de aba fica só pro 404/410 real
+    // (evictTicketFromCache, chamado em loadTicketDetailFromApi/commitTicketViaApi).
   }
   return pruned;
 }
