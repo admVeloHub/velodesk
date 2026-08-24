@@ -1,5 +1,5 @@
-# nginx-cloudrun.conf.template v1.0.3 — timeout maior no push Gmail Pub/Sub
-# VERSION: v1.0.3 | DATE: 2026-07-27 | AUTHOR: VeloHub Development Team
+# nginx-cloudrun.conf.template v1.0.4 — proxy /csat para o backend (pagina publica de CSAT)
+# VERSION: v1.0.4 | DATE: 2026-08-24 | AUTHOR: VeloHub Development Team
 
 server {
     listen ${PORT};
@@ -47,6 +47,16 @@ server {
     }
 
     location /health {
+        proxy_pass ${BACKEND_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_hide_header Cross-Origin-Opener-Policy;
+        proxy_hide_header Cross-Origin-Embedder-Policy;
+    }
+
+    # Página pública de avaliação CSAT (link clicado no e-mail) — sem prefixo
+    # /api, então precisa de location própria ou cai no fallback do SPA (/login).
+    location /csat {
         proxy_pass ${BACKEND_URL};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
