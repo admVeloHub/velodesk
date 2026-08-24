@@ -1,6 +1,6 @@
 /**
- * emailPreviewHtml v1.3.0 — bloco de estrelas do CSAT só na simulação
- * VERSION: v1.3.0 | DATE: 2026-08-24
+ * emailPreviewHtml v1.4.0 — CSAT usa linha compacta de protocolo, não o card grande
+ * VERSION: v1.4.0 | DATE: 2026-08-24
  */
 
 const BLUE = '#1634FF';
@@ -72,6 +72,16 @@ export function buildCsatStarsPreviewHtml() {
 </table>`;
 }
 
+/**
+ * Linha compacta "Avaliação referente ao protocolo X." — usada no lugar do
+ * card grande de "Atendimento" só nos templates de CSAT, espelhando o que
+ * o backend gera de verdade (csatEmail.service.ts, buildCsatProtocoloLineHtml).
+ */
+export function buildCsatProtocoloLinePreviewHtml(protocolo) {
+  const safeProtocolo = escapeHtml(protocolo || '0100000001');
+  return `<p style="margin:0 0 16px 0;font-size:13px;color:#5A6472;font-family:Arial,sans-serif;">Avaliação referente ao protocolo <strong style="color:${BLUE};">${safeProtocolo}</strong>.</p>`;
+}
+
 export function buildFarewellPreviewHtml(farewellHtml) {
   if (farewellHtml && /<[a-z][\s\S]*>/i.test(String(farewellHtml))) {
     return String(farewellHtml);
@@ -132,10 +142,15 @@ export function buildOutboundPreviewHtml({
 }) {
   const parts = [
     plainTextToPreviewHtml(saudacao),
-    buildTicketBoxPreviewHtml(protocolo, titulo),
+    // CSAT usa a linha compacta "Avaliação referente ao protocolo X.", igual ao
+    // e-mail real — os demais templates mantêm o card grande de "Atendimento".
+    showCsatStars ? '' : buildTicketBoxPreviewHtml(protocolo, titulo),
     plainTextToPreviewHtml(corpo),
   ];
-  if (showCsatStars) parts.push(buildCsatStarsPreviewHtml());
+  if (showCsatStars) {
+    parts.push(buildCsatProtocoloLinePreviewHtml(protocolo));
+    parts.push(buildCsatStarsPreviewHtml());
+  }
   parts.push(buildFarewellPreviewHtml(farewellHtml));
   if (signatureHtml) {
     parts.push(`<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;">${signatureHtml}</div>`);

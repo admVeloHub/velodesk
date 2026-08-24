@@ -1,6 +1,6 @@
 /**
- * csatEmail.service v1.1.0 — estrela ilustrada (imagem) no lugar do glifo ★
- * VERSION: v1.1.0 | DATE: 2026-08-24
+ * csatEmail.service v1.2.0 — linha compacta "Avaliação referente ao protocolo X."
+ * VERSION: v1.2.0 | DATE: 2026-08-24
  */
 import fs from 'fs';
 import path from 'path';
@@ -52,6 +52,12 @@ function loadCsatStarDataUri(): string | null {
     cachedCsatStarDataUri = null;
   }
   return cachedCsatStarDataUri;
+}
+
+/** Linha discreta "Avaliação referente ao protocolo X." — formato compacto, não o card grande padrão. */
+function buildCsatProtocoloLineHtml(protocolo: string): string {
+  const safeProtocolo = escapeHtmlAttribute(protocolo);
+  return `<p style="margin:0 0 16px 0;font-size:13px;color:#5A6472;font-family:Arial,sans-serif;">Avaliação referente ao protocolo <strong style="color:#1634FF;">${safeProtocolo}</strong>.</p>`;
 }
 
 /** Monta o bloco HTML das 5 estrelas clicáveis (cada uma é um <a href> com nota na URL). */
@@ -118,8 +124,9 @@ async function composeAndSendCsatEmail(
   const corpoTexto = substituteEmailTemplatePlaceholders(doc.corpo || '', clientName);
   const corpoTextoHtml = plainTextToEmailHtml(corpoTexto);
   const protocolo = String(chamado.chamadoProtocolo ?? '').trim();
+  const protocoloLineHtml = buildCsatProtocoloLineHtml(protocolo);
   const blocoEstrelasHtml = buildCsatStarsHtml(protocolo);
-  const corpo = `${corpoTextoHtml}\n${blocoEstrelasHtml}`;
+  const corpo = `${corpoTextoHtml}\n${protocoloLineHtml}\n${blocoEstrelasHtml}`;
 
   const assembled = await assembleClientEmail({
     mode: 'template',
