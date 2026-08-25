@@ -16,12 +16,29 @@ import {
   getDemandaByTicketId,
   mirrorDemandaFromTicket,
   refreshDemandasFromApi,
+  updateDemandaGroupFromTicket,
 } from './bacenStore';
 
 const BC_WORKFLOW_SLUG = 'bacen-tratativa';
 
 function normalizeCpf(value) {
   return String(value || '').replace(/\D/g, '');
+}
+
+/**
+ * Funde o snapshot congelado do ticket (registro[0].metadados.bacen, gravado só na criação e
+ * nunca mais atualizado) sob o item do store — o store é a fonte viva (PATCH de classificação/
+ * dados via BcClassificacaoFields etc.); o snapshot só preenche campos que o item nunca teve.
+ */
+function overlayFrozenTicketMeta(storeItem, frozenMeta) {
+  if (!frozenMeta || typeof frozenMeta !== 'object') return storeItem;
+  const merged = { ...frozenMeta, ...storeItem };
+  Object.keys(frozenMeta).forEach((key) => {
+    if (merged[key] === undefined || merged[key] === null || merged[key] === '') {
+      merged[key] = frozenMeta[key];
+    }
+  });
+  return merged;
 }
 
 function buildBacenMeta(form) {
@@ -238,14 +255,15 @@ export async function fetchBcTicketView(bcId) {
 
   const raw = await ticketsApi.get(bcItem.ticketId);
   const ticket = apiTicketToCockpit(raw);
+  updateDemandaGroupFromTicket(ticket);
+  const syncedItem = getDemandaById(bcId) || bcItem;
   const apiBc = ticket.lateralForm?.bacen;
 
   return {
     bcItem: {
-      ...bcItem,
-      ...(apiBc && typeof apiBc === 'object' ? apiBc : {}),
-      ticketId: bcItem.ticketId,
-      chamadoProtocolo: ticket.chamadoProtocolo || bcItem.chamadoProtocolo,
+      ...overlayFrozenTicketMeta(syncedItem, apiBc),
+      ticketId: syncedItem.ticketId,
+      chamadoProtocolo: ticket.chamadoProtocolo || syncedItem.chamadoProtocolo,
     },
     ticket,
   };

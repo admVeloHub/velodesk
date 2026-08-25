@@ -8,6 +8,7 @@ import { useNotifications } from '../../../context/NotificationContext';
 import { useTabulation } from '../../../context/TabulationContext';
 import { TABULACAO_OPCOES_CATEGORIAS } from '../../../services/tabulationConfig';
 import { PC_MOTIVOS } from '../../../services/especiais/proconData';
+import { patchDemanda } from '../../../services/especiais/proconStore';
 
 export default function PcClassificacaoFields({ pcItem, onSaved }) {
   const { showNotification } = useNotifications();
@@ -38,7 +39,11 @@ export default function PcClassificacaoFields({ pcItem, onSaved }) {
     setSaving(true);
     try {
       const updated = await reclamacoesApi.patch('procon', pcItem.id, { [field]: value });
-      onSaved?.({ ...pcItem, ...updated });
+      const merged = { ...pcItem, ...updated };
+      // Grava no store local antes do reload disparado por onSaved — sem isso, o reload
+      // relê o item obsoleto do cache e zera o produto/motivo recém-selecionado.
+      patchDemanda(merged);
+      onSaved?.(merged);
       showNotification('Classificação atualizada.', 'success');
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Não foi possível atualizar a classificação.';

@@ -8,6 +8,7 @@ import { useNotifications } from '../../../context/NotificationContext';
 import { useTabulation } from '../../../context/TabulationContext';
 import { TABULACAO_OPCOES_CATEGORIAS } from '../../../services/tabulationConfig';
 import { RA_MOTIVOS } from '../../../services/especiais/reclameAquiData';
+import { patchReclamacao } from '../../../services/especiais/reclameAquiStore';
 
 export default function RaClassificacaoFields({ raItem, onSaved }) {
   const { showNotification } = useNotifications();
@@ -38,7 +39,11 @@ export default function RaClassificacaoFields({ raItem, onSaved }) {
     setSaving(true);
     try {
       const updated = await reclamacoesApi.patch('reclame-aqui', raItem.id, { [field]: value });
-      onSaved?.({ ...raItem, ...updated });
+      const merged = { ...raItem, ...updated };
+      // Grava no store local antes do reload disparado por onSaved — sem isso, o reload
+      // relê o item obsoleto do cache e zera o produto/motivo recém-selecionado.
+      patchReclamacao(merged);
+      onSaved?.(merged);
       showNotification('Classificação atualizada.', 'success');
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Não foi possível atualizar a classificação.';

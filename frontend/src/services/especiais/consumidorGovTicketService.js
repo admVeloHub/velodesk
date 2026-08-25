@@ -16,12 +16,30 @@ import {
   getDemandaByTicketId,
   mirrorDemandaFromTicket,
   refreshDemandasFromApi,
+  updateDemandaGroupFromTicket,
 } from './consumidorGovStore';
 
 const CG_WORKFLOW_SLUG = 'consumidor-gov-tratativa';
 
 function normalizeCpf(value) {
   return String(value || '').replace(/\D/g, '');
+}
+
+/**
+ * Funde o snapshot congelado do ticket (registro[0].metadados.consumidorGov, gravado só na
+ * criação e nunca mais atualizado) sob o item do store — o store é a fonte viva (PATCH de
+ * classificação/dados via CgClassificacaoFields etc.); o snapshot só preenche campos que o item
+ * nunca teve.
+ */
+function overlayFrozenTicketMeta(storeItem, frozenMeta) {
+  if (!frozenMeta || typeof frozenMeta !== 'object') return storeItem;
+  const merged = { ...frozenMeta, ...storeItem };
+  Object.keys(frozenMeta).forEach((key) => {
+    if (merged[key] === undefined || merged[key] === null || merged[key] === '') {
+      merged[key] = frozenMeta[key];
+    }
+  });
+  return merged;
 }
 
 function buildConsumidorGovMeta(form) {
@@ -238,14 +256,15 @@ export async function fetchCgTicketView(cgId) {
 
   const raw = await ticketsApi.get(cgItem.ticketId);
   const ticket = apiTicketToCockpit(raw);
+  updateDemandaGroupFromTicket(ticket);
+  const syncedItem = getDemandaById(cgId) || cgItem;
   const apiCg = ticket.lateralForm?.consumidorGov;
 
   return {
     cgItem: {
-      ...cgItem,
-      ...(apiCg && typeof apiCg === 'object' ? apiCg : {}),
-      ticketId: cgItem.ticketId,
-      chamadoProtocolo: ticket.chamadoProtocolo || cgItem.chamadoProtocolo,
+      ...overlayFrozenTicketMeta(syncedItem, apiCg),
+      ticketId: syncedItem.ticketId,
+      chamadoProtocolo: ticket.chamadoProtocolo || syncedItem.chamadoProtocolo,
     },
     ticket,
   };

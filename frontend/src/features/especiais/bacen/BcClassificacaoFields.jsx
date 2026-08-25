@@ -8,6 +8,7 @@ import { useNotifications } from '../../../context/NotificationContext';
 import { useTabulation } from '../../../context/TabulationContext';
 import { TABULACAO_OPCOES_CATEGORIAS } from '../../../services/tabulationConfig';
 import { BC_MOTIVOS } from '../../../services/especiais/bacenData';
+import { patchDemanda } from '../../../services/especiais/bacenStore';
 
 export default function BcClassificacaoFields({ bcItem, onSaved }) {
   const { showNotification } = useNotifications();
@@ -38,7 +39,11 @@ export default function BcClassificacaoFields({ bcItem, onSaved }) {
     setSaving(true);
     try {
       const updated = await reclamacoesApi.patch('bacen', bcItem.id, { [field]: value });
-      onSaved?.({ ...bcItem, ...updated });
+      const merged = { ...bcItem, ...updated };
+      // Grava no store local antes do reload disparado por onSaved — sem isso, o reload
+      // relê o item obsoleto do cache e zera o produto/motivo recém-selecionado.
+      patchDemanda(merged);
+      onSaved?.(merged);
       showNotification('Classificação atualizada.', 'success');
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Não foi possível atualizar a classificação.';

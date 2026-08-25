@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import { reclamacoesApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
+import { patchReclamacao } from '../../../services/especiais/reclameAquiStore';
 
 /** Converte ISO -> valor aceito por <input type="datetime-local"> (hora local). */
 function toDatetimeLocalInput(iso) {
@@ -34,7 +35,11 @@ export default function RaDadosEditableFields({ raItem, onSaved }) {
     setSaving(true);
     try {
       const updated = await reclamacoesApi.patch('reclame-aqui', raItem.id, patch);
-      onSaved?.({ ...raItem, ...updated });
+      const merged = { ...raItem, ...updated };
+      // Grava no store local antes do reload disparado por onSaved — sem isso, o reload
+      // relê o item obsoleto do cache e reverte o campo recém-salvo.
+      patchReclamacao(merged);
+      onSaved?.(merged);
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Não foi possível salvar.';
       showNotification(msg, 'error');

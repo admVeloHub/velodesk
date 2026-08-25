@@ -8,6 +8,7 @@ import { useNotifications } from '../../../context/NotificationContext';
 import { useTabulation } from '../../../context/TabulationContext';
 import { TABULACAO_OPCOES_CATEGORIAS } from '../../../services/tabulationConfig';
 import { CG_MOTIVOS } from '../../../services/especiais/consumidorGovData';
+import { patchDemanda } from '../../../services/especiais/consumidorGovStore';
 
 export default function CgClassificacaoFields({ cgItem, onSaved }) {
   const { showNotification } = useNotifications();
@@ -38,7 +39,11 @@ export default function CgClassificacaoFields({ cgItem, onSaved }) {
     setSaving(true);
     try {
       const updated = await reclamacoesApi.patch('consumidor-gov', cgItem.id, { [field]: value });
-      onSaved?.({ ...cgItem, ...updated });
+      const merged = { ...cgItem, ...updated };
+      // Grava no store local antes do reload disparado por onSaved — sem isso, o reload
+      // relê o item obsoleto do cache e zera o produto/motivo recém-selecionado.
+      patchDemanda(merged);
+      onSaved?.(merged);
       showNotification('Classificação atualizada.', 'success');
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Não foi possível atualizar a classificação.';

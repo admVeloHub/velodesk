@@ -16,12 +16,29 @@ import {
   getDemandaByTicketId,
   mirrorDemandaFromTicket,
   refreshDemandasFromApi,
+  updateDemandaGroupFromTicket,
 } from './proconStore';
 
 const PC_WORKFLOW_SLUG = 'procon-tratativa';
 
 function normalizeCpf(value) {
   return String(value || '').replace(/\D/g, '');
+}
+
+/**
+ * Funde o snapshot congelado do ticket (registro[0].metadados.procon, gravado só na criação
+ * e nunca mais atualizado) sob o item do store — o store é a fonte viva (PATCH de classificação/
+ * dados via PcClassificacaoFields etc.); o snapshot só preenche campos que o item nunca teve.
+ */
+function overlayFrozenTicketMeta(storeItem, frozenMeta) {
+  if (!frozenMeta || typeof frozenMeta !== 'object') return storeItem;
+  const merged = { ...frozenMeta, ...storeItem };
+  Object.keys(frozenMeta).forEach((key) => {
+    if (merged[key] === undefined || merged[key] === null || merged[key] === '') {
+      merged[key] = frozenMeta[key];
+    }
+  });
+  return merged;
 }
 
 function buildProconMeta(form) {
@@ -238,14 +255,15 @@ export async function fetchPcTicketView(pcId) {
 
   const raw = await ticketsApi.get(pcItem.ticketId);
   const ticket = apiTicketToCockpit(raw);
+  updateDemandaGroupFromTicket(ticket);
+  const syncedItem = getDemandaById(pcId) || pcItem;
   const apiPc = ticket.lateralForm?.procon;
 
   return {
     pcItem: {
-      ...pcItem,
-      ...(apiPc && typeof apiPc === 'object' ? apiPc : {}),
-      ticketId: pcItem.ticketId,
-      chamadoProtocolo: ticket.chamadoProtocolo || pcItem.chamadoProtocolo,
+      ...overlayFrozenTicketMeta(syncedItem, apiPc),
+      ticketId: syncedItem.ticketId,
+      chamadoProtocolo: ticket.chamadoProtocolo || syncedItem.chamadoProtocolo,
     },
     ticket,
   };

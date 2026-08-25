@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import { reclamacoesApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
+import { patchReclamacao } from '../../../services/especiais/reclameAquiStore';
 
 export default function RaModeracaoPanel({ raItem, onSaved }) {
   const { showNotification } = useNotifications();
@@ -32,7 +33,11 @@ export default function RaModeracaoPanel({ raItem, onSaved }) {
           moderacaoAvaliacaoCliente: avaliacaoCliente,
         },
       });
-      onSaved?.({ ...raItem, ...updated });
+      const merged = { ...raItem, ...updated };
+      // Grava no store local antes do reload disparado por onSaved — sem isso, o reload
+      // relê o item obsoleto do cache e reverte o campo recém-salvo.
+      patchReclamacao(merged);
+      onSaved?.(merged);
       showNotification('Moderação salva.', 'success');
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Não foi possível salvar a moderação.';

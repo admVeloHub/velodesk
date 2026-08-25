@@ -22,6 +22,23 @@ function normalizeCpf(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
+/**
+ * Funde o snapshot congelado do ticket (registro[0].metadados.reclameAqui, gravado só na criação
+ * e nunca mais atualizado) sob o item do store — o store é a fonte viva (PATCH de classificação/
+ * dados via RaClassificacaoFields, RaDadosEditableFields etc.); o snapshot só preenche campos que
+ * o item nunca teve.
+ */
+function overlayFrozenTicketMeta(storeItem, frozenMeta) {
+  if (!frozenMeta || typeof frozenMeta !== 'object') return storeItem;
+  const merged = { ...frozenMeta, ...storeItem };
+  Object.keys(frozenMeta).forEach((key) => {
+    if (merged[key] === undefined || merged[key] === null || merged[key] === '') {
+      merged[key] = frozenMeta[key];
+    }
+  });
+  return merged;
+}
+
 function buildReclameAquiMeta(form) {
   const defaults = buildRegistroDefaults(form);
   const idOrigem = String(defaults.idReclamacaoRa || defaults.protocoloRa || '').trim();
@@ -189,8 +206,7 @@ export async function fetchRaTicketView(raId) {
 
   return {
     raItem: {
-      ...syncedItem,
-      ...(apiRa && typeof apiRa === 'object' ? apiRa : {}),
+      ...overlayFrozenTicketMeta(syncedItem, apiRa),
       ticketId: syncedItem.ticketId,
       chamadoProtocolo: ticket.chamadoProtocolo || syncedItem.chamadoProtocolo,
     },
