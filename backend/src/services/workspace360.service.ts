@@ -8,6 +8,7 @@ import {
   buildResponsavelCandidates,
   chamadoToTicketListItem,
   currentStatus,
+  excludeEspeciaisChannelsMongoFilter,
   isSlaBreached,
   meusChamadosResponsavelFilter,
 } from './chamado.mapper';
@@ -317,6 +318,11 @@ async function loadAgentChamados(candidates: string[]): Promise<IChamadoN1[]> {
   return ChamadoN1.find({
     $and: [
       baseFilter,
+      // Painel 360° pessoal do agente é do módulo Tickets — canais especiais (Procon/Bacen/
+      // Consumidor.gov/Reclame Aqui) têm CRM próprio e não devem contar nos KPIs/seções do
+      // agente comum, mesmo se ele aparecer como responsável/atribuído (mesma regra já
+      // aplicada ao módulo Tickets em chamado.mapper.ts:buildChamadoQueryFilter).
+      excludeEspeciaisChannelsMongoFilter(),
       {
         $or: [
           lastStatusInFilter(ACTIVE_STATUS_LIST),
