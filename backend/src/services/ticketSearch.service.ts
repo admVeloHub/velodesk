@@ -13,6 +13,7 @@ import {
   buildResponsavelCandidates,
   chamadoToTicketListItem,
   currentStatus,
+  excludeEspeciaisChannelsMongoFilter,
   isSlaBreached,
   meusChamadosResponsavelFilter,
   meusChamadosAgentScopeFilter,
@@ -526,8 +527,13 @@ export async function searchTickets(
   }
 
   const andClauses: Record<string, unknown>[] = [];
+  // Módulo Tickets (Busca de Tickets): CE nunca entra — mesma regra absoluta do board
+  // (boxes.routes.ts/buildChamadoQueryFilter). Tickets de canal especial só aparecem
+  // nos CRMs dedicados (Especiais), nunca na busca geral do agente de atendimento.
+  andClauses.push(excludeEspeciaisChannelsMongoFilter());
   const visibility = await buildVisibilityFilter(resolved);
   if (visibility) andClauses.push(visibility);
+  const baselineClauseCount = andClauses.length;
 
   for (const criterio of criterios) {
     const campo = String(criterio.campo || '').trim().toLowerCase();
@@ -541,9 +547,9 @@ export async function searchTickets(
   if (!hasNonSla && !needsSlaPostFilter(criterios)) {
     return { tickets: [], total: 0, limit };
   }
-  if (hasNonSla && andClauses.length === (visibility ? 1 : 0)) {
+  if (hasNonSla && andClauses.length === baselineClauseCount) {
     // Todos os critérios não-SLA foram inválidos
-    const onlyVisibility = Boolean(visibility) && andClauses.length === 1;
+    const onlyVisibility = Boolean(visibility);
     if (!onlyVisibility) {
       return { tickets: [], total: 0, limit };
     }
