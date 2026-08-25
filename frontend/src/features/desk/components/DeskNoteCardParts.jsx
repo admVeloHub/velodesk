@@ -1,6 +1,6 @@
 /**
- * DeskNoteCardParts v1.1.0 — corpo de nota interna renderiza HTML sanitizado do compose
- * VERSION: v1.1.0 | DATE: 2026-08-17
+ * DeskNoteCardParts v1.2.0 — evento de CSAT usa icone de estrela
+ * VERSION: v1.2.0 | DATE: 2026-08-25
  */
 import React from 'react';
 import { htmlToPlainText, normalizeMessageHtmlForDisplay } from '../../../services/desk/composeRichEditor';
@@ -138,9 +138,12 @@ export function NoteAvatar({ note }) {
       </span>
     );
   }
+  // Evento de resposta do CSAT: mesmo ícone de estrela do KPI no Painel 360
+  // (ws360-kpi__top .ti-star), em vez do ícone genérico do tipo "registro".
+  const icon = note.isCsatEvent ? 'ti ti-star' : meta.icon;
   return (
     <span className="crm-note-card__avatar crm-note-card__avatar--icon" aria-hidden="true">
-      <i className={meta.icon} />
+      <i className={icon} />
     </span>
   );
 }

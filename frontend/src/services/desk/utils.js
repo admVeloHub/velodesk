@@ -1,7 +1,7 @@
 /**
  * Desk CRM — utilitários de fila e conversa
- * VERSION: v3.22.0 | DATE: 2026-08-21
- * — Busca Desk sempre une API (CPF/protocolo); sem early-return no cache
+ * VERSION: v3.23.0 | DATE: 2026-08-25
+ * — Evento de resposta do CSAT marcado com isCsatEvent (ícone de estrela)
  */
 import {
   formatDateBr,
@@ -2056,6 +2056,10 @@ function mapSupervisorRegistroOccurrence(entry, ticket, client, previousTabulati
     statusChanged,
   } = collectRegistroOccurrenceData(entry, previousTabulationState, prevStatus);
   const internalExcerpt = String(entry.anotacaoInterna ?? '').trim();
+  // Evento de resposta do CSAT (ver csat.routes.ts) — mesmo ícone de estrela
+  // usado no KPI do Painel 360 (ws360-kpi__top .ti-star), no lugar do ícone
+  // genérico de histórico.
+  const isCsatEvent = /^Avaliação CSAT recebida/i.test(internalExcerpt);
 
   return {
     id: `${ticketId}:${entry.id}`,
@@ -2069,6 +2073,7 @@ function mapSupervisorRegistroOccurrence(entry, ticket, client, previousTabulati
     previousStatusLabel,
     statusChanged,
     internalExcerpt,
+    isCsatEvent,
     ticketId,
     ticketTitle: getTicketTitle(ticket),
   };
