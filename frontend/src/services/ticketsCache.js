@@ -119,6 +119,12 @@ function pruneTicketsAbsentFromApi(mergedCols, apiCols) {
       const id = ticketIdKey(ticket);
       if (!id) return false;
       if (apiIds.has(id)) return true;
+      // Ticket com aba aberta (ativa ou em segundo plano — setMergeProtectedTicketIds cobre
+      // todas): não remove só por estar ausente desta resposta pontual de /boxes. Sem isso,
+      // uma aba em segundo plano perde silenciosamente o ticket do cache (e a próxima edição
+      // do agente) até ele reativar a aba. Deleção real de verdade é tratada só via 404/410
+      // (evictTicketFromCache), não por ausência aqui.
+      if (mergeProtectedTicketIds.has(id)) return true;
       evictedIds.push(id);
       mergeProtectedTicketIds.delete(id);
       detailLoadInFlight.delete(id);
