@@ -3,6 +3,7 @@ import { addBrCivilDaysIso } from './dates/brDateTime.util';
 import { decodeBasicHtmlEntities } from './emailHtml.util';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { ChamadoIaAnalise } from '../models/ChamadoIaAnalise';
+import { isFusaoAbsorvidoChamado } from './ticketFusao.helpers';
 import { applyAssignmentIfNeeded } from './assignmentRouter.service';
 import {
   appendMessage,
@@ -647,7 +648,14 @@ async function runInboundEmailFlow(
     };
   }
 
-  const existing = await findChamadoForEmailReply(payload);
+  let existing = await findChamadoForEmailReply(payload);
+  if (existing && isFusaoAbsorvidoChamado(existing) && existing.fusao?.parentId) {
+    // Ticket encontrado já foi mesclado (fusão) — toda correspondência futura sobre esse
+    // protocolo vai para o ticket ativo (pai). Sem isso, o reply reabre o absorvido, que
+    // fica escondido pra sempre em todas as filas/buscas (excludeFusaoAbsorvidosFilter).
+    const parent = await ChamadoN1.findById(existing.fusao.parentId);
+    if (parent) existing = parent;
+  }
   retainOnlyNewAttachments(payload, existing);
   dropBrandInlineAttachments(payload);
 
