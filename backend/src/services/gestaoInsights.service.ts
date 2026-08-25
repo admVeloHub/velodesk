@@ -848,6 +848,32 @@ export async function getCasoEspecialDetail(
   };
 }
 
+/** Início/fim (no fuso da Gestão) do mês indicado pela chave YYYY-MM. */
+function monthRangeFor(key: string): DateRange {
+  const [y, m] = key.split('-').map(Number);
+  const start = new Date(y, (m || 1) - 1, 1);
+  const end = new Date(y, m || 1, 0); // dia 0 do mês seguinte = último dia do mês atual
+  return { start: startOfDayInTz(start), end: endOfDayInTz(end) };
+}
+
+/** Chave do mês anterior a partir de uma chave YYYY-MM. */
+function previousMonthKey(key: string): string {
+  const [y, m] = key.split('-').map(Number);
+  const date = new Date(y, (m || 1) - 2, 1);
+  return monthKey(date);
+}
+
+/** As N últimas chaves de mês (mais antiga → mais recente), terminando no mês corrente. */
+function lastNMonthKeys(n: number): string[] {
+  const keys: string[] = [];
+  let key = monthKey(new Date());
+  for (let i = 0; i < n; i++) {
+    keys.unshift(key);
+    key = previousMonthKey(key);
+  }
+  return keys;
+}
+
 export interface CsatAgentBreakdown {
   responsavel: string;
   notaMedia: number;
@@ -942,5 +968,306 @@ export async function getCsatSummary(query: GestaoInsightsQuery = {}): Promise<C
     porAtendente,
     comentariosRecentes,
     tendencia,
+  };
+}
+
+export interface CsatMonthTab {
+  key: string;
+  label: string;
+  atual: boolean;
+}
+
+export interface CsatKpi {
+  value: number | null;
+  delta: number | null;
+}
+
+export interface CsatCanalBreakdown {
+  canal: string;
+  notaMedia: number | null;
+  respostas: number;
+  notasBaixas: number;
+  faixa: 'high' | 'mid' | 'low';
+}
+
+export interface CsatFunilStep {
+  label: string;
+  total: number;
+  pct: number;
+}
+
+export interface CsatCaso {
+  id: string;
+  protocolo: string;
+  respondidoEm: string;
+  canal: string;
+  nota: number;
+  comentario: string | null;
+}
+
+export interface CsatDashboardResult {
+  months: CsatMonthTab[];
+  selectedMonth: string;
+  kpis: {
+    notaMediaPonderada: CsatKpi;
+    taxaResposta: CsatKpi;
+    notasBaixasPct: CsatKpi;
+    avaliacoesNoPeriodo: { value: number; enviados: number };
+  };
+  tendencia: { date: string; label: string; notaMedia: number | null }[];
+  porCanal: CsatCanalBreakdown[];
+  funil: CsatFunilStep[];
+  casos: CsatCaso[];
+}
+
+function classifyFaixa(nota: number | null): 'high' | 'mid' | 'low' {
+  if (nota == null) return 'low';
+  if (nota >= 4.5) return 'high';
+  if (nota >= 4) return 'mid';
+  return 'low';
+}
+
+/** Nota média + total de respostas (por csat.respondidoEm) num intervalo — usado pro KPI e pro delta do mês anterior. */
+async function computeNotaMediaNoRange(range: DateRange): Promise<{ notaMedia: number | null; totalRespostas: number }> {
+  const rows = await ChamadoN1.aggregate<{ _id: null; notaSum: number; notaN: number }>([
+    { $match: { 'csat.respondido': true, 'csat.respondidoEm': { $gte: range.start, $lte: range.end } } },
+    { $group: { _id: null, notaSum: { $sum: '$csat.nota' }, notaN: { $sum: 1 } } },
+  ]);
+  const row = rows[0];
+  return {
+    notaMedia: row?.notaN ? Math.round((row.notaSum / row.notaN) * 10) / 10 : null,
+    totalRespostas: row?.notaN ?? 0,
+  };
+}
+
+/**
+ * Funil de envio/resposta do CSAT para um mês (coorte por `csat.enviadoEm` — quando o
+ * e-mail original foi disparado, para que E5/E5.2 e resposta fiquem no mesmo grupo mesmo
+ * que a resposta tenha chegado já no mês seguinte). "Respondeu no E5" x "Respondeu na
+ * repescagem (E5.2)" são inferidos comparando `csat.respondidoEm` com
+ * `csat.repescagemEnviadaEm` (não há flag dedicada gravada na resposta).
+ */
+async function computeFunilEEnviados(range: DateRange): Promise<{ funil: CsatFunilStep[]; enviados: number }> {
+  const enviadoMatch = { 'csat.enviado': true, 'csat.enviadoEm': { $gte: range.start, $lte: range.end } };
+
+  const [fechadosRows, funilRows] = await Promise.all([
+    ChamadoN1.aggregate<{ _id: null; n: number }>([
+      { $match: { 'registro.data': { $gte: range.start, $lte: range.end } } },
+      { $addFields: { __resolvedAt: resolvedAtExpr } },
+      { $match: { __resolvedAt: { $gte: range.start, $lte: range.end } } },
+      { $group: { _id: null, n: { $sum: 1 } } },
+    ]),
+    ChamadoN1.aggregate<{
+      _id: null;
+      enviados: number;
+      respondeuE5: number;
+      repescagemEnviada: number;
+      respondeuRepescagem: number;
+      comentario: number;
+    }>([
+      { $match: enviadoMatch },
+      {
+        $group: {
+          _id: null,
+          enviados: { $sum: 1 },
+          respondeuE5: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$csat.respondido', true] },
+                    {
+                      $or: [
+                        { $ne: ['$csat.repescagemEnviada', true] },
+                        { $lt: ['$csat.respondidoEm', '$csat.repescagemEnviadaEm'] },
+                      ],
+                    },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          repescagemEnviada: { $sum: { $cond: [{ $eq: ['$csat.repescagemEnviada', true] }, 1, 0] } },
+          respondeuRepescagem: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$csat.respondido', true] },
+                    { $eq: ['$csat.repescagemEnviada', true] },
+                    { $gte: ['$csat.respondidoEm', '$csat.repescagemEnviadaEm'] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          comentario: {
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ['$csat.respondido', true] }, { $ne: ['$csat.comentario', ''] }, { $ne: ['$csat.comentario', null] }] },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]),
+  ]);
+
+  const fechados = fechadosRows[0]?.n ?? 0;
+  const row = funilRows[0];
+  const enviados = row?.enviados ?? 0;
+  const base = fechados > 0 ? fechados : enviados;
+  const pct = (n: number) => (base > 0 ? Math.round((n / base) * 1000) / 10 : 0);
+
+  const funil: CsatFunilStep[] = [
+    { label: 'Tickets fechados', total: fechados, pct: 100 },
+    { label: 'E5 enviado', total: enviados, pct: pct(enviados) },
+    { label: 'Respondeu no E5', total: row?.respondeuE5 ?? 0, pct: pct(row?.respondeuE5 ?? 0) },
+    { label: 'E5.2 (repescagem)', total: row?.repescagemEnviada ?? 0, pct: pct(row?.repescagemEnviada ?? 0) },
+    { label: 'Respondeu no E5.2', total: row?.respondeuRepescagem ?? 0, pct: pct(row?.respondeuRepescagem ?? 0) },
+    { label: 'Escreveu comentário', total: row?.comentario ?? 0, pct: pct(row?.comentario ?? 0) },
+  ];
+
+  return { funil, enviados };
+}
+
+/**
+ * Painel dedicado de CSAT (mês fechado): tabs dos últimos 7 meses, KPIs com variação vs.
+ * mês anterior, tendência de 7 meses, quebra por canal, funil de envio/resposta e lista
+ * de casos avaliados (pra filtro por nota + link pro ticket original).
+ */
+export async function getCsatDashboard(query: { month?: string } = {}): Promise<CsatDashboardResult> {
+  const monthKeys = lastNMonthKeys(7);
+  const currentKey = monthKeys[monthKeys.length - 1];
+  const selectedMonth = monthKeys.includes(String(query.month ?? '')) ? String(query.month) : currentKey;
+
+  const range = monthRangeFor(selectedMonth);
+  const prevRange = monthRangeFor(previousMonthKey(selectedMonth));
+  const trendStart = monthRangeFor(monthKeys[0]).start;
+
+  const respondedMatch = { 'csat.respondido': true, 'csat.respondidoEm': { $gte: range.start, $lte: range.end } };
+
+  const [
+    current,
+    previous,
+    { funil, enviados },
+    canalRows,
+    trendRows,
+    casosRows,
+  ] = await Promise.all([
+    computeNotaMediaNoRange(range),
+    computeNotaMediaNoRange(prevRange),
+    computeFunilEEnviados(range),
+    ChamadoN1.aggregate<{ _id: string; notaSum: number; notaN: number; baixas: number }>([
+      { $match: respondedMatch },
+      { $addFields: { __canal: { $trim: { input: { $ifNull: [{ $arrayElemAt: ['$tabulacao.canal', -1] }, ''] } } } } },
+      { $match: { __canal: { $ne: '' } } },
+      {
+        $group: {
+          _id: '$__canal',
+          notaSum: { $sum: '$csat.nota' },
+          notaN: { $sum: 1 },
+          baixas: { $sum: { $cond: [{ $lte: ['$csat.nota', 3] }, 1, 0] } },
+        },
+      },
+      { $sort: { notaN: -1 } },
+    ]),
+    ChamadoN1.aggregate<{ _id: string; notaSum: number; notaN: number }>([
+      { $match: { 'csat.respondido': true, 'csat.respondidoEm': { $gte: trendStart, $lte: range.end } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: '$csat.respondidoEm', timezone: TZ } },
+          notaSum: { $sum: '$csat.nota' },
+          notaN: { $sum: 1 },
+        },
+      },
+    ]),
+    ChamadoN1.find({ ...respondedMatch })
+      .select('chamadoProtocolo tabulacao.canal csat.nota csat.comentario csat.respondidoEm')
+      .sort({ 'csat.respondidoEm': -1 })
+      .limit(50)
+      .lean(),
+  ]);
+
+  // Taxa de resposta / notas baixas do mês selecionado e do anterior (pra delta).
+  const respondeuNoMes = (funil.find((f) => f.label === 'Respondeu no E5')?.total ?? 0) +
+    (funil.find((f) => f.label === 'Respondeu no E5.2')?.total ?? 0);
+  const taxaResposta = enviados > 0 ? Math.round((respondeuNoMes / enviados) * 1000) / 10 : null;
+  const { funil: prevFunil, enviados: prevEnviados } = await computeFunilEEnviados(prevRange);
+  const prevRespondeu = (prevFunil.find((f) => f.label === 'Respondeu no E5')?.total ?? 0) +
+    (prevFunil.find((f) => f.label === 'Respondeu no E5.2')?.total ?? 0);
+  const prevTaxaResposta = prevEnviados > 0 ? Math.round((prevRespondeu / prevEnviados) * 1000) / 10 : null;
+
+  const notasBaixasAgg = await ChamadoN1.aggregate<{ _id: null; n: number; total: number }>([
+    { $match: respondedMatch },
+    { $group: { _id: null, n: { $sum: { $cond: [{ $lte: ['$csat.nota', 3] }, 1, 0] } }, total: { $sum: 1 } } },
+  ]);
+  const notasBaixasPct = notasBaixasAgg[0]?.total ? Math.round((notasBaixasAgg[0].n / notasBaixasAgg[0].total) * 1000) / 10 : null;
+  const prevNotasBaixasAgg = await ChamadoN1.aggregate<{ _id: null; n: number; total: number }>([
+    { $match: { 'csat.respondido': true, 'csat.respondidoEm': { $gte: prevRange.start, $lte: prevRange.end } } },
+    { $group: { _id: null, n: { $sum: { $cond: [{ $lte: ['$csat.nota', 3] }, 1, 0] } }, total: { $sum: 1 } } },
+  ]);
+  const prevNotasBaixasPct = prevNotasBaixasAgg[0]?.total
+    ? Math.round((prevNotasBaixasAgg[0].n / prevNotasBaixasAgg[0].total) * 1000) / 10
+    : null;
+
+  const round1 = (n: number | null) => (n == null ? null : Math.round(n * 10) / 10);
+  const delta = (a: number | null, b: number | null) => (a == null || b == null ? null : round1(a - b));
+
+  const porCanal: CsatCanalBreakdown[] = canalRows.map((row) => {
+    const notaMedia = Math.round((row.notaSum / row.notaN) * 10) / 10;
+    return { canal: row._id, notaMedia, respostas: row.notaN, notasBaixas: row.baixas, faixa: classifyFaixa(notaMedia) };
+  });
+
+  const trendMap = new Map<string, { notaSum: number; notaN: number }>();
+  trendRows.forEach((row) => {
+    if (row._id) trendMap.set(row._id, { notaSum: row.notaSum, notaN: row.notaN });
+  });
+  const tendencia = monthKeys.map((key) => {
+    const bucket = trendMap.get(key);
+    return {
+      date: key,
+      label: labelForMonth(key),
+      notaMedia: bucket ? Math.round((bucket.notaSum / bucket.notaN) * 10) / 10 : null,
+    };
+  });
+
+  const casos: CsatCaso[] = casosRows.map((doc) => {
+    const raw = doc as unknown as {
+      _id: unknown;
+      chamadoProtocolo?: string;
+      tabulacao?: { canal?: string }[];
+      csat?: { nota?: number; comentario?: string; respondidoEm?: Date };
+    };
+    const tab = raw.tabulacao?.[raw.tabulacao.length - 1];
+    return {
+      id: String(raw._id),
+      protocolo: raw.chamadoProtocolo ?? '',
+      respondidoEm: raw.csat?.respondidoEm ? new Date(raw.csat.respondidoEm).toISOString() : '',
+      canal: tab?.canal || '',
+      nota: Number(raw.csat?.nota ?? 0),
+      comentario: raw.csat?.comentario ? raw.csat.comentario : null,
+    };
+  });
+
+  return {
+    months: monthKeys.map((key) => ({ key, label: labelForMonth(key), atual: key === currentKey })),
+    selectedMonth,
+    kpis: {
+      notaMediaPonderada: { value: current.notaMedia, delta: delta(current.notaMedia, previous.notaMedia) },
+      taxaResposta: { value: taxaResposta, delta: delta(taxaResposta, prevTaxaResposta) },
+      notasBaixasPct: { value: notasBaixasPct, delta: delta(notasBaixasPct, prevNotasBaixasPct) },
+      avaliacoesNoPeriodo: { value: current.totalRespostas, enviados },
+    },
+    tendencia,
+    porCanal,
+    funil,
+    casos,
   };
 }

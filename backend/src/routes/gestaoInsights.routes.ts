@@ -6,6 +6,7 @@ import { env } from '../config/env';
 import {
   getCasoEspecialDetail,
   getCasosEspeciais,
+  getCsatDashboard,
   getCsatSummary,
   getTopMotivosPorProduto,
   getVolumeSeries,
@@ -80,6 +81,20 @@ router.get('/csat', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[gestao-insights] GET /csat falhou:', err);
     return res.status(500).json({ message: 'Erro ao carregar resumo de CSAT' });
+  }
+});
+
+router.get('/csat-dashboard', async (req: Request, res: Response) => {
+  if (!isMongoConnected()) {
+    return res.status(503).json({ message: 'Banco de chamados indisponível' });
+  }
+  try {
+    const month = typeof req.query.month === 'string' ? req.query.month : undefined;
+    const result = await getCsatDashboard({ month });
+    return res.json(result);
+  } catch (err) {
+    console.error('[gestao-insights] GET /csat-dashboard falhou:', err);
+    return res.status(500).json({ message: 'Erro ao carregar painel de CSAT' });
   }
 });
 
