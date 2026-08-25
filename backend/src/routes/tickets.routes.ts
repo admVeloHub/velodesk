@@ -71,7 +71,10 @@ import {
 } from '../services/twilio/whatsappActiveOutbound.service';
 import { requestWhatsAppAudioTranscription } from '../services/twilio/whatsappAudioTranscription.service';
 import { resolveSentAttachmentSendMeta } from '../services/sentAttachmentStorage.service';
-import { notifyWorkflowMensagemToResponsavel } from '../services/workflowNotificacao.service';
+import {
+  markNotificacoesLidasForTicket,
+  notifyWorkflowMensagemToResponsavel,
+} from '../services/workflowNotificacao.service';
 import { isDraftTicketId } from '../utils/persistedTicketId';
 
 const router = Router();
@@ -183,6 +186,13 @@ router.get('/:id', authMiddleware, async (req, res: Response) => {
   if (String(req.query.view ?? '') === 'light') {
     const lightDto = await chamadoToTicketLight(chamado, boxId);
     return res.json({ ...lightDto, light: true });
+  }
+  // Abertura real do ticket (não o polling `view=light`) — marca lido no sininho o que
+  // o front já trata como resolvido localmente (ex.: pedido de informação do workflow).
+  if (req.user?.email) {
+    void markNotificacoesLidasForTicket(String(chamado._id), req.user.email).catch((err: Error) => {
+      console.warn('[tickets.routes] markNotificacoesLidasForTicket fail-soft:', err.message);
+    });
   }
   res.json(await chamadoToTicket(chamado, boxId));
 });
