@@ -344,11 +344,15 @@ function ticketHasClientContactData(ticket) {
     || Boolean(String(ticket.clientEmail || '').trim());
 }
 
-function shouldReinsertPreservedTicket(ticket, id) {
-  if (detailLoadInFlight.has(id)) return true;
-  if (hasPendingWorkflowPersist(ticket)) return true;
-  if (isDraftTicket(ticket)) return true;
-  return false;
+/**
+ * Ticket preservado (detalhe carregado, workflow pendente, draft ou load em andamento) que
+ * ficou ausente da resposta mais recente de /boxes — mesmo critério de shouldPreserveTicketDetail.
+ * Ausência em /boxes (fila sem coluna pra status terminal, corte de limite da query, etc.) nunca
+ * é motivo pra remover um ticket do cache local; só evictTicketFromCache (404/410 real) fecha a
+ * aba. Sem isso, o ticket some silenciosamente e a próxima edição do usuário falha sem erro.
+ */
+function shouldReinsertPreservedTicket(ticket) {
+  return shouldPreserveTicketDetail(ticket);
 }
 
 function dispatchTicketEvicted(ticketId) {
@@ -469,7 +473,7 @@ function mergePreservedDetails(prevCols, nextCols) {
 
   preserved.forEach((ticket, id) => {
     if (presentIds.has(id)) return;
-    if (!shouldReinsertPreservedTicket(ticket, id)) return;
+    if (!shouldReinsertPreservedTicket(ticket)) return;
     const boxId = resolveBoxIdForTicketStatus(ticket.status);
     const box = merged.find((col) => col.id === boxId) || merged[0];
     if (!box) return;
