@@ -35,6 +35,7 @@ import {
   syncTicketWorkflowOnCommit,
   getTicketStatusBadgeMeta,
   isTicketReadOnly,
+  isTerminalTicketStatusValue,
   getDeskSearchNotFoundMessage,
   getDeskSearchSuccessMessage,
   isFusaoAbsorvido,
@@ -1335,12 +1336,15 @@ export default function DeskV2Root() {
           'success',
         );
         void syncTicketViews().catch(() => {});
-        if (!getAutoCloseOnSave()) {
+        // Mesma regra do commit normal: só fecha/avança se o status salvo for terminal.
+        if (!getAutoCloseOnSave() || !isTerminalTicketStatusValue(status)) {
           void loadTicketDetailFromApi(newId)
             .then((loaded) => { if (loaded) patchTicket(newId, loaded); })
             .catch(() => {});
         }
-        advanceAfterSaveIfEnabled(newId, plannedNextId, draftId);
+        if (isTerminalTicketStatusValue(status)) {
+          advanceAfterSaveIfEnabled(newId, plannedNextId, draftId);
+        }
         deskLog.action('commit → ok (rascunho)', { ticketId: newId, status });
         return newId;
       }
@@ -1412,12 +1416,18 @@ export default function DeskV2Root() {
         'success',
       );
       void syncTicketViews().catch(() => {});
-      if (!getAutoCloseOnSave()) {
+      // "Fechar ao salvar" só faz sentido quando o status salvo realmente encerra o
+      // atendimento (Resolvido/Cancelado/Fechado) — "Em andamento"/"Pendente" é o agente
+      // seguindo no mesmo ticket, então a aba tem que continuar aberta mesmo com a
+      // preferência ligada; só fecha se o agente clicar no × da aba.
+      if (!getAutoCloseOnSave() || !isTerminalTicketStatusValue(status)) {
         void loadTicketDetailFromApi(ticket.id)
           .then((loaded) => { if (loaded) patchTicket(ticket.id, loaded); })
           .catch(() => {});
       }
-      advanceAfterSaveIfEnabled(ticket.id, plannedNextId, savedListTicketId);
+      if (isTerminalTicketStatusValue(status)) {
+        advanceAfterSaveIfEnabled(ticket.id, plannedNextId, savedListTicketId);
+      }
       deskLog.action('commit → ok', { ticketId: ticket.id, status });
       return ticket.id;
     } catch (err) {

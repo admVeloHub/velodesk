@@ -1745,8 +1745,13 @@ export function isFusaoAbsorvido(ticket) {
 }
 
 export function isTicketTerminalStatus(ticket) {
-  const status = String(ticket?.status || '').trim().toLowerCase();
-  return TERMINAL_TICKET_STATUSES.has(status);
+  return isTerminalTicketStatusValue(ticket?.status);
+}
+
+/** Mesma checagem de `isTicketTerminalStatus`, mas a partir do status bruto (sem precisar do ticket inteiro) —
+ * usado pra decidir se um "salvar" acabou de verdade o atendimento (só então faz sentido fechar/avançar a aba). */
+export function isTerminalTicketStatusValue(status) {
+  return TERMINAL_TICKET_STATUSES.has(String(status || '').trim().toLowerCase());
 }
 
 /** Ticket fechado: somente leitura no Desk (sem mutação de agente). */
