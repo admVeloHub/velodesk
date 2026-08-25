@@ -1096,7 +1096,17 @@ function legacyDadosFromRef(ref?: LegacyClienteEmbed | null): IClienteDados | nu
 
 export function statusFromBoxName(boxName: string): string {
   if (boxName === 'Novo') return 'novo';
-  if (boxName === 'Em processamento' || boxName === 'Em Processamento') return 'em-andamento';
+  // Compat de nome legado — mesmo caso já resolvido aqui pra "Em processamento": a box real
+  // no Mongo (coleção `boxes`) ficou cadastrada como "Em aberto" e nunca foi renomeada pra
+  // "Em Andamento" (o nome que BOX_NAME_BY_STATUS/MEUS_CHAMADOS_COLUMNS esperam pro status
+  // 'em-andamento', que é o que os tickets realmente usam — 'em-aberto' não tem uso real hoje).
+  // Sem isso, quem cai no board genérico (permissão ver_todos) nunca vê nenhum ticket
+  // 'em-andamento': a box "Em aberto" resolve pro status errado e não existe nenhuma box
+  // chamada "Em Andamento" pra pegar esses tickets.
+  if (
+    boxName === 'Em processamento' || boxName === 'Em Processamento'
+    || boxName === 'Em aberto' || boxName === 'Em Aberto'
+  ) return 'em-andamento';
   return STATUS_BY_BOX_NAME[boxName] ?? 'novo';
 }
 
