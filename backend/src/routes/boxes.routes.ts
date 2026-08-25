@@ -30,11 +30,13 @@ async function resolveDbUser(userId?: string) {
   return User.findById(userId).select('name email');
 }
 
+const CE_QUEUE_PARAMS = new Set(['procon', 'consumidor-gov', 'bacen', 'reclame-aqui']);
+
 async function resolveQueueMode(
   resolved: Awaited<ReturnType<typeof resolveUserPermissions>>,
   queueParam?: string,
 ) {
-  if (queueParam === 'procon' || queueParam === 'consumidor-gov') {
+  if (queueParam && CE_QUEUE_PARAMS.has(queueParam)) {
     return { queue: queueParam, extraFilter: undefined as Record<string, unknown> | undefined };
   }
   if (hasPermission(resolved.permissoes, 'tickets', 'ver_todos')) {

@@ -2366,18 +2366,30 @@ export function workflowActorQueueFilter(
   return { $or: orClauses };
 }
 
+/**
+ * Filas dos 4 CRMs Especiais que podem reusar o board genérico (boxes.routes.ts) passando
+ * ?fila=<canal> — mantém o próprio canal incluído em vez de excluí-lo. Hoje só procon/
+ * consumidor-gov chegam a usar esse caminho; bacen/reclame-aqui têm serviços dedicados, mas
+ * ficam aqui também para não zerar a fila se algum dia passarem a usar ?fila=bacen/reclame-aqui.
+ */
+const CE_QUEUE_CHANNEL_FILTERS: Record<string, () => Record<string, unknown>> = {
+  procon: proconChannelMongoFilter,
+  'consumidor-gov': consumidorGovChannelMongoFilter,
+  bacen: bacenChannelMongoFilter,
+  'reclame-aqui': reclameAquiChannelMongoFilter,
+};
+
 export function buildChamadoQueryFilter(status: string, queue?: string, responsavelCandidates?: string[], extraFilter?: Record<string, unknown>) {
   const filters: Record<string, unknown>[] = [lastStatusFilter(status)];
-  const isCeModuleQueue = queue === 'procon' || queue === 'consumidor-gov';
+  const ceChannelFilter = queue ? CE_QUEUE_CHANNEL_FILTERS[queue] : undefined;
+  const isCeModuleQueue = Boolean(ceChannelFilter);
 
-  if (queue === 'procon') {
-    filters.push(proconChannelMongoFilter());
-  } else if (queue === 'consumidor-gov') {
-    filters.push(consumidorGovChannelMongoFilter());
+  if (ceChannelFilter) {
+    filters.push(ceChannelFilter());
   }
 
   // Módulo Tickets: CE nunca entra (ver_todos, meus-chamados, funcao-atribuido, default).
-  // Filas procon/consumidor-gov são dos CRMs Especiais — mantêm inclusão do órgão.
+  // Filas dos CRMs Especiais (uma por canal) mantêm inclusão do próprio órgão.
   if (!isCeModuleQueue) {
     filters.push(excludeEspeciaisChannelsMongoFilter());
   }
