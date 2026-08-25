@@ -244,5 +244,8 @@ ChamadoN1Schema.index({ 'cliente.clienteCpf': 1 }, { name: 'cliente_clienteCpf_1
 // varredura completa de coleção (15-19s em produção).
 ChamadoN1Schema.index({ createdAt: 1 }, { name: 'createdAt_1' });
 ChamadoN1Schema.index({ 'registro.data': 1 }, { name: 'registro_data_1' });
+// Acelera as agregações de CSAT (gestaoInsights/workspace360) que filtram por respostas
+// dentro de um período.
+ChamadoN1Schema.index({ 'csat.respondido': 1, 'csat.respondidoEm': 1 }, { name: 'csat_respondido_1' });
 
 export const ChamadoN1 = mongoose.model<IChamadoN1>('ChamadoN1', ChamadoN1Schema);

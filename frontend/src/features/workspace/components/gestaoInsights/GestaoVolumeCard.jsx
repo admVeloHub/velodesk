@@ -189,11 +189,6 @@ export default function GestaoVolumeCard({ period, painelVolume, painelLoading }
           <Chart type="bar" data={chartData} options={chartOptions} plugins={[valueLabelsPlugin]} />
         )}
       </div>
-
-      <p className="gestao-insight-card__mock-note">
-        <i className="ti ti-info-circle" aria-hidden="true" />
-        Nota média: dados ilustrativos — aguardando captura real de avaliação do cliente.
-      </p>
     </section>
   );
 }

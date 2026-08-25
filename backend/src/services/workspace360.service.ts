@@ -24,7 +24,7 @@ const ACTIVE_STATUS_LIST = [...ACTIVE_STATUSES];
 
 /** Campos mínimos para KPIs, SLA, leaderboard e cards do painel — registro vem enxuto da agregação. */
 const PANEL_CHAMADO_SELECT =
-  'createdAt updatedAt chamadoTitulo tabulacao registro workflow cliente';
+  'createdAt updatedAt chamadoTitulo tabulacao registro workflow cliente csat';
 
 /** Projeta registro sem mensagens/anotações — preserva status, datas, metadados e flags de conteúdo. */
 const SLIM_REGISTRO_EXPR = {
@@ -96,6 +96,21 @@ const FINANCEIRO_KW = ['financeiro', 'cobrança', 'cobranca', 'fatura', 'inadimp
 const ESTORNO_KW = ['estorno', 'procon', 'devolução', 'devolucao'];
 
 const TZ = 'America/Sao_Paulo';
+
+/** Chave (segunda-feira da semana, YYYY-MM-DD) usada pra agrupar o relatório de CSAT por semana. */
+function weekKeyOf(date: Date): string {
+  const dayKey = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(date);
+  const local = new Date(`${dayKey}T12:00:00`);
+  const weekday = local.getDay(); // 0=dom..6=sáb
+  const diffToMonday = (weekday + 6) % 7;
+  local.setDate(local.getDate() - diffToMonday);
+  return new Intl.DateTimeFormat('en-CA').format(local);
+}
+
+function weekLabelOf(key: string): string {
+  const date = new Date(`${key}T12:00:00`);
+  return `Semana de ${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+}
 
 export interface Workspace360Query {
   period?: string;
@@ -286,6 +301,7 @@ async function loadSupervisorChamados(from: Date, to: Date): Promise<IChamadoN1[
         tabulacao: 1,
         workflow: 1,
         cliente: 1,
+        csat: 1,
         registro: SLIM_REGISTRO_EXPR,
       },
     },
@@ -406,12 +422,18 @@ export async function buildAgent360Payload(authUser: AuthPayload) {
 
   let tmaTotalMin = 0;
   let tmaCount = 0;
+  let csatTotal = 0;
+  let csatCount = 0;
   resolvedTodayList.forEach((c) => {
     const resolvedAt = getResolvedAt(c);
     if (!resolvedAt) return;
     const start = c.createdAt ? new Date(c.createdAt) : resolvedAt;
     tmaTotalMin += (resolvedAt.getTime() - start.getTime()) / 60000;
     tmaCount++;
+    if (c.csat?.respondido && typeof c.csat.nota === 'number') {
+      csatTotal += c.csat.nota;
+      csatCount++;
+    }
   });
 
   const bucketsRaw: Record<string, IChamadoN1[]> = {
@@ -506,7 +528,7 @@ export async function buildAgent360Payload(authUser: AuthPayload) {
       assigned: active.length,
       resolvedToday: resolvedTodayList.length,
       slaAtRisk: slaAtRiskList.length,
-      csat: null,
+      csat: csatCount > 0 ? Math.round((csatTotal / csatCount) * 10) / 10 : null,
       tma: tmaCount > 0 ? formatDurationMinutes(tmaTotalMin / tmaCount) : null,
     },
     sections,
@@ -577,6 +599,8 @@ async function computeSupervisor360Payload(authUser: AuthPayload, query: Workspa
   let tmaN = 0;
   let tmeSum = 0;
   let tmeN = 0;
+  let csatSum = 0;
+  let csatN = 0;
   resolvedInPeriod.forEach((c) => {
     const resolvedAt = getResolvedAt(c);
     if (!resolvedAt) return;
@@ -587,6 +611,10 @@ async function computeSupervisor360Payload(authUser: AuthPayload, query: Workspa
     if (firstAgent) {
       tmeSum += firstAgent.getTime() - start.getTime();
       tmeN++;
+    }
+    if (c.csat?.respondido && typeof c.csat.nota === 'number') {
+      csatSum += c.csat.nota;
+      csatN++;
     }
   });
 
@@ -673,6 +701,7 @@ async function computeSupervisor360Payload(authUser: AuthPayload, query: Workspa
       tma: tmaN ? formatDurationMs(tmaSum / tmaN) : '—',
       tme: tmeN ? formatDurationMs(tmeSum / tmeN) : '—',
       nps: null,
+      csat: csatN ? Math.round((csatSum / csatN) * 10) / 10 : null,
       volume: String(createdInPeriod),
       warRoom: slaCriticalCount >= 3,
     },
@@ -715,7 +744,7 @@ interface LeaderboardEntry {
   tma: string;
   /** Tempo médio até a 1ª resposta do agente, sobre os resolvidos no período. */
   tme: string;
-  /** Nota de pesquisa de satisfação — null até existir captura real de avaliação do cliente por agente. */
+  /** Nota média de CSAT (1-5) dos tickets resolvidos por esse agente no período; null se nenhum cliente respondeu. */
   csat: number | null;
   vsLastWeek: string;
   shift: null;
@@ -776,6 +805,8 @@ async function buildLeaderboard(chamados: IChamadoN1[], from: Date, to: Date) {
     tmaN: number;
     tmeSum: number;
     tmeN: number;
+    csatSum: number;
+    csatN: number;
   }>();
 
   const ensureAgent = (key: string) => {
@@ -790,6 +821,8 @@ async function buildLeaderboard(chamados: IChamadoN1[], from: Date, to: Date) {
         tmaN: 0,
         tmeSum: 0,
         tmeN: 0,
+        csatSum: 0,
+        csatN: 0,
       });
     }
     return byAgent.get(key)!;
@@ -827,6 +860,10 @@ async function buildLeaderboard(chamados: IChamadoN1[], from: Date, to: Date) {
         row.tmeSum += firstAgent.getTime() - start.getTime();
         row.tmeN++;
       }
+      if (c.csat?.respondido && typeof c.csat.nota === 'number') {
+        row.csatSum += c.csat.nota;
+        row.csatN++;
+      }
     } else {
       row.resolvedPrevWeek++;
     }
@@ -849,7 +886,7 @@ async function buildLeaderboard(chamados: IChamadoN1[], from: Date, to: Date) {
           inProgress: stats.inProgress,
           tma: stats.tmaN ? formatDurationMs(stats.tmaSum / stats.tmaN) : '—',
           tme: stats.tmeN ? formatDurationMs(stats.tmeSum / stats.tmeN) : '—',
-          csat: null,
+          csat: stats.csatN ? Math.round((stats.csatSum / stats.csatN) * 10) / 10 : null,
           vsLastWeek: `${delta >= 0 ? '+' : ''}${delta}%`,
           shift: null,
           channel: null,
@@ -886,7 +923,10 @@ function buildReport(reportId: string, chamados: IChamadoN1[], query: Workspace3
   const cardMeta: Record<string, { icon: string; title: string; desc: string; action: string }> = {
     sla: { icon: 'ti-clock', title: 'SLA operacional', desc: 'Cumprimento de prazos por fila, canal e equipe.', action: 'Ver relatório SLA' },
     volume: { icon: 'ti-chart-bar', title: 'Volume de tickets', desc: 'Entradas, resolvidos e backlog por período.', action: 'Ver relatório de volume' },
-    nps: { icon: 'ti-mood-smile', title: 'NPS e satisfação', desc: 'Notas de atendimento e tendência semanal.', action: 'Ver relatório NPS' },
+    // Não existe pesquisa de NPS (0-10 "recomendaria") no sistema — este card reaproveita o
+    // mesmo slot/rota (report=nps) para mostrar CSAT real (nota 1-5), sem inventar um NPS
+    // que não é coletado.
+    nps: { icon: 'ti-mood-smile', title: 'CSAT e satisfação', desc: 'Notas de atendimento (CSAT) e tendência semanal.', action: 'Ver relatório de CSAT' },
     team: { icon: 'ti-users', title: 'Performance da equipe', desc: 'TMA, TME e produtividade por agente.', action: 'Ver relatório de equipe' },
     monitoria: { icon: 'ti-headphones', title: 'Monitoria', desc: 'Scorecards, avaliações de qualidade e feedback por agente.', action: 'Abrir monitoria' },
   };
@@ -894,20 +934,58 @@ function buildReport(reportId: string, chamados: IChamadoN1[], query: Workspace3
   const meta = cardMeta[reportId];
   if (!meta) return null;
 
-  if (reportId === 'nps' || reportId === 'monitoria') {
+  if (reportId === 'nps') {
+    const responded = chamados.filter((c) => c.csat?.respondido && typeof c.csat.nota === 'number');
+    const totalNota = responded.reduce((sum, c) => sum + (c.csat!.nota as number), 0);
+    const notaMedia = responded.length ? Math.round((totalNota / responded.length) * 10) / 10 : null;
+
+    const byWeek = new Map<string, { sum: number; n: number }>();
+    responded.forEach((c) => {
+      const at = c.csat!.respondidoEm ? new Date(c.csat!.respondidoEm as unknown as string) : null;
+      if (!at) return;
+      const key = weekKeyOf(at);
+      if (!byWeek.has(key)) byWeek.set(key, { sum: 0, n: 0 });
+      const bucket = byWeek.get(key)!;
+      bucket.sum += c.csat!.nota as number;
+      bucket.n++;
+    });
+    const weekKeys = [...byWeek.keys()].sort();
+    const rows = weekKeys.map((key, index) => {
+      const bucket = byWeek.get(key)!;
+      const media = Math.round((bucket.sum / bucket.n) * 10) / 10;
+      const prev = index > 0 ? byWeek.get(weekKeys[index - 1])! : null;
+      const prevMedia = prev ? prev.sum / prev.n : null;
+      const tendencia = prevMedia == null ? '—' : media >= prevMedia ? '↑' : media < prevMedia ? '↓' : '—';
+      return [weekLabelOf(key), media.toFixed(1), String(bucket.n), tendencia];
+    });
+
     return {
       ...meta,
       id: reportId,
       generatedAt: new Date().toLocaleString('pt-BR'),
       filters: { period: query.period, channel: query.channel, team: query.team },
       summary: [
-        { label: reportId === 'nps' ? 'NPS' : 'Score médio', value: '—' },
-        { label: reportId === 'nps' ? 'CSAT médio' : 'Avaliações', value: 'Sem dados' },
-        { label: reportId === 'nps' ? 'Respostas' : 'Feedback pendente', value: '—' },
+        { label: 'CSAT médio', value: notaMedia != null ? notaMedia.toFixed(1) : '—' },
+        { label: 'Respostas', value: String(responded.length) },
+        { label: 'Tickets no período', value: String(chamados.length) },
       ],
-      columns: reportId === 'nps'
-        ? ['Semana', 'NPS', 'CSAT', 'Respostas', 'Tendência']
-        : ['Agente', 'Score', 'Avaliações', 'Conformidade', 'Feedback'],
+      columns: ['Semana', 'CSAT', 'Respostas', 'Tendência'],
+      rows,
+    };
+  }
+
+  if (reportId === 'monitoria') {
+    return {
+      ...meta,
+      id: reportId,
+      generatedAt: new Date().toLocaleString('pt-BR'),
+      filters: { period: query.period, channel: query.channel, team: query.team },
+      summary: [
+        { label: 'Score médio', value: '—' },
+        { label: 'Avaliações', value: 'Sem dados' },
+        { label: 'Feedback pendente', value: '—' },
+      ],
+      columns: ['Agente', 'Score', 'Avaliações', 'Conformidade', 'Feedback'],
       rows: [],
     };
   }
@@ -1003,12 +1081,12 @@ function buildReport(reportId: string, chamados: IChamadoN1[], query: Workspace3
 }
 
 function buildReportTeamRows(chamados: IChamadoN1[], from: Date, to: Date) {
-  const agents = new Map<string, { name: string; resolved: number; tmaSum: number; tmaN: number; tmeSum: number; tmeN: number }>();
+  const agents = new Map<string, { name: string; resolved: number; tmaSum: number; tmaN: number; tmeSum: number; tmeN: number; csatSum: number; csatN: number }>();
   chamados.forEach((c) => {
     const resp = (c.tabulacao?.[c.tabulacao.length - 1]?.responsavel ?? '').trim();
     if (!resp) return;
     const key = resp.toLowerCase();
-    if (!agents.has(key)) agents.set(key, { name: resp, resolved: 0, tmaSum: 0, tmaN: 0, tmeSum: 0, tmeN: 0 });
+    if (!agents.has(key)) agents.set(key, { name: resp, resolved: 0, tmaSum: 0, tmaN: 0, tmeSum: 0, tmeN: 0, csatSum: 0, csatN: 0 });
     const row = agents.get(key)!;
     if (currentStatus(c) !== 'resolvido') return;
     const resolvedAt = getResolvedAt(c);
@@ -1022,6 +1100,10 @@ function buildReportTeamRows(chamados: IChamadoN1[], from: Date, to: Date) {
       row.tmeSum += firstAgent.getTime() - start.getTime();
       row.tmeN++;
     }
+    if (c.csat?.respondido && typeof c.csat.nota === 'number') {
+      row.csatSum += c.csat.nota;
+      row.csatN++;
+    }
   });
   const rows = [...agents.values()]
     .filter((a) => a.resolved > 0)
@@ -1031,7 +1113,7 @@ function buildReportTeamRows(chamados: IChamadoN1[], from: Date, to: Date) {
       String(a.resolved),
       a.tmaN ? formatDurationMs(a.tmaSum / a.tmaN) : '—',
       a.tmeN ? formatDurationMs(a.tmeSum / a.tmeN) : '—',
-      '—',
+      a.csatN ? (Math.round((a.csatSum / a.csatN) * 10) / 10).toFixed(1) : '—',
     ]);
   let tmaAll = 0;
   let tmaN = 0;

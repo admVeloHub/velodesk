@@ -190,6 +190,7 @@ export const gestaoInsightsApi = {
   /** Payload unificado dos cards analíticos (resumo, volume dia, motivos, casos especiais, risco). */
   painel: (params) => api.get('/gestao-insights/painel', { params }).then((r) => r.data),
   volume: (params) => api.get('/gestao-insights/volume', { params }).then((r) => r.data),
+  csat: (params) => api.get('/gestao-insights/csat', { params }).then((r) => r.data),
   resumo: (params) => api.get('/gestao-insights/resumo', { params }).then((r) => r.data),
   motivos: (params) => api.get('/gestao-insights/motivos', { params }).then((r) => r.data),
   casosEspeciais: (params) => api.get('/gestao-insights/casos-especiais', { params }).then((r) => r.data),

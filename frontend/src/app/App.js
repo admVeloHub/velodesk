@@ -56,6 +56,7 @@ import ConsumidorGovChannelPage from '../features/especiais/ConsumidorGovChannel
 import BacenChannelPage from '../features/especiais/BacenChannelPage';
 import CasoEspecialDetailPage from '../features/workspace/components/gestaoDetail/CasoEspecialDetailPage';
 import AiUsageDetailPage from '../features/workspace/components/gestaoDetail/AiUsageDetailPage';
+import CsatDetailPage from '../features/workspace/components/gestaoDetail/CsatDetailPage';
 import AtendimentoIaTelefonicoPage from '../pages/AtendimentoIaTelefonicoPage';
 import RealtimePage from '../pages/RealtimePage';
 import { PermissionProvider } from '../context/PermissionContext';
@@ -91,6 +92,8 @@ function AppRoutes() {
             { path: 'workspace/gestao/casos-especiais/:orgao', element: React.createElement(CasoEspecialDetailPage) },
 
             { path: 'workspace/gestao/custo-ia', element: React.createElement(AiUsageDetailPage) },
+
+            { path: 'workspace/gestao/csat', element: React.createElement(CsatDetailPage) },
 
             { path: 'workflow', element: React.createElement(WorkflowPage) },
 

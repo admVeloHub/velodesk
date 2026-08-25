@@ -807,9 +807,9 @@ function buildAgentKpis(kpis) {
     {
       id: 'csat',
       label: 'CSAT médio',
-      value: '—',
-      hint: 'Sem dados',
-      tone: 'neutral',
+      value: kpis?.csat != null ? String(kpis.csat) : '—',
+      hint: kpis?.csat != null ? 'hoje' : 'Sem dados',
+      tone: kpis?.csat != null ? 'success' : 'neutral',
       icon: 'ti ti-star',
     },
     {
@@ -831,6 +831,7 @@ function buildSupervisorKpis(kpis) {
     tma: formatKpiValue(kpis?.tma, '—'),
     tme: formatKpiValue(kpis?.tme, '—'),
     nps: kpis?.nps == null ? '—' : String(kpis.nps),
+    csat: kpis?.csat == null ? '—' : String(kpis.csat),
     volume: formatKpiValue(kpis?.volume, '0'),
     warRoom: Boolean(kpis?.warRoom),
   };

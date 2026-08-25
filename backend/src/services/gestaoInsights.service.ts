@@ -276,37 +276,20 @@ export function labelForDay(key: string): string {
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: TZ });
 }
 
-/** Hash determinístico (0–1) usado para gerar dados fictícios estáveis por seed, sem Math.random(). */
-function seededRatio(seed: string): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  }
-  return (hash % 1000) / 1000;
-}
-
-/**
- * Nota média fictícia por dia (3.6–4.9), determinística por data.
- * TODO: substituir por CSAT real quando existir captura de avaliação do cliente.
- */
-function fakeNotaMediaForDay(key: string): number {
-  const ratio = seededRatio(`nota-media:${key}`);
-  return Math.round((3.6 + ratio * 1.3) * 10) / 10;
-}
-
 export interface VolumeSeriesDay {
   date: string;
   label: string;
   abertos: number;
   encerrados: number;
-  notaMedia: number;
+  /** Nota média de CSAT das respostas recebidas naquele dia; null se ninguém respondeu. */
+  notaMedia: number | null;
 }
 
 export interface VolumeSeriesResult {
   range: { start: string; end: string };
   series: VolumeSeriesDay[];
   granularity: ChartGranularity;
-  mock: { notaMedia: true };
+  mock: { notaMedia: false };
 }
 
 /** Agrega uma série diária em buckets de mês fechado (soma para contagens, média para a nota). */
@@ -322,8 +305,10 @@ function aggregateVolumeByMonth(daily: VolumeSeriesDay[]): VolumeSeriesDay[] {
     const bucket = buckets.get(key)!;
     bucket.abertos += day.abertos;
     bucket.encerrados += day.encerrados;
-    bucket.notaSum += day.notaMedia;
-    bucket.notaN += 1;
+    if (day.notaMedia != null) {
+      bucket.notaSum += day.notaMedia;
+      bucket.notaN += 1;
+    }
   });
   return order.map((key) => {
     const bucket = buckets.get(key)!;
@@ -332,15 +317,16 @@ function aggregateVolumeByMonth(daily: VolumeSeriesDay[]): VolumeSeriesDay[] {
       label: labelForMonth(key),
       abertos: bucket.abertos,
       encerrados: bucket.encerrados,
-      notaMedia: bucket.notaN > 0 ? Math.round((bucket.notaSum / bucket.notaN) * 10) / 10 : 0,
+      notaMedia: bucket.notaN > 0 ? Math.round((bucket.notaSum / bucket.notaN) * 10) / 10 : null,
     };
   });
 }
 
 /**
- * Volume de tickets abertos/encerrados no período + nota média (fictícia).
- * `granularity=dia` (padrão) respeita o período selecionado; `granularity=mes` sempre mostra
- * os meses fechados do ano corrente (jan, fev, mar…), permitindo comparar mês a mês.
+ * Volume de tickets abertos/encerrados no período + nota média real de CSAT (respostas
+ * recebidas no dia). `granularity=dia` (padrão) respeita o período selecionado;
+ * `granularity=mes` sempre mostra os meses fechados do ano corrente (jan, fev, mar…),
+ * permitindo comparar mês a mês.
  */
 export async function getVolumeSeries(
   query: GestaoInsightsQuery & { granularity?: string } = {},
@@ -350,11 +336,13 @@ export async function getVolumeSeries(
 
   const abertosMap = new Map<string, number>(keys.map((k) => [k, 0]));
   const encerradosMap = new Map<string, number>(keys.map((k) => [k, 0]));
+  const notaMediaMap = new Map<string, number>(); // sem entrada = sem resposta naquele dia
 
-  // Contagens feitas no MongoDB (índices createdAt / registro.data), sem transferir os
-  // arrays `registro` de todos os chamados do período. Mantém a mesma semântica do JS:
-  // abertos = por dia de createdAt; encerrados = por dia do último registro terminal.
-  const [abertosRows, encerradosRows] = await Promise.all([
+  // Contagens feitas no MongoDB (índices createdAt / registro.data / csat.respondidoEm),
+  // sem transferir os arrays `registro` de todos os chamados do período. Mantém a mesma
+  // semântica do JS: abertos = por dia de createdAt; encerrados = por dia do último
+  // registro terminal; notaMedia = média de csat.nota por dia de csat.respondidoEm.
+  const [abertosRows, encerradosRows, csatRows] = await Promise.all([
     ChamadoN1.aggregate<{ _id: string; n: number }>([
       { $match: { createdAt: { $gte: range.start, $lte: range.end } } },
       { $group: { _id: dayKeyExpr('$createdAt'), n: { $sum: 1 } } },
@@ -365,6 +353,15 @@ export async function getVolumeSeries(
       { $match: { __resolvedAt: { $gte: range.start, $lte: range.end } } },
       { $group: { _id: dayKeyExpr('$__resolvedAt'), n: { $sum: 1 } } },
     ]),
+    ChamadoN1.aggregate<{ _id: string; avgNota: number }>([
+      {
+        $match: {
+          'csat.respondido': true,
+          'csat.respondidoEm': { $gte: range.start, $lte: range.end },
+        },
+      },
+      { $group: { _id: dayKeyExpr('$csat.respondidoEm'), avgNota: { $avg: '$csat.nota' } } },
+    ]),
   ]);
 
   abertosRows.forEach((row) => {
@@ -373,13 +370,16 @@ export async function getVolumeSeries(
   encerradosRows.forEach((row) => {
     if (encerradosMap.has(row._id)) encerradosMap.set(row._id, row.n);
   });
+  csatRows.forEach((row) => {
+    notaMediaMap.set(row._id, Math.round(row.avgNota * 10) / 10);
+  });
 
   const dailySeries: VolumeSeriesDay[] = keys.map((key) => ({
     date: key,
     label: labelForDay(key),
     abertos: abertosMap.get(key) ?? 0,
     encerrados: encerradosMap.get(key) ?? 0,
-    notaMedia: fakeNotaMediaForDay(key),
+    notaMedia: notaMediaMap.get(key) ?? null,
   }));
 
   const series = granularity === 'mes' ? aggregateVolumeByMonth(dailySeries) : dailySeries;
@@ -388,7 +388,7 @@ export async function getVolumeSeries(
     range: { start: range.start.toISOString(), end: range.end.toISOString() },
     series,
     granularity,
-    mock: { notaMedia: true },
+    mock: { notaMedia: false },
   };
 }
 
@@ -845,5 +845,102 @@ export async function getCasoEspecialDetail(
         : undefined,
     motivosPorProduto,
     mock: false,
+  };
+}
+
+export interface CsatAgentBreakdown {
+  responsavel: string;
+  notaMedia: number;
+  respostas: number;
+}
+
+export interface CsatComentario {
+  protocolo: string;
+  nota: number;
+  comentario: string;
+  respondidoEm: string;
+}
+
+export interface CsatSummaryResult {
+  range: { start: string; end: string };
+  notaMedia: number | null;
+  totalRespostas: number;
+  porAtendente: CsatAgentBreakdown[];
+  comentariosRecentes: CsatComentario[];
+  tendencia: { date: string; label: string; notaMedia: number | null; respostas: number }[];
+}
+
+/**
+ * Resumo de CSAT real (nota 1-5) no período: nota média geral, nota média por atendente,
+ * comentários recentes e tendência diária. Base para o painel dedicado de CSAT.
+ */
+export async function getCsatSummary(query: GestaoInsightsQuery = {}): Promise<CsatSummaryResult> {
+  const range = resolvePeriodRange(query);
+  const respondedMatch = {
+    'csat.respondido': true,
+    'csat.respondidoEm': { $gte: range.start, $lte: range.end },
+  };
+
+  const [overallAgg, porAtendenteAgg, comentariosRows, tendenciaAgg] = await Promise.all([
+    ChamadoN1.aggregate<{ _id: null; notaSum: number; notaN: number }>([
+      { $match: respondedMatch },
+      { $group: { _id: null, notaSum: { $sum: '$csat.nota' }, notaN: { $sum: 1 } } },
+    ]),
+    ChamadoN1.aggregate<{ _id: string; notaSum: number; notaN: number }>([
+      { $match: respondedMatch },
+      { $addFields: { __responsavel: { $trim: { input: { $ifNull: [{ $arrayElemAt: ['$tabulacao.responsavel', -1] }, ''] } } } } },
+      { $match: { __responsavel: { $ne: '' } } },
+      { $group: { _id: '$__responsavel', notaSum: { $sum: '$csat.nota' }, notaN: { $sum: 1 } } },
+      { $sort: { notaN: -1 } },
+    ]),
+    ChamadoN1.find({ ...respondedMatch, 'csat.comentario': { $nin: [null, ''] } })
+      .select('chamadoProtocolo csat.nota csat.comentario csat.respondidoEm')
+      .sort({ 'csat.respondidoEm': -1 })
+      .limit(20)
+      .lean(),
+    ChamadoN1.aggregate<{ _id: string; notaSum: number; notaN: number }>([
+      { $match: respondedMatch },
+      { $group: { _id: dayKeyExpr('$csat.respondidoEm'), notaSum: { $sum: '$csat.nota' }, notaN: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const overall = overallAgg[0];
+  const notaMedia = overall?.notaN ? Math.round((overall.notaSum / overall.notaN) * 10) / 10 : null;
+
+  const porAtendente: CsatAgentBreakdown[] = porAtendenteAgg.map((row) => ({
+    responsavel: row._id,
+    notaMedia: Math.round((row.notaSum / row.notaN) * 10) / 10,
+    respostas: row.notaN,
+  }));
+
+  const comentariosRecentes: CsatComentario[] = comentariosRows.map((doc) => ({
+    protocolo: String((doc as unknown as { chamadoProtocolo?: string }).chamadoProtocolo ?? ''),
+    nota: Number((doc as unknown as { csat?: { nota?: number } }).csat?.nota ?? 0),
+    comentario: String((doc as unknown as { csat?: { comentario?: string } }).csat?.comentario ?? ''),
+    respondidoEm: (doc as unknown as { csat?: { respondidoEm?: Date } }).csat?.respondidoEm
+      ? new Date((doc as unknown as { csat?: { respondidoEm?: Date } }).csat!.respondidoEm as Date).toISOString()
+      : '',
+  }));
+
+  const tendenciaMap = new Map<string, { notaSum: number; notaN: number }>();
+  tendenciaAgg.forEach((row) => tendenciaMap.set(row._id, { notaSum: row.notaSum, notaN: row.notaN }));
+  const keys = dayKeysBetween(range);
+  const tendencia = keys.map((key) => {
+    const bucket = tendenciaMap.get(key);
+    return {
+      date: key,
+      label: labelForDay(key),
+      notaMedia: bucket ? Math.round((bucket.notaSum / bucket.notaN) * 10) / 10 : null,
+      respostas: bucket?.notaN ?? 0,
+    };
+  });
+
+  return {
+    range: { start: range.start.toISOString(), end: range.end.toISOString() },
+    notaMedia,
+    totalRespostas: overall?.notaN ?? 0,
+    porAtendente,
+    comentariosRecentes,
+    tendencia,
   };
 }

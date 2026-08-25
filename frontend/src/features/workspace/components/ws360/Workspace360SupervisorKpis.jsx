@@ -14,7 +14,8 @@ export default function Workspace360SupervisorKpis({ kpis, statusSlot = null }) 
   const secondary = [
     { value: kpis.tma, label: 'TMA', icon: 'fa-stopwatch' },
     { value: kpis.tme, label: 'TME', icon: 'fa-hourglass-half' },
-    { value: kpis.nps, label: 'NPS', icon: 'fa-smile' },
+    // NPS (0-10 "recomendaria") não existe no sistema — mostra CSAT real (nota 1-5) aqui.
+    { value: kpis.csat, label: 'CSAT', icon: 'fa-smile' },
     { value: kpis.volume, label: 'Volume', icon: 'fa-phone-volume' },
   ];
 

@@ -26,6 +26,7 @@ import GestaoCustomerVoiceCard from './components/gestaoInsights/GestaoCustomerV
 import GestaoPeriodFilter from './components/gestaoInsights/GestaoPeriodFilter';
 import GestaoAdherenceCard from './components/gestaoInsights/GestaoAdherenceCard';
 import AiUsageCostCard from './components/aiUsage/AiUsageCostCard';
+import GestaoCsatCard from './components/gestaoInsights/GestaoCsatCard';
 
 export default function GestaoPanel() {
   const navigate = useNavigate();
@@ -170,6 +171,7 @@ export default function GestaoPanel() {
             painelLoading={insightsLoading}
           />
           <AiUsageCostCard />
+          <GestaoCsatCard />
         </div>
 
         <div className="gestao-insights-row gestao-insights-row--risco">

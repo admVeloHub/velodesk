@@ -6,6 +6,7 @@ import { env } from '../config/env';
 import {
   getCasoEspecialDetail,
   getCasosEspeciais,
+  getCsatSummary,
   getTopMotivosPorProduto,
   getVolumeSeries,
   getVolumeSummary,
@@ -66,6 +67,19 @@ router.get('/volume', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[gestao-insights] GET /volume falhou:', err);
     return res.status(500).json({ message: 'Erro ao carregar volume de tickets' });
+  }
+});
+
+router.get('/csat', async (req: Request, res: Response) => {
+  if (!isMongoConnected()) {
+    return res.status(503).json({ message: 'Banco de chamados indisponível' });
+  }
+  try {
+    const result = await getCsatSummary(parseQuery(req));
+    return res.json(result);
+  } catch (err) {
+    console.error('[gestao-insights] GET /csat falhou:', err);
+    return res.status(500).json({ message: 'Erro ao carregar resumo de CSAT' });
   }
 });
 
