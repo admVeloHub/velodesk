@@ -1,6 +1,7 @@
-/** csat.routes v1.0.0 — endpoint público de recebimento de nota CSAT */
+/** csat.routes v1.1.0 — registra evento na aba Eventos ao receber a nota */
 import { Router, type Request, type Response } from 'express';
 import { ChamadoN1 } from '../models/ChamadoN1';
+import { currentStatus } from '../services/chamado.mapper';
 
 const router = Router();
 
@@ -28,10 +29,31 @@ router.post('/', async (req: Request, res: Response) => {
       return res.json({ ok: true });
     }
 
+    const comentarioTexto = String(comentario ?? '').trim().slice(0, 1000);
     chamado.csat.nota = notaNum;
-    chamado.csat.comentario = String(comentario ?? '').trim().slice(0, 1000);
+    chamado.csat.comentario = comentarioTexto;
     chamado.csat.respondido = true;
     chamado.csat.respondidoEm = new Date();
+
+    // Evento na aba "Eventos" do ticket — mesmo padrão do "E-mail CSAT enviado:
+    // ...", só leitura/anotação interna. Mantém o status atual (não altera o
+    // andamento do chamado).
+    if (!chamado.registro) chamado.registro = [];
+    chamado.registro.push({
+      data: new Date(),
+      origin: 'sistema',
+      autor: 'Pesquisa de satisfação',
+      mensagemPublica: '',
+      anexosMensagemPublica: [],
+      anotacaoInterna: comentarioTexto
+        ? `Avaliação CSAT recebida: nota ${notaNum}/5 — "${comentarioTexto}"`
+        : `Avaliação CSAT recebida: nota ${notaNum}/5`,
+      anexosAnotacaoInterna: [],
+      alteracoes: [],
+      metadados: { csatNota: notaNum, csatComentario: comentarioTexto },
+      status: currentStatus(chamado),
+    });
+
     await chamado.save();
 
     return res.json({ ok: true });
