@@ -28,6 +28,8 @@ export interface LogAiUsageParams {
   feature: AiUsageFeature;
   inputTokens?: number;
   outputTokens?: number;
+  cachedInputTokens?: number;
+  reasoningTokens?: number;
   ticketId?: string;
   protocolo?: string;
   userId?: string;
@@ -46,6 +48,8 @@ export async function logAiUsage(params: LogAiUsageParams): Promise<void> {
       feature: params.feature,
       inputTokens,
       outputTokens,
+      cachedInputTokens: params.cachedInputTokens,
+      reasoningTokens: params.reasoningTokens,
       totalTokens: inputTokens + outputTokens,
       estimatedCostUsd: costUsd,
       pricingSource: source,

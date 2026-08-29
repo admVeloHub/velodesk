@@ -23,6 +23,10 @@ export interface IAiUsageLog extends Document {
   feature: AiUsageFeature;
   inputTokens: number;
   outputTokens: number;
+  /** Subconjunto de inputTokens servido via cache da OpenAI (usage.input_tokens_details.cached_tokens) — cobrado mais barato. Ausente para Gemini. */
+  cachedInputTokens?: number;
+  /** Tokens de raciocínio interno consumidos (usage.output_tokens_details.reasoning_tokens), cobrados como output. Ausente para Gemini e modelos sem raciocínio. */
+  reasoningTokens?: number;
   totalTokens: number;
   estimatedCostUsd: number;
   pricingSource: 'catalog' | 'fallback';
@@ -40,6 +44,8 @@ const AiUsageLogSchema = new Schema<IAiUsageLog>(
     feature: { type: String, required: true },
     inputTokens: { type: Number, required: true, default: 0 },
     outputTokens: { type: Number, required: true, default: 0 },
+    cachedInputTokens: { type: Number, required: false },
+    reasoningTokens: { type: Number, required: false },
     totalTokens: { type: Number, required: true, default: 0 },
     estimatedCostUsd: { type: Number, required: true, default: 0 },
     pricingSource: { type: String, required: true, default: 'catalog' },

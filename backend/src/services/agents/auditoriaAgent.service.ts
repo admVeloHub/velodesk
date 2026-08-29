@@ -189,6 +189,8 @@ export async function validateAuditoria(params: AuditoriaInput): Promise<Auditor
         feature: 'auditoria',
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
+        cachedInputTokens: response.usage.input_tokens_details?.cached_tokens,
+        reasoningTokens: response.usage.output_tokens_details?.reasoning_tokens,
         protocolo: params.protocolo,
         userId: params.userId,
       });

@@ -71,6 +71,8 @@ async function callAtendimentoOpenAi(
       feature: 'atendimento',
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
+      cachedInputTokens: response.usage.input_tokens_details?.cached_tokens,
+      reasoningTokens: response.usage.output_tokens_details?.reasoning_tokens,
       ticketId: usageContext.ticketId,
       protocolo: usageContext.protocolo,
       userId: usageContext.userId,

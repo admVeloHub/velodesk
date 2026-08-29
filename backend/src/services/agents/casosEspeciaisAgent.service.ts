@@ -102,6 +102,8 @@ export async function classifyCasosEspeciais(params: {
         feature: 'casos_especiais',
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
+        cachedInputTokens: response.usage.input_tokens_details?.cached_tokens,
+        reasoningTokens: response.usage.output_tokens_details?.reasoning_tokens,
         ticketId: String(params.chamado._id),
         protocolo: params.chamado.chamadoProtocolo,
       });

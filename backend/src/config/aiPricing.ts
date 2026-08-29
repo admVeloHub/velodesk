@@ -31,8 +31,13 @@ export const AI_MODEL_PRICING: Record<string, AiModelPricing> = {
 /** Usado quando o modelo retornado pela API não está no catálogo acima — mantém o custo visível (marcado como estimativa grosseira) em vez de zerar silenciosamente. */
 const FALLBACK_PRICING: AiModelPricing = { provider: 'openai', inputPer1M: 1.00, outputPer1M: 3.00 };
 
+/** A OpenAI costuma devolver em `response.model` o snapshot datado resolvido do alias pedido (ex. "gpt-4.1-mini-2025-04-14" para um request de "gpt-4.1-mini") — removemos esse sufixo antes de comparar com o catálogo. */
+function stripDatedSnapshotSuffix(model: string): string {
+  return model.replace(/-\d{4}-\d{2}-\d{2}$/, '');
+}
+
 export function resolveModelPricing(model: string): { pricing: AiModelPricing; source: 'catalog' | 'fallback' } {
-  const normalized = String(model || '').trim().toLowerCase();
+  const normalized = stripDatedSnapshotSuffix(String(model || '').trim().toLowerCase());
   const found = Object.entries(AI_MODEL_PRICING).find(([key]) => key.toLowerCase() === normalized);
   if (found) return { pricing: found[1], source: 'catalog' };
   return { pricing: FALLBACK_PRICING, source: 'fallback' };
