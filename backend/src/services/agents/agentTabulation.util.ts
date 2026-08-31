@@ -6,11 +6,6 @@ import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from
 import type { TicketAiMessageInput, TicketAiTabulationResult, AuditoriaInput } from './agentTypes';
 import { getAgentNomeOficial } from './agentRegistry';
 import { resolveClientFirstName, trimStr } from './openaiAgent.util';
-import {
-  filterTabulationConfigToPopProducts,
-  getPopProductLabels,
-  isPopAllowedProduct,
-} from '../processos/popTabulationWhitelist.service';
 
 const VALID_TIPOS = new Set(['Reclamação', 'Solicitação', 'Dúvida', 'Informação']);
 const MAX_MESSAGES = 50;
@@ -37,9 +32,8 @@ export async function loadTabulationConfig(): Promise<TabulationActiveDto> {
 }
 
 export function buildTabulationCatalog(config: TabulationActiveDto): string {
-  const popConfig = filterTabulationConfigToPopProducts(config);
   const lines: string[] = [];
-  for (const p of popConfig.produtos.filter((item) => item.ativo)) {
+  for (const p of config.produtos.filter((item) => item.ativo)) {
     const motivoLines: string[] = [];
     for (const m of (p.motivos || []).filter((item) => item.ativo !== false)) {
       const detalhes = (m.detalhes || [])
@@ -304,21 +298,14 @@ export function validateTabulationResult(
   raw: { tipo?: string; produto?: string; motivo?: string; detalhe?: string },
   config: TabulationActiveDto,
 ): TicketAiTabulationResult {
-  const popConfig = filterTabulationConfigToPopProducts(config);
-  const treeConfig = popConfig.produtos.length > 0 ? popConfig : config;
-
   const tipo = resolveTipoValue(raw.tipo || '');
   let produto = trimStr(raw.produto, 200);
   let motivo = trimStr(raw.motivo, 200);
   let detalhe = trimStr(raw.detalhe, 200);
 
   if (produto) {
-    produto = resolveOptionValue(activeProductNames(treeConfig), produto);
-    if (!produto || !validateComboSoft(treeConfig, produto, '', '')) {
-      produto = '';
-      motivo = '';
-      detalhe = '';
-    } else if (getPopProductLabels().length > 0 && !isPopAllowedProduct(produto)) {
+    produto = resolveOptionValue(activeProductNames(config), produto);
+    if (!produto || !validateComboSoft(config, produto, '', '')) {
       produto = '';
       motivo = '';
       detalhe = '';
@@ -326,16 +313,16 @@ export function validateTabulationResult(
   }
 
   if (produto && motivo) {
-    motivo = resolveOptionValue(activeMotivoNames(treeConfig, produto), motivo);
-    if (!motivo || !validateComboSoft(treeConfig, produto, motivo, '')) {
+    motivo = resolveOptionValue(activeMotivoNames(config, produto), motivo);
+    if (!motivo || !validateComboSoft(config, produto, motivo, '')) {
       motivo = '';
       detalhe = '';
     }
   }
 
   if (produto && motivo && detalhe) {
-    detalhe = resolveOptionValue(activeDetalheNames(treeConfig, produto, motivo), detalhe);
-    if (detalhe && !validateComboSoft(treeConfig, produto, motivo, detalhe)) {
+    detalhe = resolveOptionValue(activeDetalheNames(config, produto, motivo), detalhe);
+    if (detalhe && !validateComboSoft(config, produto, motivo, detalhe)) {
       detalhe = '';
     }
   }
