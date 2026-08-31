@@ -2036,17 +2036,17 @@ function isAgentRegistroEntry(entry) {
   return String(entry.origin || 'agente').toLowerCase() !== 'cliente';
 }
 
-/** Supervisor: agente com anotação interna, diff de tabulação ou mudança de status */
+/** Aba Eventos: só tabulação/status/workflow — nota interna pura (sem outra mudança
+ * junto) pertence só à aba Notas (buildInternalNotesOnlyFeed), nunca às duas. */
 function shouldShowSupervisorRegistroOccurrence(entry, previousTabulationState, prevStatus) {
   if (!isAgentRegistroEntry(entry)) return false;
 
-  const hasInternal = Boolean(String(entry.anotacaoInterna ?? '').trim());
   const { tabulationChanges, statusChanged } = collectRegistroOccurrenceData(
     entry,
     previousTabulationState,
     prevStatus,
   );
-  return hasInternal || tabulationChanges.length > 0 || statusChanged;
+  return tabulationChanges.length > 0 || statusChanged;
 }
 
 function mapSupervisorRegistroOccurrence(entry, ticket, client, previousTabulationState, prevStatus) {
@@ -2158,7 +2158,6 @@ function resolveRegistroAutorLabel(entry, ticket, client) {
 function buildSupervisorRegistroFeed(ticket, client) {
   const merged = [];
   const seen = new Set();
-  const seenInternalOnly = new Set();
 
   normalizeTicketForDeskV2(ticket);
   const historico = ticket.registroHistorico || ticket.registroAlteracoes || [];
@@ -2173,24 +2172,9 @@ function buildSupervisorRegistroFeed(ticket, client) {
       previousTabulationState,
       prevStatus,
     );
-    if (mapped) {
-      const internalOnly = Boolean(mapped.internalExcerpt)
-        && !mapped.tabulationChanges?.length
-        && !mapped.statusChanged;
-      if (internalOnly) {
-        const ts = Math.floor(new Date(mapped.timestamp || 0).getTime() / 1000);
-        const dedupeKey = `${ts}:${mapped.internalExcerpt}`;
-        if (seenInternalOnly.has(dedupeKey)) {
-          applyAlteracoesToTabulationState(tabulationState, entry.alteracoes);
-          if (entry.status) prevStatus = entry.status;
-          return;
-        }
-        seenInternalOnly.add(dedupeKey);
-      }
-      if (!seen.has(mapped.id)) {
-        seen.add(mapped.id);
-        merged.push(mapped);
-      }
+    if (mapped && !seen.has(mapped.id)) {
+      seen.add(mapped.id);
+      merged.push(mapped);
     }
     applyAlteracoesToTabulationState(tabulationState, entry.alteracoes);
     if (entry.status) prevStatus = entry.status;
