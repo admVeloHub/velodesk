@@ -13,11 +13,16 @@ import {
 import { subscribeToTicketEvents } from '../services/desk/ticketEventsRealtime';
 
 function buildQueryParams(profileId, canSeeEquipe, reportParams) {
-  if (profileId === 'gestao' || canSeeEquipe) {
-    return { profile: 'gestao', ...(reportParams || {}) };
-  }
+  // profileId manda: se o app está na visão Agente, o Painel 360 tem que ser o do
+  // próprio agente, mesmo que a função dele também tenha painel_360_equipe/ver_todos
+  // (isso só deve valer pra quem está de fato na visão Gestão). Antes essa checagem
+  // vinha depois de canSeeEquipe e "vazava" tickets de outros agentes pro quadro do
+  // agente sempre que a função dele podia ver a equipe.
   if (profileId === 'agent' || profileId === 'especiais') {
     return { profile: 'agent' };
+  }
+  if (profileId === 'gestao' || canSeeEquipe) {
+    return { profile: 'gestao', ...(reportParams || {}) };
   }
   return reportParams || undefined;
 }
