@@ -716,6 +716,31 @@ export async function assertCanInterruptWorkflow(
   }
 }
 
+function isSupervisaoOuGestaoFuncao(resolved: ResolvedUserPermissions): boolean {
+  const slugs = userFuncaoSlugs(resolved);
+  return slugs.some((s) => s === 'gestao' || s === 'suporte-supervisao');
+}
+
+/** Resolver ticket com workflow em aberto — restrito a supervisão e gestão. */
+export function canResolveTicketWithOpenWorkflow(resolved: ResolvedUserPermissions): boolean {
+  if (hasPermission(resolved.permissoes, 'portal', 'gestao')) return true;
+  return isSupervisaoOuGestaoFuncao(resolved);
+}
+
+export async function assertCanResolveTicketWithOpenWorkflow(
+  authUser: AuthPayload,
+  chamado: IChamadoN1,
+): Promise<void> {
+  if (!chamado.workflow?.active) return;
+  const resolved = await resolveUserPermissions(authUser);
+  if (!canResolveTicketWithOpenWorkflow(resolved)) {
+    throw new PermissionDeniedError(
+      'Apenas supervisão ou gestão podem resolver um ticket com workflow em aberto',
+      403,
+    );
+  }
+}
+
 /** Pedir informação (WF) ou Responder Solicitação (responsável). */
 export async function canWorkflowComunicacao(
   resolved: ResolvedUserPermissions,

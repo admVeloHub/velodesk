@@ -50,6 +50,7 @@ import {
   assertCanCommitTicket,
   assertCanInterruptWorkflow,
   assertCanPostTicketMessage,
+  assertCanResolveTicketWithOpenWorkflow,
   assertCanWorkflowComunicacao,
   canClaimTicketResponsavel,
   isResponsavelSelfClaimBody,
@@ -269,6 +270,9 @@ router.put('/:id', authMiddleware, async (req, res: Response) => {
   try {
     if (req.body.status != null && String(req.body.status).trim()) {
       assertResponsavelForTerminalStatus(chamado, String(req.body.status));
+      if (normalizeStatusValue(String(req.body.status)) === 'resolvido') {
+        await assertCanResolveTicketWithOpenWorkflow(req.user!, chamado);
+      }
     }
     applyManualResponsavelClaim(chamado, req.user);
     await applyBodyToChamado(chamado, req.body, req.user);
@@ -336,6 +340,9 @@ router.post('/:id/commit', authMiddleware, async (req, res: Response) => {
       : currentStatus(chamado);
     if (targetStatus !== normalizeStatusValue(currentStatus(chamado))) {
       assertResponsavelForTerminalStatus(chamado, targetStatus);
+      if (targetStatus === 'resolvido') {
+        await assertCanResolveTicketWithOpenWorkflow(req.user!, chamado);
+      }
     }
     applyManualResponsavelClaim(chamado, req.user);
     const commitResult = await commitChamadoFromAgent(chamado, req.body, req.user);
