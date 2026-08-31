@@ -12,6 +12,7 @@ import {
   getWorkflowProgress,
 } from '../desk/utils';
 import { MEUS_TICKETS_QUEUE_ID, MY_TICKETS_SECTION_CLIENTE_RESPONDEU } from '../desk/constants';
+import { isEspeciaisDeskExcludedTicket } from '../especiais/especiaisChannelDetection';
 import { ticketAwaitingDecision } from '../desk/workflowDefinitions';
 import { getWorkflowInfoRequests, resolveDeskTicketIdForInfoRequest } from '../workflow/workflowInfoNotifications';
 import { getWorkflowTeamQueueMeta, ticketMatchesWorkflowTeam } from '../workflow/workflowTeamQueues';
@@ -54,6 +55,9 @@ export function computeAgentDeskData() {
   const counts = { novos: 0, emAndamento: 0, pendente: 0, resolvidos: 0, slaCritico: 0, aguardandoRetorno: 0 };
 
   const enriched = entries
+    // CE nunca entra no módulo Tickets (exclusão absoluta) — getAllCockpitTickets() lê o
+    // cache local direto, sem passar pelos filtros de desk/utils.js que já fazem isso.
+    .filter((e) => !isEspeciaisDeskExcludedTicket(e.ticket))
     .filter((e) => e.queueId !== 'resolvidos')
     .map(({ ticket, queueId }) => {
       if (queueId === 'novos') counts.novos++;

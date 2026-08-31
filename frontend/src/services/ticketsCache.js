@@ -659,8 +659,16 @@ function assertApiReady(action = 'salvar ticket') {
 }
 
 function filterColumnsForAgent(columns) {
-  if (!shouldUseMeusChamadosFila()) return columns;
   const profileId = readDeskProfileId();
+  // CE nunca entra no módulo Tickets (exclusão absoluta; ver_todos não libera) — precisa
+  // rodar mesmo quando shouldUseMeusChamadosFila() é false, senão sessões com ver_todos/
+  // gestão/workflow ficam sem esse filtro no cache local.
+  if (!shouldUseMeusChamadosFila()) {
+    return (columns || []).map((box) => ({
+      ...box,
+      tickets: (box.tickets || []).filter((ticket) => !isEspeciaisDeskExcludedTicket(ticket, profileId)),
+    }));
+  }
   return (columns || []).map((box) => ({
     ...box,
     tickets: (box.tickets || []).filter((ticket) => {

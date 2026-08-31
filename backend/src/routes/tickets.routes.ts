@@ -20,6 +20,7 @@ import {
   commitChamadoFromAgent,
   createChamadoFromBody,
   currentStatus,
+  excludeEspeciaisChannelsMongoFilter,
   lastStatusFilter,
   normalizeStatusValue,
   resolveBoxIdForChamado,
@@ -118,7 +119,9 @@ function handleTicketMutationError(err: unknown, res: Response): boolean {
 
 router.get('/', authMiddleware, async (req, res: Response) => {
   const boxes = await loadBoxes();
-  const filter: Record<string, unknown> = {};
+  // CE (Procon/Bacen/Consumidor.gov/Reclame Aqui) nunca entra no módulo Tickets — mesma
+  // regra já aplicada em GET /boxes via buildChamadoQueryFilter.
+  const filter: Record<string, unknown> = { $and: [excludeEspeciaisChannelsMongoFilter()] };
 
   if (req.query.boxId) {
     const box = boxes.find((b) => b._id.toString() === String(req.query.boxId));
