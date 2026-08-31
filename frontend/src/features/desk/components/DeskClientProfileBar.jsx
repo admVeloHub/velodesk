@@ -66,6 +66,7 @@ export default function DeskClientProfileBar({
   });
   const [emailErrors, setEmailErrors] = useState({});
   const contact = getClientContactFields(ticket, client);
+  const cadastroNaoEncontrado = Boolean(contact.cpf) && !(ticket?.clienteId || ticket?.lateralForm?.clienteId);
   const activeProducts = getClientActiveProducts(ticket, client);
   const protocolLabel = resolveProtocolLabel(ticket);
   const inWorkflow = isTicketInWorkflow(ticket);
@@ -229,6 +230,14 @@ export default function DeskClientProfileBar({
           <span className="ticket-client-profile__field ticket-client-profile__field--cpf" id="profileCpf">
             {contact.cpf || '—'}
           </span>
+          {cadastroNaoEncontrado ? (
+            <span
+              className="velo-product-tag velo-tag velo-tag--alert ticket-client-profile__badge-not-found"
+              title="CPF sem cadastro encontrado no cadastro local nem na API Velotax"
+            >
+              CADASTRO NÃO ENCONTRADO
+            </span>
+          ) : null}
           <span className="ticket-client-profile__sep" aria-hidden="true">–</span>
           <span className="ticket-client-profile__field ticket-client-profile__field--phone" id="profilePhone">
             {contact.phone || '—'}

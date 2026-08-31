@@ -1840,6 +1840,11 @@ body:has(.eco-prototype-banner) {
 .velo-tag--landline { background: #1634FF; }
 .velo-tag--streaming { background: #db2777; }
 .velo-tag--default { background: #475569; }
+.velo-tag--alert { background: #dc2626; }
+
+.ticket-client-profile__badge-not-found {
+    white-space: nowrap;
+}
 
 /* Hist?rico com busca */
 .velo-lf-history {

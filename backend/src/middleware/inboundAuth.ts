@@ -1,7 +1,8 @@
-﻿/** inboundAuth v1.1.0 — validação webhooks inbound + app-notify */
+﻿/** inboundAuth v1.2.0 — webhook 55PBX inbound_b2c (x-api-key/token) */
 import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { env } from '../config/env';
+import { safeCompare } from '../utils/safeCompare';
 
 function verifyMailgunSignature(req: Request): boolean {
   const signingKey = env.inboundEmailWebhookSecret;
@@ -67,6 +68,33 @@ export function inboundTelephonyAuthMiddleware(req: Request, res: Response, next
   const header = String(req.headers['x-inbound-secret'] ?? '').trim();
   if (header !== secret) {
     res.status(401).json({ message: 'Secret inbound telefonia inválido' });
+    return;
+  }
+
+  next();
+}
+
+/** Webhook 55PBX (call center humano) — aceita x-api-key ou token, secret isolado. */
+export function inboundB2cTelephonyAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const secret = env.inboundB2cTelephonySecret;
+  if (!secret) {
+    if (env.nodeEnv !== 'production') {
+      next();
+      return;
+    }
+    res.status(503).json({ message: 'Inbound telefonia B2C desabilitado — secret ausente' });
+    return;
+  }
+
+  const apiKeyHeader = req.headers['x-api-key'];
+  const tokenHeader = req.headers['token'];
+  const authorized = (
+    safeCompare(typeof apiKeyHeader === 'string' ? apiKeyHeader : null, secret)
+    || safeCompare(typeof tokenHeader === 'string' ? tokenHeader : null, secret)
+  );
+
+  if (!authorized) {
+    res.status(401).json({ message: 'Secret inbound telefonia B2C inválido' });
     return;
   }
 

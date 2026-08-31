@@ -3,7 +3,7 @@ import { Router, Request, Response } from 'express';
 import path from 'path';
 import multer from 'multer';
 import { env } from '../config/env';
-import { inboundAppAuthMiddleware, inboundEmailAuthMiddleware, inboundTelephonyAuthMiddleware } from '../middleware/inboundAuth';
+import { inboundAppAuthMiddleware, inboundB2cTelephonyAuthMiddleware, inboundEmailAuthMiddleware, inboundTelephonyAuthMiddleware } from '../middleware/inboundAuth';
 import { inboundTicketAuthMiddleware } from '../middleware/inboundTicketAuth';
 import { twilioWebhookAuthMiddleware } from '../middleware/twilioWebhookAuth';
 import {
@@ -26,6 +26,11 @@ import {
   getInboundTelephonyRecados,
   processInboundTelephonyCall,
 } from '../services/telephony-inbound/telephonyInbound.service';
+import { parseTelecom55B2cPayload } from '../services/telephony-inbound/adapters/telecom55B2c.adapter';
+import {
+  createTicketFromTelecom55B2cCall,
+  shouldCreateTicketFromTelecom55B2cEvent,
+} from '../services/telecom55B2cTicket.service';
 import { countActiveRecados, getRecadosEnvelopeUpdatedAt, migrateLegacyRecadosIfNeeded } from '../services/telephonyRecado.service';
 import {
   getTelecom55WebhookHealth,
@@ -161,6 +166,40 @@ router.get('/telephony/recados', inboundTelephonyAuthMiddleware, async (_req, re
   } catch (err) {
     console.error('[inbound/telephony/recados]', err);
     return res.status(500).json({ message: 'Falha ao carregar recados ativos' });
+  }
+});
+
+/**
+ * Webhook 55PBX (call center humano) — abertura de ticket quando a ligação entra no
+ * ramal de um atendente. Distinto de /telephony/calls (Contact Tel) e de /telecom55
+ * (painel ao vivo via Supabase, não mexer). Contrato de resposta pedido pela 55: 200
+ * sempre que o evento é aceito/processado ou filtrado (nunca gera ticket sozinho e não
+ * deve reentrar em retry), 400 só pra body ausente/inválido, 500 pra falha interna.
+ */
+router.post('/telephony/inbound_b2c', inboundB2cTelephonyAuthMiddleware, async (req, res: Response) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ message: 'Body inválido' });
+  }
+
+  try {
+    const event = parseTelecom55B2cPayload(body as Record<string, unknown>);
+    if (!shouldCreateTicketFromTelecom55B2cEvent(event)) {
+      return res.status(200).json({ status: 'Success' });
+    }
+
+    const result = await createTicketFromTelecom55B2cCall(event);
+    if (result) {
+      console.info('[inbound/telephony/inbound_b2c] ticket criado', result);
+    } else {
+      console.info('[inbound/telephony/inbound_b2c] atendente não resolvido — ticket não criado', {
+        branchEmail: event.branchEmail,
+      });
+    }
+    return res.status(200).json({ status: 'Success' });
+  } catch (err) {
+    console.error('[inbound/telephony/inbound_b2c]', err);
+    return res.status(500).json({ message: 'Falha ao processar evento da 55' });
   }
 });
 

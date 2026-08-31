@@ -299,6 +299,10 @@ export const env = {
   inboundTelephonyEnabled: process.env.INBOUND_TELEPHONY_ENABLED !== 'false',
   inboundTelephonyWebhookSecret: (process.env.INBOUND_TELEPHONY_WEBHOOK_SECRET || '').trim(),
   telephonyAutoCreateTicket: process.env.TELEPHONY_AUTO_CREATE_TICKET === 'true',
+  /** Webhook 55PBX (call center humano) — abertura de ticket em /api/inbound/telephony/inbound_b2c.
+   * Secret isolado, não reaproveita INBOUND_TELEPHONY_WEBHOOK_SECRET (Contact Tel) nem
+   * TELECOM55_WEBHOOK_SECRET (painel ao vivo). */
+  inboundB2cTelephonySecret: (process.env.INBOUND_B2C_TELEPHONY_SECRET || '').trim(),
   /** Aba Consultas — Velotax Customer Data API (header x-api-key na fonte da verdade) */
   customerDataApiKey: (
     process.env['x-api-key']

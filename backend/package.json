@@ -28,6 +28,7 @@
     "test:status-lifecycle": "tsx scripts/test-status-lifecycle.ts",
     "test:ticket-ia": "tsx scripts/test-ticket-ia-adapter.ts",
     "test:telephony-inbound": "tsx scripts/test-telephony-inbound.ts",
+    "test:telecom55-b2c-inbound": "tsx scripts/test-telecom55-b2c-inbound.ts",
     "test:inbound-tickets": "tsx scripts/test-inbound-tickets.ts",
     "generate:inbound-ticket-secrets": "tsx scripts/generate-inbound-ticket-secrets.ts",
     "test:whatsapp-send": "tsx scripts/test-whatsapp-send.ts",
