@@ -3041,6 +3041,7 @@
 #velodeskDeskV2Root .velo-tag--landline { background: #1634FF; }
 #velodeskDeskV2Root .velo-tag--streaming { background: #db2777; }
 #velodeskDeskV2Root .velo-tag--default { background: #475569; }
+#velodeskDeskV2Root .velo-tag--contracted { background: #1634FF; }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__badge {
     font-size: var(--desk-fs-caption);

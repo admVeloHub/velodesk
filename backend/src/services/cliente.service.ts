@@ -7,6 +7,7 @@ import {
   isCustomerDataApiConfigured,
   type ConsultaSnapshotResult,
 } from './customerDataApi.service';
+import { extractContractedProductSlugs } from './consultaProductMap';
 
 export function normalizeCpf(value: unknown): string {
   return String(value ?? '').replace(/\D/g, '');
@@ -144,6 +145,9 @@ export function mapOverviewToClienteDados(
   const phoneRaw = normalizePhoneDigits(overviewData.phone);
   const emailList = emailRaw ? [emailRaw] : [];
   const phoneList = phoneRaw ? [phoneRaw] : [];
+  const produtosContratados = extractContractedProductSlugs(
+    overviewData.products as Record<string, boolean> | null | undefined,
+  );
 
   return {
     clienteCpf: cpf,
@@ -156,10 +160,16 @@ export function mapOverviewToClienteDados(
       lista: phoneList,
       whatsapp: phoneList.length === 1 ? phoneList[0] : '',
     },
+    produtosContratados,
   };
 }
 
-/** Enriquece cadastro existente só nos campos de contato ausentes (≥1 email e ≥1 telefone = skip). */
+/**
+ * Reconsulta a Customer Data API para manter o cadastro em dia:
+ * preenche e-mail/telefone/nome só se estiverem ausentes, mas SEMPRE atualiza
+ * `produtosContratados` — inclusive quando o contato já está completo — para
+ * o badge de produtos do painel superior refletir a contratação mais recente.
+ */
 export async function enrichClienteContactFromApiIfNeeded(
   cliente: ICliente,
   cpfRaw: unknown,
@@ -173,7 +183,6 @@ export async function enrichClienteContactFromApiIfNeeded(
 
   const hasEmail = clienteDadosHasEmail(dados);
   const hasPhone = clienteDadosHasPhone(dados);
-  if (hasEmail && hasPhone) return { cliente, enriched: false };
 
   if (!isCustomerDataApiConfigured()) return { cliente, enriched: false };
 
@@ -210,6 +219,15 @@ export async function enrichClienteContactFromApiIfNeeded(
 
     if (!String(dados.clienteNome ?? '').trim() && fromApi.clienteNome) {
       dados.clienteNome = fromApi.clienteNome;
+      changed = true;
+    }
+
+    const currentProdutos = dados.produtosContratados ?? [];
+    const fromApiProdutos = fromApi.produtosContratados ?? [];
+    const produtosDiffer = currentProdutos.length !== fromApiProdutos.length
+      || fromApiProdutos.some((slug) => !currentProdutos.includes(slug));
+    if (produtosDiffer) {
+      dados.produtosContratados = fromApiProdutos;
       changed = true;
     }
 
@@ -275,6 +293,7 @@ export async function findOrCreateClienteFromCpfLookup(
         clienteNome: dados.clienteNome,
         clienteEmail: dados.clienteEmail,
         clienteTelefone: dados.clienteTelefone,
+        produtosContratados: dados.produtosContratados,
       }],
       atendimentoHistorico: [],
     });

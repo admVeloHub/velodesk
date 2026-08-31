@@ -323,13 +323,16 @@ export default function DeskClientProfileBar({
               id="profileProducts"
               aria-label="Produtos ativos do cliente"
             >
-              {activeProducts.map((produto) => (
+              {activeProducts.map(({ name, contracted }) => (
                 <span
-                  key={produto}
-                  className={'velo-product-tag velo-tag ' + getProductTagClass(produto)}
-                  title={`Produto ativo: ${produto}`}
+                  key={name}
+                  className={
+                    'velo-product-tag velo-tag '
+                    + (contracted ? 'velo-tag--contracted' : getProductTagClass(name))
+                  }
+                  title={contracted ? `Produto contratado: ${name}` : `Produto informado na tabulação: ${name}`}
                 >
-                  {produto}
+                  {name}
                 </span>
               ))}
             </div>

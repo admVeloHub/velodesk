@@ -1,9 +1,12 @@
 /**
  * Desk CRM — raiz 5 colunas (layout referência)
- * VERSION: v3.44.1 | DATE: 2026-08-24
+ * VERSION: v3.44.2 | DATE: 2026-08-31
  * — handleCommitWithStatus/handleSendInternalNote: try/finally cobre toda a função,
  *   sem gap entre travar o lock (commitInProgressRef/sendInternalNoteInProgressRef) e o try;
  *   exceção antes do try deixava o lock preso pra sempre (todos os canais de envio) sem erro visível.
+ * — handleCommitWithStatus (ticket não-rascunho): append otimista da mensagem pública em
+ *   `prepared.messages` antes do patchTicket, para a thread local já refletir o agente como
+ *   último remetente e suprimir a sugestão IA sem esperar o reload assíncrono do ticket.
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -73,7 +76,7 @@ import {
 import { apiTicketToCockpit, cockpitTicketToApi } from '../../api/adapters/ticketAdapter';
 import { lookupClient, upsertClientFromContact } from '../../services/clientDb';
 import { clientsApi, colaboradoresApi, ticketsApi } from '../../api/client';
-import { persistClienteContact, applyClienteDocToTicket, ticketNeedsContactHydration, ticketContactIsComplete, mapClienteDocToContact } from '../../api/adapters/clienteAdapter';
+import { persistClienteContact, applyClienteDocToTicket, mapClienteDocToContact } from '../../api/adapters/clienteAdapter';
 import { useTickets } from '../../context/TicketsContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
@@ -615,7 +618,10 @@ export default function DeskV2Root() {
     };
   }, [activeTabId, patchTicket, showNotification]);
 
-  // Hidratação só no cadastro (b2c_cadastros) + painel superior — nunca PUT/claim no ticket
+  // Hidratação do cadastro (b2c_cadastros) + painel superior — nunca PUT/claim no ticket.
+  // Sempre roda (1 vez por ticket+CPF): cria/enriquece contato quando faltar e-mail/telefone,
+  // e SEMPRE reconsulta produtosContratados (mesmo com contato já completo) para o badge
+  // do painel superior refletir a contratação mais recente do cliente.
   useEffect(() => {
     if (!ticket) return undefined;
 
@@ -626,7 +632,6 @@ export default function DeskV2Root() {
       ticket.lateralForm?.clienteCpf || ticket.lateralForm?.cpf || ticket.clientCPF,
     );
     if (!isValidCpfDigits(cpf)) return undefined;
-    if (!ticketNeedsContactHydration(ticket)) return undefined;
 
     const dedupeKey = `${ticketId}:${cpf}`;
     if (contactHydrateRef.current.has(dedupeKey)) return undefined;
@@ -646,23 +651,11 @@ export default function DeskV2Root() {
       return contact;
     };
 
-    const contactLooksComplete = (contact) => {
-      if (!contact) return false;
-      const hasEmail = Boolean(
-        contact.email || contact.replyEmail || (contact.emails && contact.emails.length),
-      );
-      const hasPhone = Boolean(
-        contact.phone || contact.whatsappPhone || (contact.phones && contact.phones.length),
-      );
-      return hasEmail && hasPhone;
-    };
-
     (async () => {
       try {
         const localDoc = await clientsApi.getByCpf(cpf, { hydrateFromApi: 0 });
-        const afterLocal = applyCadastroToPanel(localDoc);
+        applyCadastroToPanel(localDoc);
         if (cancelled) return;
-        if (contactLooksComplete(afterLocal) || ticketContactIsComplete(ticket)) return;
 
         const enrichedDoc = await clientsApi.getByCpf(cpf, { hydrateFromApi: 1 });
         applyCadastroToPanel(enrichedDoc);
@@ -1354,6 +1347,22 @@ export default function DeskV2Root() {
       );
       syncTicketWorkflowOnCommit(prepared);
       applySendStatus({ ticket: prepared, boxId: entry.boxId }, status);
+      if (hasPublicPayload) {
+        // Append otimista da mensagem pública recém-enviada — sem isso a thread local só
+        // reflete o agente como último remetente após o reload assíncrono do ticket, e a
+        // sugestão IA (que só deve rodar aguardando o cliente) continua ativa nesse intervalo.
+        if (!prepared.messages) prepared.messages = [];
+        prepared.messages.push({
+          id: `optimistic-${Date.now()}`,
+          type: 'agent',
+          fromClient: false,
+          origin: 'agente',
+          text: messagePayload,
+          attachments: attachmentUrls,
+          timestamp: new Date().toISOString(),
+          author: getAgentName(),
+        });
+      }
       patchTicket(ticket.id, {
         ...prepared,
         listOnly: false,

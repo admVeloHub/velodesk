@@ -17,6 +17,8 @@ export interface IClienteDados {
   clienteNome: string;
   clienteEmail: IClienteEmail;
   clienteTelefone: IClienteTelefone;
+  /** Slugs de produtos Velotax contratados, conforme último overview da Customer Data API. */
+  produtosContratados?: string[];
 }
 
 export interface IAtendimentoHistorico {
@@ -44,6 +46,7 @@ const ClienteDadosSchema = new Schema<IClienteDados>(
       lista: { type: [String], default: [] },
       whatsapp: { type: String, default: '' },
     },
+    produtosContratados: { type: [String], default: [] },
   },
   { _id: false }
 );

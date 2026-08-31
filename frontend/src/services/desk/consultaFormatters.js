@@ -19,6 +19,21 @@ export const CONSULTA_PRODUCT_LABELS = {
   'clube-velotax': 'Clube Velotax',
 };
 
+/** Espelha backend/src/services/consultaProductMap.ts (TABULACAO_TO_SLUG) — manter em sincronia. */
+const TABULACAO_TO_SLUG = [
+  { match: /empr[eé]stimo/i, slug: 'emprestimo-pessoal' },
+  { match: /antecipa[cç][aã]o.{0,12}sal[aá]rio|sal[aá]rio/i, slug: 'antecipacao-salario' },
+  { match: /irpf|imposto.{0,12}renda|antecipa[cç][aã]o.{0,12}ir/i, slug: 'antecipacao-irpf' },
+  { match: /clube|cupom|vibes/i, slug: 'clube-velotax' },
+];
+
+export function mapTabulacaoProdutoToSlug(produto) {
+  const text = String(produto ?? '').trim();
+  if (!text) return null;
+  const entry = TABULACAO_TO_SLUG.find(({ match }) => match.test(text));
+  return entry ? entry.slug : null;
+}
+
 export function formatConsultaCpf(value) {
   const digits = String(value ?? '').replace(/\D/g, '');
   if (digits.length !== 11) return digits || '';

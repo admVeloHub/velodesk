@@ -40,6 +40,7 @@ export function upsertClientFromContact(contact) {
     replyEmail: contact.replyEmail || prev.replyEmail,
     whatsappPhone: contact.whatsappPhone || prev.whatsappPhone,
     clienteId: contact.clienteId || prev.clienteId,
+    produtosContratados: contact.produtosContratados || prev.produtosContratados || [],
   };
   db[digits] = next;
   saveClientDB(db);

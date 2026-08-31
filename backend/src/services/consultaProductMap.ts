@@ -68,3 +68,11 @@ export function listPendingExpandSlugs(
 ): ConsultaProductSlug[] {
   return CONSULTA_PRODUCT_SLUGS.filter((slug) => !prefetched.has(slug));
 }
+
+/** Produtos contratados (flags true) a partir do bloco `products` do overview da Customer Data API. */
+export function extractContractedProductSlugs(
+  products: Record<string, boolean> | null | undefined,
+): ConsultaProductSlug[] {
+  if (!products) return [];
+  return CONSULTA_PRODUCT_SLUGS.filter((slug) => SLUG_TO_OVERVIEW_FLAG[slug](products));
+}

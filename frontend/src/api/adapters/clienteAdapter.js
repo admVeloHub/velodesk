@@ -2,7 +2,7 @@
  * clienteAdapter v1.4.2 — hidratação só se faltar email ou telefone no ticket
  * VERSION: v1.4.2 | DATE: 2026-08-19
  */
-import { formatPhone, normalizeCpf, normalizePhone, isValidCpfDigits } from '../../services/desk/utils';
+import { formatPhone, normalizeCpf, normalizePhone } from '../../services/desk/utils';
 
 function normalizeListInput(value) {
   if (Array.isArray(value)) {
@@ -60,6 +60,7 @@ export function mapClienteDocToContact(doc) {
     whatsappPhone,
     email: replyEmail || emails[0] || '',
     phone: whatsappPhone || phones[0] || '',
+    produtosContratados: Array.isArray(dados.produtosContratados) ? dados.produtosContratados : [],
   };
 }
 
@@ -217,25 +218,3 @@ export function applyClienteDocToTicket(ticket, doc) {
   return ticket;
 }
 
-export function collectTicketContactLists(ticket) {
-  const lf = ticket?.lateralForm || {};
-  return {
-    emails: normalizeListInput(lf.clienteEmail ?? ticket?.clientEmail),
-    phones: normalizeListInput(lf.clienteTelefone ?? ticket?.clientPhone),
-  };
-}
-
-/** Cadastro de contato completo no ticket: ≥1 e-mail e ≥1 telefone. */
-export function ticketContactIsComplete(ticket) {
-  const { emails, phones } = collectTicketContactLists(ticket);
-  return emails.length > 0 && phones.length > 0;
-}
-
-export function ticketNeedsContactHydration(ticket) {
-  if (!ticket) return false;
-  const cpf = normalizeCpf(
-    ticket.lateralForm?.clienteCpf || ticket.lateralForm?.cpf || ticket.clientCPF,
-  );
-  if (!isValidCpfDigits(cpf)) return false;
-  return !ticketContactIsComplete(ticket);
-}

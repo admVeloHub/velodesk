@@ -18,6 +18,7 @@ import { ticketBelongsInMeusTicketsList, ticketBelongsInAgentNovosQueue, ticketM
 import { isEspeciaisDeskExcludedTicket } from '../especiais/especiaisChannelDetection';
 import { normalizeMessageDisplayText } from '../../utils/htmlText.util';
 import { sanitizeResponsavel } from '../tabulationConfig';
+import { CONSULTA_PRODUCT_LABELS, mapTabulacaoProdutoToSlug } from './consultaFormatters';
 import { ticketsApi, ticketSearchApi } from '../../api/client';
 import { upsertDeskSearchTicketsInCache, isApiMode } from '../ticketsCache';
 import {
@@ -425,39 +426,32 @@ export function getClientProducts(ticket, client) {
   return products;
 }
 
-function normalizeClientProductEntry(entry) {
-  if (typeof entry === 'string') {
-    const name = entry.trim();
-    return name ? { name, active: true } : null;
-  }
-  if (entry && typeof entry === 'object') {
-    const name = String(entry.nome || entry.produto || entry.name || '').trim();
-    if (!name) return null;
-    return { name, active: entry.ativo !== false && entry.active !== false };
-  }
-  return null;
-}
-
-/** Produtos com contrato ativo — exclui itens marcados como inativos no cadastro */
+/**
+ * Produtos exibidos no painel superior — objetos { name, contracted }.
+ * `contracted: true` = produto Velotax que o cadastro (B2C) confirma como contratado (tag azul).
+ * O produto da tabulação sempre aparece primeiro; fica cinza se não constar como contratado.
+ */
 export function getClientActiveProducts(ticket, client) {
-  if (Array.isArray(client?.produtosAtivos) && client.produtosAtivos.length) {
-    return client.produtosAtivos
-      .map((entry) => (typeof entry === 'string' ? entry.trim() : String(entry?.nome || entry?.produto || '').trim()))
-      .filter(Boolean);
-  }
+  const contractedSlugs = new Set(
+    Array.isArray(client?.produtosContratados) ? client.produtosContratados : [],
+  );
 
   const seen = new Set();
   const list = [];
 
-  (client?.produtos || []).forEach((entry) => {
-    const normalized = normalizeClientProductEntry(entry);
-    if (!normalized?.active || seen.has(normalized.name)) return;
-    seen.add(normalized.name);
-    list.push(normalized.name);
-  });
-
   const ticketProd = String(ticket?.lateralForm?.produto || '').trim();
-  if (ticketProd && !seen.has(ticketProd)) list.unshift(ticketProd);
+  if (ticketProd) {
+    const slug = mapTabulacaoProdutoToSlug(ticketProd);
+    list.push({ name: ticketProd, contracted: Boolean(slug && contractedSlugs.has(slug)) });
+    seen.add(ticketProd);
+  }
+
+  contractedSlugs.forEach((slug) => {
+    const label = CONSULTA_PRODUCT_LABELS[slug];
+    if (!label || seen.has(label)) return;
+    seen.add(label);
+    list.push({ name: label, contracted: true });
+  });
 
   return list;
 }
