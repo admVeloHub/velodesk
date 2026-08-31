@@ -33,8 +33,11 @@ function createOpenAiClient() {
     apiKey: env.openaiApiKey,
     timeout: REQUEST_TIMEOUT_MS,
     maxRetries: 2,
-    // node-fetch bundled pelo SDK falha com ERR_STREAM_PREMATURE_CLOSE no Windows
-    fetch: globalThis.fetch,
+    // node-fetch bundled pelo SDK falha com ERR_STREAM_PREMATURE_CLOSE no Windows;
+    // em produção (Linux/Cloud Run) o fetch nativo conflita com o content-length
+    // que o SDK seta manualmente ("invalid content-length header"), então só
+    // trocamos o transporte no Windows.
+    ...(process.platform === 'win32' ? { fetch: globalThis.fetch } : {}),
   });
 }
 
