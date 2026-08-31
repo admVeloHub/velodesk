@@ -2060,12 +2060,9 @@ function mapSupervisorRegistroOccurrence(entry, ticket, client, previousTabulati
     previousStatusLabel,
     statusChanged,
   } = collectRegistroOccurrenceData(entry, previousTabulationState, prevStatus);
-  const internalExcerpt = String(entry.anotacaoInterna ?? '').trim();
-  // Evento de resposta do CSAT (ver csat.routes.ts) — mesmo ícone de estrela
-  // usado no KPI do Painel 360 (ws360-kpi__top .ti-star), no lugar do ícone
-  // genérico de histórico.
-  const isCsatEvent = /^Avaliação CSAT recebida/i.test(internalExcerpt);
 
+  // Eventos mostra só a mudança (tabulação/status) — nunca o texto da anotação
+  // interna que possa ter acompanhado o mesmo save; essa vive só na aba Notas.
   return {
     id: `${ticketId}:${entry.id}`,
     kind: 'registro',
@@ -2077,8 +2074,6 @@ function mapSupervisorRegistroOccurrence(entry, ticket, client, previousTabulati
     statusLabel,
     previousStatusLabel,
     statusChanged,
-    internalExcerpt,
-    isCsatEvent,
     ticketId,
     ticketTitle: getTicketTitle(ticket),
   };
