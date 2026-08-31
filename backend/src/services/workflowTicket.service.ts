@@ -14,6 +14,7 @@ import {
   readTabulacaoSnapshot,
 } from './chamado.mapper';
 import { wrapComposerOpening } from './clientMessageEnvelope.service';
+import { notifyAgentReplyAsync } from './emailNotification.service';
 import { getActiveWorkflows, getWorkflowById, getWorkflowBySlug, resolveWorkflowForTicket } from './workflowDefinicao.service';
 import { getActiveGrupos } from './grupoResponsabilidade.service';
 import {
@@ -139,10 +140,10 @@ function buildProdutosConclusaoClientMessage(chamado: IChamadoN1): string {
   return `Olá, ${nome}! Sua solicitação de ${tipo} foi analisada e concluída pelo time de Produtos. Estamos à disposição caso precise de algo mais.`;
 }
 
-function appendProdutosConclusaoPublicMessage(chamado: IChamadoN1, autor: string): void {
+async function appendProdutosConclusaoPublicMessage(chamado: IChamadoN1, autor: string): Promise<void> {
   const nucleo = buildProdutosConclusaoClientMessage(chamado);
   const composerText = wrapComposerOpening({ nucleo, agentName: autor });
-  appendRegistroEntry(chamado, {
+  const result = appendRegistroEntry(chamado, {
     mensagemPublica: composerText,
     sender: 'me',
     autor,
@@ -151,6 +152,11 @@ function appendProdutosConclusaoPublicMessage(chamado: IChamadoN1, autor: string
       at: new Date().toISOString(),
     },
   });
+  // appendRegistroEntry só grava no chamado em memória — sem isto o "Retorno ao Cliente"
+  // automático do workflow de Produtos nunca chegava ao e-mail do cliente, só ficava
+  // registrado como mensagem pública no ticket (quem chama salva o chamado depois,
+  // persistindo o carimbo de emailOutboundMessageId que notifyAgentReplyAsync grava aqui).
+  await notifyAgentReplyAsync(chamado, composerText, undefined, result.public?.registroIndex);
 }
 
 function markTicketEmAndamentoAfterReject(chamado: IChamadoN1, autor: string): void {
@@ -641,7 +647,7 @@ async function advanceWorkflowProdutosQueueDecision(
     metadados: { workflowDecision: 'approve' },
   });
   wf.pendingDecision = null;
-  appendProdutosConclusaoPublicMessage(chamado, autor);
+  await appendProdutosConclusaoPublicMessage(chamado, autor);
   // "Feito" em produtos encerra o workflow — mensagem ao cliente já persistida acima.
   await advanceToStep(chamado, definicao, sortPassos(definicao).length, autor, {
     trigger: 'produtos-queue-feito',

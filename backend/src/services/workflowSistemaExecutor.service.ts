@@ -7,6 +7,7 @@ import type { TicketAiMessageInput } from './agents/agentTypes';
 import { invokeInternalHook } from './workflowInternalHooks';
 import { getAgentNomeOficial } from './agents/agentRegistry';
 import { wrapComposerOpening } from './clientMessageEnvelope.service';
+import { notifyAgentReplyAsync } from './emailNotification.service';
 import { createWorkflowNotificacao } from './workflowNotificacao.service';
 import { getActiveGrupos } from './grupoResponsabilidade.service';
 import { buildTabulationFieldsFromTicket } from './workflowMatcher.service';
@@ -178,7 +179,7 @@ async function executeRespostaCliente(
     agentName: getAgentNomeOficial(1),
   });
 
-  appendRegistroEntry(chamado, {
+  const registroResult = appendRegistroEntry(chamado, {
     mensagemPublica: composerText,
     sender: 'me',
     autor: getAgentNomeOficial(1),
@@ -191,6 +192,11 @@ async function executeRespostaCliente(
       },
     },
   });
+  // appendRegistroEntry só grava no chamado em memória — sem isto a resposta automática
+  // dessa etapa "sistema" nunca chegava ao e-mail do cliente, mesmo a mensagem de retorno
+  // abaixo dizendo "Resposta enviada ao cliente" (quem chama salva o chamado depois,
+  // persistindo o carimbo de emailOutboundMessageId que notifyAgentReplyAsync grava aqui).
+  await notifyAgentReplyAsync(chamado, composerText, undefined, registroResult.public?.registroIndex);
 
   return {
     ok: true,
