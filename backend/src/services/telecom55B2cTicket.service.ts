@@ -86,9 +86,12 @@ async function resolveClienteParaTicket(cpf: string): Promise<ResolvedCliente> {
 
 export async function createTicketFromTelecom55B2cCall(
   event: Telecom55B2cEvent,
-): Promise<{ ticketId: string; protocolo: string; notified: boolean } | null> {
+): Promise<{ ticketId: string; protocolo: string; notified: boolean }> {
+  // Sem branch_email resolvido, o ticket ainda é criado (não pode ficar sem registro da
+  // ligação), só que sem responsável — e nunca cai na roleta genérica (shouldAutoAssign
+  // exclui canal Telefone), porque atribuir a alguém que não atendeu a ligação é pior do
+  // que ficar sem dono até um humano puxar manualmente.
   const agent = await resolveAgentByBranchEmail(event.branchEmail);
-  if (!agent) return null;
 
   const categoria = resolveCategoriaFromUra(event.callTerminal, event.callUra);
   const produto = CATEGORIA_TO_PRODUTO[categoria] || '';
@@ -99,7 +102,7 @@ export async function createTicketFromTelecom55B2cCall(
   const partial = await createChamadoFromBody({
     title,
     chamadoTitulo: title,
-    author: agent.displayName,
+    ...(agent ? { author: agent.displayName } : {}),
     source: 'telecom55-b2c-inbound',
     channel: 'telefone',
     internalText: `CPF digitado na URA: ${event.callDocument} · Telefone: ${event.callNumber}`,
@@ -111,7 +114,9 @@ export async function createTicketFromTelecom55B2cCall(
     clientPhone: event.callNumber,
     lateralForm: {
       canal: 'Telefone',
-      responsavel: agent.displayName,
+      // responsavel '' explícito quando não resolvido — tabulacaoFromBody() faria fallback
+      // pra body.responsibleAgent se omitido, e aqui o pedido é ficar em branco mesmo.
+      responsavel: agent?.displayName || '',
       tipo: 'Solicitação',
       tipoChamado: 'Solicitação',
       // motivo explicitamente '' (não omitido) — sem isso tabulacaoFromBody usa o título do
@@ -132,6 +137,15 @@ export async function createTicketFromTelecom55B2cCall(
   void runInboundPostCreateHooks(chamado, { source: 'telecom55-b2c-inbound' }).catch((err: Error) => {
     console.warn('[telecom55-b2c-ticket] runInboundPostCreateHooks fail-soft:', err.message);
   });
+
+  if (!agent) {
+    console.info('[telecom55-b2c-ticket] ticket criado sem responsável — branch_email não resolvido', {
+      ticketId,
+      protocolo,
+      branchEmail: event.branchEmail,
+    });
+    return { ticketId, protocolo, notified: false };
+  }
 
   let notified = false;
   try {

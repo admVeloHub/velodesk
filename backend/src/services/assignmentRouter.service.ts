@@ -142,6 +142,10 @@ export function shouldAutoAssign(partial: Partial<IChamadoN1>): boolean {
   if (!env.assignmentRouterEnabled) return false;
   const chamado = partial as IChamadoN1;
   if (isProconChamado(chamado) || isConsumidorGovChamado(chamado)) return false;
+  // Ticket de canal telefone (ex.: webhook 55PBX) sem responsável resolvido fica sem dono
+  // de propósito — não pode cair na roleta genérica, precisa do agente real do atendimento.
+  const canal = String(partial.tabulacao?.[0]?.canal ?? '').trim().toLowerCase();
+  if (canal === 'telefone') return false;
   return !isRealResponsavel(partial.tabulacao?.[0]?.responsavel);
 }
 

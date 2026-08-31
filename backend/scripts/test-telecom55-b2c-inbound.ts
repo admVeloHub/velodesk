@@ -8,6 +8,7 @@ import {
   resolveCategoriaFromUra,
   shouldCreateTicketFromTelecom55B2cEvent,
 } from '../src/services/telecom55B2cTicket.service';
+import { shouldAutoAssign } from '../src/services/assignmentRouter.service';
 
 const DID_CENTRAL = '551130037293';
 const DID_0800 = '08008000049';
@@ -98,7 +99,14 @@ async function main(): Promise<void> {
       branch_email: 'ninguem-com-esse-email@velotax.com.br',
     }));
     const resultNoAgent = await createTicketFromTelecom55B2cCall(eventNoAgent);
-    console.log('resultado (branch_email sem User correspondente, deve ser null):', resultNoAgent);
+    console.log('resultado (branch_email sem User correspondente — ticket ainda deve ser criado):', resultNoAgent);
+    if (resultNoAgent) {
+      createdTicketIds.push(resultNoAgent.ticketId);
+      const chamadoNoAgent = await ChamadoN1.findById(resultNoAgent.ticketId).lean();
+      console.log('responsavel (deve ser "" — não pode entrar na roleta):', JSON.stringify(chamadoNoAgent?.tabulacao?.[0]?.responsavel));
+      const autoAssignOk = chamadoNoAgent ? shouldAutoAssign(chamadoNoAgent) === false : false;
+      console.log(`${autoAssignOk ? 'OK  ' : 'FAIL'} shouldAutoAssign (deve ser false — canal Telefone não entra na roleta)`);
+    }
   }
 
   if (createdTicketIds.length) {

@@ -189,13 +189,7 @@ router.post('/telephony/inbound_b2c', inboundB2cTelephonyAuthMiddleware, async (
     }
 
     const result = await createTicketFromTelecom55B2cCall(event);
-    if (result) {
-      console.info('[inbound/telephony/inbound_b2c] ticket criado', result);
-    } else {
-      console.info('[inbound/telephony/inbound_b2c] atendente não resolvido — ticket não criado', {
-        branchEmail: event.branchEmail,
-      });
-    }
+    console.info('[inbound/telephony/inbound_b2c] ticket criado', result);
     return res.status(200).json({ status: 'Success' });
   } catch (err) {
     console.error('[inbound/telephony/inbound_b2c]', err);
