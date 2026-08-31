@@ -55,10 +55,10 @@ export default function CreateTicketPanel({ onClose, onSaved }) {
     }
     setLoading(true);
     try {
-      // hydrateFromApi:0 — checagem local rápida primeiro. Sem isso, um CPF não cadastrado
-      // dispara consulta externa (até ~30s) antes de oferecer o cadastro manual: o botão
-      // parecia travado quando o cliente simplesmente ainda não existe.
-      const cliente = await clientsApi.getByCpf(cpf, { hydrateFromApi: 0 });
+      // hydrateFromApi:1 — busca local e, se não achar, consulta a API Velotax e cadastra
+      // automaticamente (findOrCreateClienteFromCpfLookup). Pode levar alguns segundos
+      // quando cai na API; o botão mostra "Consultando…" pra não parecer travado.
+      const cliente = await clientsApi.getByCpf(cpf, { hydrateFromApi: 1 });
       if (!cliente) {
         setPendingCpf(cpf);
         setRegisterOpen(true);
@@ -124,6 +124,11 @@ export default function CreateTicketPanel({ onClose, onSaved }) {
               maxLength={14}
             />
           </div>
+          {loading ? (
+            <p className="crm-create-panel__hint" role="status">
+              Consultando cadastro do cliente…
+            </p>
+          ) : null}
         </div>
 
         <footer className="crm-create-panel__footer">
