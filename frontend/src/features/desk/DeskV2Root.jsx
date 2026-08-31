@@ -112,7 +112,7 @@ import DeskRightPanel from './components/DeskRightPanel';
 import { applyCascadeFieldChange, applyTabulationSuggestion, buildDefaultRightFields, getMotivos, hasApplyableTabulation, isCasosEspeciaisCanal, isTabulationComplete, mergeRightFieldsWithDefaults, parseTabulationDisplay, sanitizeResponsavel, validateTabulationForSendStatus } from '../../services/tabulationConfig';
 import { useTabulation } from '../../context/TabulationContext';
 import { useWorkflowConfig } from '../../context/WorkflowConfigContext';
-import { htmlToPlainText, normalizeComposePlain } from '../../services/desk/composeRichEditor';
+import { htmlToPlainText, htmlHasComposeContent, normalizeComposePlain } from '../../services/desk/composeRichEditor';
 import { useTicketAiSuggestions } from '../../hooks/useTicketAiSuggestions';
 import DeskAiRevisionModal from './components/DeskAiRevisionModal';
 import { resolveAutomaticaConfig } from '../config/workflow/workflowConfigData';
@@ -1174,11 +1174,11 @@ export default function DeskV2Root() {
     const messageHtml = String(composeText || '').trim();
     const internalNoteHtml = String(internalText || '').trim();
     const messageText = htmlToPlainText(messageHtml).trim();
-    const internalNoteText = htmlToPlainText(internalNoteHtml).trim();
     const attachmentUrls = (composeAttachments || [])
       .map((item) => String(item?.url || '').trim())
       .filter(Boolean);
     const hasPublicPayload = Boolean(messageText || attachmentUrls.length);
+    const hasInternalPayload = htmlHasComposeContent(internalNoteHtml);
     const messagePayload = messageHtml || '';
     const internalNotePayload = internalNoteHtml || '';
 
@@ -1188,12 +1188,12 @@ export default function DeskV2Root() {
       commitInProgressRef.current = false;
       return null;
     }
-    if (internalNoteText && !canSendInternalNoteOnTicket(ticket, deskPerms)) {
+    if (hasInternalPayload && !canSendInternalNoteOnTicket(ticket, deskPerms)) {
       showNotification('Sem permissão para comentar neste ticket.', 'warning');
       commitInProgressRef.current = false;
       return null;
     }
-    if (!hasPublicPayload && !internalNoteText && !canSendPublicMessageOnTicket(ticket, deskPerms)) {
+    if (!hasPublicPayload && !hasInternalPayload && !canSendPublicMessageOnTicket(ticket, deskPerms)) {
       showNotification('Sem permissão para alterar tabulação ou status deste ticket.', 'warning');
       commitInProgressRef.current = false;
       return null;
@@ -1241,7 +1241,7 @@ export default function DeskV2Root() {
       ticketId: ticket.id,
       status,
       hasPublic: hasPublicPayload,
-      hasInternal: Boolean(internalNoteText),
+      hasInternal: hasInternalPayload,
       attachments: attachmentUrls.length,
     });
 
@@ -1270,7 +1270,7 @@ export default function DeskV2Root() {
             author,
           });
         }
-        if (internalNoteText) {
+        if (hasInternalPayload) {
           if (!prepared.internalNotes) prepared.internalNotes = [];
           prepared.internalNotes.push({
             id: `${regKey}-int`,
@@ -1282,9 +1282,6 @@ export default function DeskV2Root() {
           });
         }
         const persisted = await persistDraftTicket(prepared, {
-          publicText: messageText,
-          internalText: internalNoteText,
-          attachments: attachmentUrls,
           author: getAgentName(),
         });
         const newId = persisted.id || persisted._id;
@@ -1317,7 +1314,7 @@ export default function DeskV2Root() {
             sendStatus: status,
             composeText: hasPublicPayload ? '' : session.composeText,
             composeReviewedPlain: hasPublicPayload ? '' : session.composeReviewedPlain,
-            internalText: internalNoteText ? '' : session.internalText,
+            internalText: hasInternalPayload ? '' : session.internalText,
             composeAttachments: hasPublicPayload ? [] : session.composeAttachments,
           };
         }
@@ -1329,10 +1326,10 @@ export default function DeskV2Root() {
         setSendStatus(status);
         if (hasPublicPayload) setComposeText('');
         if (hasPublicPayload) setComposeReviewedPlain('');
-        if (internalNoteText) setInternalText('');
+        if (hasInternalPayload) setInternalText('');
         if (hasPublicPayload) setComposeAttachments([]);
         showNotification(
-          hasPublicPayload || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
+          hasPublicPayload || hasInternalPayload ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
           'success',
         );
         void syncTicketViews().catch(() => {});
@@ -1374,7 +1371,7 @@ export default function DeskV2Root() {
       await commitTicketViaApi(ticket.id, {
         ...cockpitTicketToApi(prepared),
         text: hasPublicPayload ? messagePayload : '',
-        internalText: internalNoteText ? internalNotePayload : '',
+        internalText: hasInternalPayload ? internalNotePayload : '',
         author: getAgentName(),
         ...(attachmentUrls.length ? { attachments: attachmentUrls } : {}),
       });
@@ -1396,7 +1393,7 @@ export default function DeskV2Root() {
       setSendStatus(status);
       if (hasPublicPayload) setComposeText('');
       if (hasPublicPayload) setComposeReviewedPlain('');
-      if (internalNoteText) setInternalText('');
+      if (hasInternalPayload) setInternalText('');
       if (hasPublicPayload) setComposeAttachments([]);
       if (activeTabId) {
         const sessionKey = String(activeTabId);
@@ -1406,13 +1403,13 @@ export default function DeskV2Root() {
             ...session,
             composeText: hasPublicPayload ? '' : session.composeText,
             composeReviewedPlain: hasPublicPayload ? '' : session.composeReviewedPlain,
-            internalText: internalNoteText ? '' : session.internalText,
+            internalText: hasInternalPayload ? '' : session.internalText,
             composeAttachments: hasPublicPayload ? [] : session.composeAttachments,
           };
         }
       }
       showNotification(
-        hasPublicPayload || internalNoteText ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
+        hasPublicPayload || hasInternalPayload ? 'Ticket enviado e salvo.' : 'Ticket salvo.',
         'success',
       );
       void syncTicketViews().catch(() => {});
@@ -1456,8 +1453,7 @@ export default function DeskV2Root() {
     }
 
     const internalNoteHtml = String(internalText || '').trim();
-    const internalNoteText = htmlToPlainText(internalNoteHtml).trim();
-    if (!internalNoteText) {
+    if (!htmlHasComposeContent(internalNoteHtml)) {
       showNotification('Digite uma anotação interna antes de enviar.', 'warning');
       return;
     }

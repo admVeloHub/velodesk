@@ -1285,31 +1285,73 @@ export async function persistDraftTicket(ticket, messageOptions = {}) {
   const opts = typeof messageOptions === 'string'
     ? { publicText: messageOptions }
     : (messageOptions || {});
+  const author = opts.author || getAgentName() || undefined;
 
-  const publicText = String(opts.publicText ?? '').trim();
-  const internalText = String(opts.internalText ?? '').trim();
-  const attachments = Array.isArray(opts.attachments)
-    ? opts.attachments.map((item) => String(item ?? '').trim()).filter(Boolean)
-    : [];
+  // Um rascunho pode acumular várias mensagens/notas antes do 1º salvamento (ex.: "Enviar
+  // Nota" usado para gerar o contexto da sugestão IA, depois a resposta pública enviada).
+  // O endpoint de criação só aceita UM registro inicial — juntamos tudo numa linha do
+  // tempo e repetimos o restante via addMessage logo após criar, senão só o último envio
+  // sobrevive e o resto vira uma nota/mensagem "fantasma" que nunca chegou ao Mongo.
+  const pending = [
+    ...(ticket.messages || [])
+      .filter((m) => m?.type === 'agent')
+      .map((m) => ({
+        kind: 'public',
+        text: String(m.text || ''),
+        attachments: Array.isArray(m.attachments) ? m.attachments.filter(Boolean) : [],
+        timestamp: m.timestamp || m.time || '',
+        author: m.author || author,
+      })),
+    ...(ticket.internalNotes || []).map((n) => ({
+      kind: 'internal',
+      text: String(n.text || ''),
+      attachments: [],
+      timestamp: n.timestamp || n.time || '',
+      author: n.author || author,
+    })),
+  ]
+    .filter((entry) => entry.text.trim() || entry.attachments.length)
+    .sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+
+  const [first, ...rest] = pending;
 
   const payload = cockpitTicketToApi(ticket);
   delete payload.text;
   delete payload.description;
+  if (author) payload.author = author;
 
-  if (opts.author) payload.author = opts.author;
-
-  if (publicText || attachments.length) {
-    payload.text = publicText;
-    if (publicText) payload.description = publicText;
-    if (attachments.length) payload.attachments = attachments;
-    if (internalText) payload.internalText = internalText;
-  } else if (internalText) {
-    payload.internal = true;
-    payload.text = internalText;
+  if (first) {
+    if (first.kind === 'public') {
+      payload.text = first.text;
+      if (first.text) payload.description = first.text;
+      if (first.attachments.length) payload.attachments = first.attachments;
+    } else {
+      payload.internal = true;
+      payload.text = first.text;
+    }
   }
 
   const created = await ticketsApi.create(payload);
-  const persisted = apiTicketToCockpit(created);
+  const persistedId = String(created._id || created.id);
+
+  for (const entry of rest) {
+    try {
+      await ticketsApi.addMessage(persistedId, {
+        text: entry.text,
+        internal: entry.kind === 'internal',
+        ...(entry.kind === 'public' && entry.attachments.length ? { attachments: entry.attachments } : {}),
+        author: entry.author,
+      });
+    } catch (err) {
+      console.error('[persistDraftTicket] falha ao repetir registro acumulado do rascunho:', err);
+    }
+  }
+
+  const finalTicket = rest.length
+    ? await ticketsApi.get(persistedId).catch(() => created)
+    : created;
+
+  const persisted = apiTicketToCockpit(finalTicket);
   persisted.listOnly = false;
   persisted._detailLoaded = true;
   removeTicketFromColumns(draftId);

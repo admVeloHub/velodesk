@@ -10,7 +10,7 @@ import { shouldViewAllDeskTickets } from '../../../services/desk/responsavelSegm
 import { useAuth } from '../../../context/AuthContext';
 import { useNotifications } from '../../../context/NotificationContext';
 import { getDeskDisplayName } from '../../../utils/userDisplayName';
-import { htmlToPlainText, normalizePlainToHtml, COMPOSE_IMAGE_MAX_BYTES } from '../../../services/desk/composeRichEditor';
+import { htmlToPlainText, htmlHasComposeContent, normalizePlainToHtml, COMPOSE_IMAGE_MAX_BYTES } from '../../../services/desk/composeRichEditor';
 import ComposeRichEditor from './ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
 import ComposeRefinarModal from './ComposeRefinarModal';
@@ -415,8 +415,7 @@ export default function DeskComposePanel({
   const publicComposeLocked = Boolean(workflowLocked || ticketReadOnly);
   const internalLocked = Boolean(internalComposeLocked || ticketReadOnly);
   const publicLocked = publicComposeLocked;
-  const internalPlainText = useMemo(() => htmlToPlainText(internalText), [internalText]);
-  const sendInternalNoteDisabled = internalLocked || !internalPlainText.trim() || sendInternalNoteBusy;
+  const sendInternalNoteDisabled = internalLocked || !htmlHasComposeContent(internalText) || sendInternalNoteBusy;
 
   const internalPlaceholder = ticketReadOnly
     ? 'Ticket fechado — anotações indisponíveis'

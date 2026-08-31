@@ -29,6 +29,15 @@ export function htmlToPlainText(html) {
   return (div.innerText || div.textContent || '').replace(/\u00A0/g, ' ');
 }
 
+/** Considera conte\u00FAdo v\u00E1lido texto OU imagem embutida \u2014 innerText ignora <img>, ent\u00E3o uma
+ * nota s\u00F3 com imagem colada teria texto puro vazio e ficaria travada como "nota vazia". */
+export function htmlHasComposeContent(html) {
+  const raw = String(html || '');
+  if (!raw) return false;
+  if (/<img\b/i.test(raw)) return true;
+  return Boolean(htmlToPlainText(raw).trim());
+}
+
 /** Texto plano normalizado para comparar compose vs revisão IA (html ou plain). */
 export function normalizeComposePlain(value) {
   const raw = String(value ?? '');
