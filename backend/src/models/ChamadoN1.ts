@@ -146,6 +146,7 @@ const ComunicacaoWorkflowSchema = new Schema(
     mensagem: { type: String, default: '' },
     data: { type: Date, default: Date.now },
     autor: { type: String, default: '' },
+    autorEmail: { type: String, default: '' },
   },
   { _id: false },
 );
@@ -155,6 +156,12 @@ const ComunicacaoResumoSchema = new Schema(
     ultimaOrigem: { type: String, default: null },
     ultimaData: { type: Date, default: null },
     temRespostaAgente: { type: Boolean, default: false },
+    // E-mail de quem mandou a última mensagem do lado "workflow" — usado pra notificar de
+    // volta essa mesma pessoa quando o agente responde (não sobrescrito por respostas do agente).
+    ultimoWorkflowAutorEmail: { type: String, default: '' },
+    // Última vez que o lado workflow abriu o ticket depois da resposta do agente — esconde o
+    // badge "Aguardando resposta" na fila de aprovação sem exigir uma nova mensagem enviada.
+    vistoResponsavelEm: { type: Date, default: null },
   },
   { _id: false },
 );

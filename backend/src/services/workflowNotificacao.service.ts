@@ -103,6 +103,59 @@ export async function notifyWorkflowMensagemToResponsavel(
 }
 
 /**
+ * Sininho de quem está do lado workflow (aprovador) quando o agente responde a uma
+ * mensagem do comunicador. Direção inversa de notifyWorkflowMensagemToResponsavel —
+ * antes o agente não recebia aviso nenhum de resposta, e o comunicador nunca notificava
+ * o lado workflow de volta quando o agente respondia. Usa comunicacaoResumo.
+ * ultimoWorkflowAutorEmail (quem mandou por último como "workflow"), não o responsável do
+ * ticket, porque quem está aguardando é quem escreveu a pergunta, não necessariamente o
+ * dono do ticket.
+ */
+export async function notifyAgentReplyToWorkflowResponsavel(
+  chamado: IChamadoN1,
+): Promise<IWorkflowNotificacao | null> {
+  const destinatarioEmail = String(
+    chamado.workflow?.requisicao?.comunicacaoResumo?.ultimoWorkflowAutorEmail || '',
+  ).trim().toLowerCase();
+  if (!destinatarioEmail) {
+    console.info('[workflow-notif] resposta do agente sem autor workflow conhecido pra notificar', {
+      ticketId: String(chamado._id),
+    });
+    return null;
+  }
+
+  const workflowId = chamado.workflow?.workflowId
+    ? String(chamado.workflow.workflowId)
+    : '';
+  if (!workflowId || !Types.ObjectId.isValid(workflowId)) {
+    console.info('[workflow-notif] ticket sem workflowId válido para CTA de resposta', {
+      ticketId: String(chamado._id),
+    });
+    return null;
+  }
+
+  const protocolo = String(chamado.chamadoProtocolo || '').trim() || String(chamado._id);
+  const recado = `O agente respondeu sua mensagem no ticket número ${protocolo}`;
+
+  try {
+    return await createWorkflowNotificacao({
+      destinatarioEmail,
+      ticketId: String(chamado._id),
+      chamadoProtocolo: protocolo,
+      workflowId,
+      workflowSlug: 'workflow-info-reply',
+      step: chamado.workflow?.step ?? 0,
+      passoId: chamado.workflow?.passoId ? String(chamado.workflow.passoId) : null,
+      titulo: 'Workflow',
+      mensagem: recado,
+    });
+  } catch (err) {
+    console.warn('[workflow-notif] falha ao criar recado de resposta no sininho:', (err as Error).message);
+    return null;
+  }
+}
+
+/**
  * Notificação de sininho para item novo em canal especial (Bacen/Procon/Consumidor.gov/Reclame Aqui).
  * Sem workflow dedicado: aponta direto para o item no dash do órgão (rota /especiais/:orgao/ticket/:id).
  */

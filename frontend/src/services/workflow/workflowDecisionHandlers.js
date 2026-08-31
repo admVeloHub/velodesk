@@ -233,6 +233,7 @@ export function resolveComunicacaoResumo(ticket) {
       ultimaOrigem: fromApi.ultimaOrigem || null,
       ultimaData: fromApi.ultimaData || null,
       temRespostaAgente: fromApi.temRespostaAgente === true,
+      vistoResponsavelEm: fromApi.vistoResponsavelEm || null,
     };
   }
   return buildComunicacaoResumoFromThread(readTicketComunicacaoWorkflow(ticket));
@@ -243,7 +244,14 @@ export function ticketAwaitingProdutosComunicacaoReview(ticket) {
   if (ticket.workflow?.completedAt) return false;
   const lfStatus = ticket?.lateralForm?.workflow?.status;
   if (lfStatus === 'completed') return false;
-  return resolveComunicacaoResumo(ticket).ultimaOrigem === 'responsavel';
+  const resumo = resolveComunicacaoResumo(ticket);
+  if (resumo.ultimaOrigem !== 'responsavel') return false;
+  // Some quando o responsável do workflow já abriu o ticket depois dessa resposta —
+  // markComunicacaoWorkflowVisto no backend carimba isso ao abrir o ticket na tela.
+  if (resumo.vistoResponsavelEm && resumo.ultimaData) {
+    return new Date(resumo.vistoResponsavelEm).getTime() < new Date(resumo.ultimaData).getTime();
+  }
+  return true;
 }
 
 function readComunicacaoFromRegistro(ticket) {

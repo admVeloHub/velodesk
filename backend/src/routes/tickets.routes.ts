@@ -43,6 +43,7 @@ import {
 } from '../services/workflowTicket.service';
 import {
   appendComunicacaoWorkflow,
+  markComunicacaoWorkflowVisto,
   WorkflowRequisicaoError,
 } from '../services/workflowRequisicao.service';
 import {
@@ -52,6 +53,7 @@ import {
   assertCanPostTicketMessage,
   assertCanResolveTicketWithOpenWorkflow,
   assertCanWorkflowComunicacao,
+  canApproveWorkflow,
   canClaimTicketResponsavel,
   isResponsavelSelfClaimBody,
   PermissionDeniedError,
@@ -74,6 +76,7 @@ import { requestWhatsAppAudioTranscription } from '../services/twilio/whatsappAu
 import { resolveSentAttachmentSendMeta } from '../services/sentAttachmentStorage.service';
 import {
   markNotificacoesLidasForTicket,
+  notifyAgentReplyToWorkflowResponsavel,
   notifyWorkflowMensagemToResponsavel,
 } from '../services/workflowNotificacao.service';
 import { isDraftTicketId } from '../utils/persistedTicketId';
@@ -194,6 +197,18 @@ router.get('/:id', authMiddleware, async (req, res: Response) => {
     void markNotificacoesLidasForTicket(String(chamado._id), req.user.email).catch((err: Error) => {
       console.warn('[tickets.routes] markNotificacoesLidasForTicket fail-soft:', err.message);
     });
+  }
+  // Quem pode aprovar workflow abriu o ticket depois da resposta do agente — some o badge
+  // "Aguardando resposta" da fila de aprovação sem exigir uma nova mensagem enviada.
+  if (req.user) {
+    try {
+      const resolved = await resolveUserPermissions(req.user);
+      if (canApproveWorkflow(resolved) && markComunicacaoWorkflowVisto(chamado)) {
+        await chamado.save();
+      }
+    } catch (err) {
+      console.warn('[tickets.routes] markComunicacaoWorkflowVisto fail-soft:', (err as Error).message);
+    }
   }
   res.json(await chamadoToTicket(chamado, boxId));
 });
@@ -722,6 +737,8 @@ router.post('/:id/workflow/comunicacao', authMiddleware, async (req, res: Respon
     await chamado.save();
     if (origem === 'workflow') {
       void notifyWorkflowMensagemToResponsavel(chamado);
+    } else {
+      void notifyAgentReplyToWorkflowResponsavel(chamado);
     }
     void publishTicketEvent(chamado._id.toString(), 'workflow');
     const boxes = await loadBoxes();

@@ -34,6 +34,7 @@ export interface IChamadoWorkflowComunicacao {
   mensagem: string;
   data: Date;
   autor: string;
+  autorEmail?: string;
 }
 
 export type ComunicacaoWorkflowOrigem = 'workflow' | 'responsavel';
@@ -42,6 +43,8 @@ export interface IChamadoWorkflowComunicacaoResumo {
   ultimaOrigem: ComunicacaoWorkflowOrigem | null;
   ultimaData: Date | null;
   temRespostaAgente: boolean;
+  ultimoWorkflowAutorEmail?: string;
+  vistoResponsavelEm?: Date | null;
 }
 
 export interface IChamadoWorkflowRequisicao {

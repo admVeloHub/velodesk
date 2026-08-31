@@ -727,6 +727,7 @@ export interface TicketDto {
         ultimaOrigem: 'workflow' | 'responsavel' | null;
         ultimaData?: Date | null;
         temRespostaAgente?: boolean;
+        vistoResponsavelEm?: Date | null;
       };
     };
   };
@@ -844,6 +845,9 @@ function serializeComunicacaoResumo(
       ultimaOrigem: req.comunicacaoResumo.ultimaOrigem ?? null,
       ultimaData: req.comunicacaoResumo.ultimaData ?? null,
       temRespostaAgente: req.comunicacaoResumo.temRespostaAgente === true,
+      // Front usa isso pra esconder o badge "Aguardando resposta" quando o lado workflow já
+      // abriu o ticket depois da última resposta do agente (markComunicacaoWorkflowVisto).
+      vistoResponsavelEm: req.comunicacaoResumo.vistoResponsavelEm ?? null,
     };
   }
   return buildComunicacaoResumo(comunicacao);

@@ -27,19 +27,51 @@ function readAutorOrigem(autor: string): ComunicacaoWorkflowOrigem | null {
 
 export function buildComunicacaoResumo(
   thread: IChamadoWorkflowComunicacao[] = [],
+  previous?: IChamadoWorkflowComunicacaoResumo | null,
 ): IChamadoWorkflowComunicacaoResumo {
+  // vistoResponsavelEm nunca é recalculado a partir da thread — só muda via
+  // markComunicacaoWorkflowVisto (ticket aberto pelo lado workflow). Preservar aqui evita
+  // que cada nova mensagem "reabra" o badge indevidamente antes da hora.
+  const vistoResponsavelEm = previous?.vistoResponsavelEm ?? null;
+
   if (!thread.length) {
-    return { ultimaOrigem: null, ultimaData: null, temRespostaAgente: false };
+    return {
+      ultimaOrigem: null,
+      ultimaData: null,
+      temRespostaAgente: false,
+      ultimoWorkflowAutorEmail: previous?.ultimoWorkflowAutorEmail || '',
+      vistoResponsavelEm,
+    };
   }
   const temRespostaAgente = thread.some(
     (item) => readAutorOrigem(item.autor) === 'responsavel',
+  );
+  const lastWorkflowEntry = [...thread].reverse().find(
+    (item) => readAutorOrigem(item.autor) === 'workflow',
   );
   const last = thread[thread.length - 1];
   return {
     ultimaOrigem: readAutorOrigem(last.autor),
     ultimaData: last.data ? new Date(last.data) : null,
     temRespostaAgente,
+    // Só o e-mail de quem mandou como "workflow" — usado pra notificar de volta quando o
+    // agente responde. Cai no valor anterior se essa mensagem não tiver e-mail capturado
+    // (dados antigos) ao invés de apagar quem já estava marcado como destinatário.
+    ultimoWorkflowAutorEmail: lastWorkflowEntry?.autorEmail || previous?.ultimoWorkflowAutorEmail || '',
+    vistoResponsavelEm,
   };
+}
+
+/** Ticket aberto pelo lado workflow após resposta do agente — esconde o badge "Aguardando
+ * resposta" na fila de aprovação sem exigir que uma nova mensagem seja enviada. */
+export function markComunicacaoWorkflowVisto(chamado: IChamadoN1): boolean {
+  const requisicao = chamado.workflow?.requisicao;
+  if (!requisicao?.comunicacaoResumo) return false;
+  if (requisicao.comunicacaoResumo.ultimaOrigem !== 'responsavel') return false;
+
+  requisicao.comunicacaoResumo.vistoResponsavelEm = new Date();
+  chamado.markModified('workflow.requisicao.comunicacaoResumo');
+  return true;
 }
 
 export function getRequisicaoConfig(definicao: IWorkflowDefinicao) {
@@ -146,10 +178,11 @@ export function appendComunicacaoWorkflow(
     mensagem: texto,
     data: new Date(),
     autor: `${prefix}: ${nome}`,
+    autorEmail: String(authUser?.email || '').trim().toLowerCase(),
   };
 
   requisicao.comunicacaoWorkflow = [...(requisicao.comunicacaoWorkflow || []), entry];
-  requisicao.comunicacaoResumo = buildComunicacaoResumo(requisicao.comunicacaoWorkflow);
+  requisicao.comunicacaoResumo = buildComunicacaoResumo(requisicao.comunicacaoWorkflow, requisicao.comunicacaoResumo);
   chamado.markModified('workflow');
   chamado.markModified('workflow.requisicao');
   chamado.markModified('workflow.requisicao.comunicacaoWorkflow');
