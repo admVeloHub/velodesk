@@ -101,6 +101,23 @@ export function isAllMongoReady(): boolean {
     && isReclamacoesConnected();
 }
 
+/**
+ * Aguarda as conexões Mongo ficarem prontas, com timeout curto — cobre a janela entre
+ * app.listen() (imediato) e connectDatabase() terminar no boot de uma instância nova
+ * (ou um reconnect após soneca/blip de rede), quando requests reais já chegam mas as
+ * rotas que dependem de desk_config/cadastros/reclamacoes ainda falhariam na hora com
+ * "Conexão X indisponível". Sem custo depois de pronto (isAllMongoReady() é síncrono).
+ */
+export async function waitForMongoReady(timeoutMs = 12000): Promise<boolean> {
+  if (isAllMongoReady()) return true;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    if (isAllMongoReady()) return true;
+  }
+  return isAllMongoReady();
+}
+
 async function resetConnection(conn: Connection | null): Promise<void> {
   if (!conn) return;
   try {

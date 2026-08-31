@@ -16,6 +16,7 @@ import {
   isFuncionariosConnected,
   isMongoConnected,
   tryConnectFuncionarios,
+  waitForMongoReady,
 } from './config/database';
 import authRoutes from './routes/auth.routes';
 import ticketsRoutes from './routes/tickets.routes';
@@ -164,6 +165,16 @@ app.get('/health', (_req, res) => {
       configured: isLanguageToolConfigured(),
     },
   });
+});
+
+// Instância nova (cold start) ou reconexão após blip: app.listen() já aceita
+// tráfego antes do connectDatabase() terminar. Sem isso, as rotas abaixo falham
+// na hora com "Conexão X indisponível" durante essa janela — aguarda pronto (ou
+// timeout curto) em vez de derrubar o request. Não afeta /api/health acima, que
+// precisa responder na hora pro readiness probe do Cloud Run.
+app.use(async (_req, _res, next) => {
+  if (!isAllMongoReady()) await waitForMongoReady();
+  next();
 });
 
 app.use('/api/tickets', ticketsRoutes);
