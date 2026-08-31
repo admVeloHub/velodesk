@@ -83,6 +83,10 @@ async function purgeLegacyEscalonarPermissao(): Promise<void> {
 export async function runDeskConfigMigrations(): Promise<void> {
   await purgeLegacyEscalonarPermissao();
   await migrateGrupoToFuncao();
+  // seedFuncoesPermissoes() é no-op se já existem funções (não recria seed), mas roda os
+  // backfills de permissão (preferencias.visualizar, tickets.atuar_sempre) — precisa
+  // rodar em prod também, não só em dev via seedDevelopmentData().
+  await seedFuncoesPermissoes();
   const { seedEmailConteudosIfEmpty, seedCsatEmailConteudosIfMissing } = await import('./emailConteudo.service');
   await seedEmailConteudosIfEmpty();
   await seedCsatEmailConteudosIfMissing();

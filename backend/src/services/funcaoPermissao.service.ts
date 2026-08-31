@@ -114,6 +114,35 @@ async function backfillPreferenciasVisualizar(): Promise<number> {
   return updated;
 }
 
+/**
+ * tickets.atuar_sempre é novo (2026-08-21): antes, tickets.ver_todos cobria tanto "ver
+ * todos os tickets" quanto "reatribuir/agir em ticket já com responsável" — a divisão
+ * nunca fez backfill, então toda função que já tinha ver_todos=true (efetivo, incluindo
+ * via herdaDe) perdeu silenciosamente a capacidade de reatribuir ticket alheio (botão
+ * "Assumir Ticket" sumiu pra atendimento/suporte/qualidade etc.). Preenche atuar_sempre=
+ * true onde ver_todos efetivo já era true e atuar_sempre ainda não foi configurado.
+ */
+async function backfillAtuarSempreFromVerTodos(): Promise<number> {
+  const Model = getDeskFuncaoPermissaoModel();
+  const all = await Model.find({});
+  const bySlug = new Map(all.map((f) => [f.slug, f as unknown as IDeskFuncaoPermissao]));
+
+  let updated = 0;
+  for (const doc of all) {
+    if (doc.permissoes?.tickets?.atuar_sempre === true) continue;
+    const effective = resolveEffectivePermissoes(doc as unknown as IDeskFuncaoPermissao, bySlug);
+    if (!effective.tickets?.ver_todos) continue;
+
+    if (!doc.permissoes) doc.permissoes = {};
+    if (!doc.permissoes.tickets) doc.permissoes.tickets = {};
+    doc.permissoes.tickets.atuar_sempre = true;
+    doc.markModified('permissoes');
+    await doc.save();
+    updated += 1;
+  }
+  return updated;
+}
+
 /** Não insere funções default — permissões são configuradas manualmente no editor. */
 export async function seedFuncoesPermissoes(): Promise<void> {
   const Model = getDeskFuncaoPermissaoModel();
@@ -129,6 +158,12 @@ export async function seedFuncoesPermissoes(): Promise<void> {
   if (backfilled > 0) {
     invalidateFuncaoPermissaoCache();
     console.log(`Permissões Desk: backfill preferencias.visualizar em ${backfilled} função(ões)`);
+  }
+
+  const atuarSempreBackfilled = await backfillAtuarSempreFromVerTodos();
+  if (atuarSempreBackfilled > 0) {
+    invalidateFuncaoPermissaoCache();
+    console.log(`Permissões Desk: backfill tickets.atuar_sempre (a partir de ver_todos) em ${atuarSempreBackfilled} função(ões)`);
   }
 }
 
