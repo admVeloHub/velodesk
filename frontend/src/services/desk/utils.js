@@ -2036,10 +2036,20 @@ function isAgentRegistroEntry(entry) {
   return String(entry.origin || 'agente').toLowerCase() !== 'cliente';
 }
 
-/** Aba Eventos: só tabulação/status/workflow — nota interna pura (sem outra mudança
- * junto) pertence só à aba Notas (buildInternalNotesOnlyFeed), nunca às duas. */
+/** Recebimento da avaliação CSAT (ver csat.routes.ts) é um evento em si — a nota/
+ * comentário do cliente é que fica só na aba Notas via anotacaoInterna. Usa o
+ * metadado estruturado, nunca o texto, pra Eventos não vazar conteúdo de nota. */
+function csatNotaFromEntry(entry) {
+  const n = Number(entry?.metadados?.csatNota);
+  return Number.isInteger(n) && n >= 1 && n <= 5 ? n : null;
+}
+
+/** Aba Eventos: só tabulação/status/workflow/CSAT recebido — nota interna pura
+ * (sem outra mudança junto) pertence só à aba Notas (buildInternalNotesOnlyFeed),
+ * nunca às duas. */
 function shouldShowSupervisorRegistroOccurrence(entry, previousTabulationState, prevStatus) {
   if (!isAgentRegistroEntry(entry)) return false;
+  if (csatNotaFromEntry(entry) !== null) return true;
 
   const { tabulationChanges, statusChanged } = collectRegistroOccurrenceData(
     entry,
@@ -2060,20 +2070,24 @@ function mapSupervisorRegistroOccurrence(entry, ticket, client, previousTabulati
     previousStatusLabel,
     statusChanged,
   } = collectRegistroOccurrenceData(entry, previousTabulationState, prevStatus);
+  const csatNota = csatNotaFromEntry(entry);
 
-  // Eventos mostra só a mudança (tabulação/status) — nunca o texto da anotação
-  // interna que possa ter acompanhado o mesmo save; essa vive só na aba Notas.
+  // Eventos mostra só a mudança (tabulação/status/CSAT recebido) — nunca o texto
+  // da anotação interna/comentário que possa ter acompanhado o mesmo save; esse
+  // conteúdo vive só na aba Notas.
   return {
     id: `${ticketId}:${entry.id}`,
     kind: 'registro',
     author,
     initials: getInitials(author),
-    badge: 'Registro',
+    badge: csatNota !== null ? 'Avaliação CSAT' : 'Registro',
     timestamp: entry.time || entry.timestamp || ticket.updatedAt,
     tabulationChanges,
     statusLabel,
     previousStatusLabel,
     statusChanged,
+    csatNota,
+    isCsatEvent: csatNota !== null,
     ticketId,
     ticketTitle: getTicketTitle(ticket),
   };

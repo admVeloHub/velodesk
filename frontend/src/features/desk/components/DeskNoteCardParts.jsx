@@ -73,6 +73,12 @@ export function RegistroOccurrenceBody({ note }) {
         <span className="crm-note-card__body-label">Realizado por:</span>{' '}
         <span>{note.author}</span>
       </p>
+      {note.csatNota != null ? (
+        <p className="crm-note-card__inline-line">
+          <span className="crm-note-card__body-label">Avaliação CSAT:</span>{' '}
+          <span>nota {note.csatNota}/5 — comentário na aba Notas</span>
+        </p>
+      ) : null}
       {note.tabulationChanges?.length ? (
         <div className="crm-note-card__registro-block">
           <span className="crm-note-card__body-label">Alterações</span>
@@ -132,9 +138,12 @@ export function NoteAvatar({ note }) {
       </span>
     );
   }
+  // Evento de recebimento de CSAT: mesmo ícone de estrela do KPI no Painel 360
+  // (ws360-kpi__top .ti-star), em vez do ícone genérico do tipo "registro".
+  const icon = note.isCsatEvent ? 'ti ti-star' : meta.icon;
   return (
     <span className="crm-note-card__avatar crm-note-card__avatar--icon" aria-hidden="true">
-      <i className={meta.icon} />
+      <i className={icon} />
     </span>
   );
 }
