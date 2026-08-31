@@ -186,6 +186,10 @@ export const workspace360Api = {
   agents: () => api.get('/workspace360/agents').then((r) => r.data),
 };
 
+export const moduleStatusApi = {
+  list: () => api.get('/module-status').then((r) => r.data),
+};
+
 export const gestaoInsightsApi = {
   /** Payload unificado dos cards analíticos (resumo, volume dia, motivos, casos especiais, risco). */
   painel: (params) => api.get('/gestao-insights/painel', { params }).then((r) => r.data),

@@ -89,6 +89,8 @@ export const env = {
   mongoFuncionariosDbName: process.env.MONGODB_FUNCIONARIOS_DB_NAME || 'console_funcionarios',
   mongoFuncionariosCollection:
     process.env.MONGODB_FUNCIONARIOS_COLLECTION || 'funcionarios_cadastroColaboradores',
+  /** VeloHubCentral — console_config.module_status (mesmo status dos serviços do VeloHub, leitura via MONGO_ENV) */
+  mongoConsoleConfigDbName: process.env.MONGODB_CONSOLE_CONFIG_DB_NAME || 'console_config',
   jwtSecret: process.env.JWT_SECRET || 'velodesk-dev-secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   /** Diretório com os .docx dos POPs, um subdiretório por produto (quadro de Processos) */

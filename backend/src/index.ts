@@ -14,8 +14,10 @@ import {
   isDeskConfigConnected,
   isDeskPreferencesConnected,
   isFuncionariosConnected,
+  isConsoleConfigConnected,
   isMongoConnected,
   tryConnectFuncionarios,
+  tryConnectConsoleConfig,
   waitForMongoReady,
 } from './config/database';
 import authRoutes from './routes/auth.routes';
@@ -55,6 +57,7 @@ import reclameAquiHugmeRoutes from './routes/reclameAquiHugme.routes';
 import processosRoutes from './routes/processos.routes';
 import csatPageRoutes from './routes/csatPage.routes';
 import csatRoutes from './routes/csat.routes';
+import moduleStatusRoutes from './routes/moduleStatus.routes';
 import { logPopCatalogStartup } from './services/processos/popCatalog.service';
 import { blockNoticiarioRoutes } from './middleware/blockNoticiarioRoutes';
 import { shouldSkipApiRateLimit } from './middleware/rateLimitPolicy';
@@ -207,6 +210,7 @@ app.use('/api/reclamacoes', reclamacoesRoutes);
 app.use('/api/reclame-aqui/hugme', reclameAquiHugmeRoutes);
 app.use('/api/processos', processosRoutes);
 app.use('/api/csat', csatRoutes);
+app.use('/api/module-status', moduleStatusRoutes);
 
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -280,6 +284,9 @@ function scheduleMongoRetry() {
     }
     if (!isFuncionariosConnected() && getMongoHubCentralUri()) {
       void tryConnectFuncionarios();
+    }
+    if (!isConsoleConfigConnected() && getMongoHubCentralUri()) {
+      void tryConnectConsoleConfig();
     }
   }, 15000);
 }

@@ -251,6 +251,16 @@ body.velodesk-dark .ws360-service-status__tag--offline {
     color: #fca5a5;
 }
 
+body.velodesk-dark .ws360-service-status__tag--warning {
+    background: rgba(234, 179, 8, 0.18);
+    color: #fde68a;
+}
+
+body.velodesk-dark .ws360-service-status__tag--unknown {
+    background: rgba(148, 163, 184, 0.18);
+    color: #cbd5e1;
+}
+
 body.velodesk-dark .ws360-super-kpi__value,
 body.velodesk-dark .ws360-super-kpi--primary .ws360-super-kpi__value,
 body.velodesk-dark .ws360-super-kpi--secondary .ws360-super-kpi__value,

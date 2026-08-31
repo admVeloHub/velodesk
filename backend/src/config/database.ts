@@ -8,6 +8,7 @@ import { maskMongoUri, resolveAtlasSrvUri } from './resolveAtlasUri';
 /**
  * Conexões deste serviço (cluster VeloDesk): b2c_chamados, b2c_cadastros, desk_config, desk_preferences, chamados_reclamacoes.
  * Cadastro colaboradores: cluster VeloHubCentral → console_funcionarios (somente leitura).
+ * Status dos serviços (Painel 360°): cluster VeloHubCentral → console_config.module_status (somente leitura).
  * VeloNews continua via API VeloHub (console_conteudo).
  */
 let cadastrosConnection: Connection | null = null;
@@ -15,6 +16,7 @@ let deskConfigConnection: Connection | null = null;
 let deskPreferencesConnection: Connection | null = null;
 let funcionariosConnection: Connection | null = null;
 let reclamacoesConnection: Connection | null = null;
+let consoleConfigConnection: Connection | null = null;
 
 export function isMongoConnected(): boolean {
   return mongoose.connection.readyState === 1;
@@ -38,6 +40,10 @@ export function isFuncionariosConnected(): boolean {
 
 export function isReclamacoesConnected(): boolean {
   return reclamacoesConnection?.readyState === 1;
+}
+
+export function isConsoleConfigConnected(): boolean {
+  return consoleConfigConnection?.readyState === 1;
 }
 
 export function getCadastrosConnection(): Connection {
@@ -73,6 +79,13 @@ export function getReclamacoesConnection(): Connection {
     throw new Error('Conexão chamados_reclamacoes indisponível');
   }
   return reclamacoesConnection;
+}
+
+export function getConsoleConfigConnection(): Connection {
+  if (!consoleConfigConnection || consoleConfigConnection.readyState !== 1) {
+    throw new Error('Conexão console_config (VeloHubCentral) indisponível');
+  }
+  return consoleConfigConnection;
 }
 
 export function getMongoStorageLabel(): 'atlas' {
@@ -226,6 +239,43 @@ async function connectFuncionarios(): Promise<void> {
   );
 }
 
+async function connectConsoleConfig(): Promise<void> {
+  if (consoleConfigConnection?.readyState === 1) return;
+
+  const rawUri = getMongoHubCentralUri();
+  if (!rawUri) {
+    console.warn(
+      '[mongo] MONGO_ENV ausente — status dos serviços (Painel 360°) indisponível (VeloHubCentral / console_config).',
+    );
+    return;
+  }
+
+  if (consoleConfigConnection) {
+    await resetConnection(consoleConfigConnection);
+    consoleConfigConnection = null;
+  }
+
+  const { uri: atlasUri, method } = await resolveAtlasSrvUri(rawUri);
+  consoleConfigConnection = mongoose.createConnection(atlasUri, {
+    dbName: env.mongoConsoleConfigDbName,
+    ...MONGO_DRIVER_OPTIONS,
+  });
+  await consoleConfigConnection.asPromise();
+  console.log(
+    `Atlas console_config conectado: ${env.mongoConsoleConfigDbName} @ ${maskUri(atlasUri)} (${method}) [MONGO_ENV]`,
+  );
+}
+
+export async function tryConnectConsoleConfig(): Promise<boolean> {
+  try {
+    await connectConsoleConfig();
+    return isConsoleConfigConnected();
+  } catch (err) {
+    console.error('[mongo] Falha ao conectar console_config (VeloHubCentral):', (err as Error).message);
+    return false;
+  }
+}
+
 export async function tryConnectFuncionarios(): Promise<boolean> {
   try {
     await connectFuncionarios();
@@ -268,12 +318,17 @@ export async function connectDatabase(uriOverride?: string): Promise<void> {
   await connectDeskPreferences(atlasUri);
   await connectReclamacoes(atlasUri);
   await tryConnectFuncionarios();
+  await tryConnectConsoleConfig();
 }
 
 export async function disconnectDatabase(): Promise<void> {
   if (funcionariosConnection) {
     await funcionariosConnection.close();
     funcionariosConnection = null;
+  }
+  if (consoleConfigConnection) {
+    await consoleConfigConnection.close();
+    consoleConfigConnection = null;
   }
   if (deskConfigConnection) {
     await deskConfigConnection.close();
