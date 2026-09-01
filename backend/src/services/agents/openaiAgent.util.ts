@@ -1,6 +1,7 @@
 /**
- * openaiAgent.util v1.1.0 — atendimento usa somente POP vector store
- * VERSION: v1.1.0 | DATE: 2026-08-21
+ * openaiAgent.util v1.2.0 — Agente de Sugestão volta a incluir a vector store de
+ * respostas públicas (estava configurada em env mas nunca era passada ao file_search)
+ * VERSION: v1.2.0 | DATE: 2026-09-01
  */
 import OpenAI from 'openai';
 import { env } from '../../config/env';
@@ -97,7 +98,9 @@ function hasAnyVectorStoreConfigured(): boolean {
 
 export function getAtendimentoVectorStoreIds(): string[] {
   const popId = env.openaiPopVectorStoreId?.trim();
-  if (popId) return [popId];
+  const publicId = env.openaiPublicVectorStoreId?.trim();
+  const ids = [...new Set([popId, publicId].filter(Boolean))] as string[];
+  if (ids.length) return ids;
   const legacy = env.openaiVectorStoreId?.trim();
   return legacy ? [legacy] : [];
 }
