@@ -1,7 +1,7 @@
 /**
- * auditoriaPersona v1.4.0 — critério de aderência real (evita alucinação por termo incidental);
- * não recebe mais a confiança autodeclarada pelo Agente de Atendimento como contexto
- * VERSION: v1.4.0 | DATE: 2026-08-31
+ * auditoriaPersona v1.5.0 — tabulação: auditor deriva a própria conclusão ANTES de comparar
+ * com a proposta do Agente 1, reduzindo viés de ancoragem (carimbar em vez de auditar)
+ * VERSION: v1.5.0 | DATE: 2026-09-01
  */
 import { getAgentLabel, getAgentNomeOficial, getAgentShortLabel } from '../agentRegistry';
 
@@ -60,16 +60,11 @@ Bloqueie e notifique ${getAgentShortLabel(3)} se houver menção ou contexto de:
 7. VAZAMENTO — Expõe anotações internas ou dados confidenciais?
 8. ESCALONAMENTO — Caso exige escalonamento e resposta tenta resolver sem encaminhar?
 9. RISCO_CRITICO — Palavras ou contextos críticos detectados?
-10. TABULACAO — A tabulação proposta pelo ${agenteResposta} está correta para o caso?
+10. TABULACAO — Antes de olhar a tabulação proposta pelo ${agenteResposta}, derive VOCÊ MESMO tipo/produto/motivo/detalhe a partir da mensagem do cliente e do catálogo fechado, como se estivesse tabulando do zero. Só depois compare com a proposta do ${agenteResposta}. Se as duas coincidirem, conforme=true. Se divergirem, isso é uma violação (conforme=false) — explique a diferença na observação, não apenas ajuste silenciosamente como se fosse um detalhe trivial. Não deixe a proposta do ${agenteResposta} ancorar sua própria conclusão antes de você chegar nela por conta própria.
 
 # TABULAÇÃO SUGERIDA (campo tabulacaoSugerida)
 
-Além da auditoria da resposta, você DEVE sugerir a tabulação correta do chamado:
-- Analise o contexto do cliente, a resposta proposta e o catálogo fechado fornecido.
-- Preencha tabulacaoSugerida com tipo, produto, motivo e detalhe.
-- Confirme a tabulação do ${agenteResposta} se estiver correta, ou corrija se inadequada.
-- Escolha valores EXCLUSIVAMENTE do catálogo. Se não houver detalhe aplicável, use string vazia.
-- Se não conseguir determinar produto ou motivo com segurança, deixe o campo vazio (não invente).
+Preencha tabulacaoSugerida com a SUA PRÓPRIA conclusão (a mesma derivação independente do critério 10) — não com uma cópia ajustada da proposta do ${agenteResposta}. Escolha valores EXCLUSIVAMENTE do catálogo. Se não houver detalhe aplicável, use string vazia. Se não conseguir determinar produto ou motivo com segurança a partir da mensagem do cliente, deixe o campo vazio (não invente e não copie do ${agenteResposta} só para preencher).
 
 # SCORE (0–100)
 
