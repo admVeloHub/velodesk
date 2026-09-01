@@ -61,14 +61,12 @@ export function plainTextToEmailHtml(raw: string): string {
 
 export function buildTicketBoxHtml(ticket: EmailSkeletonTicket): string {
   const protocolo = escapeHtmlAttribute(ticket.protocolo || '—');
-  const titulo = escapeHtmlAttribute(ticket.titulo || '');
   return `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;border-collapse:collapse;">
   <tr>
     <td style="background:#f4f6fb;border-left:4px solid ${EMAIL_BRAND_COLORS.blueMedium};padding:16px 20px;">
       <p style="margin:0 0 6px 0;font-size:11px;font-weight:600;letter-spacing:0.08em;color:#64748b;text-transform:uppercase;">Atendimento</p>
-      <p style="margin:0 0 8px 0;font-size:22px;font-weight:700;color:${EMAIL_BRAND_COLORS.blueMedium};line-height:1.2;">${protocolo}</p>
-      ${titulo ? `<p style="margin:0;font-size:13px;color:#64748b;line-height:1.5;">Assunto: ${titulo}</p>` : ''}
+      <p style="margin:0;font-size:22px;font-weight:700;color:${EMAIL_BRAND_COLORS.blueMedium};line-height:1.2;">${protocolo}</p>
     </td>
   </tr>
 </table>`;
@@ -224,7 +222,6 @@ export async function assembleClientEmail(params: {
   if (params.mode === 'template' && params.saudacao) textParts.push(String(params.saudacao).trim());
   if (params.showTicketBox !== false) {
     textParts.push(`Protocolo: ${ticket.protocolo}`);
-    if (ticket.titulo) textParts.push(`Assunto: ${ticket.titulo}`);
   }
   textParts.push(htmlToPlainTextForEmail(params.corpo || ''));
   textParts.push(buildFarewellPlain());
