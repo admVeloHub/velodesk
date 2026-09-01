@@ -16894,7 +16894,8 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
 }
 
 #config .config-editor .forms-editor-back:disabled,
-#config .config-action-btn:disabled {
+#config .config-action-btn:disabled,
+#config .config-action-btn[aria-disabled="true"] {
     opacity: 0.55;
     cursor: not-allowed;
 }

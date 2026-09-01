@@ -2,6 +2,7 @@
  * FuncaoConfigurarModal v1.0.0 — configurar funções VeloHub pendentes
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { useNotifications } from '../../../context/NotificationContext';
 import FuncaoOverridesEditor from './FuncaoOverridesEditor';
 import { buildDraftFromVelohub } from './funcaoPermissoesLabels';
 
@@ -19,6 +20,7 @@ export default function FuncaoConfigurarModal({
 }) {
   const dialogRef = useRef(null);
   const [accordionOpen, setAccordionOpen] = useState(true);
+  const { showNotification } = useNotifications();
 
   useEffect(() => {
     const onKey = (e) => {
@@ -131,8 +133,15 @@ export default function FuncaoConfigurarModal({
           <button
             type="button"
             className="config-action-btn config-action-btn--create"
-            onClick={onSave}
-            disabled={saving || !selectedVelohub || !draft}
+            aria-disabled={saving || !selectedVelohub || !draft}
+            onClick={() => {
+              if (saving) return;
+              if (!selectedVelohub || !draft) {
+                showNotification('Selecione uma função acima antes de salvar.', 'warning');
+                return;
+              }
+              onSave();
+            }}
           >
             {saving ? 'Salvando…' : 'Salvar configuração'}
           </button>
