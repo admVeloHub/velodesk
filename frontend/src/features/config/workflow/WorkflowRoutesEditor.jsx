@@ -16,7 +16,7 @@ function emptyRota() {
   return { variavel: 'approve', rotulo: 'Aprovar', proximoPassoId: null, statusTicket: '' };
 }
 
-export default function WorkflowRoutesEditor({ rotas = [], passos = [], onChange }) {
+export default function WorkflowRoutesEditor({ rotas = [], passos = [], currentPassoId = '', onChange }) {
   const list = rotas.length ? rotas : [];
 
   const passoOptions = (passos || [])
@@ -26,7 +26,8 @@ export default function WorkflowRoutesEditor({ rotas = [], passos = [], onChange
       id: p._id ? String(p._id) : '',
       label: p.passo?.nome || `Etapa ${index + 1}`,
     }))
-    .filter((p) => p.id);
+    // Nunca oferecer a própria etapa como destino — geraria um loop que nem salva.
+    .filter((p) => p.id && p.id !== String(currentPassoId || ''));
 
   const updateRow = (index, patch) => {
     onChange?.(list.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -81,7 +82,11 @@ export default function WorkflowRoutesEditor({ rotas = [], passos = [], onChange
                     value={row.proximoPassoId ? String(row.proximoPassoId) : ''}
                     onChange={(e) => updateRow(index, { proximoPassoId: e.target.value || null })}
                   >
-                    <option value="">Sequencial / fim</option>
+                    <option value="">
+                      {row.variavel === 'reject'
+                        ? 'Sem destino — encerra aqui e volta ao responsável'
+                        : 'Próxima etapa da lista (ou fim, se for a última)'}
+                    </option>
                     {passoOptions.map((p) => (
                       <option key={p.id} value={p.id}>{p.label}</option>
                     ))}

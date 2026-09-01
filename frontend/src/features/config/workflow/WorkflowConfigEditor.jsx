@@ -101,10 +101,11 @@ export default function WorkflowConfigEditor({
       const rejeitar = (acao.rotas || []).find((r) => r.variavel === 'reject');
       if (!rejeitar) continue;
       const nome = envelope.passo?.nome || 'Etapa de aprovação';
-      if (!rejeitar.proximoPassoId) {
-        showNotification(`Etapa "${nome}": selecione a etapa de destino para "Reprovar" antes de salvar.`, 'error');
-        return;
-      }
+      // Sem destino explícito: reprovação encerra a passagem pelo workflow e devolve o
+      // ticket ao responsável (comportamento incondicional já garantido em runtime por
+      // markTicketEmAndamentoAfterReject/notifyWorkflowRejectToResponsavel) — não é mais
+      // obrigatório escolher uma etapa de destino só pra reprovar.
+      if (!rejeitar.proximoPassoId) continue;
       const destino = passosById.get(String(rejeitar.proximoPassoId));
       if (destino?.passo?.acao?.tipo === 'automatica') {
         showNotification(`Etapa "${nome}": a etapa de destino para "Reprovar" não pode ser uma etapa automática (resposta ao cliente/ação de sistema).`, 'error');

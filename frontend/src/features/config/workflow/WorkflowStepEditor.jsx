@@ -386,6 +386,7 @@ export default function WorkflowStepEditor({
           <WorkflowRoutesEditor
             rotas={cfg.acao?.rotas || []}
             passos={passos}
+            currentPassoId={envelope?._id ? String(envelope._id) : ''}
             onChange={(next) => patchAcao({ rotas: next })}
           />
         ) : null}

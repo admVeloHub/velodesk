@@ -58,10 +58,14 @@ function normalizeGatilho(gatilho?: Partial<IWorkflowGatilho> | null): IWorkflow
 }
 
 /**
- * Toda etapa de aprovação com rota "Reprovar" precisa de um destino explícito:
- * sem isso o motor de execução (workflowTicket.service) não sabe para onde
- * mandar o ticket reprovado, e por segurança nunca cai numa etapa automática
- * (resposta ao cliente/ação de sistema não pode ser disparada por reprovação).
+ * Rota "Reprovar" sem destino explícito é válida: o motor de execução
+ * (workflowTicket.service) trata isso como fim da passagem do ticket pelo
+ * workflow, e o retorno ao responsável já acontece incondicionalmente via
+ * markTicketEmAndamentoAfterReject/notifyWorkflowRejectToResponsavel — não
+ * depende de nenhuma etapa de destino configurada. Só validamos o destino
+ * quando ELE FOI escolhido: precisa existir e nunca pode ser uma etapa
+ * automática (resposta ao cliente/ação de sistema não pode ser disparada
+ * por reprovação).
  */
 function validateWorkflowPassos(passos: IWorkflowPassoEnvelope[]): void {
   const passosById = new Map(passos.map((p) => [String(p._id), p]));
@@ -75,9 +79,7 @@ function validateWorkflowPassos(passos: IWorkflowPassoEnvelope[]): void {
     if (!rejectRota) return;
 
     const destinoId = rejectRota.proximoPassoId ? String(rejectRota.proximoPassoId) : '';
-    if (!destinoId) {
-      throw new Error(`Etapa "${nome}": selecione a etapa de destino para "Reprovar" antes de salvar o workflow.`);
-    }
+    if (!destinoId) return;
 
     const destino = passosById.get(destinoId);
     if (!destino) {
