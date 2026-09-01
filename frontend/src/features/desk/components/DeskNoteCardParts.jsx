@@ -11,6 +11,7 @@ export const NOTE_KIND_META = {
   system: { icon: 'ti ti-terminal-2' },
   sla: { icon: 'ti ti-alert-triangle' },
   registro: { icon: 'ti ti-history' },
+  'email-automatico': { icon: 'ti ti-mail-forward' },
   workflow: { icon: 'ti ti-message-question' },
   'mensagem-enviada': { icon: 'ti ti-send' },
   'mensagem-recebida': { icon: 'ti ti-mail' },

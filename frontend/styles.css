@@ -15558,6 +15558,20 @@ input:checked + .slider:before {
     flex-shrink: 0;
 }
 
+.config-placeholder-picker {
+    align-self: flex-start;
+    margin-top: 0.15rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px dashed var(--config-border, rgba(0, 0, 0, 0.2));
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-family: inherit;
+    background: var(--white, #fff);
+    color: var(--config-muted, #64748b);
+    cursor: pointer;
+    max-width: 220px;
+}
+
 #config .config-email-field,
 #config .config-email-ativo {
     display: flex;

@@ -1,4 +1,4 @@
-/** workflowSistemaExecutor.service v1.2.0 — wrapComposerOpening antes de persistir */
+/** workflowSistemaExecutor.service v1.3.0 — resposta_cliente: IA ou e-mail padrão (com envelope) */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import type { IWorkflowDefinicao, IWorkflowPassoEnvelope, IWorkflowAutomaticaConfig } from '../models/WorkflowDefinicao';
 import { appendRegistroEntry } from './chamado.mapper';
@@ -12,6 +12,8 @@ import { createWorkflowNotificacao } from './workflowNotificacao.service';
 import { getActiveGrupos } from './grupoResponsabilidade.service';
 import { buildTabulationFieldsFromTicket } from './workflowMatcher.service';
 import { isAutomaticaStep, resolveAutomaticaConfig } from './workflowAutomatica.util';
+import { getEmailConteudoById } from './emailConteudo.service';
+import { applyTicketPlaceholders } from './placeholders.util';
 
 const WEBHOOK_TIMEOUT_MS = 15000;
 
@@ -140,16 +142,57 @@ async function executeWebhook(
   }
 }
 
-async function executeRespostaCliente(
+/** Envelopa o núcleo (IA ou e-mail padrão) e envia como resposta pública ao cliente. */
+async function sendRespostaClienteNucleo(
   chamado: IChamadoN1,
-  definicao: IWorkflowDefinicao,
   step: number,
+  messages: TicketAiMessageInput[],
+  nucleo: string,
+  detail: Record<string, unknown>,
+): Promise<SistemaExecResult> {
+  const composerText = wrapComposerOpening({
+    nucleo,
+    messages,
+    agentName: getAgentNomeOficial(1),
+  });
+
+  const registroResult = appendRegistroEntry(chamado, {
+    mensagemPublica: composerText,
+    sender: 'me',
+    autor: getAgentNomeOficial(1),
+    metadados: {
+      sistemaExec: {
+        modo: 'resposta_cliente',
+        step,
+        at: new Date().toISOString(),
+        ...detail,
+      },
+    },
+  });
+  // appendRegistroEntry só grava no chamado em memória — sem isto a resposta automática
+  // dessa etapa "sistema" nunca chegava ao e-mail do cliente, mesmo a mensagem de retorno
+  // abaixo dizendo "Resposta enviada ao cliente" (quem chama salva o chamado depois,
+  // persistindo o carimbo de emailOutboundMessageId que notifyAgentReplyAsync grava aqui).
+  await notifyAgentReplyAsync(chamado, composerText, undefined, registroResult.public?.registroIndex);
+
+  return {
+    ok: true,
+    autoAdvance: true,
+    modo: 'resposta_cliente',
+    message: 'Resposta enviada ao cliente',
+    detail,
+  };
+}
+
+async function executeRespostaClienteIa(
+  chamado: IChamadoN1,
   passo: IWorkflowPassoEnvelope,
   automatica: IWorkflowAutomaticaConfig,
+  step: number,
+  messages: TicketAiMessageInput[],
 ): Promise<SistemaExecResult> {
   const tab = chamado.tabulacao?.[chamado.tabulacao.length - 1];
-  const promptExtra = String(automatica.promptContexto || '').trim();
-  const messages = registroToMessages(chamado);
+  const promptExtra = applyTicketPlaceholders(automatica.promptContexto || '', chamado).trim();
 
   const result = await composeAtendimento({
     ticketId: chamado._id?.toString(),
@@ -173,38 +216,62 @@ async function executeRespostaCliente(
     };
   }
 
-  const composerText = wrapComposerOpening({
-    nucleo: result.respostaSugerida.trim(),
-    messages,
-    agentName: getAgentNomeOficial(1),
+  return sendRespostaClienteNucleo(chamado, step, messages, result.respostaSugerida.trim(), {
+    conteudoModo: 'ia',
+    model: result.model,
   });
+}
 
-  const registroResult = appendRegistroEntry(chamado, {
-    mensagemPublica: composerText,
-    sender: 'me',
-    autor: getAgentNomeOficial(1),
-    metadados: {
-      sistemaExec: {
-        modo: 'resposta_cliente',
-        step,
-        model: result.model,
-        at: new Date().toISOString(),
-      },
-    },
+async function executeRespostaClienteEmailPadrao(
+  chamado: IChamadoN1,
+  automatica: IWorkflowAutomaticaConfig,
+  step: number,
+  messages: TicketAiMessageInput[],
+): Promise<SistemaExecResult> {
+  const conteudoId = String(automatica.emailConteudoId || '').trim();
+  const doc = conteudoId ? await getEmailConteudoById(conteudoId) : null;
+  const temGatilhoInterno = Boolean(doc?.gatilho?.criterios?.some((c) => c.tipo === 'gatilho_interno'));
+
+  if (!doc || !doc.ativo || !temGatilhoInterno) {
+    return {
+      ok: false,
+      autoAdvance: false,
+      modo: 'resposta_cliente',
+      message: 'E-mail padrão configurado não encontrado, inativo ou sem "Gatilho interno"',
+    };
+  }
+
+  const nucleo = applyTicketPlaceholders(doc.corpo || '', chamado).trim();
+  if (!nucleo) {
+    return {
+      ok: false,
+      autoAdvance: false,
+      modo: 'resposta_cliente',
+      message: `E-mail padrão "${doc.nome}" está sem corpo configurado`,
+    };
+  }
+
+  return sendRespostaClienteNucleo(chamado, step, messages, nucleo, {
+    conteudoModo: 'email_padrao',
+    emailConteudoId: conteudoId,
+    emailConteudoNome: doc.nome,
   });
-  // appendRegistroEntry só grava no chamado em memória — sem isto a resposta automática
-  // dessa etapa "sistema" nunca chegava ao e-mail do cliente, mesmo a mensagem de retorno
-  // abaixo dizendo "Resposta enviada ao cliente" (quem chama salva o chamado depois,
-  // persistindo o carimbo de emailOutboundMessageId que notifyAgentReplyAsync grava aqui).
-  await notifyAgentReplyAsync(chamado, composerText, undefined, registroResult.public?.registroIndex);
+}
 
-  return {
-    ok: true,
-    autoAdvance: true,
-    modo: 'resposta_cliente',
-    message: 'Resposta enviada ao cliente',
-    detail: { model: result.model },
-  };
+async function executeRespostaCliente(
+  chamado: IChamadoN1,
+  definicao: IWorkflowDefinicao,
+  step: number,
+  passo: IWorkflowPassoEnvelope,
+  automatica: IWorkflowAutomaticaConfig,
+): Promise<SistemaExecResult> {
+  const messages = registroToMessages(chamado);
+
+  if (automatica.conteudoModo === 'email_padrao') {
+    return executeRespostaClienteEmailPadrao(chamado, automatica, step, messages);
+  }
+
+  return executeRespostaClienteIa(chamado, passo, automatica, step, messages);
 }
 
 async function resolveCtaDestinatario(

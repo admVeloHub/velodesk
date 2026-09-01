@@ -8,7 +8,7 @@ import type { IChamadoN1 } from '../models/ChamadoN1';
 import { env } from '../config/env';
 import { isEspeciaisChamado, currentStatus } from './chamado.mapper';
 import { resolveClienteEmailFromChamado } from './emailNotification.service';
-import { resolveChamadoClientName, substituteEmailTemplatePlaceholders } from './emailTrigger.service';
+import { applyTicketPlaceholders } from './placeholders.util';
 import { getEmailConteudoByNome } from './emailConteudo.service';
 import { assembleClientEmail, plainTextToEmailHtml } from './emailSkeleton.service';
 import { escapeHtmlAttribute } from './emailHtml.util';
@@ -119,9 +119,8 @@ async function composeAndSendCsatEmail(
     return;
   }
 
-  const clientName = resolveChamadoClientName(chamado);
-  const saudacao = substituteEmailTemplatePlaceholders(doc.saudacao || '', clientName);
-  const corpoTexto = substituteEmailTemplatePlaceholders(doc.corpo || '', clientName);
+  const saudacao = applyTicketPlaceholders(doc.saudacao || '', chamado);
+  const corpoTexto = applyTicketPlaceholders(doc.corpo || '', chamado);
   const corpoTextoHtml = plainTextToEmailHtml(corpoTexto);
   const protocolo = String(chamado.chamadoProtocolo ?? '').trim();
   const protocoloLineHtml = buildCsatProtocoloLineHtml(protocolo);

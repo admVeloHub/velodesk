@@ -1,4 +1,4 @@
-/** emailTrigger.service v1.1.0 — substitui {client_name} antes do assemble */
+/** emailTrigger.service v1.2.0 — placeholders (nome/agente/ticket/produto/data) via placeholders.util */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import type { IEmailCriterio } from '../models/EmailConteudo';
 import { getEmailDisparoLogModel } from '../models/EmailDisparoLog';
@@ -8,8 +8,8 @@ import {
   readChamadoOriginSource,
   resolveCanalLabelFromSource,
 } from './chamado.mapper';
-import { resolveClientGreetingName } from './clientMessageEnvelope.service';
 import { listActiveEmailConteudos } from './emailConteudo.service';
+import { applyTicketPlaceholders } from './placeholders.util';
 import { EMAIL_SLA_LIMIT_HOURS } from './emailOutbound.constants';
 import { assembleClientEmail } from './emailSkeleton.service';
 import { sendOutboundEmail } from './email-outbound.service';
@@ -22,24 +22,6 @@ import {
 
 export type TriggerPass = 'event' | 'sla';
 
-export function resolveChamadoClientName(chamado: IChamadoN1): string {
-  const tab = Array.isArray(chamado.tabulacao) ? chamado.tabulacao[chamado.tabulacao.length - 1] : null;
-  const fromCliente = (chamado.cliente?.[0] as { clienteNome?: string } | undefined)?.clienteNome;
-  return String(fromCliente || chamado.chamadoTitulo || tab?.motivo || '').trim();
-}
-
-/** Troca placeholders do admin ({client_name}, {nome_cliente}, etc.) pelo nome do cliente. */
-export function substituteEmailTemplatePlaceholders(text: string, clientName?: string): string {
-  const raw = String(text ?? '');
-  if (!raw) return '';
-  const greeting = resolveClientGreetingName(clientName, 'cliente');
-  return raw
-    .replace(/\{client_name\}/gi, greeting)
-    .replace(/\{nome_cliente\}/gi, greeting)
-    .replace(/\{nomeCliente\}/gi, greeting)
-    .replace(/\{cliente\}/gi, greeting)
-    .replace(/\{nome\}/gi, greeting);
-}
 function hasInternalTrigger(criterios: IEmailCriterio[]): boolean {
   return criterios.some((item) => item.tipo === 'gatilho_interno');
 }
@@ -141,9 +123,8 @@ async function sendTemplateEmail(chamado: IChamadoN1, doc: {
   const to = await resolveClienteEmailFromChamado(chamado);
   if (!to) return false;
 
-  const clientName = resolveChamadoClientName(chamado);
-  const saudacao = substituteEmailTemplatePlaceholders(doc.saudacao ?? '', clientName);
-  const corpo = substituteEmailTemplatePlaceholders(doc.corpo ?? '', clientName);
+  const saudacao = applyTicketPlaceholders(doc.saudacao ?? '', chamado);
+  const corpo = applyTicketPlaceholders(doc.corpo ?? '', chamado);
 
   const assembled = await assembleClientEmail({
     mode: 'template',

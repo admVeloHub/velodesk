@@ -2,11 +2,12 @@
  * EmailOutboundEditor v1.2.0 — simulação do CSAT mostra bloco de estrelas
  * VERSION: v1.2.0 | DATE: 2026-08-24
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { emailOutboundApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useTabulation } from '../../../context/TabulationContext';
 import { buildOutboundPreviewHtml } from './emailPreviewHtml';
+import PlaceholderPicker, { insertPlaceholderAtCursor } from '../components/PlaceholderPicker';
 
 const CRITERIO_TIPOS = [
   { id: 'canal', label: 'Canal' },
@@ -94,6 +95,8 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
   const [layout, setLayout] = useState({ headerHtml: '', signatureHtml: '', farewellHtml: '' });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const saudacaoRef = useRef(null);
+  const corpoRef = useRef(null);
 
   const isInternal = filtros.some((item) => item.tipo === 'gatilho_interno');
 
@@ -254,18 +257,36 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
         <label className="config-email-field">
           <span>Saudação</span>
           <textarea
+            ref={saudacaoRef}
             rows={3}
             value={draft.saudacao}
             onChange={(e) => setDraft((prev) => ({ ...prev, saudacao: e.target.value }))}
             placeholder="Olá,"
           />
+          <PlaceholderPicker
+            onInsert={(token) => insertPlaceholderAtCursor(
+              saudacaoRef,
+              draft.saudacao,
+              token,
+              (next) => setDraft((prev) => ({ ...prev, saudacao: next })),
+            )}
+          />
         </label>
         <label className="config-email-field">
           <span>Corpo do e-mail</span>
           <textarea
+            ref={corpoRef}
             rows={8}
             value={draft.corpo}
             onChange={(e) => setDraft((prev) => ({ ...prev, corpo: e.target.value }))}
+          />
+          <PlaceholderPicker
+            onInsert={(token) => insertPlaceholderAtCursor(
+              corpoRef,
+              draft.corpo,
+              token,
+              (next) => setDraft((prev) => ({ ...prev, corpo: next })),
+            )}
           />
         </label>
 

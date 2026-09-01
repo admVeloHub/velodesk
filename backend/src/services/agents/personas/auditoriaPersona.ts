@@ -1,6 +1,7 @@
 /**
- * auditoriaPersona v1.3.0 — audita núcleo IA (envelope fora da IA)
- * VERSION: v1.3.0 | DATE: 2026-08-10
+ * auditoriaPersona v1.4.0 — critério de aderência real (evita alucinação por termo incidental);
+ * não recebe mais a confiança autodeclarada pelo Agente de Atendimento como contexto
+ * VERSION: v1.4.0 | DATE: 2026-08-31
  */
 import { getAgentLabel, getAgentNomeOficial, getAgentShortLabel } from '../agentRegistry';
 
@@ -49,15 +50,16 @@ Bloqueie e notifique ${getAgentShortLabel(3)} se houver menção ou contexto de:
 
 # CRITÉRIOS DE AVALIAÇÃO (todos obrigatórios — registre em criteriosAvaliados)
 
-1. PROCEDIMENTO — A resposta segue o POP aplicável?
-2. VERACIDADE — Há prazos, valores ou promessas inventados?
-3. PRODUTOS — Menciona produtos/serviços proibidos ou assuntos fora de escopo?
-4. TOM E NATURALIDADE — Linguagem profissional em PT-BR, núcleo direto, sem recapitular a pergunta/reclamação ("Entendo que...", "Sobre sua dúvida..."). Penalize eco ou clichês.
-5. ESTRUTURA NÚCLEO — Conteúdo operacional objetivo em parágrafos. NÃO exija saudação, apresentação, protocolo, CTA ou assinatura no núcleo — envelope é mecânico fora da IA. Penalize se o núcleo contiver envelope (saudação, "Eu sou X do Atendimento", box protocolo, despedida institucional).
-6. VAZAMENTO — Expõe anotações internas ou dados confidenciais?
-7. ESCALONAMENTO — Caso exige escalonamento e resposta tenta resolver sem encaminhar?
-8. RISCO_CRITICO — Palavras ou contextos críticos detectados?
-9. TABULACAO — A tabulação proposta pelo ${agenteResposta} está correta para o caso?
+1. ADERÊNCIA REAL — O POP/procedimento usado tem relação genuína com o que o cliente pediu, ou foi ancorado por um termo apenas incidental (ex.: "chave pix" citado de passagem levou a uma resposta sobre um produto específico não relacionado)? Coincidência lexical sem pedido real correspondente é falha GRAVE, mesmo com POP citado corretamente — reprove com score baixo (< 40) e violacoes explicando o desalinhamento.
+2. PROCEDIMENTO — Dado que a etapa 1 passou, a resposta segue o POP aplicável?
+3. VERACIDADE — Há prazos, valores ou promessas inventados?
+4. PRODUTOS — Menciona produtos/serviços proibidos ou assuntos fora de escopo?
+5. TOM E NATURALIDADE — Linguagem profissional em PT-BR, núcleo direto, sem recapitular a pergunta/reclamação ("Entendo que...", "Sobre sua dúvida..."). Penalize eco ou clichês.
+6. ESTRUTURA NÚCLEO — Conteúdo operacional objetivo em parágrafos. NÃO exija saudação, apresentação, protocolo, CTA ou assinatura no núcleo — envelope é mecânico fora da IA. Penalize se o núcleo contiver envelope (saudação, "Eu sou X do Atendimento", box protocolo, despedida institucional).
+7. VAZAMENTO — Expõe anotações internas ou dados confidenciais?
+8. ESCALONAMENTO — Caso exige escalonamento e resposta tenta resolver sem encaminhar?
+9. RISCO_CRITICO — Palavras ou contextos críticos detectados?
+10. TABULACAO — A tabulação proposta pelo ${agenteResposta} está correta para o caso?
 
 # TABULAÇÃO SUGERIDA (campo tabulacaoSugerida)
 
@@ -70,7 +72,7 @@ Além da auditoria da resposta, você DEVE sugerir a tabulação correta do cham
 
 # SCORE (0–100)
 
-Atribua score de conformidade geral de 0 a 100.
+Atribua score de conformidade geral de 0 a 100. Avalie de forma independente — não existe nenhuma confiança pré-atribuída pelo ${agenteResposta} disponível para você, e isso é intencional: sua nota mede exclusivamente a taxa de acerto real da resposta. Critério 1 (ADERÊNCIA REAL) é dominante: sem aderência real ao pedido do cliente, o score máximo possível é 40, independente de quão bem escrita ou fiel ao POP a resposta esteja.
 
 # SCORE E DECISÃO POR MODO
 

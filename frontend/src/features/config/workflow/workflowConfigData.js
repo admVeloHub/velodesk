@@ -136,6 +136,11 @@ export const SISTEMA_MODOS = [
   { value: 'call_to_action', label: 'Call to action' },
 ];
 
+export const RESPOSTA_CONTEUDO_MODOS = [
+  { value: 'ia', label: 'Inteligência Artificial' },
+  { value: 'email_padrao', label: 'E-mail padrão' },
+];
+
 export const WEBHOOK_TIPOS = [
   { value: 'interno', label: 'Interno (catálogo VeloDesk)' },
   { value: 'externo', label: 'Externo (URL)' },

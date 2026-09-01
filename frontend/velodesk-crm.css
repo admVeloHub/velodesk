@@ -3242,6 +3242,7 @@
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--sla .crm-note-card__accent { background: #eab308; }
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--changelog .crm-note-card__accent { background: #1694FF; }
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--registro .crm-note-card__accent { background: #006AB9; }
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--email-automatico .crm-note-card__accent { background: #006AB9; }
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--workflow .crm-note-card__accent { background: #006AB9; }
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--mensagem-enviada .crm-note-card__accent { background: #1634FF; }
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--mensagem-recebida .crm-note-card__accent { background: #006AB9; }
@@ -3314,6 +3315,11 @@
     color: #006AB9;
 }
 
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--email-automatico .crm-note-card__avatar {
+    background: #e0f2fe;
+    color: #006AB9;
+}
+
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--workflow .crm-note-card__avatar {
     background: #e0f2fe;
     color: #006AB9;
@@ -3358,6 +3364,7 @@
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--sla .crm-note-card__author { color: #a16207; }
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--changelog .crm-note-card__author { color: #0369a1; }
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--registro .crm-note-card__author { color: #006AB9; }
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--email-automatico .crm-note-card__author { color: #006AB9; }
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--workflow .crm-note-card__author { color: #006AB9; }
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--mensagem-enviada .crm-note-card__author { color: #1634FF; }
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-note-card--mensagem-recebida .crm-note-card__author { color: #006AB9; }

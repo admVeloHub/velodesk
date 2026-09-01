@@ -1,4 +1,4 @@
-/** WorkflowDefinicao v1.5.0 — requisicao.campos (form complementar ao iniciar workflow) */
+/** WorkflowDefinicao v1.6.0 — automatica.conteudoModo/emailConteudoId (resposta_cliente) */
 import { Schema, Document, Model, Types } from 'mongoose';
 import { getDeskConfigConnection } from '../config/database';
 import type {
@@ -22,6 +22,9 @@ export interface IWorkflowAutomaticaConfig {
   webhookMetodo?: 'POST' | 'GET';
   webhookHeaders?: Record<string, string>;
   promptContexto?: string;
+  /** Resposta ao cliente: IA (promptContexto + contexto do chamado) ou e-mail padrão fixo. */
+  conteudoModo?: 'ia' | 'email_padrao';
+  emailConteudoId?: string;
   ctaTitulo?: string;
   ctaMensagem?: string;
   ctaAlvo?: 'responsavel' | 'atribuido' | 'grupo';
@@ -107,6 +110,8 @@ const AutomaticaConfigSchema = new Schema<IWorkflowAutomaticaConfig>(
     webhookMetodo: { type: String, enum: ['POST', 'GET'], default: 'POST' },
     webhookHeaders: { type: Schema.Types.Mixed, default: {} },
     promptContexto: { type: String, default: '' },
+    conteudoModo: { type: String, enum: ['ia', 'email_padrao'], default: 'ia' },
+    emailConteudoId: { type: String, default: '' },
     ctaTitulo: { type: String, default: '' },
     ctaMensagem: { type: String, default: '' },
     ctaAlvo: { type: String, enum: ['responsavel', 'atribuido', 'grupo'], default: 'responsavel' },

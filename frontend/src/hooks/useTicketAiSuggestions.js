@@ -1,11 +1,12 @@
 /**
- * useTicketAiSuggestions v1.13.1 — IA interna só após Enviar Nota (nota persistida)
- * VERSION: v1.13.1 | DATE: 2026-08-21
+ * useTicketAiSuggestions v1.13.3 — canal Telefone não conta a msg sintética de abertura como
+ * contexto do cliente (aguarda 1ª anotação interna); regressão do gate de "sem contexto"
+ * VERSION: v1.13.3 | DATE: 2026-09-01
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ticketAiApi, agentsApi } from '../api/client';
 import { htmlToPlainText } from '../services/desk/composeRichEditor';
-import { getClientContactFields, getAgentName, isWhatsAppCustomerSessionOpen, buildWhatsAppConvMsgs } from '../services/desk/utils';
+import { getClientContactFields, getAgentName, buildWhatsAppConvMsgs } from '../services/desk/utils';
 import { findTicketEntry } from '../services/ticketsStorage';
 import {
   buildAgentInternalNotesFingerprint,
@@ -78,6 +79,19 @@ function hasMeaningfulClientMessage(messages) {
   return (messages || []).some(
     (m) => m.type === 'client' && !isPlaceholderClientMessageText(m.text),
   );
+}
+
+/**
+ * Tickets abertos via integração de telefone (inbound-ticket-telefone) chegam com uma
+ * "mensagem do cliente" sintética (resumo automático da ligação) — não é um relato real
+ * digitado pelo cliente. Não deve contar como contexto suficiente para a sugestão: aguarda
+ * a 1ª anotação interna do agente, como qualquer outro ticket sem histórico do canal.
+ */
+function isTelefoneChannelTicket(ticket) {
+  const channel = String(
+    ticket?.lateralForm?.canal || ticket?.channel || ticket?.source || '',
+  ).toLowerCase();
+  return channel.includes('telefone') || channel === 'inbound-ticket-telefone';
 }
 
 function noteDedupeKey(ts, text) {
@@ -339,30 +353,35 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
     [ticket, internalPlain, ticketRevision],
   );
   const aiMsgs = useMemo(() => mergePublicMessagesForAi(convMsgs, ticket), [convMsgs, ticket]);
+  const isTelefoneTicket = isTelefoneChannelTicket(ticket);
   /**
    * Sem 1ª mensagem do cliente (ticket criado manualmente ou por trigger de telefonia,
    * sem histórico do canal), usa a nota interna do agente como contexto da consulta —
-   * independente do canal do ticket.
+   * independente do canal do ticket. Canal Telefone nunca conta a mensagem sintética de
+   * abertura como contexto do cliente (ver isTelefoneChannelTicket).
    */
-  const hasClient = hasMeaningfulClientMessage(aiMsgs);
+  const hasClient = !isTelefoneTicket && hasMeaningfulClientMessage(aiMsgs);
   const ticketIdNow = String(ticket?.id || ticket?._id || '');
   if (ticketIdNow && ticketIdNow !== lastTicketIdRef.current) {
     lastTicketIdRef.current = ticketIdNow;
     stickyClientFpRef.current = '';
   }
-  const liveClientFp = buildMeaningfulClientThreadFingerprint(convMsgs);
+  const liveClientFp = isTelefoneTicket ? '' : buildMeaningfulClientThreadFingerprint(convMsgs);
   if (liveClientFp) stickyClientFpRef.current = liveClientFp;
   const clientFp = liveClientFp || stickyClientFpRef.current;
   const seenClientForTicket = Boolean(clientFp);
   const useInternalContext = !hasClient && !seenClientForTicket;
   const contextSource = useInternalContext ? 'internal' : 'public';
 
-  /** Agente já respondeu — só nova msg do cliente reabre sugestão (rascunho no compose não conta). */
+  /**
+   * Agente já respondeu — só nova msg do cliente reabre sugestão (rascunho no compose não conta).
+   * Vale também no WhatsApp com sessão aberta: a última mensagem pública sendo do agente
+   * (inclusive a que acabou de ser enviada usando a sugestão) não deve gerar nova sugestão.
+   */
   const awaitingClientAfterAgentReply = useMemo(() => {
     if (useInternalContext) return false;
-    if (isWhatsAppCustomerSessionOpen(ticket)) return false;
     return isLastPublicInteractionFromAgent(aiMsgs);
-  }, [useInternalContext, aiMsgs, ticket]);
+  }, [useInternalContext, aiMsgs]);
 
   const canFetch = useMemo(() => {
     if (!ticket) return false;

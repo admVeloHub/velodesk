@@ -1,6 +1,6 @@
 /**
- * agentTypes v1.1.1 — tabulação sugerida pelo Agente Auditor
- * VERSION: v1.1.0 | DATE: 2026-07-15
+ * agentTypes v1.1.2 — AuditoriaInput não carrega mais confidence do Agente de Atendimento
+ * VERSION: v1.1.2 | DATE: 2026-08-31
  */
 
 export type TicketAiContextSource = 'public' | 'internal';
@@ -90,7 +90,6 @@ export interface AuditoriaInput {
   internalNote?: string;
   respostaSugerida: string;
   tabulacao: TicketAiTabulationResult;
-  confidence?: ConfidenceLevel;
   mensagemOperador?: string;
   ultimaMensagemCliente?: string;
   palavrasCriticasPrecheck?: string[];

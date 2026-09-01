@@ -1,4 +1,4 @@
-/** workflowNotificacao.service v1.2.0 — notifica responsável no pedido de informação do workflow */
+/** workflowNotificacao.service v1.3.0 — notifica responsável na reprovação do workflow */
 import { Types } from 'mongoose';
 import { getWorkflowNotificacaoModel, IWorkflowNotificacao } from '../models/WorkflowNotificacao';
 import type { IChamadoN1 } from '../models/ChamadoN1';
@@ -151,6 +151,53 @@ export async function notifyAgentReplyToWorkflowResponsavel(
     });
   } catch (err) {
     console.warn('[workflow-notif] falha ao criar recado de resposta no sininho:', (err as Error).message);
+    return null;
+  }
+}
+
+/**
+ * Sininho do responsável quando uma etapa de aprovação do workflow é reprovada.
+ * A devolutiva automática ao cliente é suspensa nesse caso (skipSistema na reprovação) —
+ * cabe ao responsável decidir manualmente o retorno; este recado só avisa que precisa agir.
+ */
+export async function notifyWorkflowRejectToResponsavel(
+  chamado: IChamadoN1,
+  definicao: { _id: unknown; slug?: string },
+): Promise<IWorkflowNotificacao | null> {
+  const tab = chamado.tabulacao?.[chamado.tabulacao.length - 1];
+  const responsavelNome = String(tab?.responsavel || '').trim();
+  if (!responsavelNome) {
+    console.info('[workflow-notif] reprovação sem responsável no ticket', {
+      ticketId: String(chamado._id),
+    });
+    return null;
+  }
+
+  const destinatarioEmail = await resolveResponsavelEmail(responsavelNome);
+  if (!destinatarioEmail) {
+    console.info('[workflow-notif] e-mail do responsável não resolvido (reprovação)', {
+      ticketId: String(chamado._id),
+      responsavelNome,
+    });
+    return null;
+  }
+
+  const protocolo = String(chamado.chamadoProtocolo || '').trim() || String(chamado._id);
+
+  try {
+    return await createWorkflowNotificacao({
+      destinatarioEmail,
+      ticketId: String(chamado._id),
+      chamadoProtocolo: protocolo,
+      workflowId: String(definicao._id),
+      workflowSlug: definicao.slug || 'workflow-reject',
+      step: chamado.workflow?.step ?? 0,
+      passoId: chamado.workflow?.passoId ? String(chamado.workflow.passoId) : null,
+      titulo: 'Workflow reprovado',
+      mensagem: `O workflow do ticket número ${protocolo} foi reprovado — verifique o retorno ao cliente.`,
+    });
+  } catch (err) {
+    console.warn('[workflow-notif] falha ao criar recado de reprovação no sininho:', (err as Error).message);
     return null;
   }
 }

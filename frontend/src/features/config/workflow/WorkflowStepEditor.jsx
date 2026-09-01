@@ -1,8 +1,8 @@
 /**
- * WorkflowStepEditor v1.3.0 — lista Atuação dinâmica (Desk + VeloHub, incl. Produto)
- * VERSION: v1.3.0 | DATE: 2026-07-24
+ * WorkflowStepEditor v1.4.0 — modo de conteúdo (IA / e-mail padrão) na etapa "Resposta ao cliente"
+ * VERSION: v1.4.0 | DATE: 2026-08-31
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import WorkflowRoutesEditor from './WorkflowRoutesEditor';
 import {
   ACAO_TIPOS,
@@ -12,11 +12,13 @@ import {
   FUNCAO_ATRIBUICAO_OPCOES,
   CTA_ALVOS,
   resolveAutomaticaConfig,
+  RESPOSTA_CONTEUDO_MODOS,
   SISTEMA_MODOS,
   WEBHOOK_TIPOS,
 } from './workflowConfigData';
-import api from '../../../api/client';
+import api, { emailOutboundApi } from '../../../api/client';
 import { useDeskColaboradores } from '../../../hooks/useDeskColaboradores';
+import PlaceholderPicker, { insertPlaceholderAtCursor } from '../components/PlaceholderPicker';
 
 const DEFAULT_INTERNAL_HOOKS = [
   { id: 'gestao.alert', label: 'Alerta gestão (stub)' },
@@ -34,6 +36,8 @@ export default function WorkflowStepEditor({
   const cfg = envelope?.passo || {};
   const [internalHooks, setInternalHooks] = useState(DEFAULT_INTERNAL_HOOKS);
   const [atuacaoOpcoes, setAtuacaoOpcoes] = useState(FUNCAO_ATRIBUICAO_OPCOES);
+  const [emailPadraoOpcoes, setEmailPadraoOpcoes] = useState([]);
+  const promptContextoRef = useRef(null);
   const { colaboradores, loading: colaboradoresLoading, error: colaboradoresError } = useDeskColaboradores();
 
   useEffect(() => {
@@ -48,6 +52,18 @@ export default function WorkflowStepEditor({
         Array.isArray(catalog?.velohub) ? catalog.velohub : [],
       ));
     });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    emailOutboundApi.listConteudos().then((data) => {
+      if (cancelled) return;
+      const items = Array.isArray(data?.items) ? data.items : [];
+      setEmailPadraoOpcoes(items.filter(
+        (item) => item.ativo && (item.gatilho?.criterios || []).some((c) => c.tipo === 'gatilho_interno'),
+      ));
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
@@ -270,15 +286,52 @@ export default function WorkflowStepEditor({
             ) : null}
 
             {automatica.modo === 'resposta_cliente' ? (
-              <label className="wf-step-editor__field wf-step-editor__field--full">
-                <span>Contexto para o prompt</span>
-                <textarea
-                  rows={3}
-                  value={automatica.promptContexto || ''}
-                  onChange={(e) => patchAutomatica({ promptContexto: e.target.value })}
-                  placeholder="Instruções adicionais para o Agente de Resposta nesta etapa…"
-                />
-              </label>
+              <>
+                <label className="wf-step-editor__field">
+                  <span>Modo de conteúdo</span>
+                  <select
+                    value={automatica.conteudoModo || 'ia'}
+                    onChange={(e) => patchAutomatica({ conteudoModo: e.target.value })}
+                  >
+                    {RESPOSTA_CONTEUDO_MODOS.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </label>
+                {(automatica.conteudoModo || 'ia') === 'email_padrao' ? (
+                  <label className="wf-step-editor__field wf-step-editor__field--full">
+                    <span>E-mail padrão</span>
+                    <select
+                      value={automatica.emailConteudoId || ''}
+                      onChange={(e) => patchAutomatica({ emailConteudoId: e.target.value })}
+                    >
+                      <option value="">Selecione…</option>
+                      {emailPadraoOpcoes.map((item) => (
+                        <option key={item.id} value={item.id}>{item.nome}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <label className="wf-step-editor__field wf-step-editor__field--full">
+                    <span>Contexto para o prompt</span>
+                    <textarea
+                      ref={promptContextoRef}
+                      rows={3}
+                      value={automatica.promptContexto || ''}
+                      onChange={(e) => patchAutomatica({ promptContexto: e.target.value })}
+                      placeholder="Instruções adicionais para o Agente de Resposta nesta etapa…"
+                    />
+                    <PlaceholderPicker
+                      onInsert={(token) => insertPlaceholderAtCursor(
+                        promptContextoRef,
+                        automatica.promptContexto || '',
+                        token,
+                        (next) => patchAutomatica({ promptContexto: next }),
+                      )}
+                    />
+                  </label>
+                )}
+              </>
             ) : null}
 
             {automatica.modo === 'call_to_action' ? (

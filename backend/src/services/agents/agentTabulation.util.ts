@@ -1,6 +1,6 @@
 /**
- * agentTabulation.util v1.5.0 — resolve fuzzy produto/motivo/detalhe antes de validar
- * VERSION: v1.5.0 | DATE: 2026-08-21
+ * agentTabulation.util v1.6.0 — auditoria não recebe mais confiança autodeclarada do Agente 1
+ * VERSION: v1.6.0 | DATE: 2026-08-31
  */
 import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from '../tabulation.service';
 import type { TicketAiMessageInput, TicketAiTabulationResult, AuditoriaInput } from './agentTypes';
@@ -179,9 +179,10 @@ export function buildAuditoriaUserBlock(
     '',
     `## Tabulação proposta pelo ${agenteResposta}`,
     `tipo: ${params.tabulacao.tipo} | produto: ${params.tabulacao.produto} | motivo: ${params.tabulacao.motivo} | detalhe: ${params.tabulacao.detalhe}`,
-    '',
-    `## Confiança do ${agenteResposta}: ${params.confidence || 'não informada'}`,
   );
+  // Sem "confiança autodeclarada pelo Agente de Atendimento" aqui de propósito — o auditor
+  // precisa avaliar a resposta de forma independente, sem ancorar no autojulgamento do
+  // próprio agente que a gerou (ver discussão sobre respostas alucinadas por termo incidental).
 
   if (params.mensagemOperador) {
     parts.push('', '## Resposta enviada pelo operador humano', '', params.mensagemOperador);

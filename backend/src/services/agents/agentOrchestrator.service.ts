@@ -1,6 +1,6 @@
 /**
- * agentOrchestrator.service v1.2.2 — tabulação desk: preferir sugestão mais completa
- * VERSION: v1.2.2 | DATE: 2026-08-21
+ * agentOrchestrator.service v1.2.3 — não repassa confidence do Agente 1 para a auditoria
+ * VERSION: v1.2.3 | DATE: 2026-08-31
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -155,7 +155,6 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
     internalNote: input.internalNote,
     respostaSugerida: respostaAtual,
     tabulacao: tabulacaoAtual,
-    confidence: atendimento.confidence,
     userId: input.userId,
   });
 
@@ -206,7 +205,6 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
       internalNote: input.internalNote,
       respostaSugerida: respostaAtual,
       tabulacao: tabulacaoAtual,
-      confidence: atendimento.confidence,
       userId: input.userId,
     });
 
@@ -338,7 +336,6 @@ export async function runRevisarSugestao(params: {
     internalNote: params.input.internalNote,
     respostaSugerida: revised.respostaSugerida,
     tabulacao: revised.tabulacao,
-    confidence: revised.confidence,
     userId: params.input.userId,
   });
 

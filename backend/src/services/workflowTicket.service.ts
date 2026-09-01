@@ -1,4 +1,4 @@
-/** workflowTicket.service v1.10.1 — resolveTeamApprovalStepIndex inclui funcaoSlug */
+/** workflowTicket.service v1.11.0 — reprovação grava metadados.workflowDecision + notifica responsável */
 import { isAutomaticaStep, resolveAutomaticaConfig } from './workflowAutomatica.util';
 import { Types } from 'mongoose';
 import type { AuthPayload } from '../middleware/auth';
@@ -33,6 +33,7 @@ import {
   ticketMatchesWorkflowTeamAsync,
 } from './permission.service';
 import { executeSistemaStep, isDevolutivaPasso } from './workflowSistemaExecutor.service';
+import { notifyWorkflowRejectToResponsavel } from './workflowNotificacao.service';
 import { buildLateralWorkflowDto } from './workflowDto.util';
 import {
   applyRequisicaoToChamado,
@@ -514,6 +515,11 @@ export async function advanceWorkflowManual(
         400,
       );
     }
+    appendWorkflowRegistro(chamado, {
+      autor,
+      alteracoes: [{ workflowDecision: 'reject' }],
+      metadados: { workflowDecision: 'reject' },
+    });
     await advanceToStep(chamado, definicao, targetIdx, autor, {
       trigger: 'decision-reject',
       decision: 'reject',
@@ -521,6 +527,7 @@ export async function advanceWorkflowManual(
     });
     wf.pendingDecision = null;
     markTicketEmAndamentoAfterReject(chamado, autor);
+    await notifyWorkflowRejectToResponsavel(chamado, definicao);
     return chamado;
   }
 
@@ -621,6 +628,7 @@ async function advanceWorkflowProdutosQueueDecision(
         trigger: 'produtos-queue-reject-encerrado',
         decision: 'reject',
       });
+      await notifyWorkflowRejectToResponsavel(chamado, definicao);
       return chamado;
     }
 
@@ -638,6 +646,7 @@ async function advanceWorkflowProdutosQueueDecision(
       skipSistema: true,
     });
     markTicketEmAndamentoAfterReject(chamado, autor);
+    await notifyWorkflowRejectToResponsavel(chamado, definicao);
     return chamado;
   }
 
