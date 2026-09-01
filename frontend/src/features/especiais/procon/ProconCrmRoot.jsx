@@ -71,6 +71,7 @@ export default function ProconCrmRoot() {
   const [composeText, setComposeText] = useState('');
   const [internalText, setInternalText] = useState('');
   const [composeAttachments, setComposeAttachments] = useState([]);
+  const [classificacaoDraft, setClassificacaoDraft] = useState({ produto: '', motivo: '' });
 
   const allItems = useMemo(() => {
     if (isRemoteSearch && remoteItems) return remoteItems;
@@ -157,18 +158,21 @@ export default function ProconCrmRoot() {
     setComposeText('');
     setInternalText('');
     setComposeAttachments([]);
+    setClassificacaoDraft({ produto: '', motivo: '' });
   }, [id]);
 
   const composeSession = useMemo(() => ({
     composeText,
     internalText,
     composeAttachments,
+    classificacaoDraft,
     clearCompose: (fields = {}) => {
       if (fields.composeText) setComposeText('');
       if (fields.internalText) setInternalText('');
       if (fields.composeAttachments) setComposeAttachments([]);
+      if (fields.classificacao) setClassificacaoDraft({ produto: '', motivo: '' });
     },
-  }), [composeText, internalText, composeAttachments]);
+  }), [composeText, internalText, composeAttachments, classificacaoDraft]);
 
   const handleCommitSaved = useCallback((result) => {
     setTicket(result.ticket);
@@ -212,9 +216,8 @@ export default function ProconCrmRoot() {
     setListVersion((v) => v + 1);
   }, []);
 
-  const handlePcItemUpdated = useCallback((updatedPcItem) => {
-    if (updatedPcItem) setPcItem(updatedPcItem);
-    setListVersion((v) => v + 1);
+  const handleClassificacaoDraftChange = useCallback((draft) => {
+    setClassificacaoDraft(draft);
   }, []);
 
   const handleOpenChat = useCallback(() => {
@@ -305,7 +308,7 @@ export default function ProconCrmRoot() {
         saving={committing}
         disabled={readOnly || finalized}
         finalized={finalized}
-        onPcItemUpdated={handlePcItemUpdated}
+        onClassificacaoDraftChange={handleClassificacaoDraftChange}
       />
 
       {demandaModals}

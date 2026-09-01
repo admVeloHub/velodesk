@@ -26,7 +26,7 @@ export default function CgTicketSide({
   saving = false,
   disabled = false,
   finalized = false,
-  onCgItemUpdated,
+  onClassificacaoDraftChange,
 }) {
   if (!cgItem) return null;
 
@@ -88,7 +88,7 @@ export default function CgTicketSide({
 
         <CgClassificacaoFields
           cgItem={cgItem}
-          onSaved={onCgItemUpdated}
+          onClassificacaoDraftChange={onClassificacaoDraftChange}
         />
 
         <EspeciaisTicketSideFooter

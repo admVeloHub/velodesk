@@ -26,7 +26,7 @@ export default function BcTicketSide({
   saving = false,
   disabled = false,
   finalized = false,
-  onBcItemUpdated,
+  onClassificacaoDraftChange,
 }) {
   if (!bcItem) return null;
 
@@ -88,7 +88,7 @@ export default function BcTicketSide({
 
         <BcClassificacaoFields
           bcItem={bcItem}
-          onSaved={onBcItemUpdated}
+          onClassificacaoDraftChange={onClassificacaoDraftChange}
         />
 
         <EspeciaisTicketSideFooter

@@ -1,21 +1,24 @@
 /**
- * BcClassificacaoFields v1.1.0 — produto da árvore + motivo do órgão (API)
- * VERSION: v1.1.0 | DATE: 2026-08-21
+ * BcClassificacaoFields v2.0.0 — produto + motivo (local state, salva no click do botão Salvar)
+ * VERSION: v2.0.0 | DATE: 2026-09-01
  */
 import React, { useEffect, useState } from 'react';
-import { reclamacoesApi, tabulationApi } from '../../../api/client';
-import { useNotifications } from '../../../context/NotificationContext';
+import { tabulationApi } from '../../../api/client';
 import { useTabulation } from '../../../context/TabulationContext';
 import { TABULACAO_OPCOES_CATEGORIAS } from '../../../services/tabulationConfig';
 import { BC_MOTIVOS } from '../../../services/especiais/bacenData';
-import { patchDemanda } from '../../../services/especiais/bacenStore';
 
-export default function BcClassificacaoFields({ bcItem, onSaved }) {
-  const { showNotification } = useNotifications();
+export default function BcClassificacaoFields({ bcItem, onClassificacaoDraftChange }) {
   const { getProdutoNames } = useTabulation();
-  const [saving, setSaving] = useState(false);
   const [motivos, setMotivos] = useState(BC_MOTIVOS);
+  const [produtoDraft, setProdutoDraft] = useState(bcItem?.produto || '');
+  const [motivoDraft, setMotivoDraft] = useState(bcItem?.motivo || '');
   const produtoOptions = getProdutoNames();
+
+  useEffect(() => {
+    setProdutoDraft(bcItem?.produto || '');
+    setMotivoDraft(bcItem?.motivo || '');
+  }, [bcItem?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,22 +37,13 @@ export default function BcClassificacaoFields({ bcItem, onSaved }) {
 
   if (!bcItem) return null;
 
-  const handleFieldChange = async (field, value) => {
-    if (!bcItem?.id || saving) return;
-    setSaving(true);
-    try {
-      const updated = await reclamacoesApi.patch('bacen', bcItem.id, { [field]: value });
-      const merged = { ...bcItem, ...updated };
-      // Grava no store local antes do reload disparado por onSaved — sem isso, o reload
-      // relê o item obsoleto do cache e zera o produto/motivo recém-selecionado.
-      patchDemanda(merged);
-      onSaved?.(merged);
-      showNotification('Classificação atualizada.', 'success');
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Não foi possível atualizar a classificação.';
-      showNotification(msg, 'error');
-    } finally {
-      setSaving(false);
+  const handleFieldChange = (field, value) => {
+    if (field === 'produto') {
+      setProdutoDraft(value);
+      onClassificacaoDraftChange?.({ produto: value, motivo: motivoDraft });
+    } else if (field === 'motivo') {
+      setMotivoDraft(value);
+      onClassificacaoDraftChange?.({ produto: produtoDraft, motivo: value });
     }
   };
 
@@ -62,16 +56,15 @@ export default function BcClassificacaoFields({ bcItem, onSaved }) {
       <select
         id="bc-classificacao-produto"
         className="ra-registro__select"
-        value={bcItem.produto || ''}
+        value={produtoDraft}
         onChange={(e) => handleFieldChange('produto', e.target.value)}
-        disabled={saving}
       >
         <option value="">Selecionar</option>
         {produtos.map((produto) => (
           <option key={produto} value={produto}>{produto}</option>
         ))}
-        {bcItem.produto && !produtos.includes(bcItem.produto) ? (
-          <option value={bcItem.produto}>{bcItem.produto}</option>
+        {produtoDraft && !produtos.includes(produtoDraft) ? (
+          <option value={produtoDraft}>{produtoDraft}</option>
         ) : null}
       </select>
 
@@ -79,16 +72,15 @@ export default function BcClassificacaoFields({ bcItem, onSaved }) {
       <select
         id="bc-classificacao-motivo"
         className="ra-registro__select"
-        value={bcItem.motivo || ''}
+        value={motivoDraft}
         onChange={(e) => handleFieldChange('motivo', e.target.value)}
-        disabled={saving}
       >
         <option value="">Selecionar</option>
         {motivoList.map((motivo) => (
           <option key={motivo} value={motivo}>{motivo}</option>
         ))}
-        {bcItem.motivo && !motivoList.includes(bcItem.motivo) ? (
-          <option value={bcItem.motivo}>{bcItem.motivo}</option>
+        {motivoDraft && !motivoList.includes(motivoDraft) ? (
+          <option value={motivoDraft}>{motivoDraft}</option>
         ) : null}
       </select>
     </section>

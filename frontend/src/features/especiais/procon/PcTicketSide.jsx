@@ -26,7 +26,7 @@ export default function PcTicketSide({
   saving = false,
   disabled = false,
   finalized = false,
-  onPcItemUpdated,
+  onClassificacaoDraftChange,
 }) {
   if (!pcItem) return null;
 
@@ -88,7 +88,7 @@ export default function PcTicketSide({
 
         <PcClassificacaoFields
           pcItem={pcItem}
-          onSaved={onPcItemUpdated}
+          onClassificacaoDraftChange={onClassificacaoDraftChange}
         />
 
         <EspeciaisTicketSideFooter

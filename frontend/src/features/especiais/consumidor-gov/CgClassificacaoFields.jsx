@@ -1,21 +1,24 @@
 /**
- * CgClassificacaoFields v1.1.0 — produto da árvore + motivo do órgão (API)
- * VERSION: v1.1.0 | DATE: 2026-08-21
+ * CgClassificacaoFields v2.0.0 — produto + motivo (local state, salva no click do botão Salvar)
+ * VERSION: v2.0.0 | DATE: 2026-09-01
  */
 import React, { useEffect, useState } from 'react';
-import { reclamacoesApi, tabulationApi } from '../../../api/client';
-import { useNotifications } from '../../../context/NotificationContext';
+import { tabulationApi } from '../../../api/client';
 import { useTabulation } from '../../../context/TabulationContext';
 import { TABULACAO_OPCOES_CATEGORIAS } from '../../../services/tabulationConfig';
 import { CG_MOTIVOS } from '../../../services/especiais/consumidorGovData';
-import { patchDemanda } from '../../../services/especiais/consumidorGovStore';
 
-export default function CgClassificacaoFields({ cgItem, onSaved }) {
-  const { showNotification } = useNotifications();
+export default function CgClassificacaoFields({ cgItem, onClassificacaoDraftChange }) {
   const { getProdutoNames } = useTabulation();
-  const [saving, setSaving] = useState(false);
   const [motivos, setMotivos] = useState(CG_MOTIVOS);
+  const [produtoDraft, setProdutoDraft] = useState(cgItem?.produto || '');
+  const [motivoDraft, setMotivoDraft] = useState(cgItem?.motivo || '');
   const produtoOptions = getProdutoNames();
+
+  useEffect(() => {
+    setProdutoDraft(cgItem?.produto || '');
+    setMotivoDraft(cgItem?.motivo || '');
+  }, [cgItem?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,22 +37,13 @@ export default function CgClassificacaoFields({ cgItem, onSaved }) {
 
   if (!cgItem) return null;
 
-  const handleFieldChange = async (field, value) => {
-    if (!cgItem?.id || saving) return;
-    setSaving(true);
-    try {
-      const updated = await reclamacoesApi.patch('consumidor-gov', cgItem.id, { [field]: value });
-      const merged = { ...cgItem, ...updated };
-      // Grava no store local antes do reload disparado por onSaved — sem isso, o reload
-      // relê o item obsoleto do cache e zera o produto/motivo recém-selecionado.
-      patchDemanda(merged);
-      onSaved?.(merged);
-      showNotification('Classificação atualizada.', 'success');
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Não foi possível atualizar a classificação.';
-      showNotification(msg, 'error');
-    } finally {
-      setSaving(false);
+  const handleFieldChange = (field, value) => {
+    if (field === 'produto') {
+      setProdutoDraft(value);
+      onClassificacaoDraftChange?.({ produto: value, motivo: motivoDraft });
+    } else if (field === 'motivo') {
+      setMotivoDraft(value);
+      onClassificacaoDraftChange?.({ produto: produtoDraft, motivo: value });
     }
   };
 
@@ -62,16 +56,15 @@ export default function CgClassificacaoFields({ cgItem, onSaved }) {
       <select
         id="cg-classificacao-produto"
         className="ra-registro__select"
-        value={cgItem.produto || ''}
+        value={produtoDraft}
         onChange={(e) => handleFieldChange('produto', e.target.value)}
-        disabled={saving}
       >
         <option value="">Selecionar</option>
         {produtos.map((produto) => (
           <option key={produto} value={produto}>{produto}</option>
         ))}
-        {cgItem.produto && !produtos.includes(cgItem.produto) ? (
-          <option value={cgItem.produto}>{cgItem.produto}</option>
+        {produtoDraft && !produtos.includes(produtoDraft) ? (
+          <option value={produtoDraft}>{produtoDraft}</option>
         ) : null}
       </select>
 
@@ -79,16 +72,15 @@ export default function CgClassificacaoFields({ cgItem, onSaved }) {
       <select
         id="cg-classificacao-motivo"
         className="ra-registro__select"
-        value={cgItem.motivo || ''}
+        value={motivoDraft}
         onChange={(e) => handleFieldChange('motivo', e.target.value)}
-        disabled={saving}
       >
         <option value="">Selecionar</option>
         {motivoList.map((motivo) => (
           <option key={motivo} value={motivo}>{motivo}</option>
         ))}
-        {cgItem.motivo && !motivoList.includes(cgItem.motivo) ? (
-          <option value={cgItem.motivo}>{cgItem.motivo}</option>
+        {motivoDraft && !motivoList.includes(motivoDraft) ? (
+          <option value={motivoDraft}>{motivoDraft}</option>
         ) : null}
       </select>
     </section>

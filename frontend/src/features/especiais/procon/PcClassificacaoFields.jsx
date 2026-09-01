@@ -1,21 +1,25 @@
 /**
- * PcClassificacaoFields v1.1.0 — produto da árvore + motivo do órgão (API)
- * VERSION: v1.1.0 | DATE: 2026-08-21
+ * PcClassificacaoFields v2.0.0 — produto + motivo (local state, salva no click do botão Salvar)
+ * VERSION: v2.0.0 | DATE: 2026-09-01
  */
 import React, { useEffect, useState } from 'react';
-import { reclamacoesApi, tabulationApi } from '../../../api/client';
-import { useNotifications } from '../../../context/NotificationContext';
+import { tabulationApi } from '../../../api/client';
 import { useTabulation } from '../../../context/TabulationContext';
 import { TABULACAO_OPCOES_CATEGORIAS } from '../../../services/tabulationConfig';
 import { PC_MOTIVOS } from '../../../services/especiais/proconData';
-import { patchDemanda } from '../../../services/especiais/proconStore';
 
-export default function PcClassificacaoFields({ pcItem, onSaved }) {
+export default function PcClassificacaoFields({ pcItem, onClassificacaoDraftChange }) {
   const { showNotification } = useNotifications();
   const { getProdutoNames } = useTabulation();
-  const [saving, setSaving] = useState(false);
   const [motivos, setMotivos] = useState(PC_MOTIVOS);
+  const [produtoDraft, setProdutoDraft] = useState(pcItem?.produto || '');
+  const [motivoDraft, setMotivoDraft] = useState(pcItem?.motivo || '');
   const produtoOptions = getProdutoNames();
+
+  useEffect(() => {
+    setProdutoDraft(pcItem?.produto || '');
+    setMotivoDraft(pcItem?.motivo || '');
+  }, [pcItem?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,22 +38,13 @@ export default function PcClassificacaoFields({ pcItem, onSaved }) {
 
   if (!pcItem) return null;
 
-  const handleFieldChange = async (field, value) => {
-    if (!pcItem?.id || saving) return;
-    setSaving(true);
-    try {
-      const updated = await reclamacoesApi.patch('procon', pcItem.id, { [field]: value });
-      const merged = { ...pcItem, ...updated };
-      // Grava no store local antes do reload disparado por onSaved — sem isso, o reload
-      // relê o item obsoleto do cache e zera o produto/motivo recém-selecionado.
-      patchDemanda(merged);
-      onSaved?.(merged);
-      showNotification('Classificação atualizada.', 'success');
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Não foi possível atualizar a classificação.';
-      showNotification(msg, 'error');
-    } finally {
-      setSaving(false);
+  const handleFieldChange = (field, value) => {
+    if (field === 'produto') {
+      setProdutoDraft(value);
+      onClassificacaoDraftChange?.({ produto: value, motivo: motivoDraft });
+    } else if (field === 'motivo') {
+      setMotivoDraft(value);
+      onClassificacaoDraftChange?.({ produto: produtoDraft, motivo: value });
     }
   };
 
@@ -62,16 +57,15 @@ export default function PcClassificacaoFields({ pcItem, onSaved }) {
       <select
         id="pc-classificacao-produto"
         className="ra-registro__select"
-        value={pcItem.produto || ''}
+        value={produtoDraft}
         onChange={(e) => handleFieldChange('produto', e.target.value)}
-        disabled={saving}
       >
         <option value="">Selecionar</option>
         {produtos.map((produto) => (
           <option key={produto} value={produto}>{produto}</option>
         ))}
-        {pcItem.produto && !produtos.includes(pcItem.produto) ? (
-          <option value={pcItem.produto}>{pcItem.produto}</option>
+        {produtoDraft && !produtos.includes(produtoDraft) ? (
+          <option value={produtoDraft}>{produtoDraft}</option>
         ) : null}
       </select>
 
@@ -79,16 +73,15 @@ export default function PcClassificacaoFields({ pcItem, onSaved }) {
       <select
         id="pc-classificacao-motivo"
         className="ra-registro__select"
-        value={pcItem.motivo || ''}
+        value={motivoDraft}
         onChange={(e) => handleFieldChange('motivo', e.target.value)}
-        disabled={saving}
       >
         <option value="">Selecionar</option>
         {motivoList.map((motivo) => (
           <option key={motivo} value={motivo}>{motivo}</option>
         ))}
-        {pcItem.motivo && !motivoList.includes(pcItem.motivo) ? (
-          <option value={pcItem.motivo}>{pcItem.motivo}</option>
+        {motivoDraft && !motivoList.includes(motivoDraft) ? (
+          <option value={motivoDraft}>{motivoDraft}</option>
         ) : null}
       </select>
     </section>

@@ -94,22 +94,31 @@ export function buildEspeciaisCommitPayload(ticket, session, { finalize = false,
     ? lf[config.metaKey]
     : {};
 
+  // Inclui classificação (produto/motivo) do draft se presente
+  const classificacaoDraft = session?.classificacaoDraft;
+  const updatedMeta = {
+    ...existingMeta,
+    ...(classificacaoDraft?.produto ? { produto: classificacaoDraft.produto } : {}),
+    ...(classificacaoDraft?.motivo ? { motivo: classificacaoDraft.motivo } : {}),
+  };
+
   if (finalize) {
-    lf[config.metaKey] = {
-      ...existingMeta,
-      [config.statusField]: config.respondidaStatus,
-    };
+    updatedMeta[config.statusField] = config.respondidaStatus;
   }
+  lf[config.metaKey] = updatedMeta;
   prepared.lateralForm = lf;
 
   const base = cockpitTicketToApi(prepared);
   const apiLf = { ...(base.lateralForm || {}) };
+  const apiUpdatedMeta = {
+    ...(apiLf[config.metaKey] && typeof apiLf[config.metaKey] === 'object' ? apiLf[config.metaKey] : {}),
+    ...(classificacaoDraft?.produto ? { produto: classificacaoDraft.produto } : {}),
+    ...(classificacaoDraft?.motivo ? { motivo: classificacaoDraft.motivo } : {}),
+  };
   if (finalize) {
-    apiLf[config.metaKey] = {
-      ...(apiLf[config.metaKey] && typeof apiLf[config.metaKey] === 'object' ? apiLf[config.metaKey] : {}),
-      [config.statusField]: config.respondidaStatus,
-    };
+    apiUpdatedMeta[config.statusField] = config.respondidaStatus;
   }
+  apiLf[config.metaKey] = apiUpdatedMeta;
 
   return {
     payload: {

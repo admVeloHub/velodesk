@@ -20,7 +20,7 @@ export default function RaTicketSide({
   saving = false,
   disabled = false,
   finalized = false,
-  onRaItemUpdated,
+  onClassificacaoDraftChange,
 }) {
   if (!raItem) return null;
 
@@ -57,7 +57,7 @@ export default function RaTicketSide({
 
         <RaClassificacaoFields
           raItem={raItem}
-          onSaved={onRaItemUpdated}
+          onClassificacaoDraftChange={onClassificacaoDraftChange}
         />
 
         <RaNotaContatoCard
