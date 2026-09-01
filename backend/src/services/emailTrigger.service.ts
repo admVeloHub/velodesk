@@ -11,6 +11,7 @@ import {
 import { listActiveEmailConteudos } from './emailConteudo.service';
 import { applyTicketPlaceholders } from './placeholders.util';
 import { EMAIL_SLA_LIMIT_HOURS } from './emailOutbound.constants';
+import { businessMsBetween } from './dates/businessHours.util';
 import { assembleClientEmail } from './emailSkeleton.service';
 import { sendOutboundEmail } from './email-outbound.service';
 import {
@@ -37,20 +38,27 @@ export function resolveTicketCanal(chamado: IChamadoN1): string {
   return resolveCanalLabelFromSource(readChamadoOriginSource(chamado)) || 'Portal';
 }
 
-function slaElapsedMs(chamado: IChamadoN1): number | null {
-  const status = currentStatus(chamado);
-  if (!EMAIL_SLA_LIMIT_HOURS[status]) return null;
+/** Instante em que o ticket entrou no status atual. */
+function statusSinceDate(chamado: IChamadoN1): Date | null {
   const registros = chamado.registro ?? [];
   const statusSince = registros[registros.length - 1]?.data ?? chamado.createdAt;
   if (!statusSince) return null;
-  return Date.now() - new Date(statusSince).getTime();
+  const date = new Date(statusSince);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Horas úteis (08:00–21:00, America/Sao_Paulo) decorridas desde a entrada no status atual. */
+function elapsedBusinessMs(chamado: IChamadoN1): number | null {
+  const since = statusSinceDate(chamado);
+  if (!since) return null;
+  return businessMsBetween(since, new Date());
 }
 
 export function resolveSlaFlags(chamado: IChamadoN1): { metade: boolean; estourado: boolean } {
   const status = currentStatus(chamado);
   const limitHours = EMAIL_SLA_LIMIT_HOURS[status];
   if (!limitHours) return { metade: false, estourado: false };
-  const elapsed = slaElapsedMs(chamado);
+  const elapsed = elapsedBusinessMs(chamado);
   if (elapsed == null) return { metade: false, estourado: false };
   const limitMs = limitHours * 60 * 60 * 1000;
   return {
@@ -68,22 +76,42 @@ function valuesMatch(criterio: IEmailCriterio | undefined, actual: string): bool
 
 function matchCriterios(
   criterios: IEmailCriterio[],
-  ctx: { canal: string; status: string; sla: { metade: boolean; estourado: boolean } },
+  ctx: { canal: string; status: string },
+  elapsedMs: number | null,
   pass: TriggerPass,
 ): string | null {
   if (hasInternalTrigger(criterios)) return null;
   const byTipo = new Map(criterios.map((item) => [item.tipo, item]));
   const slaCriterio = byTipo.get('sla');
-  if (pass === 'event' && slaCriterio) return null;
-  if (pass === 'sla' && !slaCriterio) return null;
+  const statusCriterio = byTipo.get('status');
+  const statusHasDelay = statusCriterio?.prazoTipo === 'horas' && Number(statusCriterio.prazoHoras) > 0;
+
+  if (pass === 'event' && (slaCriterio || statusHasDelay)) return null;
+  if (pass === 'sla' && !slaCriterio && !statusHasDelay) return null;
 
   if (!valuesMatch(byTipo.get('canal'), ctx.canal)) return null;
-  if (!valuesMatch(byTipo.get('status'), ctx.status)) return null;
+  if (!valuesMatch(statusCriterio, ctx.status)) return null;
 
   if (slaCriterio) {
+    if (elapsedMs == null) return null;
     const wanted = new Set((slaCriterio.valores || []).map((item) => String(item)));
-    if (wanted.has('estourado') && ctx.sla.estourado) return 'sla:estourado';
-    if (wanted.has('metade') && ctx.sla.metade) return 'sla:metade';
+    if (wanted.has('personalizado')) {
+      const limitHours = Number(slaCriterio.horasPersonalizadas);
+      if (limitHours > 0 && elapsedMs >= limitHours * 60 * 60 * 1000) return 'sla:personalizado';
+      return null;
+    }
+    const limitHours = EMAIL_SLA_LIMIT_HOURS[ctx.status];
+    if (!limitHours) return null;
+    const limitMs = limitHours * 60 * 60 * 1000;
+    if (wanted.has('estourado') && elapsedMs > limitMs) return 'sla:estourado';
+    if (wanted.has('metade') && elapsedMs >= limitMs / 2 && elapsedMs <= limitMs) return 'sla:metade';
+    return null;
+  }
+
+  if (statusHasDelay) {
+    if (elapsedMs == null) return null;
+    const limitMs = Number(statusCriterio!.prazoHoras) * 60 * 60 * 1000;
+    if (elapsedMs >= limitMs) return `status:${ctx.status}:prazo`;
     return null;
   }
 
@@ -178,13 +206,13 @@ export async function evaluateEmailTriggers(chamado: IChamadoN1, pass: TriggerPa
   const ctx = {
     canal: resolveTicketCanal(chamado),
     status: currentStatus(chamado),
-    sla: resolveSlaFlags(chamado),
   };
+  const elapsedMs = pass === 'sla' ? elapsedBusinessMs(chamado) : null;
 
   let sent = 0;
   for (const doc of docs) {
     const criterios = doc.gatilho?.criterios || [];
-    const eventKey = matchCriterios(criterios, ctx, pass);
+    const eventKey = matchCriterios(criterios, ctx, elapsedMs, pass);
     if (!eventKey) continue;
 
     const conteudoId = String(doc._id);

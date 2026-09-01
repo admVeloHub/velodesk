@@ -978,9 +978,12 @@ function collectTeamWorkflowEntries(teamId) {
     const { ticket } = entry;
     if (isWorkflowStatusOffApprovalConsole(ticket)) return;
     if (!isTicketWorkflowActive(ticket)) return;
-    // Inclusão: atribuído do passo (funcao:<time>) OU match de time — atribuído basta
+    // Inclusão: quem decide se o ticket aparece é o atribuído atual (eu ou meu grupo),
+    // não apenas "há workflow ativo" — mesmo critério usado em getWorkflowTeamDetail,
+    // para a lista nunca mostrar um ticket que o detalhe já não consegue abrir.
     const atribuidoNoTime = ticketAtribuidoMatchesWorkflowQueue(ticket, teamId);
-    if (!atribuidoNoTime && !ticketMatchesWorkflowTeam(ticket, teamId)) return;
+    const atribuidoNoAgente = agentCanDecideTicket(ticket) && ticketMatchesWorkflowTeam(ticket, teamId);
+    if (!atribuidoNoTime && !atribuidoNoAgente) return;
     const progress = getWorkflowProgress(ticket);
     items.push({ entry, progress, queueItem: buildQueueItem(entry, teamId) });
   });

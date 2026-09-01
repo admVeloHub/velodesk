@@ -43,7 +43,7 @@ function expandFiltros(criterios) {
   return rows;
 }
 
-function collapseFiltros(filtros) {
+function collapseFiltros(filtros, extras = {}) {
   if ((filtros || []).some((item) => item.tipo === 'gatilho_interno')) {
     return [{ tipo: 'gatilho_interno', valores: [] }];
   }
@@ -55,7 +55,22 @@ function collapseFiltros(filtros) {
     if (valor && !current.includes(valor)) current.push(valor);
     byTipo.set(item.tipo, current);
   }
-  return Array.from(byTipo.entries()).map(([tipo, valores]) => ({ tipo, valores }));
+  return Array.from(byTipo.entries()).map(([tipo, valores]) => {
+    const criterio = { tipo, valores };
+    if (tipo === 'sla' && valores.includes('personalizado')) {
+      const horas = Number(extras.slaHorasPersonalizadas);
+      if (Number.isFinite(horas) && horas > 0) criterio.horasPersonalizadas = horas;
+    }
+    if (tipo === 'status') {
+      const prazoTipo = extras.statusPrazoTipo === 'horas' ? 'horas' : 'imediato';
+      criterio.prazoTipo = prazoTipo;
+      if (prazoTipo === 'horas') {
+        const horas = Number(extras.statusPrazoHoras);
+        if (Number.isFinite(horas) && horas > 0) criterio.prazoHoras = horas;
+      }
+    }
+    return criterio;
+  });
 }
 
 function summarizeCriterios(criterios, opcoes) {
@@ -68,7 +83,15 @@ function summarizeCriterios(criterios, opcoes) {
       : item.tipo === 'sla'
         ? (item.valores || []).map((value) => opcoes.sla.find((opt) => opt.value === value)?.label || value)
         : (item.valores || []);
-    return `${label}: ${values.join(', ') || '—'}`;
+    let suffix = '';
+    if (item.tipo === 'sla' && item.horasPersonalizadas) {
+      suffix = ` (${item.horasPersonalizadas}h)`;
+    } else if (item.tipo === 'status') {
+      suffix = item.prazoTipo === 'horas' && item.prazoHoras
+        ? ` — Prazo: ${item.prazoHoras}h úteis`
+        : ' — Prazo: Imediato';
+    }
+    return `${label}: ${values.join(', ') || '—'}${suffix}`;
   }).join(' · ');
 }
 
@@ -91,6 +114,9 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
   const { getCanalContatoOptions } = useTabulation();
   const [draft, setDraft] = useState(emptyDraft());
   const [filtros, setFiltros] = useState([]);
+  const [slaHorasPersonalizadas, setSlaHorasPersonalizadas] = useState('');
+  const [statusPrazoTipo, setStatusPrazoTipo] = useState('imediato');
+  const [statusPrazoHoras, setStatusPrazoHoras] = useState('');
   const [opcoes, setOpcoes] = useState({ canais: [], status: [], sla: [], farewell: '' });
   const [layout, setLayout] = useState({ headerHtml: '', signatureHtml: '', farewellHtml: '' });
   const [saving, setSaving] = useState(false);
@@ -120,6 +146,12 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
       } : emptyDraft();
       setDraft(nextDraft);
       setFiltros(expandFiltros(nextDraft.gatilho?.criterios));
+      const criterios = nextDraft.gatilho?.criterios || [];
+      const slaCrit = criterios.find((c) => c.tipo === 'sla');
+      setSlaHorasPersonalizadas(slaCrit?.horasPersonalizadas ? String(slaCrit.horasPersonalizadas) : '');
+      const statusCrit = criterios.find((c) => c.tipo === 'status');
+      setStatusPrazoTipo(statusCrit?.prazoTipo === 'horas' ? 'horas' : 'imediato');
+      setStatusPrazoHoras(statusCrit?.prazoHoras ? String(statusCrit.prazoHoras) : '');
     }).catch((err) => {
       showNotification(err?.response?.data?.message || 'Erro ao carregar o e-mail.', 'error');
     }).finally(() => {
@@ -153,9 +185,11 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
 
   const warning = overlapWarning(draft, items || []);
 
-  const applyFiltros = (next) => {
+  const extras = { slaHorasPersonalizadas, statusPrazoTipo, statusPrazoHoras };
+
+  const applyFiltros = (next, nextExtras = extras) => {
     setFiltros(next);
-    setDraft((prev) => ({ ...prev, gatilho: { criterios: collapseFiltros(next) } }));
+    setDraft((prev) => ({ ...prev, gatilho: { criterios: collapseFiltros(next, nextExtras) } }));
   };
 
   const valoresDoTipo = (tipo) => {
@@ -197,6 +231,21 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
     applyFiltros([...filtros, { tipo: '', valor: '' }]);
   };
 
+  const updateSlaHorasPersonalizadas = (value) => {
+    setSlaHorasPersonalizadas(value);
+    applyFiltros(filtros, { ...extras, slaHorasPersonalizadas: value });
+  };
+
+  const updateStatusPrazoTipo = (value) => {
+    setStatusPrazoTipo(value);
+    applyFiltros(filtros, { ...extras, statusPrazoTipo: value });
+  };
+
+  const updateStatusPrazoHoras = (value) => {
+    setStatusPrazoHoras(value);
+    applyFiltros(filtros, { ...extras, statusPrazoHoras: value });
+  };
+
   const handleSave = async () => {
     if (!draft.nome.trim()) {
       showNotification('Informe o nome do e-mail.', 'warning');
@@ -209,7 +258,7 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
         ativo: draft.ativo,
         saudacao: draft.saudacao,
         corpo: draft.corpo,
-        gatilho: { criterios: collapseFiltros(filtros) },
+        gatilho: { criterios: collapseFiltros(filtros, extras) },
       };
       const saved = draft.id
         ? await emailOutboundApi.updateConteudo(draft.id, payload)
@@ -365,6 +414,47 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
               })}
             </ul>
           )}
+
+          {filtros.some((item) => item.tipo === 'sla' && item.valor === 'personalizado') ? (
+            <label className="config-email-field">
+              <span>Horas até disparo (SLA personalizado)</span>
+              <input
+                type="number"
+                min={1}
+                value={slaHorasPersonalizadas}
+                onChange={(e) => updateSlaHorasPersonalizadas(e.target.value)}
+                placeholder="Ex.: 6"
+              />
+            </label>
+          ) : null}
+
+          {filtros.some((item) => item.tipo === 'status') ? (
+            <div className="config-email-filtro-row">
+              <label className="config-email-field">
+                <span>Prazo</span>
+                <select
+                  value={statusPrazoTipo}
+                  onChange={(e) => updateStatusPrazoTipo(e.target.value)}
+                >
+                  <option value="imediato">Imediato</option>
+                  <option value="horas">Após um prazo (horas)</option>
+                </select>
+              </label>
+              {statusPrazoTipo === 'horas' ? (
+                <label className="config-email-field">
+                  <span>Horas úteis (1 a 48)</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={48}
+                    value={statusPrazoHoras}
+                    onChange={(e) => updateStatusPrazoHoras(e.target.value)}
+                    placeholder="Ex.: 24"
+                  />
+                </label>
+              ) : null}
+            </div>
+          ) : null}
         </section>
         <p className="config-placeholder-msg">{summarizeCriterios(draft.gatilho?.criterios, opcoes)}</p>
       </div>

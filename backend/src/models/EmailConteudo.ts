@@ -5,9 +5,17 @@ import { getDeskConfigConnection } from '../config/database';
 export const EMAIL_CRITERIO_TIPOS = ['canal', 'status', 'sla', 'gatilho_interno'] as const;
 export type EmailCriterioTipo = (typeof EMAIL_CRITERIO_TIPOS)[number];
 
+export type EmailStatusPrazoTipo = 'imediato' | 'horas';
+
 export interface IEmailCriterio {
   tipo: EmailCriterioTipo;
   valores: string[];
+  /** tipo === 'sla' com valores incluindo 'personalizado': horas até disparo. */
+  horasPersonalizadas?: number;
+  /** tipo === 'status': quando disparar após o ticket entrar no(s) status selecionado(s). */
+  prazoTipo?: EmailStatusPrazoTipo;
+  /** tipo === 'status' && prazoTipo === 'horas': horas úteis (1 a 48) até disparo. */
+  prazoHoras?: number;
 }
 
 export interface IEmailConteudo extends Document {
@@ -25,6 +33,9 @@ const CriterioSchema = new Schema<IEmailCriterio>(
   {
     tipo: { type: String, required: true, enum: EMAIL_CRITERIO_TIPOS },
     valores: { type: [String], default: [] },
+    horasPersonalizadas: { type: Number },
+    prazoTipo: { type: String, enum: ['imediato', 'horas'] },
+    prazoHoras: { type: Number },
   },
   { _id: false },
 );

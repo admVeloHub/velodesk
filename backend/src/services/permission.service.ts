@@ -911,6 +911,16 @@ export async function canUserActOnWorkflowStep(
     return false;
   }
 
+  // Gestão / visão global em etapa de aprovação — não depende de workflow.avancar,
+  // pois perfis de aprovação (ex.: "Visão Workflow") atuam via workflow.aprovar.
+  if (
+    isApprovalStep
+    && hasPermission(resolved.permissoes, 'tickets', 'atuar_sempre')
+    && canApproveWorkflow(resolved)
+  ) {
+    return true;
+  }
+
   if (!hasPermission(resolved.permissoes, 'workflow', 'avancar')) {
     return false;
   }
@@ -934,15 +944,6 @@ export async function canUserActOnWorkflowStep(
     ) {
       return true;
     }
-  }
-
-  // Gestão / visão global em etapa de aprovação.
-  if (
-    isApprovalStep
-    && hasPermission(resolved.permissoes, 'tickets', 'atuar_sempre')
-    && canApproveWorkflow(resolved)
-  ) {
-    return true;
   }
 
   const teamQueue = resolveWorkflowTeamQueueForUser(resolved);

@@ -1,12 +1,12 @@
 /**
- * emailSlaTrigger.job v1.0.1 — ciclo de SLA a cada 1 hora
- * VERSION: v1.0.1 | DATE: 2026-08-20
+ * emailSlaTrigger.job v1.1.0 — ciclo de SLA a cada 30 minutos
+ * VERSION: v1.1.0 | DATE: 2026-09-01
  */
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { isDeskConfigConnected, isMongoConnected } from '../config/database';
 import { evaluateEmailTriggers } from '../services/emailTrigger.service';
 
-const INTERVAL_MS = 60 * 60 * 1000;
+const INTERVAL_MS = 30 * 60 * 1000;
 
 let slaTimer: ReturnType<typeof setInterval> | null = null;
 let running = false;
@@ -15,11 +15,13 @@ async function runCycleSafe(): Promise<void> {
   if (running || !isMongoConnected() || !isDeskConfigConnected()) return;
   running = true;
   try {
+    // Cobre tanto o SLA (em-aberto/em-andamento) quanto o prazo por status (novo/
+    // em-andamento/pendente/resolvido/fechado) — só exclui cancelado, que não dispara e-mail.
     const cursor = ChamadoN1.find({
       $expr: {
-        $in: [
+        $ne: [
           { $ifNull: [{ $arrayElemAt: ['$registro.status', -1] }, 'novo'] },
-          ['em-aberto', 'em-andamento'],
+          'cancelado',
         ],
       },
     }).cursor();
@@ -42,7 +44,7 @@ async function runCycleSafe(): Promise<void> {
 
 export function startEmailSlaTriggerJob(): void {
   if (slaTimer) return;
-  console.info('[email-sla-job] iniciado — intervalo 1h');
+  console.info('[email-sla-job] iniciado — intervalo 30min');
   void runCycleSafe();
   slaTimer = setInterval(() => {
     void runCycleSafe();

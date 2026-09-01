@@ -160,6 +160,19 @@ async function appendProdutosConclusaoPublicMessage(chamado: IChamadoN1, autor: 
   await notifyAgentReplyAsync(chamado, composerText, undefined, result.public?.registroIndex);
 }
 
+/**
+ * Reprovação sempre devolve o ticket ao responsável, independentemente de como a
+ * etapa de destino da rota "reject" está configurada (atribuicao pode apontar para
+ * função/grupo/colaborador arbitrário). Isso garante que atribuido=responsavel e,
+ * por consequência, que o ticket some da fila do aprovador (que não é mais o atribuído).
+ */
+function forceAtribuidoToResponsavel(chamado: IChamadoN1): void {
+  const tab = readTabulacaoSnapshot(chamado.tabulacao?.[0]);
+  const responsavel = String(tab?.responsavel || '').trim();
+  if (!responsavel) return;
+  chamado.tabulacao = [{ ...tab, atribuido: responsavel }];
+}
+
 function markTicketEmAndamentoAfterReject(chamado: IChamadoN1, autor: string): void {
   const status = normalizeStatusValue(currentStatus(chamado));
   if ((MERGE_TERMINAL_STATUSES as readonly string[]).includes(status)) return;
@@ -526,6 +539,7 @@ export async function advanceWorkflowManual(
       skipSistema: true,
     });
     wf.pendingDecision = null;
+    forceAtribuidoToResponsavel(chamado);
     markTicketEmAndamentoAfterReject(chamado, autor);
     await notifyWorkflowRejectToResponsavel(chamado, definicao);
     return chamado;
@@ -538,6 +552,16 @@ export async function advanceWorkflowManual(
       metadados: { workflowDecision: 'approve' },
     });
     wf.pendingDecision = null;
+  }
+
+  // Nunca deixar uma decisão pendente (aprovar/reprovar) cair num avanço "cego":
+  // se a etapa atual não está configurada como aprovação, a decisão não tem como
+  // ser aplicada corretamente — falhar aqui evita reprovar e avançar como se fosse aprovado.
+  if (wf.pendingDecision) {
+    throw new WorkflowAdvanceError(
+      'Etapa atual não está configurada para aprovação/reprovação. Ajuste o workflow antes de decidir.',
+      400,
+    );
   }
 
   await advanceToStep(chamado, definicao, currentStep + 1, autor, { trigger: 'manual-advance' });
@@ -628,6 +652,7 @@ async function advanceWorkflowProdutosQueueDecision(
         trigger: 'produtos-queue-reject-encerrado',
         decision: 'reject',
       });
+      forceAtribuidoToResponsavel(chamado);
       await notifyWorkflowRejectToResponsavel(chamado, definicao);
       return chamado;
     }
@@ -645,6 +670,7 @@ async function advanceWorkflowProdutosQueueDecision(
       decision: 'reject',
       skipSistema: true,
     });
+    forceAtribuidoToResponsavel(chamado);
     markTicketEmAndamentoAfterReject(chamado, autor);
     await notifyWorkflowRejectToResponsavel(chamado, definicao);
     return chamado;

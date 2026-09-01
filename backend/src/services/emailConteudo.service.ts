@@ -1,7 +1,11 @@
 /** emailConteudo.service v1.0.0 — CRUD desk_config.email_conteudos */
 import { Types } from 'mongoose';
 import { EMAIL_CRITERIO_TIPOS, getEmailConteudoModel, type IEmailCriterio } from '../models/EmailConteudo';
-import { EMAIL_CONTEUDO_SEED } from './emailOutbound.constants';
+import {
+  EMAIL_CONTEUDO_SEED,
+  EMAIL_STATUS_PRAZO_MIN_HORAS,
+  EMAIL_STATUS_PRAZO_MAX_HORAS,
+} from './emailOutbound.constants';
 
 export function serializeEmailConteudo(doc: {
   _id: Types.ObjectId;
@@ -24,6 +28,17 @@ export function serializeEmailConteudo(doc: {
       criterios: (doc.gatilho?.criterios || []).map((item) => ({
         tipo: item.tipo,
         valores: Array.isArray(item.valores) ? item.valores.map((value) => String(value)) : [],
+        ...(item.tipo === 'sla' && item.horasPersonalizadas != null
+          ? { horasPersonalizadas: Number(item.horasPersonalizadas) }
+          : {}),
+        ...(item.tipo === 'status' && item.prazoTipo
+          ? {
+            prazoTipo: item.prazoTipo,
+            ...(item.prazoTipo === 'horas' && item.prazoHoras != null
+              ? { prazoHoras: Number(item.prazoHoras) }
+              : {}),
+          }
+          : {}),
       })),
     },
     updatedBy: doc.updatedBy || '',
@@ -43,7 +58,27 @@ function sanitizeCriterios(raw: unknown): IEmailCriterio[] {
     const valores = Array.isArray((item as { valores?: unknown })?.valores)
       ? (item as { valores: unknown[] }).valores.map((value) => String(value ?? '').trim()).filter(Boolean)
       : [];
-    list.push({ tipo, valores: tipo === 'gatilho_interno' ? [] : valores });
+    const criterio: IEmailCriterio = { tipo, valores: tipo === 'gatilho_interno' ? [] : valores };
+
+    if (tipo === 'sla' && valores.includes('personalizado')) {
+      const horas = Number((item as { horasPersonalizadas?: unknown })?.horasPersonalizadas);
+      if (Number.isFinite(horas) && horas > 0) criterio.horasPersonalizadas = horas;
+    }
+
+    if (tipo === 'status') {
+      const prazoTipo = (item as { prazoTipo?: unknown })?.prazoTipo === 'horas' ? 'horas' : 'imediato';
+      criterio.prazoTipo = prazoTipo;
+      if (prazoTipo === 'horas') {
+        const horas = Number((item as { prazoHoras?: unknown })?.prazoHoras);
+        if (Number.isFinite(horas) && horas >= EMAIL_STATUS_PRAZO_MIN_HORAS && horas <= EMAIL_STATUS_PRAZO_MAX_HORAS) {
+          criterio.prazoHoras = horas;
+        } else {
+          criterio.prazoTipo = 'imediato';
+        }
+      }
+    }
+
+    list.push(criterio);
   }
   if (list.some((item) => item.tipo === 'gatilho_interno')) {
     return [{ tipo: 'gatilho_interno', valores: [] }];

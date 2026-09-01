@@ -166,7 +166,13 @@ export function ticketMatchesWorkflowTeam(ticket, teamId) {
   if (templateSlug === team) return true;
   if (templateSlug.endsWith(`-${team}`)) return true;
 
-  if (team === 'produtos') {
+  // Se já sabemos o time da etapa ativa e ele é outro time, a categorização
+  // histórica da solicitação não deve mais prender o ticket nesta fila —
+  // caso contrário o ticket nunca some da lista após a decisão mudar de etapa/time.
+  const activeStepTeam = normalizeTeamSlug(progress?.activeStep?.team);
+  const historicalMatchAllowed = !activeStepTeam || activeStepTeam === team;
+
+  if (historicalMatchAllowed && team === 'produtos') {
     const solicitacao = readSolicitacaoProdutos(ticket);
     if (solicitacao && PRODUTOS_SOLICITACAO_CATEGORIAS.has(solicitacao.categoria)) {
       return true;
@@ -175,7 +181,7 @@ export function ticketMatchesWorkflowTeam(ticket, teamId) {
     if (financeiroLegacy?.categoria === 'documentos') return true;
   }
 
-  if (team === 'financeiro') {
+  if (historicalMatchAllowed && team === 'financeiro') {
     const solicitacao = readSolicitacaoFinanceiro(ticket);
     if (solicitacao && FINANCEIRO_SOLICITACAO_CATEGORIAS.has(solicitacao.categoria)) {
       return true;

@@ -19,9 +19,7 @@ export const EMAIL_CANAL_OPCOES = [
 
 export const EMAIL_STATUS_OPCOES = [
   { value: 'novo', label: 'Novo' },
-  { value: 'em-aberto', label: 'Em aberto' },
   { value: 'em-andamento', label: 'Em andamento' },
-  { value: 'em-espera', label: 'Em espera' },
   { value: 'pendente', label: 'Pendente' },
   { value: 'resolvido', label: 'Resolvido' },
   { value: 'fechado', label: 'Fechado' },
@@ -30,12 +28,21 @@ export const EMAIL_STATUS_OPCOES = [
 export const EMAIL_SLA_OPCOES = [
   { value: 'metade', label: 'Metade' },
   { value: 'estourado', label: 'Estourado' },
+  { value: 'personalizado', label: 'Personalizado' },
 ] as const;
 
 export const EMAIL_SLA_LIMIT_HOURS: Record<string, number> = {
   'em-aberto': 4,
   'em-andamento': 8,
 };
+
+/** Prazo (campo do gatilho de Status): valor numérico permitido, em horas úteis. */
+export const EMAIL_STATUS_PRAZO_MIN_HORAS = 1;
+export const EMAIL_STATUS_PRAZO_MAX_HORAS = 48;
+
+/** Janela de horário útil (America/Sao_Paulo) usada por todos os contadores de prazo. */
+export const BUSINESS_HOURS_START = 8;
+export const BUSINESS_HOURS_END = 21;
 
 export const EMAIL_CONTEUDO_SEED = [
   {
