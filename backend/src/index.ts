@@ -223,13 +223,33 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 let mongoRetryTimer: ReturnType<typeof setInterval> | null = null;
 let devMemoryServer: { getUri: (dbName?: string) => string } | null = null;
 let activeMongoUri = env.mongoUri;
+let mongoConnectInFlight: Promise<boolean> | null = null;
 
+/**
+ * scheduleMongoRetry() roda a cada 15s e chama esta função sempre que !isAllMongoReady().
+ * Sem esse guard, uma tentativa lenta (SRV timeout de até 12s) ainda em andamento faz o
+ * próximo tick do timer disparar uma SEGUNDA chamada a mongoose.connect() em paralelo —
+ * com uma URI SRV possivelmente re-resolvida em ordem diferente — e o mongoose rejeita com
+ * "Can't call openUri() on an active connection with different connection strings",
+ * transformando um blip de rede curto numa cadeia de falhas de ~15min (saves e e-mails
+ * falhando o tempo todo) até as tentativas pararem de colidir por acaso.
+ */
 async function tryConnectDatabase(uri?: string): Promise<boolean> {
   if (isAllMongoReady()) return true;
+  if (mongoConnectInFlight) return mongoConnectInFlight;
 
   const targetUri = (uri || activeMongoUri || '').trim();
   if (!targetUri) return false;
 
+  mongoConnectInFlight = doConnectDatabase(targetUri);
+  try {
+    return await mongoConnectInFlight;
+  } finally {
+    mongoConnectInFlight = null;
+  }
+}
+
+async function doConnectDatabase(targetUri: string): Promise<boolean> {
   try {
     await connectDatabase(targetUri);
     activeMongoUri = targetUri;
