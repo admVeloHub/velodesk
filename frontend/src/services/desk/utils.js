@@ -2221,73 +2221,14 @@ export function buildClientInternalNotesFeed(ticket) {
   return buildInternalNotesOnlyFeed(ticket);
 }
 
-function mapMessageToEventItem(m, ticket) {
-  const origin = m.origin || (m.sender === 'them' ? 'cliente' : 'agente');
-  const isClient = (
-    origin === 'cliente'
-    || m.fromClient === true
-    || m.type === 'client'
-    || m.sender === 'them'
-  );
-  const ts = m.timestamp || m.time || m.createdAt;
-  const authorName = isClient
-    ? (ticket.clientName || m.author || 'Cliente')
-    : (m.author || getAgentName() || 'Agente');
-  const rawText = String(m.text || m.message || '').trim();
-  const looksLikeEmailReply = /escreveu:|wrote:|Original Message|^\s*>/m.test(rawText);
-  const body = normalizeMessageDisplayText(
-    isClient && looksLikeEmailReply
-      ? extractEmailReplyContent(rawText)
-      : rawText,
-  );
-  if (!body) return null;
-
-  const ticketId = String(ticket.id || ticket._id);
-  const msgId = m.id || `${ts}:${isClient ? 'in' : 'out'}`;
-  return {
-    id: `${ticketId}:${msgId}`,
-    kind: isClient ? 'mensagem-recebida' : 'mensagem-enviada',
-    author: authorName,
-    initials: getInitials(authorName),
-    badge: isClient ? 'Mensagem recebida' : 'Mensagem enviada',
-    timestamp: ts,
-    body,
-    attachments: Array.isArray(m.attachments) ? m.attachments : [],
-    ticketId,
-    ticketTitle: getTicketTitle(ticket),
-  };
-}
-
-function buildMessageEventsFeed(ticket) {
-  if (!ticket) return [];
-
-  normalizeTicketForDeskV2(ticket);
-  const merged = [];
-  const seen = new Set();
-
-  (ticket.messages || []).forEach((m) => {
-    if (!m || m.type === 'internal') return;
-    if (m.type === 'system') return;
-    const mapped = mapMessageToEventItem(m, ticket);
-    if (!mapped || seen.has(mapped.id)) return;
-    seen.add(mapped.id);
-    merged.push(mapped);
-  });
-
-  return merged;
-}
-
-/** Aba Eventos: registros/gatilhos (visão gestão) + mensagens públicas enviadas/recebidas. */
+/**
+ * Aba Eventos: só registros/gatilhos (mudança de tabulação/status, envio de mensagem
+ * automática) — nunca o texto de mensagens enviadas/recebidas, que pertence só à
+ * aba Conversa (inclusive e-mails manuais). Não duplicar conteúdo entre as duas abas.
+ */
 export function buildTicketEventsFeed(ticket, client) {
   if (!ticket) return [];
-
-  const registros = buildSupervisorRegistroFeed(ticket, client);
-  const messages = buildMessageEventsFeed(ticket);
-  if (!messages.length) return registros;
-
-  return [...registros, ...messages].sort(
-    (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
-  );
+  return buildSupervisorRegistroFeed(ticket, client);
 }
 
 export function applySendStatus(entry, queueId) {
