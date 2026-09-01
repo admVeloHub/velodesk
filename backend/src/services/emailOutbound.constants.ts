@@ -1,6 +1,6 @@
 /** emailOutbound.constants v1.1.0 — textos da despedida injetada */
 export const EMAIL_FAREWELL_REPLY_HINT =
-  'É só responder este e-mail — a sua mensagem chega direto para quem está cuidando do seu caso.';
+  'É só responder este e-mail. A sua mensagem chega direto para quem está cuidando do seu caso.';
 export const EMAIL_FAREWELL_TEXT = 'Estou por aqui para o que você precisar.';
 export const EMAIL_FAREWELL_SIGN_OFF = 'Time de Atendimento Velotax';
 
