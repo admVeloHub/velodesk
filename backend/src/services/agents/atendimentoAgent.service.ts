@@ -1,6 +1,7 @@
 /**
- * atendimentoAgent.service v1.0.2 — revisão preserva primeira resposta
- * VERSION: v1.0.2 | DATE: 2026-08-07
+ * atendimentoAgent.service v1.1.0 — trava determinística de citação literal do cliente
+ * (enforceLiteralClientQuote) contra pedido "implícito" inventado pelo modelo
+ * VERSION: v1.1.0 | DATE: 2026-09-01
  */
 import { env } from '../../config/env';
 import type { AtendimentoInput, AtendimentoResult, RevisaoInput, ConfidenceLevel } from './agentTypes';
@@ -14,6 +15,7 @@ import {
   buildTabulationCatalog,
   validateTabulationResult,
   isPrimeiroContatoAgente,
+  isLiteralClientQuote,
 } from './agentTabulation.util';
 import {
   createOpenAiClient,
@@ -29,10 +31,40 @@ import { getFeedbackExamplesForPrompt } from './agentFeedback.service';
 import { logAiUsage } from '../aiUsage.service';
 
 interface AtendimentoParsed {
+  pedidoClienteCitado?: string;
   respostaSugerida?: string;
   tabulacao?: { tipo?: string; produto?: string; motivo?: string; detalhe?: string };
   confidence?: ConfidenceLevel;
   fontesConsultadas?: string[];
+}
+
+/**
+ * Trava determinística: se o modelo não citou um trecho que realmente existe na mensagem
+ * do cliente, força o resultado para "sem solicitação identificada" — não confia no
+ * julgamento do próprio modelo sobre se o pedido é real (ver isLiteralClientQuote).
+ */
+function enforceLiteralClientQuote(
+  parsed: AtendimentoParsed,
+  clientText: string,
+): AtendimentoParsed {
+  if (!clientText.trim()) return parsed;
+  const quote = String(parsed.pedidoClienteCitado || '');
+  if (isLiteralClientQuote(quote, clientText)) return parsed;
+
+  return {
+    ...parsed,
+    respostaSugerida: 'Não foi possível identificar uma solicitação clara nesse contato. '
+      + 'Por favor, confirme com o cliente qual é a dúvida ou pedido antes de prosseguir.',
+    tabulacao: { tipo: parsed.tabulacao?.tipo || '', produto: '', motivo: '', detalhe: '' },
+    confidence: 'baixa',
+  };
+}
+
+function buildClientTextForQuoteCheck(messages?: AtendimentoInput['messages']): string {
+  return (messages || [])
+    .filter((m) => m.role === 'cliente')
+    .map((m) => m.text)
+    .join('\n');
 }
 
 async function callAtendimentoOpenAi(
@@ -111,15 +143,16 @@ export async function composeAtendimento(params: AtendimentoInput): Promise<Aten
       return { success: false, error: 'Resposta da IA inválida ou vazia' };
     }
 
-    const tabulacao = validateTabulationResult(parsed.tabulacao || {}, config);
+    const enforced = enforceLiteralClientQuote(parsed, buildClientTextForQuoteCheck(params.messages));
+    const tabulacao = validateTabulationResult(enforced.tabulacao || {}, config);
 
     return {
       success: true,
-      respostaSugerida: parsed.respostaSugerida.trim(),
+      respostaSugerida: enforced.respostaSugerida!.trim(),
       tabulacao,
       tabulacaoDisplay: buildTabulationDisplay(tabulacao),
-      confidence: parsed.confidence || 'media',
-      fontesConsultadas: parsed.fontesConsultadas || ['public', 'pop'],
+      confidence: enforced.confidence || 'media',
+      fontesConsultadas: enforced.fontesConsultadas || ['public', 'pop'],
       model,
     };
   } catch (err) {
@@ -173,15 +206,16 @@ export async function reviseAtendimento(params: RevisaoInput): Promise<Atendimen
       return { success: false, error: 'Revisão da IA inválida ou vazia' };
     }
 
-    const tabulacao = validateTabulationResult(parsed.tabulacao || {}, config);
+    const enforced = enforceLiteralClientQuote(parsed, buildClientTextForQuoteCheck(params.messages));
+    const tabulacao = validateTabulationResult(enforced.tabulacao || {}, config);
 
     return {
       success: true,
-      respostaSugerida: parsed.respostaSugerida.trim(),
+      respostaSugerida: enforced.respostaSugerida!.trim(),
       tabulacao,
       tabulacaoDisplay: buildTabulationDisplay(tabulacao),
-      confidence: parsed.confidence || 'media',
-      fontesConsultadas: parsed.fontesConsultadas || ['public', 'pop'],
+      confidence: enforced.confidence || 'media',
+      fontesConsultadas: enforced.fontesConsultadas || ['public', 'pop'],
       model,
     };
   } catch (err) {

@@ -340,6 +340,7 @@ export const ATENDIMENTO_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
+    pedidoClienteCitado: { type: 'string' },
     respostaSugerida: { type: 'string' },
     tabulacao: {
       type: 'object',
@@ -358,8 +359,29 @@ export const ATENDIMENTO_JSON_SCHEMA = {
       items: { type: 'string' },
     },
   },
-  required: ['respostaSugerida', 'tabulacao', 'confidence', 'fontesConsultadas'],
+  required: ['pedidoClienteCitado', 'respostaSugerida', 'tabulacao', 'confidence', 'fontesConsultadas'],
 } as const;
+
+function normalizeForLiteralMatch(value: string): string {
+  return normalizeMatchText(value)
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Trava determinística contra o "pedido implícito": o modelo tem que citar um trecho que
+ * REALMENTE existe na mensagem do cliente. Instrução em texto sozinha não impediu o modelo
+ * de inventar/racionalizar um pedido (ex.: aprovar resposta sobre portabilidade de chave Pix
+ * porque o termo "chave pix" apareceu solto num e-mail sem nexo nenhum) — isso é verificado
+ * em código, não deixado à interpretação do LLM.
+ */
+export function isLiteralClientQuote(pedidoClienteCitado: string, clientText: string): boolean {
+  const quote = normalizeForLiteralMatch(pedidoClienteCitado);
+  if (quote.length < 8) return false;
+  const source = normalizeForLiteralMatch(clientText);
+  return source.includes(quote);
+}
 
 export const AUDITORIA_JSON_SCHEMA = {
   type: 'object',

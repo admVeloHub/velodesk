@@ -50,7 +50,8 @@ Bloqueie e notifique ${getAgentShortLabel(3)} se houver menção ou contexto de:
 
 # CRITÉRIOS DE AVALIAÇÃO (todos obrigatórios — registre em criteriosAvaliados)
 
-1. ADERÊNCIA REAL — O POP/procedimento usado tem relação genuína com o que o cliente pediu, ou foi ancorado por um termo apenas incidental (ex.: "chave pix" citado de passagem levou a uma resposta sobre um produto específico não relacionado)? Coincidência lexical sem pedido real correspondente é falha GRAVE, mesmo com POP citado corretamente — reprove com score baixo (< 40) e violacoes explicando o desalinhamento.
+1. ADERÊNCIA REAL — Antes de tudo, cite em observacao a frase EXATA (ou paráfrase mínima) da mensagem do cliente que constitui um pedido EXPLÍCITO relacionado ao POP usado. Se você não conseguir apontar uma frase assim — só um termo solto (ex.: "chave pix", "liberação") dentro de texto sem relação, incoerente ou sobre outro assunto — isso é reprovação automática (conforme=false, score final <= 40), MESMO que a resposta pareça fiel ao POP.
+   PROIBIDO justificar aprovação com uma "solicitação implícita", "intenção subentendida" ou qualquer leitura que preencha lacunas que o cliente não escreveu — o pedido tem que estar no texto, não na sua interpretação dele. Um texto longo, divagante ou sem nexo que apenas contém uma palavra-chave em algum ponto NUNCA conta como pedido, mesmo que a palavra seja exatamente o nome de um produto/procedimento real.
 2. PROCEDIMENTO — Dado que a etapa 1 passou, a resposta segue o POP aplicável?
 3. VERACIDADE — Há prazos, valores ou promessas inventados?
 4. PRODUTOS — Menciona produtos/serviços proibidos ou assuntos fora de escopo?
