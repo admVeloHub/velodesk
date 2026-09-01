@@ -119,8 +119,8 @@ async function composeAndSendCsatEmail(
     return;
   }
 
-  const saudacao = applyTicketPlaceholders(doc.saudacao || '', chamado);
-  const corpoTexto = applyTicketPlaceholders(doc.corpo || '', chamado);
+  const saudacao = await applyTicketPlaceholders(doc.saudacao || '', chamado);
+  const corpoTexto = await applyTicketPlaceholders(doc.corpo || '', chamado);
   const corpoTextoHtml = plainTextToEmailHtml(corpoTexto);
   const protocolo = String(chamado.chamadoProtocolo ?? '').trim();
   const protocoloLineHtml = buildCsatProtocoloLineHtml(protocolo);

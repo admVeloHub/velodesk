@@ -192,7 +192,7 @@ async function executeRespostaClienteIa(
   messages: TicketAiMessageInput[],
 ): Promise<SistemaExecResult> {
   const tab = chamado.tabulacao?.[chamado.tabulacao.length - 1];
-  const promptExtra = applyTicketPlaceholders(automatica.promptContexto || '', chamado).trim();
+  const promptExtra = (await applyTicketPlaceholders(automatica.promptContexto || '', chamado)).trim();
 
   const result = await composeAtendimento({
     ticketId: chamado._id?.toString(),
@@ -241,7 +241,7 @@ async function executeRespostaClienteEmailPadrao(
     };
   }
 
-  const nucleo = applyTicketPlaceholders(doc.corpo || '', chamado).trim();
+  const nucleo = (await applyTicketPlaceholders(doc.corpo || '', chamado)).trim();
   if (!nucleo) {
     return {
       ok: false,

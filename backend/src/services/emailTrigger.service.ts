@@ -123,8 +123,8 @@ async function sendTemplateEmail(chamado: IChamadoN1, doc: {
   const to = await resolveClienteEmailFromChamado(chamado);
   if (!to) return false;
 
-  const saudacao = applyTicketPlaceholders(doc.saudacao ?? '', chamado);
-  const corpo = applyTicketPlaceholders(doc.corpo ?? '', chamado);
+  const saudacao = await applyTicketPlaceholders(doc.saudacao ?? '', chamado);
+  const corpo = await applyTicketPlaceholders(doc.corpo ?? '', chamado);
 
   const assembled = await assembleClientEmail({
     mode: 'template',

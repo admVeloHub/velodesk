@@ -4,6 +4,7 @@
  */
 import type { IChamadoN1 } from '../models/ChamadoN1';
 import { resolveClientGreetingName } from './clientMessageEnvelope.service';
+import { findClienteByEmail, getPrimaryDados, loadDadosForRef } from './cliente.service';
 
 export type PlaceholderKey =
   | 'nomeCliente'
@@ -71,21 +72,49 @@ function formatBrDate(date: Date | string | null | undefined): string {
   return new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo' }).format(parsed);
 }
 
-/** Nome de exibição do cliente a partir do chamado (cadastro > título > motivo da tabulação). */
-export function resolveChamadoClientName(chamado: IChamadoN1): string {
-  const tab = Array.isArray(chamado.tabulacao) ? chamado.tabulacao[chamado.tabulacao.length - 1] : null;
-  const fromCliente = (chamado.cliente?.[0] as { clienteNome?: string } | undefined)?.clienteNome;
-  return String(fromCliente || chamado.chamadoTitulo || tab?.motivo || '').trim();
+function firstRegistroEmailInboundSender(chamado: IChamadoN1): string {
+  const first = chamado.registro?.[0];
+  const meta = (first?.metadados && typeof first.metadados === 'object' ? first.metadados : {}) as Record<string, unknown>;
+  if (String(meta.source ?? '').trim().toLowerCase() !== 'email-inbound') return '';
+  const from = String(meta.emailFrom ?? '').trim().toLowerCase();
+  return from.includes('@') ? from : '';
 }
 
-export function buildTicketPlaceholderValues(
+/**
+ * Nome real do cliente — única fonte aceitável é o cadastro, nunca o assunto do e-mail ou a
+ * tabulação (que já causou casos como "primeira palavra do assunto virou nome do cliente" e
+ * o assunto-fallback "Atendimento por e-mail" virando nome "Atendimento"). Ordem:
+ * 1. Cadastro já associado ao ticket (via CPF ou qualquer outro meio) — única referência aceitável
+ *    quando presente.
+ * 2. Ticket aberto por e-mail sem cadastro associado — busca o cadastro pelo e-mail do remetente
+ *    da primeira mensagem.
+ * 3. Nada encontrado — string vazia (o chamador usa "Cliente" literal, sem tentar mais nada).
+ */
+export async function resolveChamadoClientName(chamado: IChamadoN1): Promise<string> {
+  const ref = chamado.cliente?.[0];
+  if (ref) {
+    // Cadastro já associado ao ticket — única referência aceitável enquanto existir vínculo,
+    // mesmo que o cadastro em si esteja sem nome preenchido (não cai pro lookup por e-mail).
+    const dados = await loadDadosForRef(ref);
+    return String(dados?.clienteNome || '').trim();
+  }
+
+  const senderEmail = firstRegistroEmailInboundSender(chamado);
+  if (!senderEmail) return '';
+
+  const cliente = await findClienteByEmail(senderEmail);
+  const dados = getPrimaryDados(cliente);
+  return String(dados?.clienteNome || '').trim();
+}
+
+export async function buildTicketPlaceholderValues(
   chamado: IChamadoN1,
   opts: { clientName?: string } = {},
-): TicketPlaceholderValues {
+): Promise<TicketPlaceholderValues> {
   const tab = Array.isArray(chamado.tabulacao) ? chamado.tabulacao[chamado.tabulacao.length - 1] : null;
-  const clientName = opts.clientName ?? resolveChamadoClientName(chamado);
+  const clientName = opts.clientName ?? await resolveChamadoClientName(chamado);
   return {
-    nomeCliente: resolveClientGreetingName(clientName, 'cliente'),
+    nomeCliente: clientName ? resolveClientGreetingName(clientName, 'Cliente') : 'Cliente',
     nomeAgente: String(tab?.responsavel || '').trim() || 'Atendimento Velotax',
     numeroTicket: String(chamado.chamadoProtocolo || '').trim(),
     produtoTicket: String(tab?.produto || '').trim(),
@@ -95,14 +124,14 @@ export function buildTicketPlaceholderValues(
 }
 
 /** Troca os placeholders do catálogo (token canônico + aliases legados) pelos dados reais do ticket. */
-export function applyTicketPlaceholders(
+export async function applyTicketPlaceholders(
   text: string,
   chamado: IChamadoN1,
   opts: { clientName?: string } = {},
-): string {
+): Promise<string> {
   const raw = String(text ?? '');
   if (!raw) return '';
-  const values = buildTicketPlaceholderValues(chamado, opts);
+  const values = await buildTicketPlaceholderValues(chamado, opts);
   return PLACEHOLDER_CATALOG.reduce(
     (acc, item) => item.aliases.reduce((inner, re) => inner.replace(re, values[item.key]), acc),
     raw,
