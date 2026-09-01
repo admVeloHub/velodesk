@@ -1,7 +1,7 @@
 /**
- * atendimentoAgent.service v1.1.0 — trava determinística de citação literal do cliente
- * (enforceLiteralClientQuote) contra pedido "implícito" inventado pelo modelo
- * VERSION: v1.1.0 | DATE: 2026-09-01
+ * atendimentoAgent.service v1.2.0 — gate de coerência (chamada separada) antes do compose;
+ * citação autorreportada de coerência na mesma chamada não impedia racionalização do modelo
+ * VERSION: v1.2.0 | DATE: 2026-09-01
  */
 import { env } from '../../config/env';
 import type { AtendimentoInput, AtendimentoResult, RevisaoInput, ConfidenceLevel } from './agentTypes';
@@ -29,6 +29,7 @@ import {
 } from './openaiAgent.util';
 import { getFeedbackExamplesForPrompt } from './agentFeedback.service';
 import { logAiUsage } from '../aiUsage.service';
+import { checkClientMessageCoherent } from './messageCoherence.service';
 
 interface AtendimentoParsed {
   pedidoClienteCitado?: string;
@@ -38,10 +39,25 @@ interface AtendimentoParsed {
   fontesConsultadas?: string[];
 }
 
+const NO_REQUEST_IDENTIFIED_RESULT: AtendimentoResult = {
+  success: true,
+  respostaSugerida: 'Não foi possível identificar uma solicitação clara nesse contato. '
+    + 'Por favor, confirme com o cliente qual é a dúvida ou pedido antes de prosseguir.',
+  tabulacao: { tipo: '', produto: '', motivo: '', detalhe: '', incompleta: true },
+  tabulacaoDisplay: 'Tabulação incompleta',
+  confidence: 'baixa',
+  fontesConsultadas: [],
+};
+
 /**
  * Trava determinística: se o modelo não citou um trecho que realmente existe na mensagem
  * do cliente, força o resultado para "sem solicitação identificada" — não confia no
  * julgamento do próprio modelo sobre se o pedido é real (ver isLiteralClientQuote).
+ * Segunda camada, mais forte, é o gate de coerência (checkClientMessageCoherent) chamado
+ * ANTES desta função sequer rodar — pedir pro mesmo modelo se autoavaliar quanto a
+ * "mensagem coerente como um todo" na mesma chamada que compõe a resposta não funcionou:
+ * ele ainda racionalizava coerência numa mensagem obviamente sem nexo (ver histórico do
+ * ticket 2609010033).
  */
 function enforceLiteralClientQuote(
   parsed: AtendimentoParsed,
@@ -121,6 +137,14 @@ export async function composeAtendimento(params: AtendimentoInput): Promise<Aten
     return { success: false, error: 'Agentes não configurados' };
   }
 
+  const clientTextForCoherence = buildClientTextForQuoteCheck(params.messages);
+  if (clientTextForCoherence.trim()) {
+    const coherence = await checkClientMessageCoherent(clientTextForCoherence);
+    if (!coherence.coerente) {
+      return { ...NO_REQUEST_IDENTIFIED_RESULT };
+    }
+  }
+
   try {
     const config = await loadTabulationConfig();
     const catalog = buildTabulationCatalog(config);
@@ -164,6 +188,14 @@ export async function composeAtendimento(params: AtendimentoInput): Promise<Aten
 export async function reviseAtendimento(params: RevisaoInput): Promise<AtendimentoResult> {
   if (!isAgentsConfigured()) {
     return { success: false, error: 'Agentes não configurados' };
+  }
+
+  const clientTextForCoherence = buildClientTextForQuoteCheck(params.messages);
+  if (clientTextForCoherence.trim()) {
+    const coherence = await checkClientMessageCoherent(clientTextForCoherence);
+    if (!coherence.coerente) {
+      return { ...NO_REQUEST_IDENTIFIED_RESULT };
+    }
   }
 
   try {
