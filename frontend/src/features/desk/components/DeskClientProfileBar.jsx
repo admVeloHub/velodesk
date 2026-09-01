@@ -66,7 +66,7 @@ export default function DeskClientProfileBar({
   });
   const [emailErrors, setEmailErrors] = useState({});
   const contact = getClientContactFields(ticket, client);
-  const cadastroNaoEncontrado = Boolean(contact.cpf) && !(ticket?.clienteId || ticket?.lateralForm?.clienteId);
+  const cadastroNaoEncontrado = Boolean(contact.cpf) && (!contact.name || !contact.email);
   const activeProducts = getClientActiveProducts(ticket, client);
   const protocolLabel = resolveProtocolLabel(ticket);
   const inWorkflow = isTicketInWorkflow(ticket);
