@@ -4,12 +4,13 @@
  */
 import fs from 'fs';
 import path from 'path';
-import type { IChamadoN1 } from '../models/ChamadoN1';
+import { ChamadoN1, type IChamadoN1 } from '../models/ChamadoN1';
 import { env } from '../config/env';
 import { isEspeciaisChamado, currentStatus } from './chamado.mapper';
 import { resolveClienteEmailFromChamado } from './emailNotification.service';
 import { applyTicketPlaceholders } from './placeholders.util';
 import { getEmailConteudoByNome } from './emailConteudo.service';
+import { businessMsBetween } from './dates/businessHours.util';
 import { assembleClientEmail, plainTextToEmailHtml } from './emailSkeleton.service';
 import { escapeHtmlAttribute } from './emailHtml.util';
 import { sendOutboundEmail } from './email-outbound.service';
@@ -224,4 +225,66 @@ export async function sendCsatRepescagemEmailAsync(chamado: IChamadoN1): Promise
   } catch (err) {
     console.warn('[csatEmail] falha ao enviar repescagem CSAT:', (err as Error).message);
   }
+}
+
+const CSAT_INICIAL_TEMPLATE_NOME = 'Encerramento mais satisfação';
+const CSAT_INICIAL_DEFAULT_STATUS = 'resolvido';
+const CSAT_INICIAL_DEFAULT_PRAZO_HORAS = 48;
+
+export interface CsatInicialResult {
+  scanned: number;
+  sent: number;
+  errors: number;
+}
+
+/**
+ * Dispara a pesquisa de CSAT inicial de acordo com o gatilho configurado no
+ * próprio e-mail (aba Emails de Saída, template "Encerramento mais satisfação"):
+ * qual status inicia a contagem e o prazo (horas úteis) até o disparo. Decoupled
+ * do fechamento automático de tickets — se o e-mail estiver inativo, não dispara.
+ */
+export async function runCsatInicialPastWindow(now = new Date()): Promise<CsatInicialResult> {
+  const doc = await getEmailConteudoByNome(CSAT_INICIAL_TEMPLATE_NOME);
+  if (!doc) return { scanned: 0, sent: 0, errors: 0 };
+
+  const criterio = (doc.gatilho?.criterios || []).find((item) => item.tipo === 'gatilho_interno');
+  const status = criterio?.valores?.[0] || CSAT_INICIAL_DEFAULT_STATUS;
+  const prazoTipo = criterio?.prazoTipo === 'imediato' ? 'imediato' : 'horas';
+  const prazoHoras = prazoTipo === 'horas'
+    ? (Number(criterio?.prazoHoras) > 0 ? Number(criterio?.prazoHoras) : CSAT_INICIAL_DEFAULT_PRAZO_HORAS)
+    : 0;
+  const prazoMs = prazoHoras * 60 * 60 * 1000;
+
+  const candidates = await ChamadoN1.find({
+    $expr: { $eq: [{ $arrayElemAt: ['$registro.status', -1] }, status] },
+    $or: [{ 'csat.enviado': { $exists: false } }, { 'csat.enviado': false }],
+  }).select('_id chamadoProtocolo cliente registro csat tabulacao');
+
+  let sent = 0;
+  let errors = 0;
+  for (const chamado of candidates) {
+    try {
+      const registros = chamado.registro ?? [];
+      const last = registros[registros.length - 1];
+      if (!last || String(last.status || '').toLowerCase() !== status) continue;
+
+      if (prazoMs > 0) {
+        const since = last.data ? new Date(last.data) : null;
+        if (!since || Number.isNaN(since.getTime())) continue;
+        if (businessMsBetween(since, now) < prazoMs) continue;
+      }
+
+      await sendCsatEmailAsync(chamado);
+      if (chamado.csat?.enviado) sent += 1;
+    } catch (err) {
+      errors += 1;
+      console.warn(
+        '[csat-inicial] falha',
+        chamado.chamadoProtocolo || chamado._id?.toString(),
+        (err as Error).message,
+      );
+    }
+  }
+
+  return { scanned: candidates.length, sent, errors };
 }

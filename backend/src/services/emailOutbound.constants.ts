@@ -77,14 +77,28 @@ export const EMAIL_CONTEUDO_SEED = [
     ativo: true,
     saudacao: 'Olá, {nome}, tudo bem?',
     corpo: 'Como o seu atendimento foi encerrado, gostaria muito de saber a sua opinião.\nÉ bem rápido — um clique já ajuda demais a melhorar.',
-    gatilho: { criterios: [{ tipo: 'gatilho_interno' as const, valores: [] }] },
+    gatilho: {
+      criterios: [{
+        tipo: 'gatilho_interno' as const,
+        valores: ['resolvido'],
+        prazoTipo: 'horas' as const,
+        prazoHoras: 48,
+      }],
+    },
   },
   {
     nome: 'Repescagem da satisfação',
     ativo: true,
     saudacao: 'Olá, {nome}, tudo bem?',
     corpo: 'Há alguns dias o seu atendimento foi encerrado e ainda não recebi a sua avaliação.\nAntes de fechar de vez, gostaria muito de saber como foi a sua experiência — é bem rápido, um clique já ajuda demais.',
-    gatilho: { criterios: [{ tipo: 'gatilho_interno' as const, valores: [] }] },
+    gatilho: {
+      criterios: [{
+        tipo: 'gatilho_interno' as const,
+        valores: [],
+        prazoTipo: 'horas' as const,
+        prazoHoras: 48,
+      }],
+    },
   },
   { nome: 'Aviso de inatividade', ativo: false, saudacao: '', corpo: '', gatilho: { criterios: [] } },
   { nome: 'Status emitido', ativo: false, saudacao: '', corpo: '', gatilho: { criterios: [] } },

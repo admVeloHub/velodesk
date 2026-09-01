@@ -45,7 +45,19 @@ function expandFiltros(criterios) {
 
 function collapseFiltros(filtros, extras = {}) {
   if ((filtros || []).some((item) => item.tipo === 'gatilho_interno')) {
-    return [{ tipo: 'gatilho_interno', valores: [] }];
+    const criterio = {
+      tipo: 'gatilho_interno',
+      valores: extras.csatStatusGatilho ? [extras.csatStatusGatilho] : [],
+    };
+    if (extras.csatPrazoTipo) {
+      const prazoTipo = extras.csatPrazoTipo === 'horas' ? 'horas' : 'imediato';
+      criterio.prazoTipo = prazoTipo;
+      if (prazoTipo === 'horas') {
+        const horas = Number(extras.csatPrazoHoras);
+        if (Number.isFinite(horas) && horas > 0) criterio.prazoHoras = horas;
+      }
+    }
+    return [criterio];
   }
   const byTipo = new Map();
   for (const item of filtros || []) {
@@ -75,7 +87,18 @@ function collapseFiltros(filtros, extras = {}) {
 
 function summarizeCriterios(criterios, opcoes) {
   if (!criterios?.length) return 'Sem gatilho';
-  if (criterios.some((item) => item.tipo === 'gatilho_interno')) return 'Gatilho interno';
+  const interno = criterios.find((item) => item.tipo === 'gatilho_interno');
+  if (interno) {
+    const statusLabel = interno.valores?.[0]
+      ? (opcoes.status.find((opt) => opt.value === interno.valores[0])?.label || interno.valores[0])
+      : null;
+    const prazoLabel = interno.prazoTipo === 'horas' && interno.prazoHoras
+      ? `${interno.prazoHoras}h úteis`
+      : 'Imediato';
+    return statusLabel
+      ? `Gatilho interno — status: ${statusLabel} · Prazo: ${prazoLabel}`
+      : `Gatilho interno — Prazo: ${prazoLabel}`;
+  }
   return criterios.map((item) => {
     const label = CRITERIO_TIPOS.find((tipo) => tipo.id === item.tipo)?.label || item.tipo;
     const values = item.tipo === 'status'
@@ -117,6 +140,9 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
   const [slaHorasPersonalizadas, setSlaHorasPersonalizadas] = useState('');
   const [statusPrazoTipo, setStatusPrazoTipo] = useState('imediato');
   const [statusPrazoHoras, setStatusPrazoHoras] = useState('');
+  const [csatStatusGatilho, setCsatStatusGatilho] = useState('resolvido');
+  const [csatPrazoTipo, setCsatPrazoTipo] = useState('horas');
+  const [csatPrazoHoras, setCsatPrazoHoras] = useState('48');
   const [opcoes, setOpcoes] = useState({ canais: [], status: [], sla: [], farewell: '' });
   const [layout, setLayout] = useState({ headerHtml: '', signatureHtml: '', farewellHtml: '' });
   const [saving, setSaving] = useState(false);
@@ -125,6 +151,9 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
   const corpoRef = useRef(null);
 
   const isInternal = filtros.some((item) => item.tipo === 'gatilho_interno');
+  const isCsatInicial = draft.nome === 'Encerramento mais satisfação';
+  const isCsatRepescagem = draft.nome === 'Repescagem da satisfação';
+  const showCsatGatilhoFields = isInternal && (isCsatInicial || isCsatRepescagem);
 
   useEffect(() => {
     let cancelled = false;
@@ -152,6 +181,10 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
       const statusCrit = criterios.find((c) => c.tipo === 'status');
       setStatusPrazoTipo(statusCrit?.prazoTipo === 'horas' ? 'horas' : 'imediato');
       setStatusPrazoHoras(statusCrit?.prazoHoras ? String(statusCrit.prazoHoras) : '');
+      const internoCrit = criterios.find((c) => c.tipo === 'gatilho_interno');
+      setCsatStatusGatilho(internoCrit?.valores?.[0] || 'resolvido');
+      setCsatPrazoTipo(internoCrit?.prazoTipo === 'imediato' ? 'imediato' : 'horas');
+      setCsatPrazoHoras(internoCrit?.prazoHoras ? String(internoCrit.prazoHoras) : '48');
     }).catch((err) => {
       showNotification(err?.response?.data?.message || 'Erro ao carregar o e-mail.', 'error');
     }).finally(() => {
@@ -185,7 +218,14 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
 
   const warning = overlapWarning(draft, items || []);
 
-  const extras = { slaHorasPersonalizadas, statusPrazoTipo, statusPrazoHoras };
+  const extras = {
+    slaHorasPersonalizadas,
+    statusPrazoTipo,
+    statusPrazoHoras,
+    csatStatusGatilho,
+    csatPrazoTipo,
+    csatPrazoHoras,
+  };
 
   const applyFiltros = (next, nextExtras = extras) => {
     setFiltros(next);
@@ -244,6 +284,21 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
   const updateStatusPrazoHoras = (value) => {
     setStatusPrazoHoras(value);
     applyFiltros(filtros, { ...extras, statusPrazoHoras: value });
+  };
+
+  const updateCsatStatusGatilho = (value) => {
+    setCsatStatusGatilho(value);
+    applyFiltros(filtros, { ...extras, csatStatusGatilho: value });
+  };
+
+  const updateCsatPrazoTipo = (value) => {
+    setCsatPrazoTipo(value);
+    applyFiltros(filtros, { ...extras, csatPrazoTipo: value });
+  };
+
+  const updateCsatPrazoHoras = (value) => {
+    setCsatPrazoHoras(value);
+    applyFiltros(filtros, { ...extras, csatPrazoHoras: value });
   };
 
   const handleSave = async () => {
@@ -386,7 +441,11 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
                       </select>
                     </label>
                     {interno ? (
-                      <p className="config-placeholder-msg">Sem valor. Este e-mail não dispara sozinho — fica pronto para outra ação chamar depois.</p>
+                      <p className="config-placeholder-msg">
+                        {showCsatGatilhoFields
+                          ? 'Disparo controlado pelo gatilho e prazo configurados abaixo.'
+                          : 'Sem valor. Este e-mail não dispara sozinho — fica pronto para outra ação chamar depois.'}
+                      </p>
                     ) : filtro.tipo ? (
                       <label className="config-email-field">
                         <span>Valor</span>
@@ -454,6 +513,51 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
                 </label>
               ) : null}
             </div>
+          ) : null}
+
+          {showCsatGatilhoFields ? (
+            <>
+              {isCsatInicial ? (
+                <label className="config-email-field">
+                  <span>Status que inicia a contagem</span>
+                  <select
+                    value={csatStatusGatilho}
+                    onChange={(e) => updateCsatStatusGatilho(e.target.value)}
+                  >
+                    {(opcoes.status || []).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <p className="config-placeholder-msg">A contagem começa quando a pesquisa inicial é enviada e o cliente ainda não respondeu.</p>
+              )}
+              <div className="config-email-filtro-row">
+                <label className="config-email-field">
+                  <span>Prazo</span>
+                  <select
+                    value={csatPrazoTipo}
+                    onChange={(e) => updateCsatPrazoTipo(e.target.value)}
+                  >
+                    <option value="imediato">Imediato</option>
+                    <option value="horas">Após um prazo (horas)</option>
+                  </select>
+                </label>
+                {csatPrazoTipo === 'horas' ? (
+                  <label className="config-email-field">
+                    <span>Horas úteis (1 a 48)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={48}
+                      value={csatPrazoHoras}
+                      onChange={(e) => updateCsatPrazoHoras(e.target.value)}
+                      placeholder="Ex.: 48"
+                    />
+                  </label>
+                ) : null}
+              </div>
+            </>
           ) : null}
         </section>
         <p className="config-placeholder-msg">{summarizeCriterios(draft.gatilho?.criterios, opcoes)}</p>

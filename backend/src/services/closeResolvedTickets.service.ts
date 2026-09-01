@@ -1,11 +1,12 @@
 /**
- * closeResolvedTickets.service v1.0.1 — resolvido → fechado após janela configurável
- * VERSION: v1.0.1 | DATE: 2026-07-29
+ * closeResolvedTickets.service v1.1.0 — resolvido → fechado após janela configurável.
+ * Não dispara mais CSAT diretamente — o envio de CSAT é decoupled, controlado pelo
+ * próprio gatilho configurado no e-mail "Encerramento mais satisfação" (ver csatEmail.service).
+ * VERSION: v1.1.0 | DATE: 2026-09-01
  */
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { env } from '../config/env';
 import { appendStatusTransition } from './chamado.mapper';
-import { sendCsatEmailAsync } from './csatEmail.service';
 
 export interface CloseResolvedResult {
   scanned: number;
@@ -60,9 +61,6 @@ export async function closeResolvedTicketsPastWindow(
       });
       await chamado.save();
       closed += 1;
-
-      // Disparo do e-mail de CSAT (fail-soft — nunca impede o fechamento)
-      await sendCsatEmailAsync(chamado);
     } catch (err) {
       errors += 1;
       console.warn(

@@ -31,7 +31,7 @@ export function serializeEmailConteudo(doc: {
         ...(item.tipo === 'sla' && item.horasPersonalizadas != null
           ? { horasPersonalizadas: Number(item.horasPersonalizadas) }
           : {}),
-        ...(item.tipo === 'status' && item.prazoTipo
+        ...((item.tipo === 'status' || item.tipo === 'gatilho_interno') && item.prazoTipo
           ? {
             prazoTipo: item.prazoTipo,
             ...(item.prazoTipo === 'horas' && item.prazoHoras != null
@@ -58,14 +58,16 @@ function sanitizeCriterios(raw: unknown): IEmailCriterio[] {
     const valores = Array.isArray((item as { valores?: unknown })?.valores)
       ? (item as { valores: unknown[] }).valores.map((value) => String(value ?? '').trim()).filter(Boolean)
       : [];
-    const criterio: IEmailCriterio = { tipo, valores: tipo === 'gatilho_interno' ? [] : valores };
+    // gatilho_interno (CSAT inicial/repescagem): valores carrega no máximo um status
+    // (qual status inicia a contagem do prazo — só usado pela pesquisa inicial).
+    const criterio: IEmailCriterio = { tipo, valores: tipo === 'gatilho_interno' ? valores.slice(0, 1) : valores };
 
     if (tipo === 'sla' && valores.includes('personalizado')) {
       const horas = Number((item as { horasPersonalizadas?: unknown })?.horasPersonalizadas);
       if (Number.isFinite(horas) && horas > 0) criterio.horasPersonalizadas = horas;
     }
 
-    if (tipo === 'status') {
+    if (tipo === 'status' || tipo === 'gatilho_interno') {
       const prazoTipo = (item as { prazoTipo?: unknown })?.prazoTipo === 'horas' ? 'horas' : 'imediato';
       criterio.prazoTipo = prazoTipo;
       if (prazoTipo === 'horas') {
@@ -80,8 +82,11 @@ function sanitizeCriterios(raw: unknown): IEmailCriterio[] {
 
     list.push(criterio);
   }
-  if (list.some((item) => item.tipo === 'gatilho_interno')) {
-    return [{ tipo: 'gatilho_interno', valores: [] }];
+  const interno = list.find((item) => item.tipo === 'gatilho_interno');
+  if (interno) {
+    // gatilho interno é exclusivo — se presente, é o único critério do e-mail —
+    // mas preserva valores/prazo (status + prazo configurados para CSAT).
+    return [interno];
   }
   return list;
 }
