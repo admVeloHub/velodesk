@@ -167,7 +167,7 @@ async function composeAndSendCsatEmail(
     autor: 'e-mail padrão',
     mensagemPublica: [saudacao, corpoTexto].filter(Boolean).join('\n\n'),
     anexosMensagemPublica: [],
-    anotacaoInterna: `E-mail CSAT enviado: ${opts.templateNome}`,
+    anotacaoInterna: `Mensagem Automática Enviada: ${opts.templateNome}`,
     anexosAnotacaoInterna: [],
     alteracoes: [],
     metadados: { emailPadraoId: String(doc._id), emailPadraoNome: doc.nome, csatType: opts.isRepescagem ? 'repescagem' : 'inicial' },

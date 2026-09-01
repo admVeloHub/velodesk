@@ -126,6 +126,12 @@ function scanStatusesForPublicAttachments(reg: IRegistro): string[] | undefined 
   return aligned.some(Boolean) ? aligned : undefined;
 }
 
+/** E-mail automático (padrão/CSAT) — sai da aba Conversa e vira evento na aba Eventos. */
+function isAutomaticEmailRegistro(reg: IRegistro, meta: Record<string, unknown>): boolean {
+  return String(reg.autor || '').trim().toLowerCase() === 'e-mail padrão'
+    || Boolean(meta.emailPadraoId);
+}
+
 function registroMetadados(reg: IRegistro): Record<string, unknown> {
   if (reg.metadados && typeof reg.metadados === 'object' && !Array.isArray(reg.metadados)) {
     return reg.metadados;
@@ -690,6 +696,7 @@ export interface RegistroHistoricoDto {
   alteracoes: unknown[];
   status: string;
   anotacaoInterna?: string;
+  metadados?: Record<string, unknown>;
 }
 
 export interface TicketDto {
@@ -1896,6 +1903,7 @@ function buildTicketDtoCore(
   if (!listOnly) {
     chamado.registro?.forEach((reg, index) => {
       const origin = resolveRegistroOrigin(reg);
+      const meta = registroMetadados(reg);
       registroHistorico.push({
         id: `${index}-reg`,
         registroIndex: index,
@@ -1905,9 +1913,9 @@ function buildTicketDtoCore(
         alteracoes: businessAlteracoesFromRegistro(reg),
         status: reg.status || 'novo',
         anotacaoInterna: String(reg.anotacaoInterna ?? '').trim() || undefined,
+        metadados: meta,
       });
       const regAutor = resolveStoredRegistroAutor(reg, origin, clientName);
-      const meta = registroMetadados(reg);
       const isWhatsAppThread = String(meta.source ?? '') === WHATSAPP_THREAD_SOURCE;
 
       if (isWhatsAppThread) {
@@ -1936,16 +1944,17 @@ function buildTicketDtoCore(
             ),
           });
         });
-      } else if (reg.mensagemPublica || (reg.anexosMensagemPublica?.length ?? 0) > 0) {
+      } else if (
+        (reg.mensagemPublica || (reg.anexosMensagemPublica?.length ?? 0) > 0)
+        && !isAutomaticEmailRegistro(reg, meta)
+      ) {
         const isEmailInbound = String(meta.source ?? '').toLowerCase() === 'email-inbound';
         const publicText = normalizeTicketMessageText(
           isEmailInbound
             ? extractEmailReplyContent(reg.mensagemPublica)
             : reg.mensagemPublica,
         );
-        const isSystemBubble = String(reg.origin || '').trim().toLowerCase() === 'sistema'
-          || String(reg.autor || '').trim().toLowerCase() === 'e-mail padrão'
-          || Boolean(meta.emailPadraoId);
+        const isSystemBubble = String(reg.origin || '').trim().toLowerCase() === 'sistema';
         messages.push({
           id: `${index}-pub`,
           text: publicText,

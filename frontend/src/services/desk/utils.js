@@ -2030,6 +2030,12 @@ function isAgentRegistroEntry(entry) {
   return String(entry.origin || 'agente').toLowerCase() !== 'cliente';
 }
 
+/** Envio de e-mail automático (padrão/CSAT) — nome cadastrado no catálogo de e-mails de saída. */
+function emailAutomaticoNomeFromEntry(entry) {
+  const nome = String(entry?.metadados?.emailPadraoNome ?? '').trim();
+  return nome || null;
+}
+
 /** Recebimento da avaliação CSAT (ver csat.routes.ts) é um evento em si — a nota/
  * comentário do cliente é que fica só na aba Notas via anotacaoInterna. Usa o
  * metadado estruturado, nunca o texto, pra Eventos não vazar conteúdo de nota. */
@@ -2043,6 +2049,7 @@ function csatNotaFromEntry(entry) {
  * nunca às duas. */
 function shouldShowSupervisorRegistroOccurrence(entry, previousTabulationState, prevStatus) {
   if (!isAgentRegistroEntry(entry)) return false;
+  if (emailAutomaticoNomeFromEntry(entry) !== null) return true;
   if (csatNotaFromEntry(entry) !== null) return true;
 
   const { tabulationChanges, statusChanged } = collectRegistroOccurrenceData(
@@ -2057,6 +2064,22 @@ function mapSupervisorRegistroOccurrence(entry, ticket, client, previousTabulati
   if (!shouldShowSupervisorRegistroOccurrence(entry, previousTabulationState, prevStatus)) return null;
 
   const ticketId = String(ticket.id || ticket._id);
+
+  // Envio de e-mail automático — evento de uma linha só, sem detalhar o conteúdo enviado.
+  const emailAutomaticoNome = emailAutomaticoNomeFromEntry(entry);
+  if (emailAutomaticoNome !== null) {
+    return {
+      id: `${ticketId}:${entry.id}`,
+      kind: 'email-automatico',
+      author: 'Sistema',
+      initials: 'SY',
+      badge: `Mensagem Automática Enviada: ${emailAutomaticoNome}`,
+      timestamp: entry.time || entry.timestamp || ticket.updatedAt,
+      ticketId,
+      ticketTitle: getTicketTitle(ticket),
+    };
+  }
+
   const author = resolveRegistroAutorLabel(entry, ticket, client);
   const {
     tabulationChanges,

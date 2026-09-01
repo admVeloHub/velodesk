@@ -177,7 +177,7 @@ async function sendTemplateEmail(chamado: IChamadoN1, doc: {
     autor: 'e-mail padrão',
     mensagemPublica: [saudacao, corpo].filter(Boolean).join('\n\n'),
     anexosMensagemPublica: [],
-    anotacaoInterna: `E-mail padrão enviado: ${doc.nome}`,
+    anotacaoInterna: `Mensagem Automática Enviada: ${doc.nome}`,
     anexosAnotacaoInterna: [],
     alteracoes: [],
     metadados: { emailPadraoId: String(doc._id), emailPadraoNome: doc.nome },
