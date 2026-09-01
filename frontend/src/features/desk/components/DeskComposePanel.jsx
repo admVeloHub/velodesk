@@ -56,6 +56,7 @@ export function DeskStatusCommitButton({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const { profileId } = useProfile();
+  const { showNotification } = useNotifications();
   const sendStatusOptions = useMemo(() => {
     if (shouldViewAllDeskTickets(profileId)) return getSendStatusOptions('gestao');
     return getSendStatusOptions(profileId);
@@ -97,10 +98,12 @@ export function DeskStatusCommitButton({
         aria-haspopup="listbox"
         aria-expanded={menuOpen}
         aria-disabled={disabled}
-        disabled={disabled}
         title={triggerTitle}
         onClick={() => {
-          if (disabled) return;
+          if (disabled) {
+            showNotification(menuDisabledReason || 'Complete os requisitos antes de enviar.', 'warning');
+            return;
+          }
           setMenuOpen((v) => !v);
         }}
       >
@@ -128,10 +131,16 @@ export function DeskStatusCommitButton({
               type="button"
               className={'crm-send-status__option crm-send-status__option--' + opt.cls + (optionBlocked ? ' is-disabled' : '')}
               role="option"
-              disabled={optionBlocked}
+              aria-disabled={optionBlocked}
               title={optionGate.reason || undefined}
               onClick={() => {
-                if (optionBlocked) return;
+                if (optionBlocked) {
+                  showNotification(
+                    optionGate.reason || menuDisabledReason || 'Complete os requisitos antes de enviar.',
+                    'warning',
+                  );
+                  return;
+                }
                 setMenuOpen(false);
                 onCommitStatus(opt.id);
               }}
@@ -570,8 +579,19 @@ export default function DeskComposePanel({
                 type="button"
                 className={'response-tab octa-nav-tab octa-tab-public' + (composeMode === 'public' ? ' active' : '')}
                 data-compose="public"
-                onClick={() => onComposeModeChange('public')}
-                disabled={publicComposeLocked}
+                aria-disabled={publicComposeLocked}
+                onClick={() => {
+                  if (publicComposeLocked) {
+                    showNotification(
+                      ticketReadOnly
+                        ? 'Ticket fechado — somente leitura.'
+                        : 'Sem permissão para resposta pública neste ticket. Use a anotação interna.',
+                      'warning',
+                    );
+                    return;
+                  }
+                  onComposeModeChange('public');
+                }}
               >
                 <i className="fas fa-envelope" /> Resposta pública
               </button>
