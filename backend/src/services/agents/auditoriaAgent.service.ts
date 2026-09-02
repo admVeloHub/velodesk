@@ -78,14 +78,18 @@ function applyPostAuditRules(
 
   const llmKeywords = parsed.palavrasCriticasDetectadas || [];
   const allKeywords = [...new Set([...precheckKeywords, ...llmKeywords])];
-  // A palavra-chave é só o gatilho barato pra acordar a triagem (avaliarAmeacaCritica) — quem
-  // decide se escalona de fato é o julgamento com a conversa inteira, não a mera presença do
-  // termo. allKeywords.length > 0 sem ameacaConfirmada = coincidência: nada muda no ticket.
-  const hasCritical = allKeywords.length > 0 && ameacaConfirmada;
+  // ameacaConfirmada já encapsula "algo acionou a triagem E ela confirmou ameaça real" (ver
+  // validateAuditoria) — palavra-chave OU autodeclaração livre do Auditor são só o gatilho pra
+  // rodar a triagem; sem confirmação real, é coincidência e nada muda no ticket.
+  const hasCritical = ameacaConfirmada;
 
   let decisao: AuditDecisao = parsed.decisao || 'encaminhar_humano';
   let nivelCriticidade: NivelCriticidade = parsed.nivelCriticidade || 'nenhuma';
-  let notificarAgente3 = Boolean(parsed.notificarAgente3);
+  // NUNCA confiar direto em parsed.notificarAgente3 — o próprio Auditor pode se autodeclarar
+  // "crítico" por critério livre (persona: "RISCO_CRITICO — contextos críticos") sem nenhuma
+  // palavra-gatilho, o que bypassaria a triagem por completo. notificarAgente3 só pode nascer
+  // true dentro do bloco hasCritical abaixo, já com ameacaConfirmada validado.
+  let notificarAgente3 = false;
   let requerRevisaoAgente1 = Boolean(parsed.requerRevisaoAgente1);
   let aprovado = Boolean(parsed.aprovado);
 
@@ -214,10 +218,18 @@ export async function validateAuditoria(params: AuditoriaInput): Promise<Auditor
 
     const llmKeywords = parsed.palavrasCriticasDetectadas || [];
     const candidateKeywords = [...new Set([...precheckKeywords, ...llmKeywords])];
-    // Palavra-gatilho é só o filtro mecânico — a decisão de escalonar de fato fica com
-    // avaliarAmeacaCritica, que lê a conversa inteira (ver criticidadeTriagem.service).
-    const ameacaConfirmada = candidateKeywords.length > 0
-      ? (await avaliarAmeacaCritica(contextText, candidateKeywords, {
+    // Gatilho pra avaliar: palavra-chave (regex ou o próprio Auditor listou em
+    // palavrasCriticasDetectadas) OU o Auditor se autodeclarou notificarAgente3=true por
+    // critério livre (RISCO_CRITICO), sem nenhuma palavra específica. De qualquer forma, é só
+    // o gatilho — a decisão de escalonar de fato fica com avaliarAmeacaCritica, que lê a
+    // conversa inteira (ver criticidadeTriagem.service). Sem isso, um "notificarAgente3=true"
+    // autodeclarado pelo Auditor bypassaria a triagem inteira.
+    const triagemAcionada = candidateKeywords.length > 0 || Boolean(parsed.notificarAgente3);
+    const triagemKeywords = candidateKeywords.length > 0
+      ? candidateKeywords
+      : ['contexto crítico sinalizado pelo Auditor (sem palavra específica)'];
+    const ameacaConfirmada = triagemAcionada
+      ? (await avaliarAmeacaCritica(contextText, triagemKeywords, {
         protocolo: params.protocolo,
         userId: params.userId,
       })).ameacaReal
