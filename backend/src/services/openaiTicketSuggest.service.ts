@@ -1,6 +1,8 @@
 /**
- * openaiTicketSuggest.service v1.4.2 — contexto internal usa só nota persistida, sem thread placeholder
- * VERSION: v1.4.2 | DATE: 2026-08-21
+ * openaiTicketSuggest.service v1.5.0 — checa aiSuggestionCache (fingerprint) antes de chamar
+ * o pipeline; se a thread não mudou desde a última geração em modo desk, serve do cache sem
+ * nenhuma chamada de LLM
+ * VERSION: v1.5.0 | DATE: 2026-09-02
  */
 import OpenAI from 'openai';
 import { env } from '../config/env';
@@ -14,6 +16,7 @@ import {
 import { getTicketSuggestPersona } from './ticketSuggestPersona';
 import { runAgentPipeline } from './agents/agentOrchestrator.service';
 import type { PipelineStage } from './agents/agentTypes';
+import { computeCanonicalFingerprint, readAiSuggestionCache } from './agents/agentSuggestionCache.util';
 import { isPersistedMongoTicketId } from '../utils/persistedTicketId';
 import { getAgentsStatus, getAtendimentoVectorStoreIds, isAgentsConfigured } from './agents/openaiAgent.util';
 import { logAiUsage } from './aiUsage.service';
@@ -390,6 +393,33 @@ export async function generateTicketAiSuggest(
     );
     if (!hasClientMsg) {
       return { success: false, error: 'Informe ao menos uma mensagem do cliente para contextSource public' };
+    }
+  }
+
+  if (env.agentsEnabled && isPersistedMongoTicketId(enrichedParams.ticketId)) {
+    const freshChamado = await ChamadoN1.findById(enrichedParams.ticketId);
+    const cached = freshChamado ? await readAiSuggestionCache(enrichedParams.ticketId!) : null;
+    const fingerprint = freshChamado
+      ? computeCanonicalFingerprint(freshChamado, enrichedParams.contextSource)
+      : '';
+    if (cached && cached.fingerprint === fingerprint) {
+      console.log('[ticket-ai-suggest] cache hit — sugestão pré-gerada reaproveitada', {
+        ticketId: enrichedParams.ticketId,
+        generatedAt: cached.generatedAt,
+      });
+      return {
+        success: true,
+        respostaSugerida: cached.respostaSugerida,
+        tabulacao: cached.tabulacao,
+        tabulacaoDisplay: cached.tabulacaoDisplay,
+        tabulacaoFonte: (cached.tabulacaoFonte as 'auditoria' | 'atendimento' | undefined) || 'atendimento',
+        model: cached.model,
+        auditScore: cached.auditScore,
+        auditAprovado: cached.auditAprovado,
+        auditDecisao: cached.auditDecisao,
+        auditComplete: true,
+        confidence: cached.confidence,
+      };
     }
   }
 

@@ -79,7 +79,7 @@ async function callAtendimentoOpenAi(
 ): Promise<{ parsed: AtendimentoParsed | null; model: string }> {
   const openai = createOpenAiClient();
   const tools = vectorStoreIds.length
-    ? [{ type: 'file_search' as const, vector_store_ids: vectorStoreIds }]
+    ? [{ type: 'file_search' as const, vector_store_ids: vectorStoreIds, max_num_results: 6 }]
     : undefined;
 
   const response = await openai.responses.create({

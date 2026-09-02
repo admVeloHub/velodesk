@@ -1,6 +1,11 @@
 /**
- * ticketIaAdapter.service v1.2.1 — notas internas ignoram entradas automáticas do sistema
- * VERSION: v1.2.1 | DATE: 2026-08-21
+ * ticketIaAdapter.service v1.3.0 — buildTicketIaMessagesFromChamado ignora registros
+ * origin='sistema' (notificações automáticas, ex.: "abertura de protocolo"). Antes disso,
+ * resolveRegistroOrigin (chamado.mapper) caía no fallback default 'cliente' pra esses
+ * registros — a IA via a própria notificação automática da Velotax como se fosse fala do
+ * cliente, e o fingerprint do cache de sugestão mudava assim que essas notificações eram
+ * gravadas (segundos depois da criação do ticket), invalidando a pré-geração sempre.
+ * VERSION: v1.3.0 | DATE: 2026-09-02
  *
  * A IA deve receber prioritariamente a fala direta do cliente. Em tickets criados
  * manualmente, onde não há mensagem originada pelo cliente, o detalhe informado pelo
@@ -115,6 +120,8 @@ export function buildTicketIaMessagesFromChamado(chamado: IChamadoN1): TicketIaC
   const items: TicketIaConversationMessage[] = [];
 
   for (const reg of sortedRegistros(chamado)) {
+    if (String(reg.origin ?? '').trim().toLowerCase() === 'sistema') continue;
+
     const metadata = registroMetadata(reg);
     const source = String(metadata.source ?? '').trim().toLowerCase();
 

@@ -1,9 +1,8 @@
 /**
- * auditoriaPersona v1.6.1 — critério 1 (ADERÊNCIA REAL) explicitamente não reprova mais pedido
- * curto/direto sem preâmbulo (ex.: "retirada de chave pix") — só reprova termo solto DENTRO de
- * texto sem relação com ele. Corrige o mesmo falso-negativo do gate de coerência do Agente 1
- * (ticket 2609020014), pois o auditor tem critério equivalente e podia reprovar de novo.
- * VERSION: v1.6.1 | DATE: 2026-09-02
+ * auditoriaPersona v1.9.0 — criteriosAvaliados vira objeto de 10 chaves booleanas fixas (era
+ * array de {criterio, conforme} — o "criterio" ainda era texto livre gerado pelo modelo a cada
+ * chamada). Nomes de propriedade do schema não custam tokens de geração; só valores custam.
+ * VERSION: v1.9.0 | DATE: 2026-09-02
  */
 import { getAgentLabel, getAgentNomeOficial, getAgentShortLabel } from '../agentRegistry';
 
@@ -52,17 +51,19 @@ Bloqueie e notifique ${getAgentShortLabel(3)} se houver menção ou contexto de:
 
 # CRITÉRIOS DE AVALIAÇÃO (todos obrigatórios — registre em criteriosAvaliados)
 
-1. ADERÊNCIA REAL — Cite em observacao a frase EXATA (ou paráfrase mínima) da mensagem do cliente que constitui um pedido EXPLÍCITO relacionado ao POP usado. Um termo solto (ex.: "chave pix", "liberação") dentro de um texto MAIOR e sem relação com ele, incoerente ou sobre outro assunto NUNCA conta como pedido, mesmo que seja o nome exato de um produto/procedimento real — isso é reprovação automática (conforme=false, score final <= 40), MESMO que a resposta pareça fiel ao POP. PROIBIDO justificar aprovação com "solicitação implícita", "intenção subentendida" ou qualquer leitura que preencha lacunas que o cliente não escreveu — o pedido tem que estar no texto, não na sua interpretação dele.
+criteriosAvaliados tem 10 chaves fixas (aderenciaReal, procedimento, veracidade, produtos, tomNaturalidade, estruturaNucleo, vazamento, escalonamento, riscoCritico, tabulacao) — cada uma é SÓ true/false, nunca escreva texto ali. Qualquer explicação de por que algo reprovou vai em "violacoes" (array no nível raiz, uma string objetiva por problema real). Isso corta texto gerado à toa nos critérios que já passam (a maioria, na prática).
+
+1. aderenciaReal — A resposta cita um pedido EXPLÍCITO da mensagem do cliente, relacionado ao POP usado? Um termo solto (ex.: "chave pix", "liberação") dentro de um texto MAIOR e sem relação com ele, incoerente ou sobre outro assunto NUNCA conta como pedido, mesmo que seja o nome exato de um produto/procedimento real — isso é reprovação automática (false, score final <= 40), MESMO que a resposta pareça fiel ao POP. PROIBIDO aprovar com "solicitação implícita", "intenção subentendida" ou qualquer leitura que preencha lacunas que o cliente não escreveu — o pedido tem que estar no texto, não na sua interpretação dele. Se reprovar, registre em violacoes qual trecho da mensagem NÃO sustenta o pedido.
    Por outro lado, uma mensagem curta, direta e objetiva que nomeia o próprio serviço desejado (ex.: "retirada de chave pix", sem saudação nem frase completa) É aderência real — não é "termo solto em texto sem relação", é o pedido inteiro. NUNCA reprove por falta de preâmbulo, saudação ou estrutura gramatical completa. Reprove só quando o termo estiver perdido dentro de outra coisa, não quando ele FOR a mensagem.
-2. PROCEDIMENTO — Dado que a etapa 1 passou, a resposta segue o POP aplicável?
-3. VERACIDADE — Há prazos, valores ou promessas inventados?
-4. PRODUTOS — Menciona produtos/serviços proibidos ou assuntos fora de escopo?
-5. TOM E NATURALIDADE — Linguagem profissional em PT-BR, núcleo direto, sem recapitular a pergunta/reclamação ("Entendo que...", "Sobre sua dúvida..."). Penalize eco ou clichês.
-6. ESTRUTURA NÚCLEO — Conteúdo operacional objetivo em parágrafos. NÃO exija saudação, apresentação, protocolo, CTA ou assinatura no núcleo — envelope é mecânico fora da IA. Penalize se o núcleo contiver envelope (saudação, "Eu sou X do Atendimento", box protocolo, despedida institucional).
-7. VAZAMENTO — Expõe anotações internas ou dados confidenciais?
-8. ESCALONAMENTO — Caso exige escalonamento e resposta tenta resolver sem encaminhar?
-9. RISCO_CRITICO — Palavras ou contextos críticos detectados?
-10. TABULACAO — Antes de olhar a tabulação proposta pelo ${agenteResposta}, derive VOCÊ MESMO tipo/produto/motivo/detalhe a partir da mensagem do cliente e do catálogo fechado, como se estivesse tabulando do zero. Só depois compare com a proposta do ${agenteResposta}. Se as duas coincidirem, conforme=true. Se divergirem, isso é uma violação (conforme=false) — explique a diferença na observação, não apenas ajuste silenciosamente como se fosse um detalhe trivial. Não deixe a proposta do ${agenteResposta} ancorar sua própria conclusão antes de você chegar nela por conta própria.
+2. procedimento — Dado que aderenciaReal passou, a resposta segue o POP aplicável?
+3. veracidade — Há prazos, valores ou promessas inventados?
+4. produtos — Menciona produtos/serviços proibidos ou assuntos fora de escopo?
+5. tomNaturalidade — Linguagem profissional em PT-BR, núcleo direto, sem recapitular a pergunta/reclamação ("Entendo que...", "Sobre sua dúvida..."). Penalize eco ou clichês.
+6. estruturaNucleo — Conteúdo operacional objetivo em parágrafos. NÃO exija saudação, apresentação, protocolo, CTA ou assinatura no núcleo — envelope é mecânico fora da IA. Penalize se o núcleo contiver envelope (saudação, "Eu sou X do Atendimento", box protocolo, despedida institucional).
+7. vazamento — Expõe anotações internas ou dados confidenciais?
+8. escalonamento — Caso exige escalonamento e resposta tenta resolver sem encaminhar?
+9. riscoCritico — Palavras ou contextos críticos detectados?
+10. tabulacao — Antes de olhar a tabulação proposta pelo ${agenteResposta}, derive VOCÊ MESMO tipo/produto/motivo/detalhe a partir da mensagem do cliente e do catálogo fechado, como se estivesse tabulando do zero. Só depois compare com a proposta do ${agenteResposta}. Se as duas coincidirem, true. Se divergirem, isso é uma violação (false) — registre a diferença em violacoes, não apenas ajuste silenciosamente como se fosse um detalhe trivial. Não deixe a proposta do ${agenteResposta} ancorar sua própria conclusão antes de você chegar nela por conta própria.
 
 # TABULAÇÃO SUGERIDA (campo tabulacaoSugerida)
 
@@ -74,5 +75,5 @@ Atribua score de conformidade geral de 0 a 100. Avalie de forma independente —
 
 # SAÍDA
 
-Responda EXCLUSIVAMENTE com JSON válido. Inclua: aprovado, score, modo, decisao, nivelCriticidade, impactoGravidade, categoriaAtendimento, palavrasCriticasDetectadas, requerRevisaoAgente1, notificarAgente3, violacoes, recomendacoes, criteriosAvaliados, tabulacaoSugerida.`;
+Responda EXCLUSIVAMENTE com JSON válido. Inclua: aprovado, score, decisao, nivelCriticidade, impactoGravidade, categoriaAtendimento, palavrasCriticasDetectadas, requerRevisaoAgente1, notificarAgente3, violacoes, recomendacoes, criteriosAvaliados, tabulacaoSugerida.`;
 }

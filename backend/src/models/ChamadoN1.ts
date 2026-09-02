@@ -1,4 +1,4 @@
-/** ChamadoN1 v1.13.0 — workflowStatus active/finished/cancel persistente */
+/** ChamadoN1 v1.14.0 — campo aiSuggestionCache (rascunho de sugestão pré-gerada, fora do registro[]) */
 import mongoose, { Schema, Document, Types } from 'mongoose';
 import type { IChamadoWorkflowRequisicao } from '../config/workflowRequisicaoDefaults';
 
@@ -44,6 +44,27 @@ export interface IChamadoWorkflow {
   completedAt: Date | null;
   pendingDecision?: 'approve' | 'reject' | null;
   requisicao?: IChamadoWorkflowRequisicao;
+}
+
+/**
+ * Cache de sugestão da IA pré-gerada (Agente 1+2, modo desk_sugestao) — nunca é mensagem
+ * enviada nem parte do histórico oficial (`registro[]`); é só um rascunho pronto pra exibir
+ * quando o agente abre o ticket. `fingerprint` identifica o estado da thread que gerou essa
+ * sugestão — se a thread mudar, o fingerprint não bate mais e o cache é ignorado (recalculado
+ * na hora). É apagado no envio real da resposta (ver clearAiSuggestionCache).
+ */
+export interface IAiSuggestionCache {
+  fingerprint: string;
+  respostaSugerida: string;
+  tabulacao: { tipo: string; produto: string; motivo: string; detalhe: string; incompleta?: boolean };
+  tabulacaoDisplay: string;
+  tabulacaoFonte?: string;
+  auditScore?: number;
+  auditAprovado?: boolean;
+  auditDecisao?: string;
+  confidence?: string;
+  model?: string;
+  generatedAt: Date;
 }
 
 export interface IChamadoCsat {
@@ -96,6 +117,7 @@ export interface IChamadoN1 extends Document {
   workflow?: IChamadoWorkflow;
   fusao?: IChamadoFusao;
   csat?: IChamadoCsat;
+  aiSuggestionCache?: IAiSuggestionCache;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -227,6 +249,32 @@ const ChamadoCsatSchema = new Schema<IChamadoCsat>(
   { _id: false },
 );
 
+const AiSuggestionCacheSchema = new Schema<IAiSuggestionCache>(
+  {
+    fingerprint: { type: String, required: true },
+    respostaSugerida: { type: String, default: '' },
+    tabulacao: {
+      type: {
+        tipo: { type: String, default: '' },
+        produto: { type: String, default: '' },
+        motivo: { type: String, default: '' },
+        detalhe: { type: String, default: '' },
+        incompleta: { type: Boolean, default: false },
+      },
+      default: undefined,
+    },
+    tabulacaoDisplay: { type: String, default: '' },
+    tabulacaoFonte: { type: String, default: undefined },
+    auditScore: { type: Number, default: undefined },
+    auditAprovado: { type: Boolean, default: undefined },
+    auditDecisao: { type: String, default: undefined },
+    confidence: { type: String, default: undefined },
+    model: { type: String, default: undefined },
+    generatedAt: { type: Date, default: Date.now },
+  },
+  { _id: false },
+);
+
 const ChamadoN1Schema = new Schema<IChamadoN1>(
   {
     chamadoProtocolo: { type: String },
@@ -237,6 +285,7 @@ const ChamadoN1Schema = new Schema<IChamadoN1>(
     workflow: { type: ChamadoWorkflowSchema, default: undefined },
     fusao: { type: ChamadoFusaoSchema, default: undefined },
     csat: { type: ChamadoCsatSchema, default: undefined },
+    aiSuggestionCache: { type: AiSuggestionCacheSchema, default: undefined },
   },
   {
     timestamps: true,

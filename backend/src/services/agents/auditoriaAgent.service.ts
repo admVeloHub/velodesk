@@ -37,7 +37,6 @@ import { logAiUsage } from '../aiUsage.service';
 interface AuditoriaParsed {
   aprovado?: boolean;
   score?: number;
-  modo?: string;
   decisao?: AuditDecisao;
   nivelCriticidade?: NivelCriticidade;
   impactoGravidade?: 'alto' | 'medio' | 'baixo';
@@ -47,7 +46,18 @@ interface AuditoriaParsed {
   notificarAgente3?: boolean;
   violacoes?: string[];
   recomendacoes?: string[];
-  criteriosAvaliados?: Array<{ criterio: string; conforme: boolean; observacao?: string }>;
+  criteriosAvaliados?: {
+    aderenciaReal?: boolean;
+    procedimento?: boolean;
+    veracidade?: boolean;
+    produtos?: boolean;
+    tomNaturalidade?: boolean;
+    estruturaNucleo?: boolean;
+    vazamento?: boolean;
+    escalonamento?: boolean;
+    riscoCritico?: boolean;
+    tabulacao?: boolean;
+  };
   tabulacaoSugerida?: { tipo?: string; produto?: string; motivo?: string; detalhe?: string };
 }
 
@@ -137,7 +147,18 @@ function applyPostAuditRules(
     notificarAgente3,
     violacoes: parsed.violacoes || [],
     recomendacoes: parsed.recomendacoes || [],
-    criteriosAvaliados: parsed.criteriosAvaliados || [],
+    criteriosAvaliados: parsed.criteriosAvaliados && {
+      aderenciaReal: parsed.criteriosAvaliados.aderenciaReal ?? false,
+      procedimento: parsed.criteriosAvaliados.procedimento ?? false,
+      veracidade: parsed.criteriosAvaliados.veracidade ?? false,
+      produtos: parsed.criteriosAvaliados.produtos ?? false,
+      tomNaturalidade: parsed.criteriosAvaliados.tomNaturalidade ?? false,
+      estruturaNucleo: parsed.criteriosAvaliados.estruturaNucleo ?? false,
+      vazamento: parsed.criteriosAvaliados.vazamento ?? false,
+      escalonamento: parsed.criteriosAvaliados.escalonamento ?? false,
+      riscoCritico: parsed.criteriosAvaliados.riscoCritico ?? false,
+      tabulacao: parsed.criteriosAvaliados.tabulacao ?? false,
+    },
     tabulacaoSugerida,
     tabulacaoDisplay: tabulacaoSugerida ? buildTabulationDisplay(tabulacaoSugerida) : undefined,
   };
@@ -172,7 +193,7 @@ export async function validateAuditoria(params: AuditoriaInput): Promise<Auditor
     const openai = createOpenAiClient();
     const vectorIds = getAuditoriaVectorStoreIds();
     const tools = vectorIds.length
-      ? [{ type: 'file_search' as const, vector_store_ids: vectorIds }]
+      ? [{ type: 'file_search' as const, vector_store_ids: vectorIds, max_num_results: 6 }]
       : undefined;
 
     const response = await openai.responses.create({

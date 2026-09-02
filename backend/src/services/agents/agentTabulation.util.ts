@@ -1,6 +1,10 @@
 /**
- * agentTabulation.util v1.6.0 — auditoria não recebe mais confiança autodeclarada do Agente 1
- * VERSION: v1.6.0 | DATE: 2026-08-31
+ * agentTabulation.util v1.7.0 — perf: remove fontesConsultadas (nunca era consumido downstream,
+ * puro custo de geração) do schema do Agente 1; criteriosAvaliados do Auditor vira objeto de 10
+ * chaves booleanas fixas em vez de array de {criterio, conforme} — nomes de propriedade de um
+ * schema JSON não custam tokens de geração, só os VALORES custam, então tirar o "criterio" como
+ * string livre corta ~10 geração de texto por chamada de auditoria
+ * VERSION: v1.7.0 | DATE: 2026-09-02
  */
 import { getActiveTabulation, validateComboSoft, type TabulationActiveDto } from '../tabulation.service';
 import type { TicketAiMessageInput, TicketAiTabulationResult, AuditoriaInput } from './agentTypes';
@@ -134,14 +138,14 @@ export function buildAtendimentoUserBlock(
       '',
       '## Tarefa',
       '',
-      'Revise o núcleo anterior corrigindo violações/recomendações da auditoria ou input do operador. Retorne SOMENTE núcleo — sem saudação, apresentação, protocolo, CTA ou assinatura. JSON com respostaSugerida, tabulacao, confidence e fontesConsultadas.',
+      'Revise o núcleo anterior corrigindo violações/recomendações da auditoria ou input do operador. Retorne SOMENTE núcleo — sem saudação, apresentação, protocolo, CTA ou assinatura. JSON com respostaSugerida, tabulacao e confidence.',
     );
   } else {
     parts.push(
       '',
       '## Tarefa',
       '',
-      'Em UMA única resposta JSON, retorne respostaSugerida (NÚCLEO ONLY — conteúdo operacional direto, sem eco da pergunta, sem saudação/apresentação/fechamento) e tabulacao (tipo, produto, motivo, detalhe) juntos. Inclua confidence e fontesConsultadas.',
+      'Em UMA única resposta JSON, retorne respostaSugerida (NÚCLEO ONLY — conteúdo operacional direto, sem eco da pergunta, sem saudação/apresentação/fechamento) e tabulacao (tipo, produto, motivo, detalhe) juntos. Inclua confidence.',
     );
   }
   return parts.join('\n');
@@ -354,12 +358,8 @@ export const ATENDIMENTO_JSON_SCHEMA = {
       required: ['tipo', 'produto', 'motivo', 'detalhe'],
     },
     confidence: { type: 'string', enum: ['alta', 'media', 'baixa'] },
-    fontesConsultadas: {
-      type: 'array',
-      items: { type: 'string' },
-    },
   },
-  required: ['pedidoClienteCitado', 'respostaSugerida', 'tabulacao', 'confidence', 'fontesConsultadas'],
+  required: ['pedidoClienteCitado', 'respostaSugerida', 'tabulacao', 'confidence'],
 } as const;
 
 function normalizeForLiteralMatch(value: string): string {
@@ -389,7 +389,6 @@ export const AUDITORIA_JSON_SCHEMA = {
   properties: {
     aprovado: { type: 'boolean' },
     score: { type: 'number' },
-    modo: { type: 'string' },
     decisao: { type: 'string' },
     nivelCriticidade: { type: 'string' },
     impactoGravidade: { type: 'string' },
@@ -400,17 +399,24 @@ export const AUDITORIA_JSON_SCHEMA = {
     violacoes: { type: 'array', items: { type: 'string' } },
     recomendacoes: { type: 'array', items: { type: 'string' } },
     criteriosAvaliados: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          criterio: { type: 'string' },
-          conforme: { type: 'boolean' },
-          observacao: { type: 'string' },
-        },
-        required: ['criterio', 'conforme', 'observacao'],
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        aderenciaReal: { type: 'boolean' },
+        procedimento: { type: 'boolean' },
+        veracidade: { type: 'boolean' },
+        produtos: { type: 'boolean' },
+        tomNaturalidade: { type: 'boolean' },
+        estruturaNucleo: { type: 'boolean' },
+        vazamento: { type: 'boolean' },
+        escalonamento: { type: 'boolean' },
+        riscoCritico: { type: 'boolean' },
+        tabulacao: { type: 'boolean' },
       },
+      required: [
+        'aderenciaReal', 'procedimento', 'veracidade', 'produtos', 'tomNaturalidade',
+        'estruturaNucleo', 'vazamento', 'escalonamento', 'riscoCritico', 'tabulacao',
+      ],
     },
     tabulacaoSugerida: {
       type: 'object',
@@ -425,7 +431,7 @@ export const AUDITORIA_JSON_SCHEMA = {
     },
   },
   required: [
-    'aprovado', 'score', 'modo', 'decisao', 'nivelCriticidade', 'impactoGravidade',
+    'aprovado', 'score', 'decisao', 'nivelCriticidade', 'impactoGravidade',
     'categoriaAtendimento', 'palavrasCriticasDetectadas', 'requerRevisaoAgente1',
     'notificarAgente3', 'violacoes', 'recomendacoes', 'criteriosAvaliados', 'tabulacaoSugerida',
   ],

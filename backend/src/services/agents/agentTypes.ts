@@ -72,10 +72,18 @@ export interface RevisaoInput extends AtendimentoInput {
   auditScore?: number;
 }
 
-export interface CriterioAvaliado {
-  criterio: string;
-  conforme: boolean;
-  observacao?: string;
+/** Um booleano fixo por critério — sem texto livre, pra não gastar tokens de geração à toa. */
+export interface CriteriosAvaliados {
+  aderenciaReal: boolean;
+  procedimento: boolean;
+  veracidade: boolean;
+  produtos: boolean;
+  tomNaturalidade: boolean;
+  estruturaNucleo: boolean;
+  vazamento: boolean;
+  escalonamento: boolean;
+  riscoCritico: boolean;
+  tabulacao: boolean;
 }
 
 export interface AuditoriaInput {
@@ -113,7 +121,7 @@ export interface AuditoriaResult {
   notificarAgente3?: boolean;
   violacoes?: string[];
   recomendacoes?: string[];
-  criteriosAvaliados?: CriterioAvaliado[];
+  criteriosAvaliados?: CriteriosAvaliados;
   tabulacaoSugerida?: TicketAiTabulationResult;
   tabulacaoDisplay?: string;
   model?: string;

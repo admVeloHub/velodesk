@@ -1,4 +1,8 @@
-/** tickets.routes v1.26.4 — by-protocol com try/catch (Express 4 não captura rejeicao async sem isso) */
+/**
+ * tickets.routes v1.27.0 — limpa aiSuggestionCache (sugestão pré-gerada) quando a resposta real
+ * é enviada ao cliente (e-mail e WhatsApp)
+ * VERSION: v1.27.0 | DATE: 2026-09-02
+ */
 import { Router, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { ChamadoN1 } from '../models/ChamadoN1';
@@ -32,6 +36,7 @@ import { publishTicketEvent } from '../services/realtime/ticketEventsBroadcast.s
 import { reconcileChamadoAttachmentScanStatuses } from '../services/attachmentScanReconcile.service';
 import { getCachedBoxes } from '../services/boxesCache.service';
 import { runInboundAgentPipeline, runInboundPostCreateHooks } from '../services/agents/inboundAgentPipeline.service';
+import { clearAiSuggestionCache } from '../services/agents/agentSuggestionCache.util';
 import { hasMeaningfulClientContextInChamado } from '../services/ticketIaAdapter.service';
 import {
   advanceWorkflowManual,
@@ -491,6 +496,9 @@ router.post('/:id/messages', authMiddleware, async (req, res: Response) => {
       attachmentList,
     );
     await chamado.save();
+    void clearAiSuggestionCache(chamado._id.toString()).catch((err: Error) => {
+      console.warn('[tickets.routes] clearAiSuggestionCache fail-soft:', err.message);
+    });
   }
 
   void publishTicketEvent(chamado._id.toString(), 'message');
@@ -603,6 +611,11 @@ router.post('/:id/whatsapp/messages', authMiddleware, async (req, res: Response)
   }
 
   await chamado.save();
+  if (sendResult.sent) {
+    void clearAiSuggestionCache(chamado._id.toString()).catch((err: Error) => {
+      console.warn('[tickets.routes] clearAiSuggestionCache fail-soft:', err.message);
+    });
+  }
   void publishTicketEvent(chamado._id.toString(), 'whatsapp-outbound');
 
   const boxes = await loadBoxes();

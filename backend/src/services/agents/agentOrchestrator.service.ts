@@ -1,6 +1,8 @@
 /**
- * agentOrchestrator.service v1.2.3 — não repassa confidence do Agente 1 para a auditoria
- * VERSION: v1.2.3 | DATE: 2026-08-31
+ * agentOrchestrator.service v1.3.0 — cache de sugestão pré-gerada (aiSuggestionCache): grava
+ * ao final de todo pipeline bem-sucedido em modo desk (cobre pré-geração na criação do ticket
+ * e geração normal ao abrir); limpa no envio autônomo
+ * VERSION: v1.3.0 | DATE: 2026-09-02
  */
 import { ChamadoN1 } from '../../models/ChamadoN1';
 import type { IChamadoN1 } from '../../models/ChamadoN1';
@@ -28,6 +30,7 @@ import { executeGestaoHandoff } from './gestaoChamadosHandoff.service';
 import { hasCasosEspeciaisTriagem } from './casosEspeciais.util';
 import { getAgentNomeOficial } from './agentRegistry';
 import { isPersistedMongoTicketId } from '../../utils/persistedTicketId';
+import { clearAiSuggestionCache, computeCanonicalFingerprint, writeAiSuggestionCache } from './agentSuggestionCache.util';
 
 function resolveDeskTabulacao(
   audit: AuditoriaResult,
@@ -121,6 +124,9 @@ async function sendAutonomousReply(
 
   await chamado.save();
   await notifyAgentReplyAsync(chamado, messageText, undefined, registroIndex);
+  void clearAiSuggestionCache(chamado._id.toString()).catch((err) => {
+    console.warn('[agent-pipeline] clearAiSuggestionCache (envio autônomo) fail-soft:', (err as Error)?.message);
+  });
 }
 
 export async function runAgentPipeline(input: PipelineInput): Promise<PipelineResult> {
@@ -257,6 +263,24 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
     model: atendimento.model,
     source: 'agent_pipeline',
   };
+
+  /**
+   * Só em modo desk (nunca em auto_envio/inbound, onde o envio autônomo já pode acontecer
+   * mais abaixo): grava a sugestão como rascunho pronto pra exibir na próxima vez que o
+   * ticket for aberto com a MESMA thread (fingerprint) — nunca em registro[], nunca enviada.
+   * Cobre tanto a pré-geração automática na criação do ticket/1ª nota interna
+   * (runInboundAgentPipeline) quanto a geração normal quando o operador abre o ticket.
+   */
+  if (chamado && input.pipelineModo === 'desk') {
+    const ticketId = chamado._id.toString();
+    void ChamadoN1.findById(ticketId).then((fresh) => {
+      if (!fresh) return undefined;
+      const fingerprint = computeCanonicalFingerprint(fresh, input.contextSource);
+      return writeAiSuggestionCache(ticketId, fingerprint, pipelineResult);
+    }).catch((err) => {
+      console.warn('[agent-pipeline] falha ao gravar aiSuggestionCache (fail-soft):', (err as Error)?.message);
+    });
+  }
 
   const canTryAutonomous = input.pipelineModo !== 'desk'
     && audit.decisao === 'aprovar_auto'
