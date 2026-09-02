@@ -294,10 +294,69 @@ export const tabulationApi = {
     api.delete(`/tabulation/opcoes/${encodeURIComponent(categoria)}/items/${encodeURIComponent(itemId)}`).then((r) => r.data),
 };
 
+/**
+ * Consome /ticket-ai/suggest-stream via SSE (fetch + ReadableStream — EventSource não suporta
+ * POST/Authorization). onStage recebe cada evento de progresso ('gerando'|'auditando'|
+ * 'revisando'); a promise resolve com o payload final (mesmo shape de /ticket-ai/suggest).
+ */
+async function suggestStream(payload, { signal, onStage } = {}) {
+  const token = localStorage.getItem('velodesk_token');
+  const response = await fetch('/api/ticket-ai/suggest-stream', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  if (!response.ok || !response.body) {
+    const data = await response.json().catch(() => ({}));
+    const err = new Error(data?.error || `HTTP ${response.status}`);
+    err.response = { status: response.status, data };
+    throw err;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let finalPayload = null;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+    for (const rawEvent of events) {
+      const line = rawEvent.split('\n').find((l) => l.startsWith('data: '));
+      if (!line) continue;
+      const json = JSON.parse(line.slice(6));
+      if (json.done) {
+        finalPayload = json;
+      } else if (json.stage) {
+        onStage?.(json.stage);
+      }
+    }
+  }
+
+  if (!finalPayload) {
+    throw new Error('Stream encerrada sem resultado final.');
+  }
+  if (!finalPayload.success) {
+    const err = new Error(finalPayload.error || 'Falha ao gerar sugestão da IA.');
+    err.response = { status: 500, data: finalPayload };
+    throw err;
+  }
+  return finalPayload;
+}
+
 export const ticketAiApi = {
   status: () => api.get('/ticket-ai/status').then((r) => r.data),
   suggest: (payload, config) =>
     api.post('/ticket-ai/suggest', payload, config).then((r) => r.data),
+  suggestStream,
 };
 
 export const agentsApi = {

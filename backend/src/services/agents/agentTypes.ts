@@ -120,8 +120,12 @@ export interface AuditoriaResult {
   error?: string;
 }
 
+export type PipelineStage = 'gerando' | 'auditando' | 'revisando';
+
 export interface PipelineInput extends AtendimentoInput {
   pipelineModo: PipelineModo;
+  /** Callback opcional (não serializado) para reportar progresso ao chamador — usado pelo endpoint SSE. */
+  onStage?: (stage: PipelineStage) => void;
 }
 
 export interface PipelineResult {

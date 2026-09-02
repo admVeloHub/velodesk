@@ -13,6 +13,7 @@ import {
 } from './agents/agentTabulation.util';
 import { getTicketSuggestPersona } from './ticketSuggestPersona';
 import { runAgentPipeline } from './agents/agentOrchestrator.service';
+import type { PipelineStage } from './agents/agentTypes';
 import { isPersistedMongoTicketId } from '../utils/persistedTicketId';
 import { getAgentsStatus, getAtendimentoVectorStoreIds, isAgentsConfigured } from './agents/openaiAgent.util';
 import { logAiUsage } from './aiUsage.service';
@@ -59,6 +60,8 @@ export interface TicketAiSuggestInput {
   messages?: TicketAiMessageInput[];
   internalNote?: string;
   produtoHint?: string;
+  /** Callback opcional (não serializado) para reportar progresso ao chamador — usado pelo endpoint SSE. */
+  onStage?: (stage: PipelineStage) => void;
 }
 
 export interface TicketAiTabulationResult {
@@ -392,7 +395,11 @@ export async function generateTicketAiSuggest(
 
   if (env.agentsEnabled) {
     console.log('[ticket-ai-suggest] delegando ao orquestrador (desk) para', userId || 'anonimo');
-    const pipeline = await runAgentPipeline({ ...enrichedParams, pipelineModo: 'desk' });
+    const pipeline = await runAgentPipeline({
+      ...enrichedParams,
+      pipelineModo: 'desk',
+      onStage: params.onStage,
+    });
     if (!pipeline.success) {
       return { success: false, error: pipeline.error || 'Falha no pipeline de agentes' };
     }

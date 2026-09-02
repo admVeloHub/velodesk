@@ -252,7 +252,7 @@ export const env = {
   agentCasosEspeciaisEnabled: process.env.AGENT_CASOS_ESPECIAIS_ENABLED === 'true',
   agentAuditThresholdAuto: parseInt(process.env.AGENT_AUDIT_THRESHOLD_AUTO || '85', 10),
   agentAuditThresholdDesk: parseInt(process.env.AGENT_AUDIT_THRESHOLD_DESK || '70', 10),
-  agentRevisionMaxAttempts: parseInt(process.env.AGENT_REVISION_MAX_ATTEMPTS || '2', 10),
+  agentRevisionMaxAttempts: parseInt(process.env.AGENT_REVISION_MAX_ATTEMPTS || '1', 10),
   gestaoSnapshotIntervalMs: parseInt(process.env.GESTAO_SNAPSHOT_INTERVAL_MS || '3600000', 10),
   gestaoChamadosIntervalMs: parseInt(process.env.GESTAO_CHAMADOS_INTERVAL_MS || '300000', 10),
   gestaoSpikeThreshold: parseInt(process.env.GESTAO_SPIKE_THRESHOLD || '10', 10),

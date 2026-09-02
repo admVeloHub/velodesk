@@ -133,6 +133,7 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
     chamado = await ChamadoN1.findById(input.ticketId);
   }
 
+  input.onStage?.('gerando');
   let atendimento: AtendimentoResult = await composeAtendimento(input);
   if (!atendimento.success || !atendimento.respostaSugerida || !atendimento.tabulacao) {
     return {
@@ -145,6 +146,7 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
   let respostaAtual = atendimento.respostaSugerida;
   let tabulacaoAtual = atendimento.tabulacao;
 
+  input.onStage?.('auditando');
   let audit = await validateAuditoria({
     modo: auditModo,
     protocolo: input.protocolo,
@@ -166,6 +168,7 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
     revisoesRealizadas += 1;
     const origem: RevisaoOrigem = 'automatica_baixo_compliance';
 
+    input.onStage?.('revisando');
     const revised = await reviseAtendimento({
       ...input,
       respostaAnterior: respostaAtual,
@@ -195,6 +198,7 @@ export async function runAgentPipeline(input: PipelineInput): Promise<PipelineRe
     atendimento = revised;
     respostaAtual = revised.respostaSugerida;
     tabulacaoAtual = revised.tabulacao;
+    input.onStage?.('auditando');
     audit = await validateAuditoria({
       modo: auditModo,
       protocolo: input.protocolo,

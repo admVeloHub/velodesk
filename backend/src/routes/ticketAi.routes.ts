@@ -1,4 +1,8 @@
-/** ticketAi.routes v1.0.5 — try/catch no suggest; rascunhos draft-* */
+/**
+ * ticketAi.routes v1.1.0 — /suggest-stream: SSE com progresso por etapa (gerando/auditando/
+ * revisando), pra frontend não ficar com barra travada sem feedback durante o pipeline
+ * VERSION: v1.1.0 | DATE: 2026-09-02
+ */
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { env } from '../config/env';
@@ -78,6 +82,75 @@ router.post('/suggest', authMiddleware, async (req: Request, res: Response) => {
       success: false,
       error: 'Falha ao gerar sugestão da IA.',
     });
+  }
+});
+
+router.post('/suggest-stream', authMiddleware, async (req: Request, res: Response) => {
+  const parsed = validateTicketAiInput(req.body);
+  if (!parsed.ok) {
+    return res.status(400).json({ success: false, error: parsed.error });
+  }
+
+  const configStatus = getOpenAiTicketSuggestStatus();
+  if (!configStatus.configured) {
+    return res.status(503).json({
+      success: false,
+      error: 'Serviço OpenAI não configurado no servidor.',
+      missing: configStatus.missing,
+    });
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  const send = (event: Record<string, unknown>) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+
+  const heartbeat = setInterval(() => res.write(': ping\n\n'), 15000);
+
+  try {
+    const userId = req.user?.email || req.user?.userId || 'anonymous';
+    const nomeOperador = await resolveOperadorDisplayNameForAuthEmail(req.user?.email || '');
+    const aiResult = await generateTicketAiSuggest(
+      {
+        ...parsed.data,
+        nomeOperador: nomeOperador || undefined,
+        onStage: (stage) => send({ stage }),
+      },
+      String(userId),
+    );
+
+    if (!aiResult.success) {
+      send({ done: true, success: false, error: aiResult.error || 'Não foi possível gerar sugestão' });
+    } else {
+      send({
+        done: true,
+        success: true,
+        respostaSugerida: aiResult.respostaSugerida,
+        tabulacao: aiResult.tabulacao,
+        tabulacaoDisplay: aiResult.tabulacaoDisplay,
+        tabulacaoFonte: aiResult.tabulacaoFonte || 'atendimento',
+        auditScore: aiResult.auditScore,
+        auditAprovado: aiResult.auditAprovado,
+        auditDecisao: aiResult.auditDecisao,
+        auditComplete: aiResult.auditComplete ?? false,
+        confidence: aiResult.confidence,
+        revisoesRealizadas: aiResult.revisoesRealizadas,
+        aiProvider: 'OpenAI',
+        model: aiResult.model,
+      });
+    }
+  } catch (err) {
+    console.error('[ticket-ai-suggest-stream] erro não tratado:', err);
+    send({ done: true, success: false, error: 'Falha ao gerar sugestão da IA.' });
+  } finally {
+    clearInterval(heartbeat);
+    res.end();
   }
 });
 

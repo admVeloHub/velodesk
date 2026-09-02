@@ -1,7 +1,8 @@
 /**
- * useTicketAiSuggestions v1.13.3 — canal Telefone não conta a msg sintética de abertura como
- * contexto do cliente (aguarda 1ª anotação interna); regressão do gate de "sem contexto"
- * VERSION: v1.13.3 | DATE: 2026-09-01
+ * useTicketAiSuggestions v1.14.0 — usa /ticket-ai/suggest-stream (SSE) em vez do POST simples:
+ * o pipeline expõe progresso por etapa (gerando/auditando/revisando) via onStage, então a
+ * mensagem de espera deixa de ficar travada num texto genérico durante todo o processamento
+ * VERSION: v1.14.0 | DATE: 2026-09-02
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ticketAiApi, agentsApi } from '../api/client';
@@ -318,6 +319,7 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
   const [agentsEnabled, setAgentsEnabled] = useState(false);
   const [waitingReason, setWaitingReason] = useState(null);
   const [serviceConfigured, setServiceConfigured] = useState(true);
+  const [stage, setStage] = useState(null);
 
   const cacheRef = useRef(new Map());
   const abortRef = useRef(null);
@@ -419,9 +421,10 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
   const waitingMessage = useMemo(() => {
     if (error) return error;
     if (loading) {
-      return agentsEnabled
-        ? 'Gerando resposta e verificando conformidade…'
-        : 'Gerando sugestão com base nos POPs…';
+      if (!agentsEnabled) return 'Gerando sugestão com base nos POPs…';
+      if (stage === 'auditando') return 'Verificando conformidade…';
+      if (stage === 'revisando') return 'Revisando resposta com base na auditoria…';
+      return 'Gerando resposta…';
     }
     if (waitingReason === 'awaiting_client_message') {
       return 'Aguardando mensagem do cliente';
@@ -436,7 +439,7 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
       return error || 'Sugestão IA indisponível no servidor.';
     }
     return '';
-  }, [loading, waitingReason, error, agentsEnabled]);
+  }, [loading, waitingReason, error, agentsEnabled, stage]);
 
   useEffect(() => {
     if (statusCheckedRef.current) return undefined;
@@ -532,6 +535,7 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
     setLoading(true);
     setError(null);
     setWaitingReason(null);
+    setStage('gerando');
     if (!stored?.result?.respostaSugerida) {
       setRespostaSugerida('');
       setTabulacao(null);
@@ -552,7 +556,12 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
     });
 
     try {
-      const data = await ticketAiApi.suggest(payload, { signal: controller.signal });
+      const data = await ticketAiApi.suggestStream(payload, {
+        signal: controller.signal,
+        onStage: (s) => {
+          if (generation === suggestGenerationRef.current) setStage(s);
+        },
+      });
       if (controller.signal.aborted) return;
       if (generation !== suggestGenerationRef.current) return;
 
@@ -645,6 +654,7 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
       suggestInFlightCountRef.current = Math.max(0, suggestInFlightCountRef.current - 1);
       if (suggestInFlightCountRef.current === 0) {
         setLoading(false);
+        setStage(null);
       }
       const pending = pendingHashAfterFlightRef.current;
       if (
@@ -667,6 +677,7 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
     abortRef.current = null;
     suggestInFlightCountRef.current = 0;
     setLoading(false);
+    setStage(null);
     inFlightHashRef.current = '';
     inFlightTicketIdRef.current = '';
     pendingHashAfterFlightRef.current = '';
@@ -910,6 +921,7 @@ export function useTicketAiSuggestions(ticketProp, rightFields, convMsgs, intern
 
   return {
     loading,
+    stage,
     error,
     respostaSugerida,
     tabulacao,

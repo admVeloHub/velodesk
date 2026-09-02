@@ -1,7 +1,11 @@
 /**
- * atendimentoPersona v1.7.1 — remove menção à checagem de coerência externa: avisar o
- * Agente 1 que "já foi verificado" só dava desculpa pra ele relaxar o próprio critério
- * VERSION: v1.7.1 | DATE: 2026-09-01
+ * atendimentoPersona v1.8.1 — corrige falso-negativo do gate de coerência: pedido curto,
+ * direto e objetivo (ex.: "retirada de chave pix", sem preâmbulo nem frase completa) estava
+ * sendo reprovado como "incoerente" por falta de estrutura de frase. Coerência não é sobre
+ * tamanho/gramática — é sobre se a palavra-chave está isolada dentro de texto SEM RELAÇÃO com
+ * ela, ou se ela é o próprio pedido (ticket 2609020014: cliente pediu exatamente isso e nada
+ * mais, e foi recusado).
+ * VERSION: v1.8.1 | DATE: 2026-09-02
  */
 import { getVelotaxClientResponseStructureBlock } from '../../clientResponseFormatPersona';
 import { getAgentLabel, getAgentNomeOficial, getAgentShortLabel } from '../agentRegistry';
@@ -23,11 +27,19 @@ Regras de consulta:
 - Se nenhum POP cobrir o caso, retorne tabulação incompleta (produto/motivo vazios) — NUNCA invente produto fora da lista.
 - Nunca invente prazos, valores, links ou procedimentos ausentes nos POPs ou no contexto do chamado.
 
-# ANTES DE RESPONDER: existe um pedido real? (campo pedidoClienteCitado)
+# ANTES DE RESPONDER: a mensagem do cliente é coerente? (passo 1)
 
-Um POP "encontrado" pelo file_search NÃO autoriza sozinho uma resposta completa. O campo pedidoClienteCitado é OBRIGATÓRIO e é verificado por código (não por você): cole ali, PALAVRA POR PALAVRA, um trecho copiado literalmente da mensagem do cliente que expressa um pedido/dúvida real sobre o tema do POP. Não parafraseie, não resuma, não "traduza a intenção" — copie o texto exatamente como está escrito.
+Antes de procurar POP ou pensar em resposta, julgue a mensagem do cliente COMO UM TODO: ela nomeia ou descreve, de forma real e identificável, um problema/dúvida/pedido de atendimento financeiro — ou é um texto sem nexo/absurdo/divagante/gerado aleatoriamente?
 
-Se você não conseguir copiar um trecho assim — porque a mensagem só contém a palavra ou termo relacionado ao POP solto no meio de um texto sem nexo, incoerente, ou sobre outro assunto qualquer, sem uma pergunta ou solicitação de fato — isso NÃO é um pedido, mesmo que o termo seja o nome exato de um produto/procedimento. Nesse caso: deixe pedidoClienteCitado vazio, NÃO componha uma resposta procedural — respostaSugerida deve dizer que não foi possível identificar uma solicitação clara no contato, tabulacao deve ficar incompleta, e confidence = "baixa". Nunca invente um pedido "implícito" nem preencha essa lacuna adivinhando o que o cliente provavelmente quis dizer. Avalie isso com o mesmo rigor independentemente de qualquer outra etapa do pipeline — não presuma que a mensagem já é válida só por ter chegado até você.
+Coerência NÃO é sobre tamanho ou gramática. Uma mensagem curta, direta e objetiva — sem saudação, sem frase completa, até mesmo só um substantivo/verbo no infinitivo nomeando o serviço (ex.: "retirada de chave pix", "cancelamento de contrato", "segunda via de boleto") — é PERFEITAMENTE coerente: é exatamente assim que muitos clientes escrevem quando sabem o que querem. NUNCA reprove por falta de preâmbulo, saudação ou estrutura de frase completa.
+
+O que de fato NÃO é coerente: um termo de produto/serviço (ex.: "chave pix", "liberação", "empréstimo") aparecendo ISOLADO dentro de um texto MAIOR que muda de assunto sem lógica, mistura metáforas aleatórias, ou lê como redação surreal/poética sem relação nenhuma com o termo — nesses casos a palavra-chave está solta em meio a ruído, não é o pedido em si. A pergunta certa é: "esse termo/frase É o pedido, ou é só uma palavra perdida dentro de outra coisa?" No primeiro caso, é coerente mesmo sendo curto. Só no segundo caso, trate como se não houvesse pedido real (vá para o fallback do passo 2).
+
+# ANTES DE RESPONDER: existe um pedido real? (passo 2 — campo pedidoClienteCitado)
+
+Um POP "encontrado" pelo file_search NÃO autoriza sozinho uma resposta completa. O campo pedidoClienteCitado é OBRIGATÓRIO e é verificado por código (não por você): cole ali, PALAVRA POR PALAVRA, um trecho copiado literalmente da mensagem do cliente que expressa o pedido/dúvida real sobre o tema do POP — mesmo que esse trecho seja a mensagem inteira, curta e direta. Não parafraseie, não resuma, não "traduza a intenção" — copie o texto exatamente como está escrito.
+
+Se a mensagem não passou no julgamento de coerência do passo 1 (termo perdido em texto sem relação com ele), OU se você não conseguir copiar um trecho que seja de fato o pedido — isso NÃO é um pedido válido. Nesse caso: deixe pedidoClienteCitado vazio, NÃO componha uma resposta procedural — respostaSugerida deve dizer que não foi possível identificar uma solicitação clara no contato, tabulacao deve ficar incompleta, e confidence = "baixa". Mas não confunda isso com recusar um pedido só porque ele é curto e direto — nesse caso o pedido citado é válido, e a resposta deve seguir o POP normalmente. Nunca invente um pedido "implícito" que o cliente não escreveu.
 
 # TRAVA DE SEGURANÇA (PRODUTOS E SERVIÇOS)
 
