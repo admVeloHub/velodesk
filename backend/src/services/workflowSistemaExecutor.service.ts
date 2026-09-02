@@ -6,7 +6,7 @@ import { composeAtendimento } from './agents/atendimentoAgent.service';
 import type { TicketAiMessageInput } from './agents/agentTypes';
 import { invokeInternalHook } from './workflowInternalHooks';
 import { getAgentNomeOficial } from './agents/agentRegistry';
-import { wrapComposerOpening } from './clientMessageEnvelope.service';
+import { detectEnvelopeModoFromChamado, wrapComposerOpening } from './clientMessageEnvelope.service';
 import { notifyAgentReplyAsync } from './emailNotification.service';
 import { createWorkflowNotificacao } from './workflowNotificacao.service';
 import { getActiveGrupos } from './grupoResponsabilidade.service';
@@ -70,19 +70,6 @@ function registroToMessages(chamado: IChamadoN1): TicketAiMessageInput[] {
     }
   }
   return rows.slice(-30);
-}
-
-/**
- * Nota interna NÃO conta como mensagem pública pro envelope de saudação — só decide se
- * "já houve contato público" olhando mensagemPublica de origem agente. registroToMessages()
- * mistura notas internas com role:'agente' pra dar contexto à IA, o que faria
- * detectEnvelopeModo(messages) achar erroneamente que o agente já falou publicamente
- * (usando só nota interna, sem nenhuma mensagem pública real) e pular o envelope completo.
- */
-function hasPriorPublicAgentMessage(chamado: IChamadoN1): boolean {
-  return (chamado.registro || []).some(
-    (reg) => reg.origin !== 'cliente' && String(reg.mensagemPublica || '').trim().length > 0,
-  );
 }
 
 async function executeWebhook(
@@ -165,7 +152,7 @@ async function sendRespostaClienteNucleo(
   const composerText = wrapComposerOpening({
     nucleo,
     agentName: getAgentNomeOficial(1),
-    modo: hasPriorPublicAgentMessage(chamado) ? 'continuacao' : 'primeiro_contato',
+    modo: detectEnvelopeModoFromChamado(chamado),
   });
 
   const registroResult = appendRegistroEntry(chamado, {

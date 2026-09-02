@@ -13,7 +13,8 @@ import {
   normalizeStatusValue,
   readTabulacaoSnapshot,
 } from './chamado.mapper';
-import { wrapComposerOpening } from './clientMessageEnvelope.service';
+import { detectEnvelopeModoFromChamado, wrapComposerOpening } from './clientMessageEnvelope.service';
+import { resolveChamadoClientName } from './placeholders.util';
 import { notifyAgentReplyAsync } from './emailNotification.service';
 import { getActiveWorkflows, getWorkflowById, getWorkflowBySlug, resolveWorkflowForTicket } from './workflowDefinicao.service';
 import { getActiveGrupos } from './grupoResponsabilidade.service';
@@ -128,7 +129,6 @@ const TIPO_SOLICITACAO_LABELS: Record<string, string> = {
 };
 
 function buildProdutosConclusaoClientMessage(chamado: IChamadoN1): string {
-  const nome = String(chamado.chamadoTitulo || '').trim().split(/\s+/)[0] || 'cliente';
   const solic = chamado.workflow?.requisicao?.solicitacaoProdutos as Record<string, unknown> | undefined;
   const tipoRaw = String(solic?.tipoSolicitacao || '').trim();
   const tab = readTabulacaoSnapshot(chamado.tabulacao[0]);
@@ -138,12 +138,22 @@ function buildProdutosConclusaoClientMessage(chamado: IChamadoN1): string {
   } else if (!tipoRaw && tab?.motivo) {
     tipo = String(tab.motivo);
   }
-  return `Olá, ${nome}! Sua solicitação de ${tipo} foi analisada e concluída pelo time de Produtos. Estamos à disposição caso precise de algo mais.`;
+  // Sem saudação aqui — quem monta "Olá/Oi, {nome}..." é o wrapComposerOpening, senão
+  // duplica a saudação (uma da abertura mecânica, outra embutida neste texto).
+  return `Sua solicitação de ${tipo} foi analisada e concluída pelo time de Produtos. Estamos à disposição caso precise de algo mais.`;
 }
 
 async function appendProdutosConclusaoPublicMessage(chamado: IChamadoN1, autor: string): Promise<void> {
   const nucleo = buildProdutosConclusaoClientMessage(chamado);
-  const composerText = wrapComposerOpening({ nucleo, agentName: autor });
+  // clientName vem só do cadastro associado (mesma regra de placeholders.util) — nunca do
+  // chamadoTitulo/assunto do e-mail, que já causou nome errado em outro ponto do sistema.
+  const clientName = await resolveChamadoClientName(chamado);
+  const composerText = wrapComposerOpening({
+    nucleo,
+    clientName,
+    agentName: autor,
+    modo: detectEnvelopeModoFromChamado(chamado),
+  });
   const result = appendRegistroEntry(chamado, {
     mensagemPublica: composerText,
     sender: 'me',

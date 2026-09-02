@@ -2,6 +2,7 @@
  * clientMessageEnvelope.service v1.2.0 — stripComposerOpening (refinar / normalização núcleo)
  * VERSION: v1.2.0 | DATE: 2026-08-20
  */
+import type { IChamadoN1 } from '../models/ChamadoN1';
 import type { TicketAiMessageInput } from './agents/agentTypes';
 import { isPrimeiroContatoAgente } from './agents/agentTabulation.util';
 import { resolveClientFirstName, trimStr } from './agents/openaiAgent.util';
@@ -18,6 +19,21 @@ export interface WrapComposerOpeningParams {
 
 export function detectEnvelopeModo(messages?: TicketAiMessageInput[]): EnvelopeModo {
   return isPrimeiroContatoAgente(messages) ? 'primeiro_contato' : 'continuacao';
+}
+
+/**
+ * Nota interna NÃO conta como mensagem pública pro envelope de saudação — só "já houve
+ * contato público" se existir mensagemPublica de origem agente. Fonte de verdade direto no
+ * chamado.registro, sem depender de um array de contexto que possa misturar nota interna.
+ */
+export function hasPriorPublicAgentMessage(chamado: IChamadoN1): boolean {
+  return (chamado.registro || []).some(
+    (reg) => reg.origin !== 'cliente' && String(reg.mensagemPublica || '').trim().length > 0,
+  );
+}
+
+export function detectEnvelopeModoFromChamado(chamado: IChamadoN1): EnvelopeModo {
+  return hasPriorPublicAgentMessage(chamado) ? 'continuacao' : 'primeiro_contato';
 }
 
 /** Primeiro nome do cliente para saudação (template WhatsApp, envelope composer, etc.). */
