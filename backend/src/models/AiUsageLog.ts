@@ -9,6 +9,7 @@ export type AiUsageProvider = 'openai' | 'gemini';
 export type AiUsageFeature =
   | 'atendimento'
   | 'auditoria'
+  | 'criticidade_triagem'
   | 'gestao_chamados'
   | 'casos_especiais'
   | 'ticket_suggest_legacy'

@@ -1,6 +1,8 @@
 /**
- * auditoriaAgent.service v1.1.1 — tabulação sugerida pelo Agente Auditor
- * VERSION: v1.1.0 | DATE: 2026-07-15
+ * auditoriaAgent.service v1.2.0 — palavra-chave crítica vira gatilho de triagem por IA
+ * (avaliarAmeacaCritica), não escalonamento automático — evita falso positivo tipo "processo"
+ * usado em sentido administrativo forçando criticidade máxima sem ameaça real.
+ * VERSION: v1.2.0 | DATE: 2026-09-02
  */
 import { env } from '../../config/env';
 import type {
@@ -29,6 +31,7 @@ import {
   trimStr,
 } from './openaiAgent.util';
 import { detectCriticalKeywords } from './criticalKeywords.service';
+import { avaliarAmeacaCritica } from './criticidadeTriagem.service';
 import { logAiUsage } from '../aiUsage.service';
 
 interface AuditoriaParsed {
@@ -62,7 +65,8 @@ function applyPostAuditRules(
   parsed: AuditoriaParsed,
   params: AuditoriaInput,
   precheckKeywords: string[],
-  tabulacaoSugerida?: TicketAiTabulationResult,
+  tabulacaoSugerida: TicketAiTabulationResult | undefined,
+  ameacaConfirmada: boolean,
 ): AuditoriaResult {
   const modo = params.modo;
   const threshold = modo === 'auto_envio'
@@ -74,7 +78,10 @@ function applyPostAuditRules(
 
   const llmKeywords = parsed.palavrasCriticasDetectadas || [];
   const allKeywords = [...new Set([...precheckKeywords, ...llmKeywords])];
-  const hasCritical = allKeywords.length > 0;
+  // A palavra-chave é só o gatilho barato pra acordar a triagem (avaliarAmeacaCritica) — quem
+  // decide se escalona de fato é o julgamento com a conversa inteira, não a mera presença do
+  // termo. allKeywords.length > 0 sem ameacaConfirmada = coincidência: nada muda no ticket.
+  const hasCritical = allKeywords.length > 0 && ameacaConfirmada;
 
   let decisao: AuditDecisao = parsed.decisao || 'encaminhar_humano';
   let nivelCriticidade: NivelCriticidade = parsed.nivelCriticidade || 'nenhuma';
@@ -204,7 +211,19 @@ export async function validateAuditoria(params: AuditoriaInput): Promise<Auditor
     }
 
     const tabulacaoSugerida = resolveTabulacaoSugerida(parsed.tabulacaoSugerida, config);
-    const result = applyPostAuditRules(parsed, params, precheckKeywords, tabulacaoSugerida);
+
+    const llmKeywords = parsed.palavrasCriticasDetectadas || [];
+    const candidateKeywords = [...new Set([...precheckKeywords, ...llmKeywords])];
+    // Palavra-gatilho é só o filtro mecânico — a decisão de escalonar de fato fica com
+    // avaliarAmeacaCritica, que lê a conversa inteira (ver criticidadeTriagem.service).
+    const ameacaConfirmada = candidateKeywords.length > 0
+      ? (await avaliarAmeacaCritica(contextText, candidateKeywords, {
+        protocolo: params.protocolo,
+        userId: params.userId,
+      })).ameacaReal
+      : false;
+
+    const result = applyPostAuditRules(parsed, params, precheckKeywords, tabulacaoSugerida, ameacaConfirmada);
     return { ...result, model };
   } catch (err) {
     console.error('[agent-auditoria]', err);
