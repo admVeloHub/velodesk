@@ -14,7 +14,7 @@ import { htmlToPlainText, htmlHasComposeContent, normalizePlainToHtml, COMPOSE_I
 import ComposeRichEditor from './ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
 import ComposeRefinarModal from './ComposeRefinarModal';
-import { stripComposerOpening } from '../../../services/desk/clientMessageEnvelope';
+import { stripComposerOpening, wrapComposerOpeningForTicket } from '../../../services/desk/clientMessageEnvelope';
 
 function readImageFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -468,10 +468,18 @@ export default function DeskComposePanel({
   };
 
   const handleApplyRefinar = useCallback((plainText) => {
-    const html = normalizePlainToHtml(plainText);
+    // handleOpenRefinar já manda o Revisor de Texto trabalhar só no núcleo (sem a
+    // saudação/apresentação) — precisa recolocar o envelope aqui, senão a resposta
+    // revisada substitui o compose sem "Olá, {nome}... Eu sou {agente}...".
+    const wrapped = wrapComposerOpeningForTicket({
+      nucleo: plainText,
+      ticket,
+      agentName: nomeOperador,
+    });
+    const html = normalizePlainToHtml(wrapped);
     onComposeTextChange(html);
     onComposeReviewed?.(html);
-  }, [onComposeTextChange, onComposeReviewed]);
+  }, [onComposeTextChange, onComposeReviewed, ticket, nomeOperador]);
 
   const handlePublicAttachImage = useCallback((file) => {
     void attachImageToEditor(publicEditorRef, file, showNotification);
