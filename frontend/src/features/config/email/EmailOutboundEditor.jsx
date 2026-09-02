@@ -150,10 +150,16 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
   const saudacaoRef = useRef(null);
   const corpoRef = useRef(null);
 
-  const isInternal = filtros.some((item) => item.tipo === 'gatilho_interno');
   const isCsatInicial = draft.nome === 'Encerramento mais satisfação';
   const isCsatRepescagem = draft.nome === 'Repescagem da satisfação';
-  const showCsatGatilhoFields = isInternal && (isCsatInicial || isCsatRepescagem);
+  // Layout específico do CSAT é definido pelo NOME do template, nunca pelos critérios
+  // armazenados no gatilho — não dependemos de "isInternal" aqui porque os dois e-mails
+  // de CSAT sempre usam o mesmo bloco de status+prazo dedicado (ver csatEmail.service.ts/
+  // csatRepescagem.service.ts, que também leem só por tipo:'gatilho_interno'). Se os
+  // critérios armazenados divergirem disso, é dado desatualizado, não uma variação válida
+  // de layout — por isso a UI nunca deve inferir o layout a partir deles.
+  const isCsatTemplateEditor = isCsatInicial || isCsatRepescagem;
+  const isInternal = !isCsatTemplateEditor && filtros.some((item) => item.tipo === 'gatilho_interno');
 
   useEffect(() => {
     let cancelled = false;
@@ -395,128 +401,17 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
         </label>
 
         <section className="config-email-gatilho">
-          <div className="config-email-gatilho__head">
-            <div>
-              <h4>Gatilho de envio</h4>
-              <p className="config-placeholder-msg">Vários critérios entram com E. Vários valores do mesmo critério entram com OU.</p>
-            </div>
-            <button
-              type="button"
-              className="config-action-btn config-action-btn--create"
-              onClick={addFiltro}
-              disabled={isInternal}
-              title={isInternal ? 'Gatilho interno não combina com outros filtros' : 'Adicionar filtro'}
-            >
-              <i className="ti ti-plus" aria-hidden="true" /> Adicionar filtro
-            </button>
-          </div>
-          {warning ? <p className="config-email-warning">{warning}</p> : null}
-
-          {filtros.length === 0 ? (
-            <p className="config-placeholder-msg">Nenhum filtro. Adicione um critério para disparar este e-mail.</p>
-          ) : (
-            <ul className="config-email-filtro-list">
-              {filtros.map((filtro, index) => {
-                const interno = filtro.tipo === 'gatilho_interno';
-                const valorOpts = valoresDisponiveis(filtro.tipo, index, filtro.valor);
-                return (
-                  <li
-                    key={`filtro-${index}`}
-                    className={
-                      'config-email-filtro-row'
-                      + (interno ? ' is-internal' : '')
-                      + (!filtro.tipo ? ' is-pending' : '')
-                    }
-                  >
-                    <label className="config-email-field">
-                      <span>Critério</span>
-                      <select
-                        value={filtro.tipo}
-                        onChange={(e) => updateFiltro(index, { tipo: e.target.value, valor: '' })}
-                      >
-                        <option value="">Selecione…</option>
-                        {CRITERIO_TIPOS.map((tipo) => (
-                          <option key={tipo.id} value={tipo.id}>{tipo.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                    {interno ? (
-                      <p className="config-placeholder-msg">
-                        {showCsatGatilhoFields
-                          ? 'Disparo controlado pelo gatilho e prazo configurados abaixo.'
-                          : 'Sem valor. Este e-mail não dispara sozinho — fica pronto para outra ação chamar depois.'}
-                      </p>
-                    ) : filtro.tipo ? (
-                      <label className="config-email-field">
-                        <span>Valor</span>
-                        <select
-                          value={filtro.valor}
-                          onChange={(e) => updateFiltro(index, { valor: e.target.value })}
-                        >
-                          <option value="">Selecione…</option>
-                          {valorOpts.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="config-action-btn config-action-btn--delete"
-                      onClick={() => removeFiltro(index)}
-                      aria-label="Remover filtro"
-                    >
-                      <i className="ti ti-trash" aria-hidden="true" />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          {filtros.some((item) => item.tipo === 'sla' && item.valor === 'personalizado') ? (
-            <label className="config-email-field">
-              <span>Horas até disparo (SLA personalizado)</span>
-              <input
-                type="number"
-                min={1}
-                value={slaHorasPersonalizadas}
-                onChange={(e) => updateSlaHorasPersonalizadas(e.target.value)}
-                placeholder="Ex.: 6"
-              />
-            </label>
-          ) : null}
-
-          {filtros.some((item) => item.tipo === 'status') ? (
-            <div className="config-email-filtro-row">
-              <label className="config-email-field">
-                <span>Prazo</span>
-                <select
-                  value={statusPrazoTipo}
-                  onChange={(e) => updateStatusPrazoTipo(e.target.value)}
-                >
-                  <option value="imediato">Imediato</option>
-                  <option value="horas">Após um prazo (horas)</option>
-                </select>
-              </label>
-              {statusPrazoTipo === 'horas' ? (
-                <label className="config-email-field">
-                  <span>Horas úteis (1 a 48)</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={48}
-                    value={statusPrazoHoras}
-                    onChange={(e) => updateStatusPrazoHoras(e.target.value)}
-                    placeholder="Ex.: 24"
-                  />
-                </label>
-              ) : null}
-            </div>
-          ) : null}
-
-          {showCsatGatilhoFields ? (
+          {isCsatTemplateEditor ? (
             <>
+              <div className="config-email-gatilho__head">
+                <div>
+                  <h4>Gatilho de envio</h4>
+                  <p className="config-placeholder-msg">
+                    Layout dedicado de CSAT — disparo controlado só pelo gatilho e prazo abaixo,
+                    sem critérios adicionais de canal/status/SLA.
+                  </p>
+                </div>
+              </div>
               {isCsatInicial ? (
                 <label className="config-email-field">
                   <span>Status que inicia a contagem</span>
@@ -558,9 +453,131 @@ export default function EmailOutboundEditor({ itemId, items, onClose, onSaved })
                 ) : null}
               </div>
             </>
-          ) : null}
+          ) : (
+            <>
+              <div className="config-email-gatilho__head">
+                <div>
+                  <h4>Gatilho de envio</h4>
+                  <p className="config-placeholder-msg">Vários critérios entram com E. Vários valores do mesmo critério entram com OU.</p>
+                </div>
+                <button
+                  type="button"
+                  className="config-action-btn config-action-btn--create"
+                  onClick={addFiltro}
+                  disabled={isInternal}
+                  title={isInternal ? 'Gatilho interno não combina com outros filtros' : 'Adicionar filtro'}
+                >
+                  <i className="ti ti-plus" aria-hidden="true" /> Adicionar filtro
+                </button>
+              </div>
+              {warning ? <p className="config-email-warning">{warning}</p> : null}
+
+              {filtros.length === 0 ? (
+                <p className="config-placeholder-msg">Nenhum filtro. Adicione um critério para disparar este e-mail.</p>
+              ) : (
+                <ul className="config-email-filtro-list">
+                  {filtros.map((filtro, index) => {
+                    const interno = filtro.tipo === 'gatilho_interno';
+                    const valorOpts = valoresDisponiveis(filtro.tipo, index, filtro.valor);
+                    return (
+                      <li
+                        key={`filtro-${index}`}
+                        className={
+                          'config-email-filtro-row'
+                          + (interno ? ' is-internal' : '')
+                          + (!filtro.tipo ? ' is-pending' : '')
+                        }
+                      >
+                        <label className="config-email-field">
+                          <span>Critério</span>
+                          <select
+                            value={filtro.tipo}
+                            onChange={(e) => updateFiltro(index, { tipo: e.target.value, valor: '' })}
+                          >
+                            <option value="">Selecione…</option>
+                            {CRITERIO_TIPOS.map((tipo) => (
+                              <option key={tipo.id} value={tipo.id}>{tipo.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        {interno ? (
+                          <p className="config-placeholder-msg">
+                            Sem valor. Este e-mail não dispara sozinho — fica pronto para outra ação chamar depois.
+                          </p>
+                        ) : filtro.tipo ? (
+                          <label className="config-email-field">
+                            <span>Valor</span>
+                            <select
+                              value={filtro.valor}
+                              onChange={(e) => updateFiltro(index, { valor: e.target.value })}
+                            >
+                              <option value="">Selecione…</option>
+                              {valorOpts.map((opt) => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="config-action-btn config-action-btn--delete"
+                          onClick={() => removeFiltro(index)}
+                          aria-label="Remover filtro"
+                        >
+                          <i className="ti ti-trash" aria-hidden="true" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {filtros.some((item) => item.tipo === 'sla' && item.valor === 'personalizado') ? (
+                <label className="config-email-field">
+                  <span>Horas até disparo (SLA personalizado)</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={slaHorasPersonalizadas}
+                    onChange={(e) => updateSlaHorasPersonalizadas(e.target.value)}
+                    placeholder="Ex.: 6"
+                  />
+                </label>
+              ) : null}
+
+              {filtros.some((item) => item.tipo === 'status') ? (
+                <div className="config-email-filtro-row">
+                  <label className="config-email-field">
+                    <span>Prazo</span>
+                    <select
+                      value={statusPrazoTipo}
+                      onChange={(e) => updateStatusPrazoTipo(e.target.value)}
+                    >
+                      <option value="imediato">Imediato</option>
+                      <option value="horas">Após um prazo (horas)</option>
+                    </select>
+                  </label>
+                  {statusPrazoTipo === 'horas' ? (
+                    <label className="config-email-field">
+                      <span>Horas úteis (1 a 48)</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={48}
+                        value={statusPrazoHoras}
+                        onChange={(e) => updateStatusPrazoHoras(e.target.value)}
+                        placeholder="Ex.: 24"
+                      />
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
         </section>
-        <p className="config-placeholder-msg">{summarizeCriterios(draft.gatilho?.criterios, opcoes)}</p>
+        {!isCsatTemplateEditor ? (
+          <p className="config-placeholder-msg">{summarizeCriterios(draft.gatilho?.criterios, opcoes)}</p>
+        ) : null}
       </div>
 
       <div className="config-email-outbound-editor__preview">

@@ -15390,6 +15390,15 @@ input:checked + .slider:before {
     text-align: left;
 }
 
+#config .config-email-table__divider td {
+    padding-top: 1.1rem;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--config-muted);
+    border-bottom: 1px solid var(--config-border, rgba(0, 0, 0, 0.08));
+}
+
 #config .config-email-table th {
     font-size: 0.75rem;
     text-transform: uppercase;
