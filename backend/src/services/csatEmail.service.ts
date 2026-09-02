@@ -16,8 +16,6 @@ import { escapeHtmlAttribute } from './emailHtml.util';
 import { sendOutboundEmail } from './email-outbound.service';
 import {
   buildOutboundMessageId,
-  buildOutboundThreadHeaders,
-  buildThreadSubject,
   persistOutboundEmailMeta,
 } from './emailThread.service';
 
@@ -141,15 +139,16 @@ async function composeAndSendCsatEmail(
   });
 
   const messageId = buildOutboundMessageId(protocolo);
-  const headers = buildOutboundThreadHeaders(chamado, messageId);
-  const subject = buildThreadSubject(protocolo);
+  // CSAT chega como thread NOVA — sem In-Reply-To/References e sem "Re:" no assunto,
+  // senão o cliente do e-mail agrupa a pesquisa dentro da conversa do atendimento.
+  const subject = `Pesquisa de satisfação — Atendimento Velotax Nº ${protocolo}`;
 
   const result = await sendOutboundEmail({
     to,
     subject,
     text: assembled.text,
     html: assembled.html,
-    headers,
+    headers: { messageId },
     inlineImages: assembled.inlineImages,
   });
 
