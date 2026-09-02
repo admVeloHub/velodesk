@@ -23,8 +23,12 @@ function resolveAgentDisplayName(agentName) {
   return name || 'Atendimento Velotax';
 }
 
-/** Abertura mecânica aplicada no composer (1º contato). */
-const MECHANICAL_OPENING_RE = /^Olá,\s*.+?,\s*tudo bem\?\s*\r?\n\s*\r?\nEu sou .+?, do time de atendimento Velotax\.\s*\r?\n\s*\r?\n/s;
+/**
+ * Abertura mecânica aplicada no composer — envelope completo no 1º contato
+ * ("Olá, X, tudo bem?\n\nEu sou Y...") ou só a saudação curta nas mensagens
+ * seguintes ("Oi, X, tudo bem?"). Sem se apresentar de novo, mas sempre cordial.
+ */
+const MECHANICAL_OPENING_RE = /^(?:Olá,\s*.+?,\s*tudo bem\?\s*\r?\n\s*\r?\nEu sou .+?, do time de atendimento Velotax\.\s*\r?\n\s*\r?\n|Oi,\s*.+?,\s*tudo bem\?\s*\r?\n\s*\r?\n)/s;
 
 /** Remove abertura mecânica do composer para obter só o núcleo. */
 export function stripComposerOpening(text) {
@@ -56,11 +60,13 @@ export function wrapComposerOpening(params) {
   if (!nucleo) return '';
 
   const modo = params?.modo || 'primeiro_contato';
+  const clientGreeting = resolveClientGreetingName(params?.clientName);
+
   if (modo === 'continuacao') {
-    return nucleo;
+    // Sem se apresentar de novo — mas continua cordial: só a saudação curta.
+    return [`Oi, ${clientGreeting}, tudo bem?`, '', nucleo].join('\n');
   }
 
-  const clientGreeting = resolveClientGreetingName(params?.clientName);
   const agentDisplay = resolveAgentDisplayName(params?.agentName);
 
   return [

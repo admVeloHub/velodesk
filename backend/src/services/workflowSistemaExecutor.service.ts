@@ -72,6 +72,19 @@ function registroToMessages(chamado: IChamadoN1): TicketAiMessageInput[] {
   return rows.slice(-30);
 }
 
+/**
+ * Nota interna NÃO conta como mensagem pública pro envelope de saudação — só decide se
+ * "já houve contato público" olhando mensagemPublica de origem agente. registroToMessages()
+ * mistura notas internas com role:'agente' pra dar contexto à IA, o que faria
+ * detectEnvelopeModo(messages) achar erroneamente que o agente já falou publicamente
+ * (usando só nota interna, sem nenhuma mensagem pública real) e pular o envelope completo.
+ */
+function hasPriorPublicAgentMessage(chamado: IChamadoN1): boolean {
+  return (chamado.registro || []).some(
+    (reg) => reg.origin !== 'cliente' && String(reg.mensagemPublica || '').trim().length > 0,
+  );
+}
+
 async function executeWebhook(
   chamado: IChamadoN1,
   definicao: IWorkflowDefinicao,
@@ -146,14 +159,13 @@ async function executeWebhook(
 async function sendRespostaClienteNucleo(
   chamado: IChamadoN1,
   step: number,
-  messages: TicketAiMessageInput[],
   nucleo: string,
   detail: Record<string, unknown>,
 ): Promise<SistemaExecResult> {
   const composerText = wrapComposerOpening({
     nucleo,
-    messages,
     agentName: getAgentNomeOficial(1),
+    modo: hasPriorPublicAgentMessage(chamado) ? 'continuacao' : 'primeiro_contato',
   });
 
   const registroResult = appendRegistroEntry(chamado, {
@@ -216,7 +228,7 @@ async function executeRespostaClienteIa(
     };
   }
 
-  return sendRespostaClienteNucleo(chamado, step, messages, result.respostaSugerida.trim(), {
+  return sendRespostaClienteNucleo(chamado, step, result.respostaSugerida.trim(), {
     conteudoModo: 'ia',
     model: result.model,
   });
@@ -226,7 +238,6 @@ async function executeRespostaClienteEmailPadrao(
   chamado: IChamadoN1,
   automatica: IWorkflowAutomaticaConfig,
   step: number,
-  messages: TicketAiMessageInput[],
 ): Promise<SistemaExecResult> {
   const conteudoId = String(automatica.emailConteudoId || '').trim();
   const doc = conteudoId ? await getEmailConteudoById(conteudoId) : null;
@@ -251,7 +262,7 @@ async function executeRespostaClienteEmailPadrao(
     };
   }
 
-  return sendRespostaClienteNucleo(chamado, step, messages, nucleo, {
+  return sendRespostaClienteNucleo(chamado, step, nucleo, {
     conteudoModo: 'email_padrao',
     emailConteudoId: conteudoId,
     emailConteudoNome: doc.nome,
@@ -268,7 +279,7 @@ async function executeRespostaCliente(
   const messages = registroToMessages(chamado);
 
   if (automatica.conteudoModo === 'email_padrao') {
-    return executeRespostaClienteEmailPadrao(chamado, automatica, step, messages);
+    return executeRespostaClienteEmailPadrao(chamado, automatica, step);
   }
 
   return executeRespostaClienteIa(chamado, passo, automatica, step, messages);
