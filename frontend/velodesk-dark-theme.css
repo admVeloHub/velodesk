@@ -716,12 +716,19 @@ body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product {
 
 body.velodesk-dark #velodeskDeskV2Root .crm-consultas__summary-card span,
 body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product__desc,
-body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product__meta dd {
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product__meta dd,
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product__title {
     color: var(--velo-dark-text);
 }
 
-body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product__contract-divider {
-    border-top-color: var(--velo-dark-border);
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product__title-extra,
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product__subtitle {
+    color: var(--velo-dark-text-muted);
+}
+
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product__block {
+    background: var(--velo-dark-surface-inset);
+    border-color: var(--velo-dark-border);
 }
 
 body.velodesk-dark #velodeskDeskV2Root .crm-consultas__analise {
