@@ -2994,10 +2994,9 @@
 }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas__products-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 14px;
-    align-items: start;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product {
@@ -3020,18 +3019,10 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    margin-bottom: 10px;
 }
 
-:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__tag.velo-tag {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 10px;
-    border-radius: 999px;
-    font-size: var(--desk-fs-caption);
-    font-weight: 700;
-    color: #fff;
-    line-height: 1.2;
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product--expanded .crm-consultas-product__header {
+    margin-bottom: 10px;
 }
 
 #velodeskDeskV2Root .velo-tag--fiber { background: #1634FF; }
@@ -3043,6 +3034,64 @@
 #velodeskDeskV2Root .velo-tag--default { background: #475569; }
 #velodeskDeskV2Root .velo-tag--contracted { background: #1634FF; }
 
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    font-size: 15px;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__icon--done { background: #E8F7ED; color: #15A237; }
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__icon--pending { background: #FFF8E1; color: #B8860B; }
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__icon--canceled { background: #ffebee; color: #dc3545; }
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__icon--none { background: #F3F4F6; color: #94a3b8; }
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__title-group {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__title {
+    font-size: var(--desk-fs-sm);
+    font-weight: 700;
+    color: #1e293b;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__title-extra {
+    font-weight: 500;
+    color: #64748b;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__subtitle {
+    font-size: var(--desk-fs-caption);
+    color: #94a3b8;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__status-pill {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: var(--desk-fs-caption);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__status-pill--green { background: #E8F7ED; color: #15A237; }
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__status-pill--amber { background: #FFF8E1; color: #B8860B; }
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__status-pill--red { background: #ffebee; color: #dc3545; }
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__status-pill--gray { background: #F3F4F6; color: #6B7280; }
+
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__badge {
     font-size: var(--desk-fs-caption);
     font-weight: 700;
@@ -3053,6 +3102,7 @@
     padding: 3px 8px;
     border-radius: 999px;
     white-space: nowrap;
+    margin-left: 8px;
 }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__desc {
@@ -3198,19 +3248,30 @@
     display: none;
 }
 
-:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__contract-divider {
-    margin: 12px 0;
-    border: none;
-    border-top: 1px solid #e2e8f0;
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__block {
+    background: #f8fafc;
+    border: 1px solid #eef1f5;
+    border-radius: 10px;
+    padding: 12px;
 }
 
-:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__installments,
-:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__years {
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__block + .crm-consultas-product__block {
+    margin-top: 10px;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__installments {
     margin: 8px 0 0;
     padding-left: 18px;
     font-size: var(--desk-fs-sm);
     color: #334155;
 }
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-installment-status {
+    font-weight: 700;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-installment-status--green { color: #15A237; }
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-installment-status--red { color: #dc3545; }
 
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__desc--loading {
     color: #64748b;

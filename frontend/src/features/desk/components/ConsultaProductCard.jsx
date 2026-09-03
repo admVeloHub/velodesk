@@ -5,20 +5,49 @@
 import React, { useState } from 'react';
 import {
   CONSULTA_PRODUCT_LABELS,
+  CONSULTA_STATUS_TONE,
+  classifyConsultaStatusLabel,
   formatConsultaDate,
   formatConsultaDateTime,
   formatConsultaMoney,
   formatInstallmentStatus,
+  getInstallmentStatusTone,
+  summarizeConsultaProduct,
 } from '../../../services/desk/consultaFormatters';
+
+/** Mais novo primeiro. */
+function sortByDateDesc(list, getDate) {
+  return list.slice().sort((a, b) => new Date(getDate(b) || 0) - new Date(getDate(a) || 0));
+}
+
+function InstallmentStatus({ status }) {
+  const tone = getInstallmentStatusTone(status);
+  const label = formatInstallmentStatus(status);
+  if (!tone) return label;
+  return <span className={`crm-consultas-installment-status crm-consultas-installment-status--${tone}`}>{label}</span>;
+}
+
+const ICON_BY_STATE = {
+  done: 'ti-circle-check',
+  pending: 'ti-clock',
+  canceled: 'ti-circle-x',
+  none: 'ti-minus',
+};
+
+function StatusChip({ label, tone }) {
+  if (!label) return null;
+  const resolvedTone = tone || CONSULTA_STATUS_TONE[classifyConsultaStatusLabel(label)] || 'gray';
+  return <span className={`crm-consultas-product__status-pill crm-consultas-product__status-pill--${resolvedTone}`}>{label}</span>;
+}
 
 function ContractBlock({ contract }) {
   if (!contract) return null;
   return (
-    <div className="crm-consultas-product__contract">
+    <div className="crm-consultas-product__block crm-consultas-product__contract">
       <dl className="crm-consultas-product__meta">
         <div>
           <dt>Status</dt>
-          <dd>{contract.contractStatusLabel || contract.contractStatus || '—'}</dd>
+          <dd><StatusChip label={contract.contractStatusLabel || contract.contractStatus} /></dd>
         </div>
         <div>
           <dt>Valor principal</dt>
@@ -44,7 +73,7 @@ function ContractBlock({ contract }) {
             <dd>
               #{contract.nextInstallment.number} · {formatConsultaDate(contract.nextInstallment.dueDate)}
               {' · '}{formatConsultaMoney(contract.nextInstallment.amountDue)}
-              {' · '}{formatInstallmentStatus(contract.nextInstallment.status)}
+              {' · '}<InstallmentStatus status={contract.nextInstallment.status} />
             </dd>
           </div>
         ) : null}
@@ -54,7 +83,7 @@ function ContractBlock({ contract }) {
           {contract.installments.slice(0, 6).map((item) => (
             <li key={`${contract.contractNumber || 'c'}-${item.number}`}>
               Parcela {item.number}: {formatConsultaMoney(item.amountDue)} · venc. {formatConsultaDate(item.dueDate)}
-              {' · '}{formatInstallmentStatus(item.status)}
+              {' · '}<InstallmentStatus status={item.status} />
             </li>
           ))}
         </ul>
@@ -64,16 +93,16 @@ function ContractBlock({ contract }) {
 }
 
 function EpAsBody({ data }) {
-  const contracts = Array.isArray(data?.contracts) ? data.contracts : [];
+  const contracts = sortByDateDesc(
+    Array.isArray(data?.contracts) ? data.contracts : [],
+    (c) => c.disbursedAt,
+  );
   const eligibility = data?.eligibility;
 
   return (
     <>
-      {contracts.length ? contracts.map((contract, index) => (
-        <React.Fragment key={contract.contractNumber || contract.productType}>
-          {index > 0 ? <hr className="crm-consultas-product__contract-divider" /> : null}
-          <ContractBlock contract={contract} />
-        </React.Fragment>
+      {contracts.length ? contracts.map((contract) => (
+        <ContractBlock key={contract.contractNumber || contract.productType} contract={contract} />
       )) : (
         <p className="crm-consultas-product__desc">Nenhum contrato ativo registrado.</p>
       )}
@@ -102,24 +131,29 @@ function EpAsBody({ data }) {
 }
 
 function IrpfBody({ data }) {
-  const years = Array.isArray(data?.years) ? data.years : [];
+  const years = (Array.isArray(data?.years) ? data.years : [])
+    .slice()
+    .sort((a, b) => Number(b.year) - Number(a.year));
   const situation = data?.situation;
 
   return (
     <>
-      {years.length ? (
-        <ul className="crm-consultas-product__years">
-          {years.map((yearItem) => (
-            <li key={yearItem.year}>
-              <strong>{yearItem.year}</strong>
-              {' · '}{yearItem.statusLabel || yearItem.status || '—'}
-              {yearItem.anticipatedAmount ? (
-                <> · {formatConsultaMoney(yearItem.anticipatedAmount)}</>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
+      {years.length ? years.map((yearItem) => (
+        <div className="crm-consultas-product__block" key={yearItem.year}>
+          <dl className="crm-consultas-product__meta">
+            <div>
+              <dt>{yearItem.year}</dt>
+              <dd><StatusChip label={yearItem.statusLabel || yearItem.status} /></dd>
+            </div>
+            {yearItem.anticipatedAmount ? (
+              <div>
+                <dt>Valor antecipado</dt>
+                <dd>{formatConsultaMoney(yearItem.anticipatedAmount)}</dd>
+              </div>
+            ) : null}
+          </dl>
+        </div>
+      )) : (
         <p className="crm-consultas-product__desc">Sem histórico IRPF retornado.</p>
       )}
       {situation ? (
@@ -139,7 +173,10 @@ function IrpfBody({ data }) {
 }
 
 function ClubeBody({ data }) {
-  const coupons = Array.isArray(data?.recentCoupons) ? data.recentCoupons : [];
+  const coupons = sortByDateDesc(
+    Array.isArray(data?.recentCoupons) ? data.recentCoupons : [],
+    (c) => c.createdAt,
+  );
   return (
     <>
       <p className="crm-consultas-product__desc">
@@ -194,6 +231,7 @@ export default function ConsultaProductCard({
   const [expanded, setExpanded] = useState(false);
   const label = CONSULTA_PRODUCT_LABELS[slug] || slug;
   const needsFetch = !entry?.loaded;
+  const summary = summarizeConsultaProduct(slug, entry);
 
   const handleToggle = () => {
     if (expanded) {
@@ -222,10 +260,22 @@ export default function ConsultaProductCard({
           disabled={loading}
           aria-expanded={expanded}
         >
-          <span className="crm-consultas-product__tag velo-tag velo-tag--default">{label}</span>
-          {isTicketProduct ? (
-            <span className="crm-consultas-product__badge">Produto do ticket</span>
-          ) : null}
+          <span className={`crm-consultas-product__icon crm-consultas-product__icon--${summary.iconState}`} aria-hidden="true">
+            <i className={'ti ' + (ICON_BY_STATE[summary.iconState] || ICON_BY_STATE.none)} />
+          </span>
+          <span className="crm-consultas-product__title-group">
+            <span className="crm-consultas-product__title">
+              {label}
+              {summary.titleExtra ? <span className="crm-consultas-product__title-extra"> · {summary.titleExtra}</span> : null}
+              {isTicketProduct ? (
+                <span className="crm-consultas-product__badge">Produto do ticket</span>
+              ) : null}
+            </span>
+            {summary.subtitle ? (
+              <span className="crm-consultas-product__subtitle">{summary.subtitle}</span>
+            ) : null}
+          </span>
+          <StatusChip label={summary.pillLabel} tone={summary.pillTone} />
           <i className={'ti ' + (expanded ? 'ti-chevron-up' : 'ti-chevron-down')} aria-hidden="true" />
         </button>
       </header>
