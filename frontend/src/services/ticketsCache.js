@@ -116,6 +116,10 @@ function pruneTicketsAbsentFromApi(mergedCols, apiCols) {
     tickets: (box.tickets || []).filter((ticket) => {
       if (isDraftTicket(ticket)) return true;
       if (hasPendingWorkflowPersist(ticket)) return true;
+      // Mesmo critério de mergePreservedDetails — sem isso, essa função remove no mesmo
+      // ciclo o ticket que a outra tinha acabado de reinserir por estar aberto/com detalhe
+      // carregado, e ele "some" da coluna a cada poll em que a query de /boxes não o trouxer.
+      if (shouldPreserveTicketDetail(ticket)) return true;
       const id = ticketIdKey(ticket);
       if (!id) return false;
       if (apiIds.has(id)) return true;
