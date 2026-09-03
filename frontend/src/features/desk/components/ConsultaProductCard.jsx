@@ -30,8 +30,14 @@ function ContractBlock({ contract }) {
         </div>
         <div>
           <dt>Desembolso</dt>
-          <dd>{formatConsultaDateTime(contract.disbursedAt)}</dd>
+          <dd>{formatConsultaDate(contract.disbursedAt)}</dd>
         </div>
+        {contract.providerStatusLabel || contract.providerStatus ? (
+          <div>
+            <dt>Status do desembolso</dt>
+            <dd>{contract.providerStatusLabel || contract.providerStatus}</dd>
+          </div>
+        ) : null}
         {contract.nextInstallment ? (
           <div>
             <dt>Próxima parcela</dt>
@@ -63,8 +69,11 @@ function EpAsBody({ data }) {
 
   return (
     <>
-      {contracts.length ? contracts.map((contract) => (
-        <ContractBlock key={contract.contractNumber || contract.productType} contract={contract} />
+      {contracts.length ? contracts.map((contract, index) => (
+        <React.Fragment key={contract.contractNumber || contract.productType}>
+          {index > 0 ? <hr className="crm-consultas-product__contract-divider" /> : null}
+          <ContractBlock contract={contract} />
+        </React.Fragment>
       )) : (
         <p className="crm-consultas-product__desc">Nenhum contrato ativo registrado.</p>
       )}

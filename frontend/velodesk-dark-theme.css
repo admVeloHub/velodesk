@@ -720,6 +720,10 @@ body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product__meta dd {
     color: var(--velo-dark-text);
 }
 
+body.velodesk-dark #velodeskDeskV2Root .crm-consultas-product__contract-divider {
+    border-top-color: var(--velo-dark-border);
+}
+
 body.velodesk-dark #velodeskDeskV2Root .crm-consultas__analise {
     color: var(--velo-dark-text-muted);
 }

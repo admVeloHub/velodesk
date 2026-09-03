@@ -3198,6 +3198,12 @@
     display: none;
 }
 
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__contract-divider {
+    margin: 12px 0;
+    border: none;
+    border-top: 1px solid #e2e8f0;
+}
+
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__installments,
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-consultas-product__years {
     margin: 8px 0 0;
