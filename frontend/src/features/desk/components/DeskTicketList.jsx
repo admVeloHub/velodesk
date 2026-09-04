@@ -4,15 +4,19 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
+  formatTicketListDate,
   formatTicketListTime,
   getDeskSearchInferredLabel,
   getSlaClass,
   getTicketQueueEntryAt,
   getTicketTitle,
+  isClienteRespondeuRead,
+  isClienteRespondeuTicket,
   isTicketInWorkflow,
   isTicketWorkflowFinished,
   normalizeTicketForDeskV2,
 } from '../../../services/desk/utils';
+import { useTicketPresenceMap } from '../../../context/TicketPresenceContext';
 
 export default function DeskTicketList({
   activeTicketId,
@@ -36,6 +40,7 @@ export default function DeskTicketList({
   const [query, setQuery] = useState(searchQuery);
   const skeletonItems = [1, 2, 3, 4, 5, 6];
   const detectedLabel = getDeskSearchInferredLabel(query);
+  const presenceByTicketId = useTicketPresenceMap();
 
   useEffect(() => {
     setQuery(searchQuery);
@@ -172,6 +177,11 @@ export default function DeskTicketList({
             const isActive = String(t.id) === String(activeTicketId);
             const entryAt = getTicketQueueEntryAt(t);
             const slaCritical = getSlaClass(t) === 'critical';
+            const clienteRespondeu = isClienteRespondeuTicket(t) && !isClienteRespondeuRead(t);
+            const presentAgents = presenceByTicketId[String(t.id)] || [];
+            const agentActiveTitle = presentAgents.length
+              ? `${presentAgents.map((agent) => agent.name).join(', ')} ${presentAgents.length > 1 ? 'estão atuando' : 'está atuando'} neste ticket`
+              : '';
 
             return (
               <li
@@ -191,14 +201,33 @@ export default function DeskTicketList({
                     aria-label="SLA crítico — fora do prazo"
                   />
                 ) : null}
+                {clienteRespondeu ? (
+                  <span
+                    className="crm-ticket-card__dot crm-ticket-card__dot--cliente-respondeu"
+                    title="Cliente respondeu"
+                    aria-label="Cliente respondeu"
+                  />
+                ) : null}
+                {agentActiveTitle ? (
+                  <span
+                    className="crm-ticket-card__dot crm-ticket-card__dot--agent-active"
+                    title={agentActiveTitle}
+                    aria-label={agentActiveTitle}
+                  />
+                ) : null}
                 <div className="crm-ticket-card__content">
                   <div className="crm-ticket-card__row-top">
                     <span className="crm-ticket-card__name">
                       {t.clientName || t.solicitante || 'Cliente'}
                     </span>
-                    <time className="crm-ticket-card__time" dateTime={entryAt}>
-                      {formatTicketListTime(entryAt)}
-                    </time>
+                    <span className="crm-ticket-card__meta-time">
+                      <span className="crm-ticket-card__date">
+                        {formatTicketListDate(entryAt)}
+                      </span>
+                      <time className="crm-ticket-card__time" dateTime={entryAt}>
+                        {formatTicketListTime(entryAt)}
+                      </time>
+                    </span>
                   </div>
                   <div className="crm-ticket-card__row-bottom">
                     <span className="crm-ticket-card__subject" title={getTicketTitle(t)}>
