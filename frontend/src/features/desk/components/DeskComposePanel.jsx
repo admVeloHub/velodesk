@@ -15,6 +15,14 @@ import ComposeRichEditor from './ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
 import ComposeRefinarModal from './ComposeRefinarModal';
 import { stripComposerOpening, wrapComposerOpeningForTicket } from '../../../services/desk/clientMessageEnvelope';
+import {
+  attachmentKindIcon,
+  classifyAttachmentKind,
+  downloadObjectUrl,
+  loadAttachmentForPreview,
+  shouldOpenPreviewModal,
+} from '../../../services/desk/attachmentPreview';
+import DeskAttachmentPreviewModal from './DeskAttachmentPreviewModal';
 
 function readImageFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -157,27 +165,191 @@ export function DeskStatusCommitButton({
 /** @deprecated use DeskStatusCommitButton */
 export const DeskComposeFooter = DeskStatusCommitButton;
 
+const MACRO_DECISIONS = [
+  {
+    id: 'pagamento-antecipado',
+    label: 'Pagamento Antecipado',
+    texto: [
+      'Agora você pode solicitar o boleto para antecipação das parcelas diretamente pelo nosso WhatsApp. Vou encaminhar os links de acesso para facilitar sua solicitação.',
+      '',
+      'Para realizar a antecipação de pagamentos, basta entrar em contato com a equipe responsável:',
+      '',
+      '+55 (11) 50282521 "Somente WhatsApp"',
+      '',
+      'Caso tenha dificuldades para acessar o link acima:',
+      '',
+      '👉 Clique Aqui',
+      '',
+      'Importante: A antecipação do pagamento não garante aumento de limite ou liberação imediata de novo crédito, pois novas ofertas dependem de análise automática. Sempre que possível, mantenha o pagamento das parcelas na data de vencimento.',
+      '',
+      'Permanecemos à disposição.',
+    ].join('\n'),
+  },
+  {
+    id: 'negociacao-cobranca',
+    label: 'Negociação e Cobrança',
+    texto: [
+      'Agradecemos pelo seu contato.',
+      '',
+      'Para solicitações relacionadas a negociação, parcelamento ou regularização de valores em aberto, esse atendimento é realizado diretamente pela nossa equipe especializada de cobrança, que possui acesso às informações e às opções disponíveis para cada caso.',
+      '',
+      'Por esse motivo, esse tipo de solicitação não é tratado por este canal, sendo necessário falar diretamente com o time responsável.',
+      '',
+      'Pedimos, por gentileza, que entre em contato pelo WhatsApp da equipe de cobrança através do link abaixo:',
+      '',
+      '+55 (11) 50282521  "Somente WhatsApp"',
+      '',
+      'Caso encontre dificuldade para acessar o link acima, você também pode utilizar a opção alternativa:',
+      '',
+      '👉 Clique Aqui',
+      '',
+      'Assim que entrar em contato, nossa equipe poderá verificar sua situação e orientar sobre as possibilidades de negociação ou parcelamento.',
+    ].join('\n'),
+  },
+  {
+    id: 'liberacao-chave',
+    label: 'Liberação de Chave',
+    texto: [
+      'Recebemos sua solicitação de retirada da chave Pix.',
+      '',
+      'Sua solicitação já foi encaminhada para o nosso time responsável e pedimos, por gentileza, que aguarde o retorno para conclusão do processo.',
+      '',
+      'Reforçamos que a portabilidade da sua chave Pix é um direito seu e pode ser realizada normalmente, conforme as regras estabelecidas pelo Banco Central.',
+    ].join('\n'),
+  },
+];
+
+function ComposeMacrosMenu({ onSelect, disabled = false }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [open]);
+
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
+  return (
+    <div className="crm-compose-bottom-bar__macros crm-macros-menu" ref={menuRef}>
+      <button
+        type="button"
+        className="btn-secondary crm-compose-bottom-bar__ai crm-macros-menu__trigger"
+        id="btnCrmMacros"
+        aria-haspopup="true"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="crm-compose-bottom-bar__ai-label">Macros</span>
+        <i className="ti ti-chevron-down" aria-hidden="true" />
+      </button>
+      <div className="crm-macros-menu__list" role="menu" aria-label="Decisões" hidden={!open}>
+        {MACRO_DECISIONS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="menuitem"
+            className="crm-macros-menu__item"
+            onClick={() => {
+              setOpen(false);
+              onSelect(item.texto);
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ComposePendingAttachments({ items, onRemove, disabled = false }) {
+  const [loadingUrl, setLoadingUrl] = useState('');
+  const [preview, setPreview] = useState(null);
+  const previewRef = useRef(null);
+  previewRef.current = preview;
+
+  useEffect(() => () => {
+    if (previewRef.current?.objectUrl) URL.revokeObjectURL(previewRef.current.objectUrl);
+  }, []);
+
+  const closePreview = useCallback(() => {
+    setPreview((current) => {
+      if (current?.objectUrl) URL.revokeObjectURL(current.objectUrl);
+      return null;
+    });
+  }, []);
+
+  const openPendingAttachment = useCallback(async (url) => {
+    setLoadingUrl(url);
+    try {
+      const loaded = await loadAttachmentForPreview(url);
+      if (shouldOpenPreviewModal(loaded.kind)) {
+        setPreview((current) => {
+          if (current?.objectUrl) URL.revokeObjectURL(current.objectUrl);
+          return loaded;
+        });
+        return;
+      }
+      downloadObjectUrl(loaded.objectUrl, loaded.filename);
+      window.setTimeout(() => URL.revokeObjectURL(loaded.objectUrl), 60_000);
+    } catch (err) {
+      console.warn('[ComposePendingAttachments] anexo:', err?.message || err);
+    } finally {
+      setLoadingUrl('');
+    }
+  }, []);
+
   if (!items?.length) return null;
   return (
-    <ul className="crm-compose-pending-attachments" aria-label="Anexos pendentes">
-      {items.map((item) => (
-        <li key={item.url} className="crm-compose-pending-attachments__chip">
-          <i className="ti ti-paperclip" aria-hidden="true" />
-          <span className="crm-compose-pending-attachments__name" title={item.name}>{item.name}</span>
-          {!disabled ? (
-            <button
-              type="button"
-              className="crm-compose-pending-attachments__remove"
-              aria-label={`Remover anexo ${item.name}`}
-              onClick={() => onRemove(item.url)}
-            >
-              <i className="ti ti-x" aria-hidden="true" />
-            </button>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="crm-compose-pending-attachments" aria-label="Anexos pendentes">
+        {items.map((item) => {
+          const isLoading = loadingUrl === item.url;
+          const kind = classifyAttachmentKind('', item.name);
+          return (
+            <li key={item.url} className="crm-compose-pending-attachments__chip">
+              <button
+                type="button"
+                className="crm-compose-pending-attachments__preview-btn"
+                onClick={() => openPendingAttachment(item.url)}
+                disabled={isLoading}
+                title={`Ver prévia de ${item.name}`}
+              >
+                <i className={`ti ${attachmentKindIcon(kind)}`} aria-hidden="true" />
+                <span className="crm-compose-pending-attachments__name" title={item.name}>
+                  {isLoading ? 'Abrindo…' : item.name}
+                </span>
+              </button>
+              {!disabled ? (
+                <button
+                  type="button"
+                  className="crm-compose-pending-attachments__remove"
+                  aria-label={`Remover anexo ${item.name}`}
+                  onClick={() => onRemove(item.url)}
+                >
+                  <i className="ti ti-x" aria-hidden="true" />
+                </button>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+      <DeskAttachmentPreviewModal
+        open={Boolean(preview)}
+        kind={preview?.kind}
+        objectUrl={preview?.objectUrl}
+        filename={preview?.filename}
+        onClose={closePreview}
+      />
+    </>
   );
 }
 
@@ -192,6 +364,7 @@ function ComposeBottomBar({
   onSendInternalNote,
   sendInternalNoteBusy = false,
   sendInternalNoteDisabled = false,
+  onSelectMacro,
   overlay = false,
 }) {
   const fileInputRef = useRef(null);
@@ -224,6 +397,9 @@ function ComposeBottomBar({
           <div className="crm-compose-bottom-bar__tools">
             {showAiAssistant ? (
               <>
+                {onSelectMacro ? (
+                  <ComposeMacrosMenu onSelect={onSelectMacro} disabled={attachDisabled} />
+                ) : null}
                 <button
                   type="button"
                   className="btn-secondary crm-compose-bottom-bar__attach"
@@ -481,6 +657,19 @@ export default function DeskComposePanel({
     onComposeReviewed?.(html);
   }, [onComposeTextChange, onComposeReviewed, ticket, nomeOperador]);
 
+  const handleApplyMacro = useCallback((texto) => {
+    const wrapped = wrapComposerOpeningForTicket({
+      nucleo: texto,
+      ticket,
+      agentName: nomeOperador,
+    });
+    const html = normalizePlainToHtml(wrapped);
+    onComposeTextChange(html);
+    // Macro já é um texto pronto/revisado — libera o envio sem precisar passar pelo Revisor de Texto de novo.
+    onComposeReviewed?.(html);
+    showNotification('Macro aplicada à resposta.', 'success');
+  }, [onComposeTextChange, onComposeReviewed, ticket, nomeOperador, showNotification]);
+
   const handlePublicAttachImage = useCallback((file) => {
     void attachImageToEditor(publicEditorRef, file, showNotification);
   }, [showNotification]);
@@ -545,6 +734,7 @@ export default function DeskComposePanel({
       onAttachFiles={ticketReadOnly || publicLocked ? undefined : handleAttachFiles}
       attachUploading={attachUploading}
       attachDisabled={publicLocked || ticketReadOnly}
+      onSelectMacro={ticketReadOnly || publicLocked ? undefined : handleApplyMacro}
       showSendInternalNote={composeMode === 'internal' && Boolean(onSendInternalNote) && !internalLocked}
       onSendInternalNote={onSendInternalNote}
       sendInternalNoteBusy={sendInternalNoteBusy}
@@ -650,6 +840,7 @@ export default function DeskComposePanel({
                     onAttachFiles={ticketReadOnly || publicLocked ? undefined : handleAttachFiles}
                     attachUploading={attachUploading}
                     attachDisabled={publicLocked || ticketReadOnly}
+                    onSelectMacro={ticketReadOnly || publicLocked ? undefined : handleApplyMacro}
                     formatToolbar={(
                       <ComposeFormatToolbar
                         applyAction={publicFormat.applyAction}

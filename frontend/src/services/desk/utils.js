@@ -264,6 +264,11 @@ export function formatTicketListTime(iso) {
   return formatTimeBr(iso);
 }
 
+/** Data curta para card da lista (ex.: 03/09), sem ano. */
+export function formatTicketListDate(iso) {
+  return formatDateBr(iso, { year: false });
+}
+
 /** Badge de canal para card da lista branca. */
 export function resolveTicketChannelBadge(ticket) {
   if (!ticket) return { label: 'Digital', variant: 'digital' };
@@ -1181,12 +1186,63 @@ function normalizeTicketStatusKey(status) {
   return String(status || '').trim().toLowerCase().replace(/\s+/g, '-');
 }
 
-function matchesMyTicketsStatusSection(entry, sectionId) {
-  const status = normalizeTicketStatusKey(entry.ticket?.status);
+/** Ticket reaberto por resposta do cliente (backend move para 'em-aberto' ao reabrir pendente/em-andamento/resolvido). */
+export function isClienteRespondeuTicket(ticket) {
+  return normalizeTicketStatusKey(ticket?.status) === 'em-aberto';
+}
 
-  if (sectionId === 'cliente-respondeu') {
-    return status === 'em-aberto' || status === 'em aberto';
+const CLIENTE_RESPONDEU_READ_STORAGE_KEY = 'veloDeskClienteRespondeuReadV1';
+
+function readClienteRespondeuReadMap() {
+  try {
+    return JSON.parse(localStorage.getItem(CLIENTE_RESPONDEU_READ_STORAGE_KEY) || '{}');
+  } catch {
+    return {};
   }
+}
+
+function writeClienteRespondeuReadMap(map) {
+  try {
+    localStorage.setItem(CLIENTE_RESPONDEU_READ_STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    /* localStorage indisponível (modo privado/quota) — marcação vale só até recarregar */
+  }
+}
+
+/** Agente responsável marca manualmente a última resposta do cliente como lida (some o ponto roxo na fila). */
+export function markClienteRespondeuRead(ticket) {
+  const entryAt = getTicketQueueEntryAt(ticket);
+  if (!ticket?.id || !entryAt) return;
+  const map = readClienteRespondeuReadMap();
+  map[String(ticket.id)] = entryAt;
+  writeClienteRespondeuReadMap(map);
+}
+
+/** Agente responsável marca manualmente a última resposta do cliente como não lida (mantém o ponto roxo). */
+export function markClienteRespondeuUnread(ticket) {
+  if (!ticket?.id) return;
+  const map = readClienteRespondeuReadMap();
+  delete map[String(ticket.id)];
+  writeClienteRespondeuReadMap(map);
+}
+
+/**
+ * true quando o agente responsável marcou explicitamente esta resposta do cliente como lida.
+ * Uma nova resposta do cliente gera um novo `entryAt` (reabre para 'em-aberto'), o que
+ * invalida sozinha a marcação anterior — o ponto roxo volta a aparecer.
+ */
+export function isClienteRespondeuRead(ticket) {
+  const entryAt = getTicketQueueEntryAt(ticket);
+  const readAt = readClienteRespondeuReadMap()[String(ticket?.id)];
+  return Boolean(readAt) && readAt === entryAt;
+}
+
+function matchesMyTicketsStatusSection(entry, sectionId) {
+  if (sectionId === 'cliente-respondeu') {
+    return isClienteRespondeuTicket(entry.ticket);
+  }
+
+  const status = normalizeTicketStatusKey(entry.ticket?.status);
   if (sectionId === 'em-andamento') return status === 'em-andamento';
   if (sectionId === 'pendentes') return status === 'pendente' || status === 'em-espera';
   if (sectionId === 'novos') return status === 'novo' || status === '' || entry.queueId === 'novos';

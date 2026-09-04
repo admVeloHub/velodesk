@@ -5,7 +5,6 @@ import type { AuthPayload } from '../middleware/auth';
 import type { IChamadoN1, IChamadoWorkflow, IRegistro } from '../models/ChamadoN1';
 import type { IWorkflowDefinicao, IWorkflowPassoEnvelope } from '../models/WorkflowDefinicao';
 import {
-  appendRegistroEntry,
   appendStatusTransition,
   currentStatus,
   isClientIdentifiedOnChamado,
@@ -13,9 +12,6 @@ import {
   normalizeStatusValue,
   readTabulacaoSnapshot,
 } from './chamado.mapper';
-import { detectEnvelopeModoFromChamado, wrapComposerOpening } from './clientMessageEnvelope.service';
-import { resolveChamadoClientName } from './placeholders.util';
-import { notifyAgentReplyAsync } from './emailNotification.service';
 import { getActiveWorkflows, getWorkflowById, getWorkflowBySlug, resolveWorkflowForTicket } from './workflowDefinicao.service';
 import { getActiveGrupos } from './grupoResponsabilidade.service';
 import {
@@ -122,52 +118,6 @@ function applyAtribuidoForPasso(chamado: IChamadoN1, passo: IWorkflowPassoEnvelo
   }
   const tab = readTabulacaoSnapshot(chamado.tabulacao[0]);
   chamado.tabulacao = [{ ...tab, atribuido }];
-}
-
-const TIPO_SOLICITACAO_LABELS: Record<string, string> = {
-  'alteracao-dados-cadastrais': 'alteração de dados cadastrais',
-};
-
-function buildProdutosConclusaoClientMessage(chamado: IChamadoN1): string {
-  const solic = chamado.workflow?.requisicao?.solicitacaoProdutos as Record<string, unknown> | undefined;
-  const tipoRaw = String(solic?.tipoSolicitacao || '').trim();
-  const tab = readTabulacaoSnapshot(chamado.tabulacao[0]);
-  let tipo = TIPO_SOLICITACAO_LABELS[tipoRaw] || 'solicitação';
-  if (!tipoRaw && tab?.motivo && tab?.produto) {
-    tipo = `${tab.motivo} · ${tab.produto}`;
-  } else if (!tipoRaw && tab?.motivo) {
-    tipo = String(tab.motivo);
-  }
-  // Sem saudação aqui — quem monta "Olá/Oi, {nome}..." é o wrapComposerOpening, senão
-  // duplica a saudação (uma da abertura mecânica, outra embutida neste texto).
-  return `Sua solicitação de ${tipo} foi analisada e concluída pelo time de Produtos. Estamos à disposição caso precise de algo mais.`;
-}
-
-async function appendProdutosConclusaoPublicMessage(chamado: IChamadoN1, autor: string): Promise<void> {
-  const nucleo = buildProdutosConclusaoClientMessage(chamado);
-  // clientName vem só do cadastro associado (mesma regra de placeholders.util) — nunca do
-  // chamadoTitulo/assunto do e-mail, que já causou nome errado em outro ponto do sistema.
-  const clientName = await resolveChamadoClientName(chamado);
-  const composerText = wrapComposerOpening({
-    nucleo,
-    clientName,
-    agentName: autor,
-    modo: detectEnvelopeModoFromChamado(chamado),
-  });
-  const result = appendRegistroEntry(chamado, {
-    mensagemPublica: composerText,
-    sender: 'me',
-    autor,
-    metadados: {
-      workflowProdutosConclusao: true,
-      at: new Date().toISOString(),
-    },
-  });
-  // appendRegistroEntry só grava no chamado em memória — sem isto o "Retorno ao Cliente"
-  // automático do workflow de Produtos nunca chegava ao e-mail do cliente, só ficava
-  // registrado como mensagem pública no ticket (quem chama salva o chamado depois,
-  // persistindo o carimbo de emailOutboundMessageId que notifyAgentReplyAsync grava aqui).
-  await notifyAgentReplyAsync(chamado, composerText, undefined, result.public?.registroIndex);
 }
 
 /**
@@ -695,9 +645,12 @@ async function advanceWorkflowProdutosQueueDecision(
     metadados: { workflowDecision: 'approve' },
   });
   wf.pendingDecision = null;
-  await appendProdutosConclusaoPublicMessage(chamado, autor);
-  // "Feito" em produtos encerra o workflow — mensagem ao cliente já persistida acima.
-  await advanceToStep(chamado, definicao, sortPassos(definicao).length, autor, {
+  // "Feito" em produtos avança pra próxima etapa da sequência (igual ao aprovar do fluxo
+  // normal em advanceWorkflowManual) — se houver uma etapa "Resposta ao cliente" configurada
+  // logo depois da aprovação, ela roda normalmente (IA ou e-mail padrão, conforme o editor de
+  // Workflows). Sem etapa configurada, advanceToStep já finaliza sozinho sem mensagem nenhuma.
+  // Nunca mais gerar o retorno ao cliente por texto fixo aqui.
+  await advanceToStep(chamado, definicao, produtosStepIdx + 1, autor, {
     trigger: 'produtos-queue-feito',
     decision: 'approve',
   });

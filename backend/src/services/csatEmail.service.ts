@@ -237,6 +237,25 @@ export interface CsatInicialResult {
 }
 
 /**
+ * Instante em que o ticket ENTROU no status alvo — não o timestamp do último registro
+ * qualquer. Antes, `since` pegava a data do último registro do array, então qualquer
+ * atividade nova no ticket já resolvido (nota interna, outro e-mail automático, etc.)
+ * empurrava a contagem do prazo pra frente indefinidamente, fazendo o CSAT disparar muito
+ * depois do prazo configurado (ou nunca, se o ticket seguisse recebendo eventos). Anda pra
+ * trás a partir do fim enquanto o status bater com o alvo, e fica com o mais antigo da
+ * sequência — ou seja, o momento exato da transição pro status alvo.
+ */
+function resolveStatusSinceDate(registros: Array<{ status?: string | null; data?: Date | null }>, status: string): Date | null {
+  let anchor: Date | null = null;
+  for (let i = registros.length - 1; i >= 0; i -= 1) {
+    const reg = registros[i];
+    if (String(reg?.status || '').toLowerCase() !== status) break;
+    anchor = reg?.data ? new Date(reg.data) : anchor;
+  }
+  return anchor;
+}
+
+/**
  * Dispara a pesquisa de CSAT inicial de acordo com o gatilho configurado no
  * próprio e-mail (aba Emails de Saída, template "Encerramento mais satisfação"):
  * qual status inicia a contagem e o prazo (horas úteis) até o disparo. Decoupled
@@ -268,7 +287,7 @@ export async function runCsatInicialPastWindow(now = new Date()): Promise<CsatIn
       if (!last || String(last.status || '').toLowerCase() !== status) continue;
 
       if (prazoMs > 0) {
-        const since = last.data ? new Date(last.data) : null;
+        const since = resolveStatusSinceDate(registros, status);
         if (!since || Number.isNaN(since.getTime())) continue;
         if (businessMsBetween(since, now) < prazoMs) continue;
       }

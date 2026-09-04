@@ -75,3 +75,10 @@ export function useTicketPresence(ticketId) {
   const key = ticketId ? String(ticketId) : '';
   return key ? (ctx.presenceByTicketId[key] || []) : [];
 }
+
+/** Mapa completo ticketId -> agentes presentes, para listas que precisam consultar vários tickets sem um hook por item. */
+export function useTicketPresenceMap() {
+  const ctx = useContext(TicketPresenceContext);
+  if (!ctx) throw new Error('useTicketPresenceMap requires TicketPresenceProvider');
+  return ctx.presenceByTicketId;
+}

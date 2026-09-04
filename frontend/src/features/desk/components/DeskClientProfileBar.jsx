@@ -20,6 +20,7 @@ import {
 } from '../../../services/desk/utils';
 import { useNotifications } from '../../../context/NotificationContext';
 import { useTickets } from '../../../context/TicketsContext';
+import { useTicketPresence } from '../../../context/TicketPresenceContext';
 import TicketWorkflowStepper from './TicketWorkflowStepper';
 import WorkflowProgressModal from './WorkflowProgressModal';
 import ClientContactFieldsEditor, {
@@ -67,6 +68,10 @@ export default function DeskClientProfileBar({
   const [emailErrors, setEmailErrors] = useState({});
   const contact = getClientContactFields(ticket, client);
   const cadastroNaoEncontrado = Boolean(contact.cpf) && (!contact.name || !contact.email);
+  const presentAgents = useTicketPresence(ticket?.id || ticket?._id);
+  const agentActiveTitle = presentAgents.length
+    ? `${presentAgents.map((agent) => agent.name).join(', ')} ${presentAgents.length > 1 ? 'estão atuando' : 'está atuando'} neste ticket`
+    : '';
   const activeProducts = getClientActiveProducts(ticket, client);
   const protocolLabel = resolveProtocolLabel(ticket);
   const inWorkflow = isTicketInWorkflow(ticket);
@@ -311,6 +316,13 @@ export default function DeskClientProfileBar({
               </div>
             )}
           </span>
+          {agentActiveTitle ? (
+            <span
+              className="ticket-client-profile__agent-active-dot"
+              title={agentActiveTitle}
+              aria-label={agentActiveTitle}
+            />
+          ) : null}
         </div>
 
         <div className="ticket-client-profile__protocol-row ticket-client-profile__cell-protocol">
