@@ -21,6 +21,7 @@ export default function RaTicketSide({
   disabled = false,
   finalized = false,
   onClassificacaoDraftChange,
+  onRaItemUpdated,
 }) {
   if (!raItem) return null;
 

@@ -324,6 +324,7 @@ export default function ReclameAquiCrmRoot() {
         onOpenChat={handleOpenChat}
         onCloseChat={handleCloseChat}
         onTicketUpdated={handleTicketUpdated}
+        onRaItemUpdated={handleModeracaoSaved}
         onSave={handleSaveTicket}
         onFinalize={handleFinalizeTicket}
         saving={committing}
