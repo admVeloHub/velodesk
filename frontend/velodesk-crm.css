@@ -5086,6 +5086,23 @@
     color: #334155;
 }
 
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-compose-pending-attachments__preview-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-compose-pending-attachments__preview-btn:hover .crm-compose-pending-attachments__name {
+    text-decoration: underline;
+}
+
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-compose-pending-attachments__name {
     overflow: hidden;
     text-overflow: ellipsis;

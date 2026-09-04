@@ -15,6 +15,14 @@ import ComposeRichEditor from './ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
 import ComposeRefinarModal from './ComposeRefinarModal';
 import { stripComposerOpening, wrapComposerOpeningForTicket } from '../../../services/desk/clientMessageEnvelope';
+import {
+  attachmentKindIcon,
+  classifyAttachmentKind,
+  downloadObjectUrl,
+  loadAttachmentForPreview,
+  shouldOpenPreviewModal,
+} from '../../../services/desk/attachmentPreview';
+import DeskAttachmentPreviewModal from './DeskAttachmentPreviewModal';
 
 function readImageFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -263,26 +271,85 @@ function ComposeMacrosMenu({ onSelect, disabled = false }) {
 }
 
 function ComposePendingAttachments({ items, onRemove, disabled = false }) {
+  const [loadingUrl, setLoadingUrl] = useState('');
+  const [preview, setPreview] = useState(null);
+  const previewRef = useRef(null);
+  previewRef.current = preview;
+
+  useEffect(() => () => {
+    if (previewRef.current?.objectUrl) URL.revokeObjectURL(previewRef.current.objectUrl);
+  }, []);
+
+  const closePreview = useCallback(() => {
+    setPreview((current) => {
+      if (current?.objectUrl) URL.revokeObjectURL(current.objectUrl);
+      return null;
+    });
+  }, []);
+
+  const openPendingAttachment = useCallback(async (url) => {
+    setLoadingUrl(url);
+    try {
+      const loaded = await loadAttachmentForPreview(url);
+      if (shouldOpenPreviewModal(loaded.kind)) {
+        setPreview((current) => {
+          if (current?.objectUrl) URL.revokeObjectURL(current.objectUrl);
+          return loaded;
+        });
+        return;
+      }
+      downloadObjectUrl(loaded.objectUrl, loaded.filename);
+      window.setTimeout(() => URL.revokeObjectURL(loaded.objectUrl), 60_000);
+    } catch (err) {
+      console.warn('[ComposePendingAttachments] anexo:', err?.message || err);
+    } finally {
+      setLoadingUrl('');
+    }
+  }, []);
+
   if (!items?.length) return null;
   return (
-    <ul className="crm-compose-pending-attachments" aria-label="Anexos pendentes">
-      {items.map((item) => (
-        <li key={item.url} className="crm-compose-pending-attachments__chip">
-          <i className="ti ti-paperclip" aria-hidden="true" />
-          <span className="crm-compose-pending-attachments__name" title={item.name}>{item.name}</span>
-          {!disabled ? (
-            <button
-              type="button"
-              className="crm-compose-pending-attachments__remove"
-              aria-label={`Remover anexo ${item.name}`}
-              onClick={() => onRemove(item.url)}
-            >
-              <i className="ti ti-x" aria-hidden="true" />
-            </button>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="crm-compose-pending-attachments" aria-label="Anexos pendentes">
+        {items.map((item) => {
+          const isLoading = loadingUrl === item.url;
+          const kind = classifyAttachmentKind('', item.name);
+          return (
+            <li key={item.url} className="crm-compose-pending-attachments__chip">
+              <button
+                type="button"
+                className="crm-compose-pending-attachments__preview-btn"
+                onClick={() => openPendingAttachment(item.url)}
+                disabled={isLoading}
+                title={`Ver prévia de ${item.name}`}
+              >
+                <i className={`ti ${attachmentKindIcon(kind)}`} aria-hidden="true" />
+                <span className="crm-compose-pending-attachments__name" title={item.name}>
+                  {isLoading ? 'Abrindo…' : item.name}
+                </span>
+              </button>
+              {!disabled ? (
+                <button
+                  type="button"
+                  className="crm-compose-pending-attachments__remove"
+                  aria-label={`Remover anexo ${item.name}`}
+                  onClick={() => onRemove(item.url)}
+                >
+                  <i className="ti ti-x" aria-hidden="true" />
+                </button>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+      <DeskAttachmentPreviewModal
+        open={Boolean(preview)}
+        kind={preview?.kind}
+        objectUrl={preview?.objectUrl}
+        filename={preview?.filename}
+        onClose={closePreview}
+      />
+    </>
   );
 }
 
