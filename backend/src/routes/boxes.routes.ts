@@ -7,6 +7,7 @@ import { getCachedBoxes } from '../services/boxesCache.service';
 import { ChamadoN1 } from '../models/ChamadoN1';
 import { User } from '../models/User';
 import {
+  buildBoxCountFilter,
   buildBoxListFindOptions,
   buildChamadoMapContext,
   buildResponsavelCandidates,
@@ -94,7 +95,10 @@ async function loadQueueCounts(
 
   await Promise.all(
     columns.map(async (column) => {
-      const { filter } = buildBoxListFindOptions(
+      // Contagem do badge nunca usa buildBoxListFindOptions — aquela função injeta uma
+      // janela de 30 dias pra status terminal (resolvido/cancelado/fechado) só pra
+      // manter a LISTA paginada rápida; usada aqui, capava o total exibido em ~150.
+      const filter = buildBoxCountFilter(
         column.status,
         queue,
         responsavelCandidates,

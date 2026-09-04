@@ -821,6 +821,24 @@ export function buildBoxListFindOptions(
   };
 }
 
+/**
+ * Filtro pra CONTAGEM total do badge de fila — nunca aplica a janela de 30 dias que
+ * buildBoxListFindOptions usa só pra limitar a lista paginada de Resolvidos/Cancelados/
+ * Fechados a até 150 itens recentes. Contagem tem que sempre refletir o total real
+ * (respeitando ver_todos vs meus-chamados, igual buildChamadoQueryFilter já faz) —
+ * nunca capada pela janela/limite pensados só pra performance da lista exibida.
+ */
+export function buildBoxCountFilter(
+  status: string,
+  queue?: string,
+  responsavelCandidates?: string[],
+  extraFilter?: Record<string, unknown>,
+): Record<string, unknown> {
+  const baseFilter = buildChamadoQueryFilter(status, queue, responsavelCandidates, extraFilter);
+  const excludeAbsorvidos = excludeFusaoAbsorvidosFilter();
+  return { $and: [baseFilter, excludeAbsorvidos] };
+}
+
 export async function chamadosToTickets(
   chamados: IChamadoN1[],
   boxId: string,
