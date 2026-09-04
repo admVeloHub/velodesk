@@ -34,8 +34,11 @@ export function isComposePublicReviewSatisfied({
   if (!plain) return true;
   if (!COMPOSE_AI_REVIEW_REQUIRED) return true;
 
+  // Uma vez que o agente aplicou a revisão (Revisor de Texto ou macro) nesta mensagem,
+  // o envio fica liberado mesmo que ele volte a editar o compose depois — não é exigido
+  // que o texto atual bata caractere a caractere com o texto revisado.
   const reviewed = normalizeComposePlain(composeReviewedPlain);
-  if (reviewed && plain === reviewed) return true;
+  if (reviewed) return true;
 
   const iaNucleo = normalizeComposePlain(iaRespostaSugerida);
   if (!iaNucleo) return false;

@@ -113,3 +113,61 @@ export function wrapComposerOpeningForTicket({ nucleo, ticket, agentName }) {
     modo,
   });
 }
+
+function escapeHtmlText(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Mesma abertura mecânica de wrapComposerOpening, mas para um núcleo que já é HTML rico
+ * (ex.: macro com links) — usada em vez de wrapComposerOpening quando o núcleo não pode
+ * passar por normalização de texto puro (senão as quebras de linha da saudação virariam
+ * espaço em vez de <br />, e o HTML do núcleo seria escapado por engano).
+ * @param {object} params
+ * @param {string} params.nucleoHtml
+ * @param {string} [params.clientName]
+ * @param {string} [params.agentName]
+ * @param {'primeiro_contato'|'continuacao'} [params.modo]
+ */
+export function wrapComposerOpeningHtml(params) {
+  const nucleoHtml = String(params?.nucleoHtml || '').trim();
+  if (!nucleoHtml) return '';
+
+  const modo = params?.modo || 'primeiro_contato';
+  const clientGreeting = resolveClientGreetingName(params?.clientName);
+
+  if (modo === 'continuacao') {
+    return `${escapeHtmlText(`Oi, ${clientGreeting}, tudo bem?`)}<br /><br />${nucleoHtml}`;
+  }
+
+  const agentDisplay = resolveAgentDisplayName(params?.agentName);
+  const greetingLines = [
+    escapeHtmlText(`Olá, ${clientGreeting}, tudo bem?`),
+    escapeHtmlText(`Eu sou ${agentDisplay}, do time de atendimento Velotax.`),
+  ];
+  return `${greetingLines.join('<br /><br />')}<br /><br />${nucleoHtml}`;
+}
+
+/**
+ * @param {object} params
+ * @param {string} params.nucleoHtml
+ * @param {object} params.ticket
+ * @param {string} params.agentName
+ */
+export function wrapComposerOpeningForTicketHtml({ nucleoHtml, ticket, agentName }) {
+  const clientName = ticket?.clientName
+    || ticket?.client?.name
+    || ticket?.lateralForm?.clienteNome
+    || ticket?.titulo
+    || '';
+  const modo = detectEnvelopeModoFromTicket(ticket);
+  return wrapComposerOpeningHtml({
+    nucleoHtml,
+    clientName,
+    agentName,
+    modo,
+  });
+}

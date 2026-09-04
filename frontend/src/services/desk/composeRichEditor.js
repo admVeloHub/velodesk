@@ -3,7 +3,18 @@
  * VERSION: v1.0.5 | DATE: 2026-08-20
  */
 
-const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'DIV', 'P', 'UL', 'OL', 'LI', 'IMG']);
+const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'DIV', 'P', 'UL', 'OL', 'LI', 'IMG', 'A']);
+
+const SAFE_LINK_PROTOCOL_RE = /^(https?:|mailto:)/i;
+
+/** Normaliza texto digitado num link (sem protocolo, e-mail, "www.") para uma URL segura. */
+export function normalizeComposeLinkUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  if (SAFE_LINK_PROTOCOL_RE.test(raw)) return raw;
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) return `mailto:${raw}`;
+  return `https://${raw.replace(/^\/+/, '')}`;
+}
 
 export const COMPOSE_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
 
@@ -72,6 +83,24 @@ export function sanitizeComposeHtml(html) {
       [...node.childNodes].forEach((child) => {
         if (child.nodeType === Node.ELEMENT_NODE) {
           const el = child;
+          if (el.tagName === 'A') {
+            const href = String(el.getAttribute('href') || '').trim();
+            if (!SAFE_LINK_PROTOCOL_RE.test(href)) {
+              const parent = el.parentNode;
+              if (parent) {
+                while (el.firstChild) parent.insertBefore(el.firstChild, el);
+              }
+              el.remove();
+              return;
+            }
+            [...el.attributes].forEach((attr) => el.removeAttribute(attr.name));
+            el.setAttribute('href', href);
+            el.setAttribute('target', '_blank');
+            el.setAttribute('rel', 'noopener noreferrer');
+            el.className = 'compose-inline-link';
+            walk(el, depth + 1);
+            return;
+          }
           if (el.tagName === 'IMG') {
             const src = el.getAttribute('src') || '';
             if (!isAllowedComposeImageSrc(src)) {
@@ -322,6 +351,95 @@ export function insertImageInEditor(root, src, alt = 'Imagem anexada', attrs = {
     root.appendChild(document.createElement('br'));
   }
   root.appendChild(img);
+  return true;
+}
+
+/** Captura a seleção/link atual antes de abrir o popover de link — o range é clonado para
+ * sobreviver ao foco saindo do editor quando o usuário clica nos campos do popover. */
+export function captureComposeLinkContext(root) {
+  const empty = { href: '', label: '', range: null, anchor: null };
+  if (!root) return empty;
+  const selection = window.getSelection();
+  if (!selection || !selection.rangeCount) return empty;
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.commonAncestorContainer)) return empty;
+
+  let node = range.startContainer;
+  if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+  const anchor = node?.closest?.('a');
+  const validAnchor = anchor && root.contains(anchor) ? anchor : null;
+
+  return {
+    href: validAnchor ? (validAnchor.getAttribute('href') || '') : '',
+    label: validAnchor ? (validAnchor.textContent || '') : range.toString(),
+    range: range.cloneRange(),
+    anchor: validAnchor,
+  };
+}
+
+/** Aplica (insere ou edita) um link a partir do contexto capturado por captureComposeLinkContext. */
+export function applyComposeLink(root, context, url, label) {
+  if (!root) return false;
+  const href = normalizeComposeLinkUrl(url);
+  if (!href) return false;
+  root.focus();
+
+  const selection = window.getSelection();
+  const anchor = context?.anchor && root.contains(context.anchor) ? context.anchor : null;
+  const range = !anchor && context?.range && root.contains(context.range.commonAncestorContainer)
+    ? context.range
+    : null;
+
+  const link = document.createElement('a');
+  link.setAttribute('href', href);
+  link.setAttribute('target', '_blank');
+  link.setAttribute('rel', 'noopener noreferrer');
+  link.textContent = String(label || '').trim() || href;
+
+  if (anchor) {
+    anchor.replaceWith(link);
+  } else if (range) {
+    range.deleteContents();
+    range.insertNode(link);
+  } else {
+    if (root.lastChild && root.lastChild.nodeName !== 'BR') {
+      root.appendChild(document.createElement('br'));
+    }
+    root.appendChild(link);
+  }
+
+  const afterRange = document.createRange();
+  afterRange.setStartAfter(link);
+  afterRange.collapse(true);
+  selection?.removeAllRanges();
+  selection?.addRange(afterRange);
+  return true;
+}
+
+/** Remove o link do contexto capturado, preservando o texto. */
+export function removeComposeLink(root, context) {
+  if (!root || !context?.anchor || !root.contains(context.anchor)) return false;
+  root.focus();
+  const anchor = context.anchor;
+  const parent = anchor.parentNode;
+  if (!parent) return false;
+
+  const frag = document.createDocumentFragment();
+  let lastNode = null;
+  while (anchor.firstChild) {
+    lastNode = anchor.firstChild;
+    frag.appendChild(lastNode);
+  }
+  parent.replaceChild(frag, anchor);
+
+  const selection = window.getSelection();
+  if (selection && lastNode) {
+    const range = document.createRange();
+    range.setStartAfter(lastNode);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
   return true;
 }
 

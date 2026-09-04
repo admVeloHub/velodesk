@@ -294,6 +294,15 @@ export const tabulationApi = {
     api.delete(`/tabulation/opcoes/${encodeURIComponent(categoria)}/items/${encodeURIComponent(itemId)}`).then((r) => r.data),
 };
 
+export const macrosApi = {
+  list: (includeInactive = false) =>
+    api.get('/macros', { params: { includeInactive: includeInactive ? 'true' : undefined } }).then((r) => r.data),
+  get: (id) => api.get(`/macros/${encodeURIComponent(id)}`).then((r) => r.data),
+  create: (data) => api.post('/macros', data).then((r) => r.data),
+  update: (id, data) => api.put(`/macros/${encodeURIComponent(id)}`, data).then((r) => r.data),
+  remove: (id) => api.delete(`/macros/${encodeURIComponent(id)}`).then((r) => r.data),
+};
+
 /**
  * Consome /ticket-ai/suggest-stream via SSE (fetch + ReadableStream — EventSource não suporta
  * POST/Authorization). onStage recebe cada evento de progresso ('gerando'|'auditando'|

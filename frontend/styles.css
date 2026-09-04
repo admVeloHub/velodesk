@@ -16913,6 +16913,32 @@ body.velodesk-dark #config .config-action-btn--delete:hover {
     font-size: 1rem;
 }
 
+#config .config-field__hint {
+    margin: -0.35rem 0 0.75rem;
+    font-size: 0.82rem;
+    color: var(--config-muted);
+}
+
+#config .config-macro-editor-zone {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+#config .config-macro-editor {
+    min-height: 220px;
+}
+
+#config .config-macro-editor__footer {
+    margin-top: 1rem;
+    justify-content: flex-end;
+}
+
+#config .config-table__preview {
+    color: var(--config-muted);
+    max-width: 360px;
+}
+
 #config .config-tree-block__children {
     margin-top: 0.75rem;
     padding-left: 0.85rem;

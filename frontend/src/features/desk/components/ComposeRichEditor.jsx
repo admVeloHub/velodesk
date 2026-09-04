@@ -11,6 +11,8 @@ import React, {
   useState,
 } from 'react';
 import {
+  applyComposeLink,
+  captureComposeLinkContext,
   execComposeFormat,
   getPlainOffset,
   htmlToPlainText,
@@ -18,6 +20,7 @@ import {
   insertImageInEditor,
   readComposeFormatState,
   readEditorHtml,
+  removeComposeLink,
   replacePlainTextInEditor,
   setEditorHtml,
 } from '../../../services/desk/composeRichEditor';
@@ -72,6 +75,17 @@ const ComposeRichEditor = forwardRef(function ComposeRichEditor({
     },
     insertImage: (src, alt, attrs) => {
       const ok = insertImageInEditor(editorRef.current, src, alt, attrs);
+      if (ok) emitChange();
+      return ok;
+    },
+    beginLink: () => captureComposeLinkContext(editorRef.current),
+    applyLink: (context, url, label) => {
+      const ok = applyComposeLink(editorRef.current, context, url, label);
+      if (ok) emitChange();
+      return ok;
+    },
+    removeLink: (context) => {
+      const ok = removeComposeLink(editorRef.current, context);
       if (ok) emitChange();
       return ok;
     },

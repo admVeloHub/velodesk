@@ -902,6 +902,35 @@ body.velodesk-dark #velodeskDeskV2Root .crm-compose-bottom-bar .crm-compose-tool
     border-color: #2563eb;
 }
 
+body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor .compose-inline-link,
+body.velodesk-dark #velodeskDeskV2Root .msg-bubble__formatted .compose-inline-link {
+    color: #93c5fd;
+}
+
+body.velodesk-dark #velodeskDeskV2Root .compose-rich-editor .compose-inline-link:hover,
+body.velodesk-dark #velodeskDeskV2Root .msg-bubble__formatted .compose-inline-link:hover {
+    color: #bfdbfe;
+}
+
+body.velodesk-dark .crm-compose-toolbar__link-popover {
+    background: var(--velo-dark-surface-inset, #1e293b);
+    border-color: var(--velo-dark-border, rgba(148, 163, 184, 0.35));
+}
+
+body.velodesk-dark .crm-compose-toolbar__link-field {
+    color: var(--velo-dark-text-muted, #94a3b8);
+}
+
+body.velodesk-dark .crm-compose-toolbar__link-field input {
+    background: rgba(15, 23, 42, 0.6);
+    border-color: var(--velo-dark-border, rgba(148, 163, 184, 0.35));
+    color: var(--velo-dark-text, #e2e8f0);
+}
+
+body.velodesk-dark .crm-compose-toolbar__link-cancel {
+    color: var(--velo-dark-text-muted, #94a3b8);
+}
+
 body.velodesk-dark #velodeskDeskV2Root .crm-compose-editor-zone.internal-form {
     background: rgba(251, 191, 36, 0.08);
     border-color: rgba(251, 191, 36, 0.35);

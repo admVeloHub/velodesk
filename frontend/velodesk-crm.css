@@ -5025,6 +5025,12 @@
     color: #fff;
 }
 
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-macros-menu__empty {
+    padding: 8px 10px;
+    font-size: var(--desk-fs-sm);
+    color: #94a3b8;
+}
+
 :is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-compose-bottom-bar__ai {
     flex-shrink: 0;
     font-size: var(--desk-fs-sm);
@@ -5545,6 +5551,97 @@
     border-color: #78350f;
 }
 
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .crm-compose-toolbar__link-wrap {
+    position: relative;
+}
+
+.crm-compose-toolbar__link-popover {
+    width: 260px;
+    background: #fff;
+    border: 0.5px solid #E4E6EA;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.crm-compose-toolbar__link-popover--floating {
+    position: fixed;
+    z-index: 12500;
+}
+
+.crm-compose-toolbar__link-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: var(--desk-fs-caption);
+    color: #64748b;
+    font-weight: 600;
+}
+
+.crm-compose-toolbar__link-field input {
+    font-family: inherit;
+    font-size: var(--desk-fs-sm);
+    font-weight: 400;
+    color: #1e293b;
+    padding: 6px 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fff;
+}
+
+.crm-compose-toolbar__link-field input:focus {
+    outline: none;
+    border-color: #1634FF;
+}
+
+.crm-compose-toolbar__link-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.crm-compose-toolbar__link-remove {
+    margin-right: auto;
+    background: none;
+    border: none;
+    color: #dc3545;
+    font-size: var(--desk-fs-caption);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 2px;
+}
+
+.crm-compose-toolbar__link-cancel {
+    background: none;
+    border: none;
+    color: #64748b;
+    font-size: var(--desk-fs-caption);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 8px;
+}
+
+.crm-compose-toolbar__link-apply {
+    background: #1634FF;
+    border: none;
+    color: #fff;
+    font-size: var(--desk-fs-caption);
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 6px 12px;
+}
+
+.crm-compose-toolbar__link-apply:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+}
+
 #velodeskDeskV2Root .spell-textarea-wrap {
     position: relative;
     width: 100%;
@@ -5702,6 +5799,18 @@
     height: auto;
     margin: 0.35rem 0;
     border-radius: 8px;
+}
+
+#velodeskDeskV2Root .compose-rich-editor .compose-inline-link,
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .msg-bubble__formatted .compose-inline-link {
+    color: #1634FF;
+    text-decoration: underline;
+    word-break: break-word;
+}
+
+#velodeskDeskV2Root .compose-rich-editor .compose-inline-link:hover,
+:is(#velodeskDeskV2Root, .desk-crm-ticket-scope) .msg-bubble__formatted .compose-inline-link:hover {
+    color: #000058;
 }
 
 #velodeskDeskV2Root .compose-rich-editor-wrap--has-errors .compose-rich-editor {

@@ -14,7 +14,8 @@ import { htmlToPlainText, htmlHasComposeContent, normalizePlainToHtml, COMPOSE_I
 import ComposeRichEditor from './ComposeRichEditor';
 import ComposeFormatToolbar, { useComposeFormat } from './ComposeFormatToolbar';
 import ComposeRefinarModal from './ComposeRefinarModal';
-import { stripComposerOpening, wrapComposerOpeningForTicket } from '../../../services/desk/clientMessageEnvelope';
+import { stripComposerOpening, wrapComposerOpeningForTicket, wrapComposerOpeningForTicketHtml } from '../../../services/desk/clientMessageEnvelope';
+import { fetchActiveMacrosCached } from '../../../services/desk/macrosCache';
 import {
   attachmentKindIcon,
   classifyAttachmentKind,
@@ -165,63 +166,19 @@ export function DeskStatusCommitButton({
 /** @deprecated use DeskStatusCommitButton */
 export const DeskComposeFooter = DeskStatusCommitButton;
 
-const MACRO_DECISIONS = [
-  {
-    id: 'pagamento-antecipado',
-    label: 'Pagamento Antecipado',
-    texto: [
-      'Agora você pode solicitar o boleto para antecipação das parcelas diretamente pelo nosso WhatsApp. Vou encaminhar os links de acesso para facilitar sua solicitação.',
-      '',
-      'Para realizar a antecipação de pagamentos, basta entrar em contato com a equipe responsável:',
-      '',
-      '+55 (11) 50282521 "Somente WhatsApp"',
-      '',
-      'Caso tenha dificuldades para acessar o link acima:',
-      '',
-      '👉 Clique Aqui',
-      '',
-      'Importante: A antecipação do pagamento não garante aumento de limite ou liberação imediata de novo crédito, pois novas ofertas dependem de análise automática. Sempre que possível, mantenha o pagamento das parcelas na data de vencimento.',
-      '',
-      'Permanecemos à disposição.',
-    ].join('\n'),
-  },
-  {
-    id: 'negociacao-cobranca',
-    label: 'Negociação e Cobrança',
-    texto: [
-      'Agradecemos pelo seu contato.',
-      '',
-      'Para solicitações relacionadas a negociação, parcelamento ou regularização de valores em aberto, esse atendimento é realizado diretamente pela nossa equipe especializada de cobrança, que possui acesso às informações e às opções disponíveis para cada caso.',
-      '',
-      'Por esse motivo, esse tipo de solicitação não é tratado por este canal, sendo necessário falar diretamente com o time responsável.',
-      '',
-      'Pedimos, por gentileza, que entre em contato pelo WhatsApp da equipe de cobrança através do link abaixo:',
-      '',
-      '+55 (11) 50282521  "Somente WhatsApp"',
-      '',
-      'Caso encontre dificuldade para acessar o link acima, você também pode utilizar a opção alternativa:',
-      '',
-      '👉 Clique Aqui',
-      '',
-      'Assim que entrar em contato, nossa equipe poderá verificar sua situação e orientar sobre as possibilidades de negociação ou parcelamento.',
-    ].join('\n'),
-  },
-  {
-    id: 'liberacao-chave',
-    label: 'Liberação de Chave',
-    texto: [
-      'Recebemos sua solicitação de retirada da chave Pix.',
-      '',
-      'Sua solicitação já foi encaminhada para o nosso time responsável e pedimos, por gentileza, que aguarde o retorno para conclusão do processo.',
-      '',
-      'Reforçamos que a portabilidade da sua chave Pix é um direito seu e pode ser realizada normalmente, conforme as regras estabelecidas pelo Banco Central.',
-    ].join('\n'),
-  },
-];
-
 function ComposeMacrosMenu({ onSelect, disabled = false }) {
   const [open, setOpen] = useState(false);
+  const [macros, setMacros] = useState(null);
   const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open || macros !== null) return;
+    let cancelled = false;
+    fetchActiveMacrosCached()
+      .then((list) => { if (!cancelled) setMacros(list); })
+      .catch(() => { if (!cancelled) setMacros([]); });
+    return () => { cancelled = true; };
+  }, [open, macros]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -251,9 +208,13 @@ function ComposeMacrosMenu({ onSelect, disabled = false }) {
         <i className="ti ti-chevron-down" aria-hidden="true" />
       </button>
       <div className="crm-macros-menu__list" role="menu" aria-label="Decisões" hidden={!open}>
-        {MACRO_DECISIONS.map((item) => (
+        {macros === null ? (
+          <span className="crm-macros-menu__empty">Carregando…</span>
+        ) : macros.length === 0 ? (
+          <span className="crm-macros-menu__empty">Nenhuma macro cadastrada.</span>
+        ) : macros.map((item) => (
           <button
-            key={item.id}
+            key={item._id}
             type="button"
             role="menuitem"
             className="crm-macros-menu__item"
@@ -262,7 +223,7 @@ function ComposeMacrosMenu({ onSelect, disabled = false }) {
               onSelect(item.texto);
             }}
           >
-            {item.label}
+            {item.nome}
           </button>
         ))}
       </div>
@@ -556,6 +517,9 @@ function InternalNoteFields({
             embedded
             onImageSelected={handleInternalAttachImage}
             attachDisabled={attachDisabled || readOnly}
+            beginLink={internalFormat.beginLink}
+            applyLink={internalFormat.applyLink}
+            removeLink={internalFormat.removeLink}
           />
         )}
       />
@@ -657,9 +621,12 @@ export default function DeskComposePanel({
     onComposeReviewed?.(html);
   }, [onComposeTextChange, onComposeReviewed, ticket, nomeOperador]);
 
-  const handleApplyMacro = useCallback((texto) => {
-    const wrapped = wrapComposerOpeningForTicket({
-      nucleo: texto,
+  const handleApplyMacro = useCallback((macroHtml) => {
+    // macroHtml já é HTML rico (pode ter <a href> com links reais cadastrados na macro) — não
+    // pode passar por normalizePlainToHtml, que trataria as quebras de linha da saudação como
+    // texto puro; wrapComposerOpeningForTicketHtml já devolve a saudação em HTML (<br />).
+    const wrapped = wrapComposerOpeningForTicketHtml({
+      nucleoHtml: macroHtml,
       ticket,
       agentName: nomeOperador,
     });
@@ -747,6 +714,9 @@ export default function DeskComposePanel({
           embedded
           onImageSelected={handlePublicAttachImage}
           attachDisabled={publicLocked || ticketReadOnly}
+          beginLink={publicFormat.beginLink}
+          applyLink={publicFormat.applyLink}
+          removeLink={publicFormat.removeLink}
         />
       ) : (
         <ComposeFormatToolbar
@@ -756,6 +726,9 @@ export default function DeskComposePanel({
           embedded
           onImageSelected={handleInternalAttachImage}
           attachDisabled={internalLocked}
+          beginLink={internalFormatState?.beginLink}
+          applyLink={internalFormatState?.applyLink}
+          removeLink={internalFormatState?.removeLink}
         />
       )}
     />
@@ -849,6 +822,9 @@ export default function DeskComposePanel({
                         embedded
                         onImageSelected={handlePublicAttachImage}
                         attachDisabled={publicLocked || ticketReadOnly}
+                        beginLink={publicFormat.beginLink}
+                        applyLink={publicFormat.applyLink}
+                        removeLink={publicFormat.removeLink}
                       />
                     )}
                   />

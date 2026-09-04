@@ -25,6 +25,13 @@ export const CONFIG_SECTIONS = [
     icon: 'ti-shield-lock',
   },
   {
+    id: 'macros',
+    label: 'Macros',
+    menuDesc: 'Respostas rápidas do compose',
+    cardDesc: 'Crie e edite as macros do botão Macros no ticket',
+    icon: 'ti-message-2-bolt',
+  },
+  {
     id: 'email',
     label: 'E-mail',
     menuDesc: 'Remetentes, e-mails de saída e assinatura',

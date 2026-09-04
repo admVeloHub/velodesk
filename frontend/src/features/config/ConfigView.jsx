@@ -10,6 +10,7 @@ import TabulationFormsSection from './components/TabulationFormsSection';
 import FuncoesPermissoesSection from './funcoes/FuncoesPermissoesSection';
 import WorkflowsConfigSection from './workflow/WorkflowsConfigSection';
 import EmailConfigSection from './email/EmailConfigSection';
+import MacrosConfigSection from './macros/MacrosConfigSection';
 import ApiExternaConfigSection from './api/ApiExternaConfigSection';
 import TicketIaConfigSection from './ai/TicketIaConfigSection';
 import { usePermissions } from '../../context/PermissionContext';
@@ -101,6 +102,8 @@ export default function ConfigView() {
                 <WorkflowsConfigSection />
               ) : section === 'funcoes-permissoes' ? (
                 <FuncoesPermissoesSection />
+              ) : section === 'macros' ? (
+                <MacrosConfigSection />
               ) : section === 'email' ? (
                 <EmailConfigSection />
               ) : section === 'api' ? (
