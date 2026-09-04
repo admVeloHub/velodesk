@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { reclamacoesApi } from '../../../api/client';
 import { useNotifications } from '../../../context/NotificationContext';
 import { patchReclamacao } from '../../../services/especiais/reclameAquiStore';
+import { formatComplaintDate } from './raTicketFormatters';
 
 /** Converte ISO -> valor aceito por <input type="datetime-local"> (hora local). */
 function toDatetimeLocalInput(iso) {
@@ -15,20 +16,29 @@ function toDatetimeLocalInput(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** Só o cadastro manual permite corrigir a data — tickets do HugMe já trazem a data real da planilha. */
+function isManuallyCreatedRaTicket(raItem) {
+  return raItem?.origemEntrada === 'reclamacoes-manual';
+}
+
 export default function RaDadosEditableFields({ raItem, onSaved }) {
   const { showNotification } = useNotifications();
   const [saving, setSaving] = useState(false);
   const [idReclamacaoRa, setIdReclamacaoRa] = useState(raItem?.idReclamacaoRa || '');
   const [assunto, setAssunto] = useState(raItem?.assunto || '');
   const [prazoRa, setPrazoRa] = useState(raItem?.prazoRa || '');
+  const [dataReclamacao, setDataReclamacao] = useState(raItem?.dataReclamacao || '');
 
   useEffect(() => {
     setIdReclamacaoRa(raItem?.idReclamacaoRa || '');
     setAssunto(raItem?.assunto || '');
     setPrazoRa(raItem?.prazoRa || '');
+    setDataReclamacao(raItem?.dataReclamacao || '');
   }, [raItem?.id]);
 
   if (!raItem) return null;
+
+  const manual = isManuallyCreatedRaTicket(raItem);
 
   const patchFields = async (patch) => {
     if (!raItem?.id || saving) return;
@@ -66,47 +76,79 @@ export default function RaDadosEditableFields({ raItem, onSaved }) {
     patchFields({ prazoLegal: iso || null });
   };
 
+  const handleDataReclamacaoChange = (raw) => {
+    const iso = raw ? new Date(raw).toISOString() : '';
+    setDataReclamacao(iso);
+    patchFields({ dataReclamacao: iso || null });
+  };
+
   return (
     <>
+      {manual ? (
+        <div>
+          <dt>Data da reclamação</dt>
+          <dd>
+            <input
+              type="datetime-local"
+              className="ra-registro__input"
+              value={toDatetimeLocalInput(dataReclamacao)}
+              onChange={(e) => handleDataReclamacaoChange(e.target.value)}
+              disabled={saving}
+            />
+          </dd>
+        </div>
+      ) : null}
       <div>
         <dt>ID Reclame Aqui</dt>
-        <dd>
-          <input
-            type="text"
-            className="ra-registro__input"
-            value={idReclamacaoRa}
-            onChange={(e) => setIdReclamacaoRa(e.target.value)}
-            onBlur={handleIdBlur}
-            disabled={saving}
-            placeholder="ID da reclamação"
-          />
-        </dd>
+        {manual ? (
+          <dd>
+            <input
+              type="text"
+              className="ra-registro__input"
+              value={idReclamacaoRa}
+              onChange={(e) => setIdReclamacaoRa(e.target.value)}
+              onBlur={handleIdBlur}
+              disabled={saving}
+              placeholder="ID da reclamação"
+            />
+          </dd>
+        ) : (
+          <dd>{raItem.idReclamacaoRa || '—'}</dd>
+        )}
       </div>
       <div>
         <dt>Assunto</dt>
-        <dd>
-          <input
-            type="text"
-            className="ra-registro__input"
-            value={assunto}
-            onChange={(e) => setAssunto(e.target.value)}
-            onBlur={handleAssuntoBlur}
-            disabled={saving}
-            placeholder="Assunto da reclamação"
-          />
-        </dd>
+        {manual ? (
+          <dd>
+            <input
+              type="text"
+              className="ra-registro__input"
+              value={assunto}
+              onChange={(e) => setAssunto(e.target.value)}
+              onBlur={handleAssuntoBlur}
+              disabled={saving}
+              placeholder="Assunto da reclamação"
+            />
+          </dd>
+        ) : (
+          <dd>{raItem.assunto || '—'}</dd>
+        )}
       </div>
       <div>
         <dt>Prazo de resposta</dt>
-        <dd>
-          <input
-            type="datetime-local"
-            className="ra-registro__input"
-            value={toDatetimeLocalInput(prazoRa)}
-            onChange={(e) => handlePrazoChange(e.target.value)}
-            disabled={saving}
-          />
-        </dd>
+        {manual ? (
+          <dd>
+            <input
+              type="datetime-local"
+              className="ra-registro__input"
+              value={toDatetimeLocalInput(prazoRa)}
+              onChange={(e) => handlePrazoChange(e.target.value)}
+              disabled={saving}
+            />
+          </dd>
+        ) : (
+          <dd>{formatComplaintDate(raItem.prazoRa)}</dd>
+        )}
       </div>
     </>
   );

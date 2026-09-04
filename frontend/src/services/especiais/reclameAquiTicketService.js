@@ -260,6 +260,19 @@ export function getRaThreadMessages(ticket, raItem) {
   });
 }
 
+/** true assim que o agente enviar a 1ª mensagem ao cliente (reclamação original do RA não conta). */
+export function raTicketHasAgentReply(ticket, raItem) {
+  return getRaThreadMessages(ticket, raItem).some((msg) => !msg.fromClient);
+}
+
+/** Saudação inicial padrão do time de Reclame Aqui, com os dados do ticket já preenchidos. */
+export function buildRaInitialGreetingMessage({ clientName, agentName, complaintId }) {
+  const nome = String(clientName || '').trim() || 'cliente';
+  const agente = String(agentName || '').trim() || 'Atendimento Velotax';
+  const id = String(complaintId || '').trim() || '—';
+  return `Olá, ${nome}. Tudo bem?\n\nMe chamo ${agente} e sou especialista no atendimento do Reclame Aqui, no Velotax. O motivo do meu contato é referente ao apontamento ID:${id}\n\nVerifiquei a sua solicitação, podemos conversar por aqui?`;
+}
+
 export function formatRaDeadlineLabel(iso) {
   if (!iso) return '—';
   const diff = new Date(iso).getTime() - Date.now();

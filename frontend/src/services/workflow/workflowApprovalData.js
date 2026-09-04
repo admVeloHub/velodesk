@@ -21,7 +21,7 @@ import {
   agentCanDecideTicket as permAgentCanDecide,
   canApproveWorkflow,
 } from '../permissions/permissionService';
-import { ticketAwaitingProdutosComunicacaoReview } from './workflowDecisionHandlers';
+import { ticketAwaitingProdutosComunicacaoReview, ticketAwaitingResponsavelReply } from './workflowDecisionHandlers';
 import {
   getWorkflowTeamQueueMeta,
   isTeamStepActive,
@@ -712,6 +712,7 @@ function buildQueueItem(entry, teamId = null) {
       teamStepActive: false,
       queueStatus: 'aguardando',
       awaitingComunicacaoReply: ticketAwaitingProdutosComunicacaoReview(ticket),
+      awaitingResponsavelReply: ticketAwaitingResponsavelReply(ticket),
     };
   }
 
@@ -761,6 +762,7 @@ function buildQueueItem(entry, teamId = null) {
         ? 'etapa-ativa'
         : 'aguardando',
     awaitingComunicacaoReply: ticketAwaitingProdutosComunicacaoReview(ticket),
+    awaitingResponsavelReply: ticketAwaitingResponsavelReply(ticket),
   };
 }
 

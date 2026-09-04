@@ -22,6 +22,7 @@ export default function RaTicketSide({
   finalized = false,
   onClassificacaoDraftChange,
   onRaItemUpdated,
+  initialMessagePrompt = null,
 }) {
   if (!raItem) return null;
 
@@ -35,18 +36,12 @@ export default function RaTicketSide({
           </span>
           <dl>
             <RaDadosEditableFields raItem={raItem} onSaved={onRaItemUpdated} />
-            <div>
-              <dt>Produto</dt>
-              <dd>{raItem.produto || '—'}</dd>
-            </div>
-            <div>
-              <dt>Motivo</dt>
-              <dd>{raItem.motivo || '—'}</dd>
-            </div>
-            <div>
-              <dt>Data da reclamação</dt>
-              <dd>{formatComplaintDate(raItem.dataReclamacao)}</dd>
-            </div>
+            {raItem.origemEntrada !== 'reclamacoes-manual' ? (
+              <div>
+                <dt>Data da reclamação</dt>
+                <dd>{formatComplaintDate(raItem.dataReclamacao)}</dd>
+              </div>
+            ) : null}
             {raItem.workflowAtivo ? (
               <div>
                 <dt>Workflow</dt>
@@ -75,6 +70,7 @@ export default function RaTicketSide({
           saving={saving}
           disabled={disabled}
           finalized={finalized}
+          initialMessagePrompt={initialMessagePrompt}
         />
       </div>
     </aside>

@@ -254,6 +254,20 @@ export function ticketAwaitingProdutosComunicacaoReview(ticket) {
   return true;
 }
 
+/**
+ * true quando o time de workflow pediu mais informação (última mensagem da comunicação é
+ * dele) e ainda não recebeu resposta do responsável do ticket — ticket cai na área
+ * "Pendentes" da fila e sai de lá sozinho assim que o responsável responder.
+ */
+export function ticketAwaitingResponsavelReply(ticket) {
+  if (!ticket?.workflow?.active) return false;
+  if (ticket.workflow?.completedAt) return false;
+  const lfStatus = ticket?.lateralForm?.workflow?.status;
+  if (lfStatus === 'completed') return false;
+  const resumo = resolveComunicacaoResumo(ticket);
+  return resumo.ultimaOrigem === 'workflow';
+}
+
 function readComunicacaoFromRegistro(ticket) {
   const rows = ticket?.registroHistorico || ticket?.registro || [];
   if (!Array.isArray(rows) || !rows.length) return [];

@@ -11,6 +11,7 @@ export default function WorkflowApprovalQueueItem({ item, active, onSelect }) {
           'wf-approval-queue-item'
           + (active ? ' is-active' : '')
           + (item.awaitingComunicacaoReply ? ' is-awaiting-reply' : '')
+          + (item.awaitingResponsavelReply ? ' is-pending-responsavel' : '')
         }
         onClick={onSelect}
       >
@@ -30,6 +31,12 @@ export default function WorkflowApprovalQueueItem({ item, active, onSelect }) {
             <span className="wf-approval-badge wf-approval-badge--comunicacao">
               <i className="ti ti-message-circle" aria-hidden="true" />
               Aguardando resposta
+            </span>
+          ) : null}
+          {item.awaitingResponsavelReply ? (
+            <span className="wf-approval-badge wf-approval-badge--pending-responsavel">
+              <i className="ti ti-hourglass" aria-hidden="true" />
+              Aguardando responsável
             </span>
           ) : null}
           {item.urgencyBadge?.tone === 'critical' ? (

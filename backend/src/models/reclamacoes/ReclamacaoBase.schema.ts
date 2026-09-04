@@ -55,6 +55,7 @@ export interface IReclamacao extends Document {
   tipo?: string;
   motivo?: string;
   statusCanal: string;
+  dataReclamacao?: Date;
   prazoLegal?: Date;
   slaPct?: number;
   orgaoInstituicao?: string;
@@ -141,6 +142,7 @@ export const ReclamacaoBaseSchema = new Schema<IReclamacao>(
     tipo: { type: String, default: '' },
     motivo: { type: String, default: '' },
     statusCanal: { type: String, default: 'nao-respondida' },
+    dataReclamacao: { type: Date, default: undefined },
     prazoLegal: { type: Date, default: undefined },
     slaPct: { type: Number, default: undefined },
     orgaoInstituicao: { type: String, default: '' },

@@ -6387,11 +6387,53 @@ body.desk-v2-mode #aiChatbotModal {
 }
 
 .wf-approval-queue__list {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+}
+
+.wf-approval-queue__sublist {
     list-style: none;
     margin: 0;
     padding: 8px;
     overflow-y: auto;
+    min-height: 0;
+}
+
+.wf-approval-queue__sublist--main {
+    flex: 2;
+}
+
+.wf-approval-queue__sublist--pending {
     flex: 1;
+    background: #FAF8FF;
+}
+
+.wf-approval-queue__divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    flex-shrink: 0;
+    background: #FAF8FF;
+    border-top: 1px solid #E4E6EA;
+    border-bottom: 1px solid #ECE4FC;
+}
+
+.wf-approval-queue__divider-line {
+    flex: 1;
+    height: 1px;
+    background: #E4D9FA;
+}
+
+.wf-approval-queue__divider-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6D28D9;
+    white-space: nowrap;
 }
 
 .wf-approval-queue__empty {
@@ -6427,6 +6469,20 @@ body.desk-v2-mode #aiChatbotModal {
 .wf-approval-queue-item.is-awaiting-reply {
     border-left-color: #7C3AED;
     box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.15);
+}
+
+.wf-approval-queue-item.is-pending-responsavel {
+    border-left-color: #D97706;
+}
+
+.wf-approval-badge--pending-responsavel {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #FEF3C7;
+    color: #92400E;
+    text-transform: none;
+    letter-spacing: normal;
 }
 
 .wf-approval-queue-item__top {
@@ -7230,9 +7286,8 @@ body.desk-v2-mode #aiChatbotModal {
     position: sticky;
     bottom: 0;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    flex-direction: column;
+    gap: 10px;
     padding: 12px 20px;
     margin: auto -20px 0;
     flex-shrink: 0;
@@ -7240,6 +7295,72 @@ body.desk-v2-mode #aiChatbotModal {
     border-top: 1px solid var(--wf-border, #e5e7eb);
     backdrop-filter: blur(6px);
     z-index: 3;
+}
+
+.wf-approval-footer__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+}
+
+.wf-approval-footer--produtos .wf-approval-footer__row {
+    justify-content: flex-end;
+}
+
+.wf-approval-footer__pending-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    border-radius: 10px;
+}
+
+.wf-approval-footer__pending-form textarea {
+    min-height: 44px;
+    max-height: 100px;
+    resize: vertical;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    line-height: 1.4;
+}
+
+.wf-approval-footer__pending-form textarea:focus {
+    outline: none;
+    border-color: #D97706;
+    box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15);
+}
+
+.wf-approval-footer__pending-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.wf-approval-btn--pending {
+    background: #FEF3C7;
+    color: #92400E;
+    border-color: #FDE68A;
+}
+
+.wf-approval-btn--pending:hover:not(:disabled) {
+    background: #FDE68A;
+}
+
+.wf-approval-btn--ghost {
+    background: transparent;
+    color: #6b7280;
+    border-color: #E5E7EB;
+}
+
+.wf-approval-btn--ghost:hover:not(:disabled) {
+    background: #F3F4F6;
 }
 
 .wf-approval-footer__hint {
@@ -12716,6 +12837,56 @@ label[for$="-classificacao-motivo"] {
 
 #especiais-reclame-aqui .ra-ticket__side-footer .ra-ticket__finalize-btn , #especiais-procon .ra-ticket__side-footer .ra-ticket__finalize-btn, #especiais-consumidor-gov .ra-ticket__side-footer .ra-ticket__finalize-btn, #especiais-bacen .ra-ticket__side-footer .ra-ticket__finalize-btn {
     margin-top: 0;
+}
+
+#especiais-reclame-aqui .especiais-initial-message-prompt, #especiais-procon .especiais-initial-message-prompt, #especiais-consumidor-gov .especiais-initial-message-prompt, #especiais-bacen .especiais-initial-message-prompt {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem 0.6rem;
+    background: #F3F4F8;
+    border: 1px solid #E4E6EA;
+    border-radius: 8px;
+}
+
+#especiais-reclame-aqui .especiais-initial-message-prompt__label, #especiais-procon .especiais-initial-message-prompt__label, #especiais-consumidor-gov .especiais-initial-message-prompt__label, #especiais-bacen .especiais-initial-message-prompt__label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #000058;
+}
+
+#especiais-reclame-aqui .especiais-initial-message-prompt__options, #especiais-procon .especiais-initial-message-prompt__options, #especiais-consumidor-gov .especiais-initial-message-prompt__options, #especiais-bacen .especiais-initial-message-prompt__options {
+    display: flex;
+    gap: 0.4rem;
+}
+
+#especiais-reclame-aqui .especiais-initial-message-prompt__btn, #especiais-procon .especiais-initial-message-prompt__btn, #especiais-consumidor-gov .especiais-initial-message-prompt__btn, #especiais-bacen .especiais-initial-message-prompt__btn {
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1.5px solid #cbd5e1;
+    background: #fff;
+    color: #475569;
+}
+
+#especiais-reclame-aqui .especiais-initial-message-prompt__btn:disabled, #especiais-procon .especiais-initial-message-prompt__btn:disabled, #especiais-consumidor-gov .especiais-initial-message-prompt__btn:disabled, #especiais-bacen .especiais-initial-message-prompt__btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+#especiais-reclame-aqui .especiais-initial-message-prompt__btn--yes:hover:not(:disabled), #especiais-procon .especiais-initial-message-prompt__btn--yes:hover:not(:disabled), #especiais-consumidor-gov .especiais-initial-message-prompt__btn--yes:hover:not(:disabled), #especiais-bacen .especiais-initial-message-prompt__btn--yes:hover:not(:disabled) {
+    border-color: #15A237;
+    color: #15A237;
+    background: #E8F5E9;
+}
+
+#especiais-reclame-aqui .especiais-initial-message-prompt__btn--no:hover:not(:disabled), #especiais-procon .especiais-initial-message-prompt__btn--no:hover:not(:disabled), #especiais-consumidor-gov .especiais-initial-message-prompt__btn--no:hover:not(:disabled), #especiais-bacen .especiais-initial-message-prompt__btn--no:hover:not(:disabled) {
+    border-color: #D92D20;
+    color: #D92D20;
+    background: #FEF2F2;
 }
 
 #especiais-reclame-aqui .rp-footer-btn , #especiais-procon .rp-footer-btn, #especiais-consumidor-gov .rp-footer-btn, #especiais-bacen .rp-footer-btn {

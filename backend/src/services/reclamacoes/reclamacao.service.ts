@@ -686,6 +686,7 @@ export function reclamacaoToPortalDto(doc: IReclamacao): Record<string, unknown>
     ticketId: String(doc.chamadoId),
     chamadoProtocolo: doc.chamadoProtocolo,
     orgao: doc.orgao,
+    origemEntrada: doc.origemEntrada,
     consumidor: doc.consumidor,
     iniciais: computeIniciais(doc.consumidor),
     cpf: doc.cpf,
@@ -696,6 +697,7 @@ export function reclamacaoToPortalDto(doc: IReclamacao): Record<string, unknown>
     produto: doc.produto,
     tipo: doc.tipo,
     motivo: doc.motivo,
+    dataReclamacao: doc.dataReclamacao,
     statusCanal: doc.statusCanal,
     statusPc: meta.statusPc ?? (doc.orgao === 'procon' ? doc.statusCanal : undefined),
     statusGov: meta.statusGov ?? (doc.orgao === 'consumidor_gov' ? doc.statusCanal : undefined),
@@ -756,6 +758,7 @@ export async function patchReclamacao(
   const scalarFields = [
     'statusCanal', 'prazoLegal', 'atendente', 'responsavel', 'aberta',
     'protocoloExterno', 'idDemandaExterna', 'slaPct', 'motivo', 'produto', 'assunto',
+    'dataReclamacao',
   ] as const;
 
   for (const key of scalarFields) {

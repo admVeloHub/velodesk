@@ -73,6 +73,7 @@ export default function WorkflowApprovalDetail({
         onFeito={handleFeito}
         onApprove={onApprove}
         onReject={onReject}
+        onMarkPending={onRequestInfoSubmit}
       />
     </section>
   );

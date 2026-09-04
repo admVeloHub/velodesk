@@ -8,7 +8,15 @@ import { useNotifications } from '../../../context/NotificationContext';
 import { useRaNovaReclamacaoModals } from '../../../hooks/useRaNovaReclamacaoModals';
 import { RA_GROUPS } from '../../../services/especiais/reclameAquiData';
 import { loadReclamacoes, searchReclamacoesFromApi, RA_LIST_PAGE_SIZE } from '../../../services/especiais/reclameAquiStore';
-import { fetchRaTicketView, loadReclameAquiTicketsFromApi } from '../../../services/especiais/reclameAquiTicketService';
+import {
+  buildRaInitialGreetingMessage,
+  fetchRaTicketView,
+  loadReclameAquiTicketsFromApi,
+  raTicketHasAgentReply,
+  sendRaWaMessage,
+} from '../../../services/especiais/reclameAquiTicketService';
+import { isRaInitialMessageAnswered, markRaInitialMessageAnswered } from '../../../services/especiais/raInitialMessagePrompt';
+import { getAgentName } from '../../../services/clientDb';
 import { useEspeciaisTicketCommit } from '../shared/useEspeciaisTicketCommit';
 import { useEspeciaisDualSearch } from '../shared/useEspeciaisDualSearch';
 import RaQueuePanel from './RaQueuePanel';
@@ -75,6 +83,8 @@ export default function ReclameAquiCrmRoot() {
   const [internalText, setInternalText] = useState('');
   const [composeAttachments, setComposeAttachments] = useState([]);
   const [classificacaoDraft, setClassificacaoDraft] = useState({ produto: '', motivo: '' });
+  const [initialMessageBusy, setInitialMessageBusy] = useState(false);
+  const [initialMessageAnsweredLocally, setInitialMessageAnsweredLocally] = useState(false);
 
   const allItems = useMemo(() => {
     if (isRemoteSearch && remoteItems) return remoteItems;
@@ -170,6 +180,7 @@ export default function ReclameAquiCrmRoot() {
     setInternalText('');
     setComposeAttachments([]);
     setClassificacaoDraft({ produto: '', motivo: '' });
+    setInitialMessageAnsweredLocally(false);
   }, [id]);
 
   const composeSession = useMemo(() => ({
@@ -231,6 +242,40 @@ export default function ReclameAquiCrmRoot() {
     if (updatedRaItem) setRaItem(updatedRaItem);
     setListVersion((v) => v + 1);
   }, []);
+
+  const showInitialMessagePrompt = Boolean(raItem?.ticketId)
+    && !initialMessageAnsweredLocally
+    && !isRaInitialMessageAnswered(raItem?.ticketId)
+    && !raTicketHasAgentReply(ticket, raItem);
+
+  const handleInitialMessageChoice = useCallback(async (choice) => {
+    const ticketId = raItem?.ticketId;
+    if (!ticketId) return;
+
+    if (choice !== 'yes') {
+      markRaInitialMessageAnswered(ticketId);
+      setInitialMessageAnsweredLocally(true);
+      return;
+    }
+
+    setInitialMessageBusy(true);
+    try {
+      const text = buildRaInitialGreetingMessage({
+        clientName: raItem?.consumidor,
+        agentName: getAgentName(),
+        complaintId: raItem?.idReclamacaoRa,
+      });
+      const updated = await sendRaWaMessage(ticketId, text);
+      if (updated) setTicket(updated);
+      markRaInitialMessageAnswered(ticketId);
+      setInitialMessageAnsweredLocally(true);
+      showNotification('Mensagem inicial enviada ao cliente.', 'success');
+    } catch {
+      showNotification('Não foi possível enviar a mensagem.', 'error');
+    } finally {
+      setInitialMessageBusy(false);
+    }
+  }, [raItem?.ticketId, raItem?.consumidor, raItem?.idReclamacaoRa, showNotification]);
 
   const handleClassificacaoDraftChange = useCallback((draft) => {
     setClassificacaoDraft(draft);
@@ -331,6 +376,9 @@ export default function ReclameAquiCrmRoot() {
         disabled={readOnly || finalized}
         finalized={finalized}
         onClassificacaoDraftChange={handleClassificacaoDraftChange}
+        initialMessagePrompt={showInitialMessagePrompt
+          ? { onChoose: handleInitialMessageChoice, busy: initialMessageBusy }
+          : null}
       />
 
       {novaModals}
