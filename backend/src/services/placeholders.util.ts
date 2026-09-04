@@ -24,42 +24,61 @@ export interface PlaceholderCatalogItem {
   aliases: RegExp[];
 }
 
+/**
+ * Gera as variantes de um mesmo nome de placeholder nos 3 formatos já vistos em conteúdo
+ * salvo: {{duplo}}, [colchete] e {simples} — nessa ordem, porque {simples} bate como
+ * substring dentro de {{duplo}} (a regex de chave simples casaria só o miolo e deixaria uma
+ * chave sobrando de cada lado); rodando a variante de duplo/colchete primeiro, ela consome o
+ * token inteiro antes que a de chave simples tenha chance de casar parcialmente.
+ */
+function placeholderAliases(...names: string[]): RegExp[] {
+  const aliases: RegExp[] = [];
+  for (const name of names) {
+    aliases.push(new RegExp(`\\{\\{${name}\\}\\}`, 'gi'));
+    aliases.push(new RegExp(`\\[${name}\\]`, 'gi'));
+  }
+  for (const name of names) {
+    aliases.push(new RegExp(`\\{${name}\\}`, 'gi'));
+  }
+  return aliases;
+}
+
 export const PLACEHOLDER_CATALOG: PlaceholderCatalogItem[] = [
   {
     key: 'nomeCliente',
     token: '{nomeCliente}',
     label: 'Nome do cliente',
-    aliases: [/\{client_name\}/gi, /\{nome_cliente\}/gi, /\{nomeCliente\}/gi, /\{cliente\}/gi, /\{nome\}/gi],
+    aliases: placeholderAliases('client_name', 'nome_cliente', 'nomeCliente', 'cliente', 'nome'),
   },
   {
     key: 'nomeAgente',
     token: '{nomeAgente}',
     label: 'Nome do agente responsável',
-    aliases: [/\{nomeAgente\}/gi, /\{nome_agente\}/gi, /\{agente\}/gi],
+    aliases: placeholderAliases('nomeAgente', 'nome_agente', 'agente'),
   },
   {
     key: 'numeroTicket',
     token: '{numeroTicket}',
     label: 'Número do ticket',
-    aliases: [/\{numeroTicket\}/gi, /\{numero_ticket\}/gi, /\{protocolo\}/gi],
+    aliases: placeholderAliases('numeroTicket', 'numero_ticket', 'protocolo'),
   },
   {
     key: 'produtoTicket',
     token: '{produtoTicket}',
     label: 'Produto do ticket',
-    aliases: [/\{produtoTicket\}/gi, /\{produto_ticket\}/gi, /\{produto\}/gi],
+    aliases: placeholderAliases('produtoTicket', 'produto_ticket', 'produto'),
   },
   {
     key: 'dataAbertura',
     token: '{dataAbertura}',
     label: 'Data de abertura do ticket',
-    aliases: [/\{dataAbertura\}/gi, /\{data_abertura\}/gi],
+    aliases: placeholderAliases('dataAbertura', 'data_abertura'),
   },
   {
     key: 'dataAtual',
     token: '{dataAtual}',
     label: 'Data atual',
-    aliases: [/\{dataAtual\}/gi, /\{data_atual\}/gi],
+    aliases: placeholderAliases('dataAtual', 'data_atual'),
   },
 ];
 
