@@ -5,7 +5,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { composeMarkupToSafeHtml, composeTextHasFormatting } from '../../../services/desk/composeFormatPreview';
 import { normalizeMessageHtmlForDisplay } from '../../../services/desk/composeRichEditor';
-import { shouldHideWorkflowSystemThreadMessage } from '../../../services/desk/utils';
+import {
+  isClienteRespondeuRead,
+  isClienteRespondeuTicket,
+  markClienteRespondeuRead,
+  markClienteRespondeuUnread,
+  shouldHideWorkflowSystemThreadMessage,
+} from '../../../services/desk/utils';
+import { ticketAssignedToCurrentAgent } from '../../../services/desk/responsavelSegmentation';
 import { normalizeMessageDisplayText } from '../../../utils/htmlText.util';
 import {
   attachmentKindIcon,
@@ -176,6 +183,41 @@ function MessageBubbleText({ text, attachments, scanStatuses, messageOrigin, mes
   );
 }
 
+function ClientReplyReadToggle({ ticket }) {
+  const [isRead, setIsRead] = useState(() => isClienteRespondeuRead(ticket));
+
+  useEffect(() => {
+    setIsRead(isClienteRespondeuRead(ticket));
+  }, [ticket?.id, ticket?.status]);
+
+  const handleMark = (read) => {
+    if (read) markClienteRespondeuRead(ticket);
+    else markClienteRespondeuUnread(ticket);
+    setIsRead(read);
+  };
+
+  return (
+    <div className="msg-client-read-toggle" role="group" aria-label="Marcar resposta do cliente como lida ou não lida">
+      <button
+        type="button"
+        className={'msg-client-read-toggle__btn' + (!isRead ? ' is-active' : '')}
+        aria-pressed={!isRead}
+        onClick={() => handleMark(false)}
+      >
+        Não lido
+      </button>
+      <button
+        type="button"
+        className={'msg-client-read-toggle__btn' + (isRead ? ' is-active' : '')}
+        aria-pressed={isRead}
+        onClick={() => handleMark(true)}
+      >
+        Lido
+      </button>
+    </div>
+  );
+}
+
 function formatWaBalloonTime(timestamp) {
   if (!timestamp) return '';
   return formatDateTimeBr(timestamp, { year: false });
@@ -235,6 +277,11 @@ export default function DeskConversation({
   const [iaVisible, setIaVisible] = useState(true);
   const lastIaReplyRef = useRef('');
   const thread = messages || [];
+  let lastRealMessageIndex = -1;
+  thread.forEach((m, idx) => {
+    if (m.type !== 'system' && m.type !== 'whatsapp-thread') lastRealMessageIndex = idx;
+  });
+  const showClientReadToggle = isClienteRespondeuTicket(ticket) && ticketAssignedToCurrentAgent(ticket);
 
   useEffect(() => {
     setIaVisible(true);
@@ -296,6 +343,7 @@ export default function DeskConversation({
             );
           }
           const isRight = msg.type === 'agent' || msg.type === 'internal';
+          const isLastClientReply = i === lastRealMessageIndex && msg.type === 'client';
           return (
           <div key={i} className={'msg-row' + (isRight ? ' msg-row--agent' : '')}>
             <div className={'msg-avatar msg-avatar--' + (msg.type === 'internal' ? 'agent' : msg.type)}>{msg.initials || '?'}</div>
@@ -305,6 +353,9 @@ export default function DeskConversation({
               </div>
               <div className="msg-meta">{msg.meta}</div>
             </div>
+            {isLastClientReply && showClientReadToggle ? (
+              <ClientReplyReadToggle ticket={ticket} />
+            ) : null}
           </div>
           );
         })
